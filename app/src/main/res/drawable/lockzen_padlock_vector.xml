@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 1. Padlock Shackle (Silver Translucent Arch) -->
+    <path
+        android:pathData="M 38,46 V 32 C 38,23.16 45.16,16 54,16 C 62.84,16 70,23.16 70,32 V 46"
+        android:strokeWidth="7"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="38"
+                android:startY="16"
+                android:endX="70"
+                android:endY="46"
+                android:type="linear">
+                <item android:color="#F8FAFC" android:offset="0.0" />
+                <item android:color="#CBD5E1" android:offset="0.5" />
+                <item android:color="#64748B" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Shackle Inner Specular Highlight -->
+    <path
+        android:pathData="M 40,44 V 32 C 40,24.27 46.27,18 54,18 C 61.73,18 68,24.27 68,32 V 44"
+        android:strokeWidth="2"
+        android:strokeColor="#80FFFFFF"
+        android:strokeLineCap="round" />
+
+    <!-- 2. Neon Green Radial Glow behind Glass Body -->
+    <path
+        android:pathData="M 34,68 A 20,20 0 1,0 74,68 A 20,20 0 1,0 34,68 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="54"
+                android:centerY="68"
+                android:gradientRadius="22"
+                android:type="radial">
+                <item android:color="#E08CFF00" android:offset="0.0" />
+                <item android:color="#80A6EB38" android:offset="0.4" />
+                <item android:color="#2055CC00" android:offset="0.75" />
+                <item android:color="#00000000" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 3. Glassmorphic Shield Lock Body (Fill) -->
+    <path
+        android:pathData="M 31,43 H 77 C 81.42,43 85,46.58 85,51 V 66 C 85,80 70,92 54,96 C 38,92 23,80 23,66 V 51 C 23,46.58 26.58,43 31,43 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="23"
+                android:startY="43"
+                android:endX="85"
+                android:endY="96"
+                android:type="linear">
+                <item android:color="#40FFFFFF" android:offset="0.0" />
+                <item android:color="#1AFFFFFF" android:offset="0.5" />
+                <item android:color="#0D000000" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 4. Glassmorphic Shield Lock Body (Frosted Glass Border Stroke) -->
+    <path
+        android:pathData="M 31,43 H 77 C 81.42,43 85,46.58 85,51 V 66 C 85,80 70,92 54,96 C 38,92 23,80 23,66 V 51 C 23,46.58 26.58,43 31,43 Z"
+        android:strokeWidth="1.8">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="23"
+                android:startY="43"
+                android:endX="85"
+                android:endY="96"
+                android:type="linear">
+                <item android:color="#CCFFFFFF" android:offset="0.0" />
+                <item android:color="#40FFFFFF" android:offset="0.4" />
+                <item android:color="#80A6EB38" android:offset="0.8" />
+                <item android:color="#20FFFFFF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 5. Neon Keyhole Core (Circle + Slot) -->
+    <!-- Keyhole Circle -->
+    <path
+        android:pathData="M 54,58 A 5.5,5.5 0 1,0 54,69 A 5.5,5.5 0 1,0 54,58 Z"
+        android:fillColor="#8CFF00" />
+
+    <!-- Keyhole Trapezoid Slot -->
+    <path
+        android:pathData="M 51,64.5 H 57 L 59.5,76 H 48.5 Z"
+        android:fillColor="#8CFF00" />
+
+    <!-- Inner Keyhole Glow Core -->
+    <path
+        android:pathData="M 54,60 A 3.5,3.5 0 1,0 54,67 A 3.5,3.5 0 1,0 54,60 Z"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M 52,65 H 56 L 58,74.5 H 50 Z"
+        android:fillColor="#FFFFFF" />
+
+</vector>

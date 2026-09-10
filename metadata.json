@@ -1,0 +1,6 @@
+{
+  "name": "Focivo",
+  "description": "Focivo: Study Timer for Focus with strict app blocking, aurora timer, study scheduler, analytics, and friend leaderboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

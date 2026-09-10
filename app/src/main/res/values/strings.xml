@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Focivo</string>
+    <string name="accessibility_service_description">Focivo AI Study Guard analyzes on-screen text solely within Claude and ChatGPT directly on your device to help maintain study discipline. No text is ever saved or shared off-device.</string>
+</resources>

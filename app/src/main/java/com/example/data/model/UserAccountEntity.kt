@@ -1,0 +1,32 @@
+package com.example.data.model
+
+data class UserAccountEntity(
+    val id: Long = 0,
+    val email: String = "",
+    val passwordHash: String = "",
+    val fullName: String = "",
+    val primaryGoal: String = "",
+    val focusStyle: String = "Deep Work (50m)",
+    val dailyTargetHours: Int = 4,
+    val peakProductivityTime: String = "Morning (8 AM - 12 PM)",
+    val primaryDistraction: String = "Smartphone & Social Media",
+    val soundPreference: String = "Silent",
+    val firebaseUid: String = "",
+    val photoUrl: String? = null,
+    val isGoogleUser: Boolean = false,
+    val isEmailVerified: Boolean = false,
+    val studentAge: Int = 16,
+    val studentClass: String = "Class 11",
+    val studentStream: String = "Science (PCM)",
+    val studySchedule: String = "6:00 PM – 10:00 PM",
+    val mobileBreakTime: String = "8:00 PM – 8:30 PM",
+    val studentClassLevel: String = "Class 11",
+    val isBoardExamYear: Boolean = false,
+    val dailyScreenTimeGoalMinutes: Int = 480,
+    val primaryStudyGoal: String = "Build daily habit",
+    val biggestDistractionApp: String = "Instagram Reels",
+    val preferredStudyTimeWindow: String = "Evening",
+    val motivationStyle: String = "Streaks",
+    val hasCompletedIntakeSurvey: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
+)
