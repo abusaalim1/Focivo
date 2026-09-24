@@ -76,7 +76,7 @@ class FirebaseAuthManager private constructor(private val context: Context) {
         _authError.value = null
         val email = "local.google.student@gmail.com"
         val displayName = "Google Scholar"
-        val safeUid = "google_${Math.abs(email.hashCode())}"
+        val safeUid = java.util.UUID.nameUUIDFromBytes("google_$email".toByteArray()).toString()
         val user = FirebaseUser(
             uid = safeUid,
             email = email,
@@ -105,7 +105,8 @@ class FirebaseAuthManager private constructor(private val context: Context) {
         _isAuthLoading.value = true
         _authError.value = null
         val cleanEmail = email.trim().lowercase()
-        val safeUid = "google_${Math.abs(cleanEmail.hashCode())}"
+        // Generate a deterministic valid UUID from the email
+        val safeUid = java.util.UUID.nameUUIDFromBytes("google_$cleanEmail".toByteArray()).toString()
 
         val user = FirebaseUser(
             uid = safeUid,
@@ -209,9 +210,8 @@ class FirebaseAuthManager private constructor(private val context: Context) {
         _isAuthLoading.value = true
         _authError.value = null
 
-        val guestNum = (System.currentTimeMillis() % 100000).toString()
-        val safeUid = "guest_$guestNum"
-        val cleanEmail = "guest_$guestNum@focusly.app"
+        val safeUid = java.util.UUID.randomUUID().toString()
+        val cleanEmail = "guest_${safeUid.take(8)}@focusly.app"
         val displayName = "Guest Deep Worker"
 
         val user = FirebaseUser(
@@ -234,10 +234,12 @@ class FirebaseAuthManager private constructor(private val context: Context) {
         )
     }
 
-    fun signOut() {
+    suspend fun signOut() = kotlinx.coroutines.withContext(Dispatchers.IO) {
         _currentUser.value = null
-        CoroutineScope(Dispatchers.IO).launch {
+        try {
             SupabaseService.getInstance().signOut()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error during Supabase signOut: ${e.message}")
         }
     }
 }

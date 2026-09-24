@@ -43,19 +43,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
-import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 import kotlin.math.cos
 import kotlin.math.sin
 
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.rotate
 
 @Composable
 fun RegainStudyDial(
@@ -85,7 +88,7 @@ fun RegainStudyDial(
         label = "pulse_glow"
     )
 
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
     val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
 
@@ -102,13 +105,13 @@ fun RegainStudyDial(
             val centerOffset = Offset(this.size.width / 2f, this.size.height / 2f)
             val radius = (this.size.width - 36.dp.toPx()) / 2f
 
-            // 1. Ambient outer background radial aura (White + Lime)
+            // 1. Ambient outer background radial aura (Subtle Aurora Glow, no harsh white blob)
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = pulseGlow * 0.22f),
-                        RegainLimePrimary.copy(alpha = pulseGlow * 0.28f),
-                        RegainLimeLight.copy(alpha = pulseGlow * 0.12f),
+                        (if (isDark) RegainLimePrimary.copy(alpha = pulseGlow * 0.25f) else RegainLimePrimary.copy(alpha = pulseGlow * 0.20f)),
+                        (if (isDark) Color(0xFF00E5FF).copy(alpha = pulseGlow * 0.16f) else Color(0xFF00B4D8).copy(alpha = pulseGlow * 0.12f)),
+                        (if (isDark) Color(0xFF69F0AE).copy(alpha = pulseGlow * 0.08f) else RegainLimeLight.copy(alpha = pulseGlow * 0.08f)),
                         Color.Transparent
                     ),
                     center = centerOffset,
@@ -118,78 +121,100 @@ fun RegainStudyDial(
                 center = centerOffset
             )
 
-            // 2. Dial track background (Sleek translucent white glass track gradient)
+            // 2. Dial track background (Sleek translucent glass track gradient)
+            val trackColor = if (isDark) Color(0x28FFFFFF) else Color(0x18000000)
             drawCircle(
-                brush = Brush.sweepGradient(
-                    0.0f to Color(0x3BFFFFFF),
-                    0.3f to Color(0x1AFFFFFF),
-                    0.7f to Color(0x38FFFFFF),
-                    1.0f to Color(0x3BFFFFFF),
-                    center = centerOffset
-                ),
+                color = trackColor,
                 radius = radius,
                 center = centerOffset,
                 style = Stroke(width = strokeWidth)
             )
 
-            // 3. Glowing premium white gradient progress arc & soft bleeding halo
+            // 3. Glowing premium gradient progress arc & soft bleeding halo (no white hotspot)
             val sweepAngle = 360f * progress
             if (sweepAngle > 0f) {
                 val arcTopLeft = Offset(centerOffset.x - radius, centerOffset.y - radius)
                 val arcSize = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
 
-                // Soft outer blurred halo bleeding outward along progress arc
-                drawArc(
-                    brush = Brush.sweepGradient(
-                        0.0f to Color.White.copy(alpha = pulseGlow * 0.55f),
-                        0.5f to RegainLimeLight.copy(alpha = pulseGlow * 0.40f),
-                        1.0f to Color.White.copy(alpha = pulseGlow * 0.25f),
-                        center = centerOffset
-                    ),
-                    startAngle = -90f,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    topLeft = arcTopLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth * 2.2f, cap = StrokeCap.Round)
-                )
+                val haloColors = if (isDark) {
+                    listOf(
+                        RegainLimePrimary.copy(alpha = pulseGlow * 0.35f),
+                        Color(0xFF00E5FF).copy(alpha = pulseGlow * 0.25f),
+                        Color(0xFF69F0AE).copy(alpha = pulseGlow * 0.30f),
+                        RegainLimeLight.copy(alpha = pulseGlow * 0.18f),
+                        RegainLimePrimary.copy(alpha = pulseGlow * 0.35f)
+                    )
+                } else {
+                    listOf(
+                        RegainLimeDeepText.copy(alpha = pulseGlow * 0.35f),
+                        RegainLimePrimary.copy(alpha = pulseGlow * 0.30f),
+                        Color(0xFF00B4D8).copy(alpha = pulseGlow * 0.20f),
+                        RegainLimeDeepText.copy(alpha = pulseGlow * 0.35f)
+                    )
+                }
 
-                // Crisp, premium gradient progress ring (Brilliant white blending into ice white and glowing lime)
-                drawArc(
-                    brush = Brush.sweepGradient(
-                        0.0f to Color.White,
-                        0.35f to Color(0xFFF4FFE0),
-                        0.70f to RegainLimeLight,
-                        1.0f to RegainLimePrimary,
-                        center = centerOffset
-                    ),
-                    startAngle = -90f,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    topLeft = arcTopLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
+                val arcGradient = if (isDark) {
+                    listOf(
+                        RegainLimePrimary,
+                        Color(0xFF00E5FF),
+                        Color(0xFF69F0AE),
+                        RegainLimeLight,
+                        RegainLimePrimary
+                    )
+                } else {
+                    listOf(
+                        RegainLimeDeepText,
+                        RegainLimePrimary,
+                        Color(0xFF00B4D8),
+                        RegainLimeDeepText
+                    )
+                }
 
-                // Refined multi-layered glowing indicator dot at leading edge
+                // Rotated smoothly to -90f so the sweep gradient starts at the top and seamlessly follows the arc
+                rotate(degrees = -90f, pivot = centerOffset) {
+                    // Soft outer blurred halo bleeding outward along progress arc
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            colors = haloColors,
+                            center = centerOffset
+                        ),
+                        startAngle = 0f,
+                        sweepAngle = sweepAngle,
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = strokeWidth * 2.0f, cap = StrokeCap.Round)
+                    )
+
+                    // Crisp, premium gradient progress ring
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            colors = arcGradient,
+                            center = centerOffset
+                        ),
+                        startAngle = 0f,
+                        sweepAngle = sweepAngle,
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                    )
+                }
+
+                // Refined luminous pearl indicator dot at leading edge (no harsh white blob)
                 val angleRad = Math.toRadians((-90.0 + sweepAngle))
                 val dotX = centerOffset.x + (radius * cos(angleRad)).toFloat()
                 val dotY = centerOffset.y + (radius * sin(angleRad)).toFloat()
                 val dotCenter = Offset(dotX, dotY)
 
                 drawCircle(
-                    color = Color.White.copy(alpha = 0.65f),
-                    radius = 12.dp.toPx(),
+                    color = (if (isDark) RegainLimePrimary else RegainLimeDeepText).copy(alpha = 0.40f),
+                    radius = 9.dp.toPx(),
                     center = dotCenter
                 )
                 drawCircle(
-                    color = Color.White,
-                    radius = 8.dp.toPx(),
-                    center = dotCenter
-                )
-                drawCircle(
-                    color = RegainLimePrimary,
-                    radius = 4.5.dp.toPx(),
+                    color = if (isDark) Color(0xFFF4FFE0) else RegainLimeLight,
+                    radius = 5.dp.toPx(),
                     center = dotCenter
                 )
             }
@@ -203,6 +228,7 @@ fun RegainStudyDial(
             // 1. "Deep Work Session" / Tag Glass Dropdown Chip
             Box(
                 modifier = Modifier
+                    .offset(y = 4.dp)
                     .shadow(
                         elevation = 6.dp,
                         shape = CircleShape,
@@ -229,58 +255,60 @@ fun RegainStudyDial(
                         ),
                         shape = CircleShape
                     )
-                    .clickable { onTagClick() }
-                    .padding(horizontal = 16.dp, vertical = 7.dp)
+                    .clickable(enabled = !isRunning) { onTagClick() }
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Pulsing green status dot with outer aura
                     Box(
                         modifier = Modifier
-                            .size(12.dp)
+                            .size(10.dp)
                             .clip(CircleShape)
                             .background(RegainLimePrimary.copy(alpha = 0.3f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(6.dp)
+                                .size(5.dp)
                                 .clip(CircleShape)
                                 .background(RegainLimeLight)
                         )
                     }
-                    Spacer(modifier = Modifier.width(7.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = activeTag,
                         style = MaterialTheme.typography.labelMedium.copy(
-                            fontFamily = PoppinsFontFamily,
-                            color = RegainLimeLight,
+                            fontFamily = AppleLinearFontFamily,
+                            color = if (isDark) RegainLimeLight else RegainLimeDeepText,
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
+                            fontSize = 12.sp,
                             letterSpacing = 0.3.sp
                         )
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Switch tag",
-                        tint = RegainLimeLight,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    if (!isRunning) {
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Switch tag",
+                            tint = if (isDark) RegainLimeLight else RegainLimeDeepText,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // 2. Giant Poppins Bold "25:00" Countdown Text with Soft Glow Shadow
+            // 2. Giant Bold Apple/Linear Countdown Text with Soft Glow Shadow
             Text(
                 text = timeFormatted,
                 style = androidx.compose.ui.text.TextStyle(
-                    fontFamily = PoppinsFontFamily,
+                    fontFamily = AppleLinearFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 50.sp,
                     lineHeight = 56.sp,
                     color = textPrimary,
-                    letterSpacing = 1.2.sp,
+                    letterSpacing = (-0.5).sp,
                     shadow = Shadow(
                         color = RegainLimePrimary.copy(alpha = 0.35f),
                         blurRadius = 14f
@@ -288,49 +316,51 @@ fun RegainStudyDial(
                 )
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            if (!isRunning) {
+                Spacer(modifier = Modifier.height(8.dp))
 
-            // 3. "Take a break" Frosted Glass Button
-            Box(
-                modifier = Modifier
-                    .shadow(
-                        elevation = 4.dp,
-                        shape = CircleShape,
-                        ambientColor = Color.Black.copy(alpha = 0.3f),
-                        spotColor = RegainLimePrimary.copy(alpha = 0.25f)
-                    )
-                    .clip(CircleShape)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                if (isDark) Color(0x28FFFFFF) else Color(0xF2FFFFFF),
-                                if (isDark) Color(0x1A141518) else Color(0xE8F0F4EC)
+                // 3. "Take a break" Frosted Glass Button
+                Box(
+                    modifier = Modifier
+                        .shadow(
+                            elevation = 4.dp,
+                            shape = CircleShape,
+                            ambientColor = Color.Black.copy(alpha = 0.3f),
+                            spotColor = RegainLimePrimary.copy(alpha = 0.25f)
+                        )
+                        .clip(CircleShape)
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    if (isDark) Color(0x28FFFFFF) else Color(0xF2FFFFFF),
+                                    if (isDark) Color(0x1A141518) else Color(0xE8F0F4EC)
+                                )
                             )
                         )
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0x4DFFFFFF),
+                                    Color(0x2B8CFF00)
+                                )
+                            ),
+                            shape = CircleShape
+                        )
+                        .clickable { onTakeBreakClick() }
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "Take a break",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = AppleLinearFontFamily,
+                            color = if (isDark) Color.White.copy(alpha = 0.92f) else NearBlack,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.6.sp
+                        )
                     )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0x4DFFFFFF),
-                                Color(0x2B8CFF00)
-                            )
-                        ),
-                        shape = CircleShape
-                    )
-                    .clickable { onTakeBreakClick() }
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "Take a break",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontFamily = PoppinsFontFamily,
-                        color = if (isDark) Color.White.copy(alpha = 0.92f) else NearBlack,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.6.sp
-                    )
-                )
+                }
             }
 
             Spacer(modifier = Modifier.height(2.dp))
@@ -339,14 +369,14 @@ fun RegainStudyDial(
             Box(
                 modifier = Modifier
                     .width(220.dp)
-                    .height(110.dp)
-                    .offset(y = 10.dp)
+                    .height(112.dp)
+                    .offset(y = 8.dp)
                     .clipToBounds()
                     .clickable { onMascotClick() },
                 contentAlignment = Alignment.TopCenter
             ) {
                 RegainMascotView(
-                    size = 195.dp,
+                    size = if (mascotPose == MascotPose.STUDYING) 205.dp else 195.dp,
                     pose = mascotPose,
                     modifier = Modifier.offset(y = 2.dp)
                 )

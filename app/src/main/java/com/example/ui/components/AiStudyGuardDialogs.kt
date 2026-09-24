@@ -81,21 +81,11 @@ fun AiStudyWarningDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(amberWarning.copy(alpha = 0.18f))
-                        .border(1.5.dp, amberWarning, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = "Warning",
-                        tint = amberWarning,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
+                RegainMascotView(
+                    width = 130.dp,
+                    height = 170.dp,
+                    pose = MascotPose.CONCERNED
+                )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "Study Discipline Warning",

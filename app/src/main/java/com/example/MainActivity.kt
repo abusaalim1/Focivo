@@ -29,6 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.service.FocusShieldService
 import com.example.ui.components.AlarmHubSheet
 import com.example.ui.components.AlarmRingingOverlay
@@ -41,8 +44,11 @@ import com.example.ui.components.AiStudyResolvedDialog
 import com.example.ui.screens.AutoStudyScheduleScreen
 import com.example.ui.components.NavTab
 import com.example.ui.components.NotificationAlarmPermissionSheet
+import com.example.ui.components.SignOutConfirmationDialog
 import com.example.ui.components.SupportLockZenSheet
 import com.example.ui.components.SupportLockZenMilestoneDialog
+import com.example.ui.components.SessionDonationPromptSheet
+import com.example.ui.components.SundayRecapGlassDialog
 import com.example.ui.components.TaskBottomSheet
 import com.example.util.PermissionUtils
 import kotlinx.coroutines.delay
@@ -52,6 +58,7 @@ import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.InsightsScreen
 import com.example.ui.screens.LeaderboardScreen
 import com.example.ui.screens.OnboardingScreen
+import com.example.ui.screens.OnboardingSurveyScreen
 import com.example.ui.screens.PlannerScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.QuestionnaireScreen
@@ -72,6 +79,8 @@ class MainActivity : ComponentActivity() {
             activeViewModel = viewModel
             handleShieldIntent(intent, viewModel)
             handleAuthIntent(intent, viewModel)
+            handleSundayRecapIntent(intent, viewModel)
+            handleWidgetIntent(intent, viewModel)
             FocuslyApp(viewModel = viewModel)
         }
     }
@@ -101,6 +110,35 @@ class MainActivity : ComponentActivity() {
         activeViewModel?.let {
             handleShieldIntent(intent, it)
             handleAuthIntent(intent, it)
+            handleSundayRecapIntent(intent, it)
+            handleWidgetIntent(intent, it)
+        }
+    }
+
+    private fun handleWidgetIntent(intent: Intent?, viewModel: FocuslyViewModel) {
+        if (intent == null) return
+        val navTab = intent.getStringExtra("EXTRA_NAV_TAB")
+        val quickMins = intent.getIntExtra("EXTRA_QUICK_START_MINS", 0)
+        val taskTitle = intent.getStringExtra("EXTRA_TASK_TITLE")
+        val startTimer = intent.getBooleanExtra("EXTRA_START_TIMER_IMMEDIATELY", false)
+        val openShieldHub = intent.getBooleanExtra("EXTRA_OPEN_SHIELD_HUB", false)
+        val openZenBreak = intent.getBooleanExtra("EXTRA_OPEN_ZEN_BREAK", false)
+
+        if (navTab != null || quickMins > 0 || startTimer || openShieldHub || openZenBreak || taskTitle != null) {
+            viewModel.handleWidgetLaunch(
+                tab = navTab,
+                quickMins = if (quickMins > 0) quickMins else null,
+                taskTitle = taskTitle,
+                startTimer = startTimer,
+                openShieldHub = openShieldHub,
+                openZenBreak = openZenBreak
+            )
+        }
+    }
+
+    private fun handleSundayRecapIntent(intent: Intent?, viewModel: FocuslyViewModel) {
+        if (intent?.getBooleanExtra("OPEN_SUNDAY_RECAP", false) == true) {
+            viewModel.openLatestSundayRecap()
         }
     }
 
@@ -109,7 +147,9 @@ class MainActivity : ComponentActivity() {
             val appName = intent.getStringExtra(FocusShieldService.EXTRA_BLOCKED_NAME)
                 ?: intent.getStringExtra(FocusShieldService.EXTRA_BLOCKED_PACKAGE)
                 ?: "Distracting App"
-            viewModel.triggerShieldIntercept(appName)
+            val reason = intent.getStringExtra(FocusShieldService.EXTRA_PUNISHMENT_REASON)
+            val isGemini = intent.getBooleanExtra("EXTRA_IS_GEMINI_INTERCEPT", false) || (reason?.contains("Gemini", ignoreCase = true) == true)
+            viewModel.triggerShieldIntercept(appName, reason, isGemini)
         }
     }
 
@@ -117,7 +157,7 @@ class MainActivity : ComponentActivity() {
         val data = intent?.data ?: return
         val scheme = data.scheme?.lowercase()
         val host = data.host?.lowercase()
-        if ((scheme == "regain" || scheme == "studytracker") && host == "auth-callback") {
+        if ((scheme == "focivo" || scheme == "regain" || scheme == "studytracker") && host == "auth-callback") {
             viewModel.handleAuthDeeplink(data)
         }
     }
@@ -142,6 +182,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val ambientSound by viewModel.ambientSound.collectAsState()
     val showCompletionScreen by viewModel.showCompletionScreen.collectAsState()
     val completedSessionSummary by viewModel.completedSessionSummary.collectAsState()
+    val sessionStartConfirmation by viewModel.sessionStartConfirmation.collectAsState()
+    val sessionProtectionNote by viewModel.sessionProtectionNote.collectAsState()
 
     // Alarm management states
     val alarms by viewModel.alarms.collectAsState()
@@ -152,14 +194,21 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     // Focus Shield / App Blocker states
     val isShieldHubOpen by viewModel.isShieldHubOpen.collectAsState()
     val isShieldOverlayVisible by viewModel.isShieldOverlayVisible.collectAsState()
+    val isDeepFocusEnabled by viewModel.isDeepFocusEnabled.collectAsState()
+    val isDeepFocusSessionActive by viewModel.isDeepFocusSessionActive.collectAsState()
     val shieldInterceptedAppName by viewModel.shieldInterceptedAppName.collectAsState()
+    val shieldInterceptReason by viewModel.shieldInterceptReason.collectAsState()
+    val isGeminiBlocked by viewModel.isGeminiBlocked.collectAsState()
     val isStandaloneShieldActive by viewModel.isStandaloneShieldActive.collectAsState()
     val standaloneShieldRemainingSeconds by viewModel.standaloneShieldRemainingSeconds.collectAsState()
     val installedApps by viewModel.installedApps.collectAsState()
     val leaderboardUsers by viewModel.leaderboardUsers.collectAsState()
+    val hallOfFame by viewModel.hallOfFame.collectAsState()
 
     // Scheduled Blocks & AI Study Guard states
     val scheduledBlocks by viewModel.scheduledBlocks.collectAsState()
+    val appDailyLimits by viewModel.appDailyLimits.collectAsState()
+    var isAppLimitsOpen by remember { mutableStateOf(false) }
     val shouldNavigateToStudyTab by viewModel.shouldNavigateToStudyTab.collectAsState()
     var selectedTab by remember { mutableStateOf(NavTab.HOME) }
 
@@ -174,8 +223,11 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val activeAiWarning by viewModel.activeAiWarning.collectAsState()
     val activeAiBlock by viewModel.activeAiBlock.collectAsState()
     val activeAiResolved by viewModel.activeAiResolved.collectAsState()
+    val showPreStudyBlockSheet by viewModel.showPreStudyBlockSheet.collectAsState()
     val isSupportLockZenSheetOpen by viewModel.isSupportLockZenSheetOpen.collectAsState()
     val showMilestoneDonationPrompt by viewModel.showMilestoneDonationPrompt.collectAsState()
+    val showSessionDonationPrompt by viewModel.showSessionDonationPrompt.collectAsState()
+    val lastCompletedSessionForPrompt by viewModel.lastCompletedSessionForPrompt.collectAsState()
 
     // Local Auth & Questionnaire states
     val currentUser by viewModel.currentUser.collectAsState()
@@ -186,17 +238,66 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val authError by viewModel.authError.collectAsState()
     val showQuestionnaire by viewModel.showQuestionnaire.collectAsState()
     val verificationMessage by viewModel.verificationMessage.collectAsState()
+    val isSigningOut by viewModel.isSigningOut.collectAsState()
 
     val context = LocalContext.current
-    var hasCheckedNotificationPermission by rememberSaveable(currentUser?.id) { mutableStateOf(false) }
+    var isNetworkConnected by remember { mutableStateOf(com.example.util.NetworkUtils.isInternetAvailable(context)) }
+    var allowOfflineSession by rememberSaveable { mutableStateOf(false) }
+    var hasCheckedNotificationPermissionOnStartup by rememberSaveable(currentUser?.id) { mutableStateOf(false) }
     var showNotificationPermissionPrompt by rememberSaveable(currentUser?.id) { mutableStateOf(false) }
+    var showSignOutConfirmationDialog by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(currentUser, showQuestionnaire) {
-        if (currentUser != null && !showQuestionnaire && !hasCheckedNotificationPermission) {
-            hasCheckedNotificationPermission = true
-            if (!PermissionUtils.hasNotificationPermission(context)) {
-                delay(600)
-                showNotificationPermissionPrompt = true
+    // Real-time network connectivity observation
+    LaunchedEffect(Unit) {
+        com.example.util.NetworkUtils.observeNetworkConnectivity(context).collect { connected ->
+            isNetworkConnected = connected
+            if (connected) {
+                allowOfflineSession = false
+                viewModel.refreshScheduledBlocks()
+                viewModel.refreshAlarms()
+                viewModel.syncUserData(context)
+            }
+        }
+    }
+
+    // Deep Focus: Android Screen Pinning / Lock Task Mode lifecycle
+    val currentActivity = context as? android.app.Activity
+    LaunchedEffect(isTimerRunning, isDeepFocusSessionActive) {
+        if (currentActivity != null) {
+            if (isTimerRunning && isDeepFocusSessionActive) {
+                com.example.util.DeepFocusManager.startScreenPinning(currentActivity)
+            } else if (!isTimerRunning && !isDeepFocusSessionActive) {
+                com.example.util.DeepFocusManager.stopScreenPinning(currentActivity)
+            }
+        }
+    }
+
+    // Prevent back navigation away when Deep Focus task lock is active
+    androidx.activity.compose.BackHandler(enabled = isTimerRunning && isDeepFocusSessionActive) {
+        // Deep Focus Active: Back gesture intercepted to keep student inside session
+    }
+
+    val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        android.util.Log.d("MainActivity", "Notification permission request result: $isGranted")
+    }
+
+    // Startup Notification Permission Check & Sunday Recap Check
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
+            viewModel.checkWeeklyReview(context)
+            if (!hasCheckedNotificationPermissionOnStartup) {
+                hasCheckedNotificationPermissionOnStartup = true
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    val isOsGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+                        context,
+                        android.Manifest.permission.POST_NOTIFICATIONS
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    if (!isOsGranted) {
+                        notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }
             }
         }
     }
@@ -227,8 +328,20 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
         else -> isSystemDark
     }
 
+    val shouldShowOfflineBlocker = !isNetworkConnected && !allowOfflineSession && currentUser == null
+
     FocuslyTheme(darkTheme = isDarkTheme) {
-        if (!isSplashFinished) {
+        if (shouldShowOfflineBlocker) {
+            com.example.ui.screens.OfflineScreen(
+                onRetry = {
+                    isNetworkConnected = com.example.util.NetworkUtils.isInternetAvailable(context)
+                },
+                onContinueOffline = {
+                    allowOfflineSession = true
+                    viewModel.signInAsGuest()
+                }
+            )
+        } else if (!isSplashFinished || isAuthChecking) {
             SplashScreen(
                 onSplashFinished = { isSplashFinished = true }
             )
@@ -245,45 +358,33 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 onGuestSignIn = { viewModel.signInAsGuest() },
                 onClearError = { viewModel.clearAuthError() }
             )
-        } else if (showQuestionnaire) {
-            // Student Onboarding Questionnaire (Age, Class, Stream, Daily Routine, Mobile Break, Distractions)
-            QuestionnaireScreen(
-                initialUserName = currentUser?.fullName?.ifBlank { currentUser?.email ?: "" } ?: "",
-                onFinishQuestions = { name, age, studentClass, stream, studySchedule, mobileBreakTime, goal, focusStyle, targetHours, peakTime, distraction ->
-                    viewModel.submitQuestionnaire(
-                        name = name,
-                        age = age,
-                        studentClass = studentClass,
-                        stream = stream,
-                        studySchedule = studySchedule,
-                        mobileBreakTime = mobileBreakTime,
-                        goal = goal,
-                        focusStyle = focusStyle,
-                        targetHours = targetHours,
-                        peakTime = peakTime,
-                        distraction = distraction
-                    )
-                },
-                onFinishIntakeSurvey = { name, classLevel, isBoard, goal, distraction, timeWindow, screenTimeMins, motivation ->
+        } else if (showQuestionnaire || userPreferences?.hasCompletedIntakeSurvey == false || userPreferences?.hasCompletedOnboarding == false) {
+            OnboardingSurveyScreen(
+                initialUserName = currentUser?.fullName ?: userPreferences?.currentUserName ?: "Guest Deep Worker",
+                onFinishSurvey = { name, studentClassLevel, isBoardExamYear, primaryStudyGoal, biggestDistractionApp, preferredStudyTimeWindow, dailyScreenTimeGoalMinutes, motivationStyle ->
                     viewModel.submitIntakeSurvey(
                         name = name,
-                        studentClassLevel = classLevel,
-                        isBoardExamYear = isBoard,
-                        primaryStudyGoal = goal,
-                        biggestDistractionApp = distraction,
-                        preferredStudyTimeWindow = timeWindow,
-                        dailyScreenTimeGoalMinutes = screenTimeMins,
-                        motivationStyle = motivation
+                        studentClassLevel = studentClassLevel,
+                        isBoardExamYear = isBoardExamYear,
+                        primaryStudyGoal = primaryStudyGoal,
+                        biggestDistractionApp = biggestDistractionApp,
+                        preferredStudyTimeWindow = preferredStudyTimeWindow,
+                        dailyScreenTimeGoalMinutes = dailyScreenTimeGoalMinutes,
+                        motivationStyle = motivationStyle
                     )
+                    viewModel.completeOnboarding()
+                    if (!PermissionUtils.hasNotificationPermission(context)) {
+                        showNotificationPermissionPrompt = true
+                    }
                 }
             )
         } else {
-            // Main OS Shell
+            // Main OS Shell (Direct Open)
             Box(modifier = Modifier.fillMaxSize()) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
-                        if (!isSettingsOpen) {
+                        if (!isSettingsOpen && !isTimerRunning) {
                             FloatingNavigation(
                                 selectedTab = selectedTab,
                                 onTabSelected = { tab ->
@@ -321,8 +422,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onOpenAlarmStudio = { isAlarmHubOpen = true },
                                         onOpenShieldHub = { viewModel.openShieldHub() },
                                         onLogout = {
-                                            isSettingsOpen = false
-                                            viewModel.logout()
+                                            showSignOutConfirmationDialog = true
                                         }
                                     )
                                 }
@@ -369,8 +469,19 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         distractionsCount = distractionsCount,
                                         ambientSound = ambientSound,
                                         userStreak = userPreferences?.currentStreak ?: 0,
+                                        userPreferences = userPreferences,
                                         isShieldActive = userPreferences?.isAppBlockerEnabled == true || isTimerRunning || isStandaloneShieldActive,
-                                        onStartTimer = { viewModel.startTimer() },
+                                        isDeepFocusEnabled = isDeepFocusEnabled,
+                                        isDeepFocusSessionActive = isDeepFocusSessionActive,
+                                        onToggleDeepFocus = { viewModel.toggleDeepFocus(it) },
+                                        sessionStartConfirmation = sessionStartConfirmation,
+                                        sessionProtectionNote = sessionProtectionNote,
+                                        showPreStudyBlockSheet = showPreStudyBlockSheet,
+                                        onConfirmPreStudyBlock = { pkgs, dontShowAgain ->
+                                            viewModel.confirmPreStudyBlock(pkgs, dontShowAgain)
+                                        },
+                                        onDismissPreStudyBlock = { viewModel.dismissPreStudyBlockSheet() },
+                                        onStartTimer = { viewModel.requestStudySessionStart() },
                                         onPauseTimer = { viewModel.pauseTimer() },
                                         onResumeTimer = { viewModel.resumeTimer() },
                                         onFinishEarly = { viewModel.finishSessionEarly() },
@@ -386,9 +497,12 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                 NavTab.LEADERBOARD.name -> {
                                     LeaderboardScreen(
                                         users = leaderboardUsers,
+                                        hallOfFame = hallOfFame,
                                         currentUserName = userPreferences?.currentUserName ?: "You",
                                         currentUserPoints = userPreferences?.focusPoints ?: 0,
-                                        currentUserStreak = userPreferences?.currentStreak ?: 1
+                                        currentUserStreak = userPreferences?.currentStreak ?: 1,
+                                        sessions = sessions,
+                                        onRefresh = { viewModel.refreshLeaderboard() }
                                     )
                                 }
                                 NavTab.INSIGHTS.name -> {
@@ -409,8 +523,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onOpenSettings = { isSettingsOpen = true },
                                         onOpenAlarmStudio = { isAlarmHubOpen = true },
                                         onOpenShieldHub = { viewModel.openShieldHub() },
+                                        onOpenSundayRecap = { viewModel.openLatestSundayRecap() },
                                         onOpenSupportLockZen = { viewModel.openSupportLockZenSheet() },
-                                        onLogout = { viewModel.logout() },
+                                        onLogout = { showSignOutConfirmationDialog = true },
                                         onUpdateProfile = { name, avatarBytes ->
                                             viewModel.updateProfileNameAndAvatar(name, avatarBytes)
                                         }
@@ -471,6 +586,15 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     )
                 }
 
+                // Weekly Review (Sunday Recap) Glassmorphism Dialog
+                val currentWeeklyReview = viewModel.weeklyReviewSummary.collectAsStateWithLifecycle().value
+                currentWeeklyReview?.let { review ->
+                    SundayRecapGlassDialog(
+                        recap = review,
+                        onDismiss = { viewModel.dismissWeeklyReview() }
+                    )
+                }
+
                 // Global Focus Shield (App Blocker) Hub Sheet
                 if (isShieldHubOpen) {
                     val context = androidx.compose.ui.platform.LocalContext.current
@@ -505,7 +629,20 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                         onSaveSchedule = { viewModel.saveScheduledBlock(it) },
                         onToggleSchedule = { id, en -> viewModel.toggleScheduledBlock(id, en) },
                         onDeleteSchedule = { viewModel.deleteScheduledBlock(it) },
+                        onOpenAppLimits = { isAppLimitsOpen = true },
                         onDismiss = { viewModel.closeShieldHub() }
+                    )
+                }
+
+                // Per-App Daily Time Limits Screen
+                if (isAppLimitsOpen) {
+                    com.example.ui.screens.AppLimitsScreen(
+                        limits = appDailyLimits,
+                        installedApps = installedApps,
+                        onBack = { isAppLimitsOpen = false },
+                        onSaveLimit = { viewModel.saveAppDailyLimit(it) },
+                        onDeleteLimit = { viewModel.deleteAppDailyLimit(it) },
+                        onToggleEnabled = { id, en -> viewModel.toggleAppDailyLimitEnabled(id, en) }
                     )
                 }
 
@@ -539,6 +676,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                         blockedAppName = shieldInterceptedAppName,
                         remainingSeconds = remainingTime,
                         isPunishment = (remainingTime > 3600),
+                        reason = shieldInterceptReason,
+                        isGeminiDetected = isGeminiBlocked,
                         onReturnToFocus = {
                             viewModel.dismissShieldOverlay()
                             selectedTab = NavTab.FOCUS
@@ -576,15 +715,55 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                             viewModel.dismissMilestoneDonationPrompt()
                             viewModel.openSupportLockZenSheet()
                         },
-                        onDismiss = { viewModel.dismissMilestoneDonationPrompt() }
+                        onDismiss = { viewModel.dismissMilestoneDonationPrompt() },
+                        onNeverShowAgain = { viewModel.setNeverShowDonationPrompt(true) }
+                    )
+                }
+
+                // Automatic Post-Session Donation Sheet
+                if (showSessionDonationPrompt && lastCompletedSessionForPrompt != null) {
+                    val totalFocusMins = remember(sessions) {
+                        sessions.sumOf { it.durationSeconds }.toLong() / 60
+                    }
+                    val streak = userPreferences?.currentStreak ?: 1
+
+                    SessionDonationPromptSheet(
+                        session = lastCompletedSessionForPrompt!!,
+                        rotationIndex = viewModel.getSessionDonationRotationIndex(),
+                        currentStreak = streak,
+                        totalFocusMinutes = totalFocusMins,
+                        onSupportClick = { viewModel.openSupportFromSessionPrompt() },
+                        onDismiss = { viewModel.dismissSessionDonationPrompt() },
+                        onNeverShowAgain = { viewModel.setNeverShowDonationPrompt(true) }
                     )
                 }
 
                 // Post-Login / Post-Onboarding Alarm & Notification Permission Sheet
-                if (showNotificationPermissionPrompt) {
+                if (showNotificationPermissionPrompt && !PermissionUtils.hasNotificationPermission(context)) {
                     NotificationAlarmPermissionSheet(
                         onDismiss = { showNotificationPermissionPrompt = false },
                         onPermissionGranted = { showNotificationPermissionPrompt = false }
+                    )
+                }
+
+                // Sign Out & Final Supabase Sync Confirmation Dialog
+                if (showSignOutConfirmationDialog) {
+                    SignOutConfirmationDialog(
+                        userPreferences = userPreferences,
+                        sessionsCount = sessions.size,
+                        isSyncing = isSigningOut,
+                        onDismiss = {
+                            if (!isSigningOut) {
+                                showSignOutConfirmationDialog = false
+                            }
+                        },
+                        onConfirmSignOut = {
+                            viewModel.syncAndLogout {
+                                showSignOutConfirmationDialog = false
+                                isSettingsOpen = false
+                                android.widget.Toast.makeText(context, "Study progress synced & signed out", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     )
                 }
             }

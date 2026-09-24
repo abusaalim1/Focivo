@@ -65,8 +65,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.GlassButton
 import com.example.ui.components.GlassCard
+import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.RegainNeonEmerald
-import com.example.ui.theme.VioletAccent
+import com.example.ui.theme.isAppInDarkTheme
 
 data class StudentQuestion(
     val id: Int,
@@ -104,7 +105,7 @@ fun QuestionnaireScreen(
         motivationStyle: String
     ) -> Unit = { _, _, _, _, _, _, _, _ -> }
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
 
     var currentStep by remember { mutableIntStateOf(0) }
 
@@ -289,7 +290,7 @@ fun QuestionnaireScreen(
                             Text(
                                 text = "${currentStep + 1}/8",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = VioletAccent,
+                                    color = RegainLimePrimary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp
                                 )
@@ -334,7 +335,7 @@ fun QuestionnaireScreen(
                                     .height(3.5.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (isPassed) VioletAccent else (if (isDark) Color(0x22FFFFFF) else Color(0x18000000))
+                                        if (isPassed) RegainLimePrimary else (if (isDark) Color(0x22FFFFFF) else Color(0x18000000))
                                     )
                             )
                         }
@@ -371,13 +372,13 @@ fun QuestionnaireScreen(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(CircleShape)
-                                    .background(VioletAccent.copy(alpha = 0.15f)),
+                                    .background(RegainLimePrimary.copy(alpha = 0.15f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = q.icon,
                                     contentDescription = null,
-                                    tint = VioletAccent,
+                                    tint = RegainLimePrimary,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
@@ -387,7 +388,7 @@ fun QuestionnaireScreen(
                             Text(
                                 text = q.stepLabel,
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = VioletAccent,
+                                    color = RegainLimePrimary,
                                     letterSpacing = 1.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp
@@ -434,7 +435,7 @@ fun QuestionnaireScreen(
                                         .testTag("student_name_input"),
                                     shape = RoundedCornerShape(18.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = VioletAccent,
+                                        focusedBorderColor = RegainLimePrimary,
                                         unfocusedBorderColor = if (isDark) Color(0x35FFFFFF) else Color(0x25000000),
                                         focusedContainerColor = Color.Transparent,
                                         unfocusedContainerColor = Color.Transparent
@@ -446,22 +447,22 @@ fun QuestionnaireScreen(
                                 // Student Protection Highlight Card
                                 Surface(
                                     shape = RoundedCornerShape(16.dp),
-                                    color = if (isDark) Color(0x1F7C3AED) else Color(0x127C3AED),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, VioletAccent.copy(alpha = 0.3f)),
+                                    color = if (isDark) Color(0x1F8CE000) else Color(0x128CE000),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, RegainLimePrimary.copy(alpha = 0.3f)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(14.dp)) {
                                         Text(
                                             text = "🎓 100% Student-Centric Focus Mode",
                                             style = MaterialTheme.typography.labelSmall.copy(
-                                                color = VioletAccent,
+                                                color = RegainLimePrimary,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 11.sp
                                             )
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = "Automatic timetable locking, emergency calls pass-through, and doubt-clearing with Claude/ChatGPT enabled.",
+                                            text = "Automatic timetable locking, emergency calls pass-through, and AI Academic Sentinel enabled.",
                                             style = MaterialTheme.typography.bodySmall.copy(
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 fontSize = 11.sp
@@ -525,7 +526,7 @@ fun QuestionnaireScreen(
                                             text = opt,
                                             style = MaterialTheme.typography.bodyMedium.copy(
                                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                                color = if (isSelected) VioletAccent else MaterialTheme.colorScheme.onBackground,
+                                                color = if (isSelected) RegainLimePrimary else MaterialTheme.colorScheme.onBackground,
                                                 fontSize = 13.5.sp
                                             ),
                                             modifier = Modifier.weight(1f)
@@ -537,17 +538,17 @@ fun QuestionnaireScreen(
                                                 .clip(CircleShape)
                                                 .border(
                                                     width = if (isSelected) 2.dp else 1.5.dp,
-                                                    color = if (isSelected) VioletAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                                    color = if (isSelected) RegainLimePrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                                                     shape = CircleShape
                                                 )
-                                                .background(if (isSelected) VioletAccent else Color.Transparent),
+                                                .background(if (isSelected) RegainLimePrimary else Color.Transparent),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             if (isSelected) {
                                                 Icon(
                                                     imageVector = Icons.Default.Check,
                                                     contentDescription = null,
-                                                    tint = Color.White,
+                                                    tint = Color.Black,
                                                     modifier = Modifier.size(13.dp)
                                                 )
                                             }
@@ -586,7 +587,7 @@ fun QuestionnaireScreen(
                                             }
                                             Spacer(modifier = Modifier.height(6.dp))
                                             Text(
-                                                text = "• AI will automatically lock distracting apps during study hours.\n• Emergency phone calls will never be blocked.\n• Claude & ChatGPT allowed for clearing doubts.\n• Personalized focus warnings for board exam prep.",
+                                                text = "• AI will automatically lock distracting apps during study hours.\n• Emergency phone calls will never be blocked.\n• Academic study tools allowed for clearing doubts.\n• Personalized focus warnings for board exam prep.",
                                                 style = MaterialTheme.typography.bodySmall.copy(
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     fontSize = 11.sp,

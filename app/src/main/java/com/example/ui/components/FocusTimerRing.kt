@@ -9,7 +9,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
@@ -25,18 +24,19 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -48,6 +48,7 @@ fun FocusTimerRing(
     modifier: Modifier = Modifier,
     size: Dp = 280.dp
 ) {
+    val isDark = isAppInDarkTheme()
     val progress = if (totalSeconds > 0) {
         (remainingSeconds.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
     } else 1f
@@ -79,7 +80,7 @@ fun FocusTimerRing(
         label = "scale_breathing"
     )
 
-    val trackColor = MutedBorderLight
+    val trackColor = if (isDark) Color(0x30FFFFFF) else Color(0xFFE2EBD6)
 
     Box(
         modifier = modifier.size(size),
@@ -106,39 +107,54 @@ fun FocusTimerRing(
                 style = Stroke(width = strokeWidth)
             )
 
-            // 3. Progress Arc (smooth continuous sweep)
+            // 3. Progress Arc (smooth continuous sweep with balanced aurora gradient)
             val sweepAngle = 360f * animatedProgress
             if (sweepAngle > 0f) {
-                drawArc(
-                    brush = Brush.sweepGradient(
-                        colors = listOf(
-                            RegainLimeLight,
-                            RegainLimePrimary,
-                            RegainLimeDeepText
-                        ),
-                        center = canvasCenter
-                    ),
-                    startAngle = -90f,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    topLeft = Offset(canvasCenter.x - radius, canvasCenter.y - radius),
-                    size = Size(radius * 2f, radius * 2f),
-                    style = Stroke(width = strokeWidth + 1.dp.toPx(), cap = StrokeCap.Round)
-                )
+                val ringColors = if (isDark) {
+                    listOf(
+                        RegainLimePrimary,
+                        Color(0xFF00E5FF),
+                        Color(0xFF69F0AE),
+                        RegainLimeLight,
+                        RegainLimePrimary
+                    )
+                } else {
+                    listOf(
+                        RegainLimeDeepText,
+                        RegainLimePrimary,
+                        Color(0xFF00B4D8),
+                        RegainLimeDeepText
+                    )
+                }
 
-                // Head indicator dot
+                rotate(degrees = -90f, pivot = canvasCenter) {
+                    drawArc(
+                        brush = Brush.sweepGradient(
+                            colors = ringColors,
+                            center = canvasCenter
+                        ),
+                        startAngle = 0f,
+                        sweepAngle = sweepAngle,
+                        useCenter = false,
+                        topLeft = Offset(canvasCenter.x - radius, canvasCenter.y - radius),
+                        size = Size(radius * 2f, radius * 2f),
+                        style = Stroke(width = strokeWidth + 1.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+
+                // Head indicator pearl (soft luminous pearl, no glaring harsh white)
                 val headAngleRad = Math.toRadians((-90f + sweepAngle).toDouble())
                 val dotX = canvasCenter.x + radius * cos(headAngleRad).toFloat()
                 val dotY = canvasCenter.y + radius * sin(headAngleRad).toFloat()
 
                 drawCircle(
-                    color = RegainLimePrimary.copy(alpha = 0.5f),
-                    radius = 9.dp.toPx(),
+                    color = RegainLimePrimary.copy(alpha = 0.45f),
+                    radius = 8.dp.toPx(),
                     center = Offset(dotX, dotY)
                 )
                 drawCircle(
-                    color = Color.White,
-                    radius = 5.dp.toPx(),
+                    color = if (isDark) Color(0xFFF4FFE0) else RegainLimeLight,
+                    radius = 4.5.dp.toPx(),
                     center = Offset(dotX, dotY)
                 )
             }
@@ -149,9 +165,8 @@ fun FocusTimerRing(
         val seconds = remainingSeconds % 60
         val formattedTime = String.format("%02d:%02d", minutes, seconds)
 
-        val isDark = isSystemInDarkTheme()
-        val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
-        val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
+        val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+        val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(

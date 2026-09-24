@@ -13,9 +13,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.OpenInNew
@@ -41,13 +44,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.example.ui.theme.LavenderSoft
-import com.example.ui.theme.VioletAccent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,12 +68,16 @@ fun FocusShieldPermissionSheet(
     var hasOverlayPermission by remember {
         mutableStateOf(FocusShieldPermissions.hasOverlayPermission(context))
     }
+    var hasAccessibilityPermission by remember {
+        mutableStateOf(FocusShieldPermissions.hasAccessibilityPermission(context))
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 hasUsagePermission = FocusShieldPermissions.hasUsageStatsPermission(context)
                 hasOverlayPermission = FocusShieldPermissions.hasOverlayPermission(context)
+                hasAccessibilityPermission = FocusShieldPermissions.hasAccessibilityPermission(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -80,12 +86,12 @@ fun FocusShieldPermissionSheet(
         }
     }
 
-    val isAllGranted = hasUsagePermission && hasOverlayPermission
+    val isAllGranted = hasUsagePermission && hasOverlayPermission && hasAccessibilityPermission
 
-    val sheetBackground = Color(0xFF100D1C)
-    val accentViolet = VioletAccent
+    val sheetBackground = Color(0xFF0F0B1E)
     val accentGreen = Color(0xFF69F0AE)
     val accentAmber = Color(0xFFFFB74D)
+    val accentLime = Color(0xFF76FF03)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -97,18 +103,19 @@ fun FocusShieldPermissionSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(top = 22.dp, bottom = 38.dp),
+                .padding(horizontal = 22.dp)
+                .padding(top = 22.dp, bottom = 36.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Glowing Shield Icon
+            // Header Shield Icon
             Box(
                 modifier = Modifier
-                    .size(68.dp)
+                    .size(64.dp)
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            listOf(Color(0xFFFF5252), accentViolet)
+                            listOf(Color(0xFF6200EE), Color(0xFF00E676))
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -117,237 +124,92 @@ fun FocusShieldPermissionSheet(
                     imageVector = Icons.Default.Shield,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(34.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
-                text = "Enable Focus Shield Access",
+                text = "Required Shield Permissions",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp,
+                    fontSize = 20.sp,
                     color = Color.White
                 )
             )
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            Text(
-                text = "To detect and lock distracting apps (like Instagram, Reels & Games) during focus sessions, Android requires two system permissions:",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 13.sp,
-                    lineHeight = 19.sp
-                ),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            CivoChatBubble(
+                text = "Grant these 3 permissions so Focivo can detect distracting apps, block YouTube Shorts & Reels, and enforce Strict Study Mode!",
+                avatarSize = 42.dp,
+                typingSpeedMs = 20L
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             // Permission 1: Usage Access
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0x18FFFFFF))
-                    .border(
-                        1.dp,
-                        if (hasUsagePermission) accentGreen.copy(alpha = 0.5f) else Color(0x22FFFFFF),
-                        RoundedCornerShape(18.dp)
-                    )
-                    .clickable {
-                        if (!hasUsagePermission) {
-                            FocusShieldPermissions.openUsageAccessSettings(context)
-                        }
-                    }
-                    .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(if (hasUsagePermission) accentGreen.copy(alpha = 0.18f) else accentAmber.copy(alpha = 0.18f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = null,
-                        tint = if (hasUsagePermission) accentGreen else accentAmber,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "1. Usage Access (App Detection)",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.5.sp,
-                            color = Color.White
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = if (hasUsagePermission) "Granted · Detects when distracting apps open" else "Allows Focus Shield to detect when Instagram/Games are opened.",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = if (hasUsagePermission) accentGreen else Color.White.copy(alpha = 0.65f),
-                            fontSize = 11.5.sp
-                        )
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                if (hasUsagePermission) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Granted",
-                        tint = accentGreen,
-                        modifier = Modifier.size(22.dp)
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(accentAmber.copy(alpha = 0.2f))
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Enable",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = accentAmber,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                imageVector = Icons.Default.OpenInNew,
-                                contentDescription = null,
-                                tint = accentAmber,
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
+            PermissionItemCard(
+                title = "1. Usage Access (App Detection)",
+                description = if (hasUsagePermission) "Granted · Detects when distracting apps open" else "Allows Focivo to detect when Instagram, Games or distracting apps open.",
+                isGranted = hasUsagePermission,
+                icon = Icons.Default.Security,
+                onClick = {
+                    if (!hasUsagePermission) {
+                        FocusShieldPermissions.openUsageAccessSettings(context)
                     }
                 }
-            }
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
             // Permission 2: Display Over Other Apps (Overlay)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0x18FFFFFF))
-                    .border(
-                        1.dp,
-                        if (hasOverlayPermission) accentGreen.copy(alpha = 0.5f) else Color(0x22FFFFFF),
-                        RoundedCornerShape(18.dp)
-                    )
-                    .clickable {
-                        if (!hasOverlayPermission) {
-                            FocusShieldPermissions.openOverlaySettings(context)
-                        }
-                    }
-                    .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(if (hasOverlayPermission) accentGreen.copy(alpha = 0.18f) else accentAmber.copy(alpha = 0.18f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Layers,
-                        contentDescription = null,
-                        tint = if (hasOverlayPermission) accentGreen else accentAmber,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "2. Display Over Other Apps",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.5.sp,
-                            color = Color.White
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = if (hasOverlayPermission) "Granted · Displays distraction lock overlay" else "Allows Focivo to draw the countdown lock over distracting apps.",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = if (hasOverlayPermission) accentGreen else Color.White.copy(alpha = 0.65f),
-                            fontSize = 11.5.sp
-                        )
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                if (hasOverlayPermission) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Granted",
-                        tint = accentGreen,
-                        modifier = Modifier.size(22.dp)
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(accentAmber.copy(alpha = 0.2f))
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Enable",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = accentAmber,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                imageVector = Icons.Default.OpenInNew,
-                                contentDescription = null,
-                                tint = accentAmber,
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
+            PermissionItemCard(
+                title = "2. Display Over Apps (Lock Screen)",
+                description = if (hasOverlayPermission) "Granted · Displays distraction lock overlay" else "Allows Focivo to draw the focus blocker overlay when apps open.",
+                isGranted = hasOverlayPermission,
+                icon = Icons.Default.Layers,
+                onClick = {
+                    if (!hasOverlayPermission) {
+                        FocusShieldPermissions.openOverlaySettings(context)
                     }
                 }
-            }
+            )
 
-            Spacer(modifier = Modifier.height(26.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Permission 3: Accessibility Service (Shorts & Strict Mode)
+            PermissionItemCard(
+                title = "3. Accessibility Service (Shorts & Strict Guard)",
+                description = if (hasAccessibilityPermission) "Granted · YouTube Shorts & Strict Mode active" else "Essential to block YouTube Shorts (allowing lectures) and prevent uninstallation during study.",
+                isGranted = hasAccessibilityPermission,
+                icon = Icons.Default.AccessibilityNew,
+                onClick = {
+                    if (!hasAccessibilityPermission) {
+                        FocusShieldPermissions.openAccessibilitySettings(context)
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Action Button
             GlassButton(
-                text = if (isAllGranted) "Activate Focus Shield" else "Grant in Settings",
+                text = if (isAllGranted) "Activate Focivo Shield" else "Grant Missing Permissions",
                 onClick = {
                     if (isAllGranted) {
                         onAllGranted()
                     } else if (!hasUsagePermission) {
                         FocusShieldPermissions.openUsageAccessSettings(context)
-                    } else {
+                    } else if (!hasOverlayPermission) {
                         FocusShieldPermissions.openOverlaySettings(context)
+                    } else {
+                        FocusShieldPermissions.openAccessibilitySettings(context)
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                fontSize = 14.sp,
+                fontSize = 14.5.sp,
                 horizontalPadding = 18.dp,
                 verticalPadding = 14.dp,
                 minHeight = 52.dp,
@@ -376,6 +238,105 @@ fun FocusShieldPermissionSheet(
                     .clickable { onDismiss() }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun PermissionItemCard(
+    title: String,
+    description: String,
+    isGranted: Boolean,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    val accentGreen = Color(0xFF69F0AE)
+    val accentAmber = Color(0xFFFFB74D)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0x18FFFFFF))
+            .border(
+                1.dp,
+                if (isGranted) accentGreen.copy(alpha = 0.5f) else Color(0x22FFFFFF),
+                RoundedCornerShape(18.dp)
+            )
+            .clickable { onClick() }
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(if (isGranted) accentGreen.copy(alpha = 0.18f) else accentAmber.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (isGranted) accentGreen else accentAmber,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.5.sp,
+                    color = Color.White
+                )
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = if (isGranted) accentGreen else Color.White.copy(alpha = 0.65f),
+                    fontSize = 11.5.sp
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        if (isGranted) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = "Granted",
+                tint = accentGreen,
+                modifier = Modifier.size(22.dp)
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(accentAmber.copy(alpha = 0.2f))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Enable",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = accentAmber,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.OpenInNew,
+                        contentDescription = null,
+                        tint = accentAmber,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+            }
         }
     }
 }

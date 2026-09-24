@@ -37,7 +37,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.VioletAccent
+import com.example.ui.theme.NearBlack
+import com.example.ui.theme.RegainLimeDeepText
+import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,7 +49,7 @@ fun DistractionDialog(
     onDismiss: () -> Unit,
     onLogDistraction: (String) -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
 
     val options = listOf(
         Pair("Phone", Icons.Default.PhoneAndroid),
@@ -62,14 +66,14 @@ fun DistractionDialog(
                 .shadow(
                     elevation = 16.dp,
                     shape = RoundedCornerShape(28.dp),
-                    ambientColor = Color(0x33000000),
-                    spotColor = Color(0x338B7CFF)
+                    ambientColor = Color(0x20000000),
+                    spotColor = Color(0x308CE000)
                 )
                 .clip(RoundedCornerShape(28.dp))
-                .background(if (isDark) Color(0xFF161820) else Color(0xFFF9F9F7))
+                .background(if (isDark) Color(0xFF1D221C) else Color(0xFFFFFFFF))
                 .border(
                     1.dp,
-                    if (isDark) Color(0x28FFFFFF) else Color(0x18000000),
+                    if (isDark) Color(0x308CE000) else Color(0x20000000),
                     RoundedCornerShape(28.dp)
                 )
                 .padding(24.dp)
@@ -78,18 +82,19 @@ fun DistractionDialog(
                 Text(
                     text = "Log Distraction",
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 19.sp,
+                        color = if (isDark) Color(0xFFF0F4ED) else NearBlack
                     )
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
                     text = "Acknowledge the impulse and return to flow.",
                     style = MaterialTheme.typography.bodySmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
+                        color = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight,
+                        fontSize = 13.sp
                     )
                 )
 
@@ -104,7 +109,12 @@ fun DistractionDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(if (isDark) Color(0x18FFFFFF) else Color(0x0C000000))
+                                .background(if (isDark) Color(0xFF262C24) else Color(0xFFF4F8EE))
+                                .border(
+                                    1.dp,
+                                    if (isDark) Color(0x25FFFFFF) else Color(0xFFE2EBD6),
+                                    RoundedCornerShape(16.dp)
+                                )
                                 .clickable {
                                     onLogDistraction(type)
                                     onDismiss()
@@ -116,13 +126,13 @@ fun DistractionDialog(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .background(VioletAccent.copy(alpha = 0.15f)),
+                                    .background(RegainLimePrimary.copy(alpha = if (isDark) 0.25f else 0.18f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = icon,
                                     contentDescription = type,
-                                    tint = VioletAccent,
+                                    tint = if (isDark) RegainLimePrimary else RegainLimeDeepText,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -133,7 +143,8 @@ fun DistractionDialog(
                                 text = type,
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDark) Color(0xFFF0F4ED) else NearBlack
                                 )
                             )
                         }
@@ -146,7 +157,8 @@ fun DistractionDialog(
                     Text(
                         text = "Never mind",
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight,
+                            fontWeight = FontWeight.Medium
                         )
                     )
                 }

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_streak_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_card_bg_streak"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Top Row: Mascot + Streak Flame -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/widget_streak_mascot"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:contentDescription="Streak Mascot"
+            android:src="@drawable/mascot_celebration" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_streak_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/poppins_bold"
+                android:letterSpacing="-0.01"
+                android:text="🔥 1 DAY STREAK"
+                android:textColor="@color/focivo_orange"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/widget_streak_level"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/poppins_medium"
+                android:text="Level 1 Student · Focus Daily"
+                android:textColor="@color/focivo_text_muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/widget_streak_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/widget_pill_badge_orange"
+            android:fontFamily="@font/poppins_bold"
+            android:letterSpacing="0.04"
+            android:paddingStart="10dp"
+            android:paddingTop="3.5dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="3.5dp"
+            android:text="ON FIRE"
+            android:textColor="@color/focivo_orange"
+            android:textSize="9.5sp" />
+    </LinearLayout>
+
+    <!-- Center: Motivational Student Quote in Frosted Card -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_glass_inner_card"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:paddingStart="12dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="6dp">
+
+        <TextView
+            android:id="@+id/widget_streak_quote"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="@font/poppins_medium"
+            android:maxLines="2"
+            android:text="&quot;Every page studied today is a step towards your dream ✨&quot;"
+            android:textColor="@color/focivo_text_secondary"
+            android:textSize="11.5sp" />
+    </LinearLayout>
+
+    <!-- Bottom: Today Study Goal Progress -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/poppins_medium"
+                android:text="Today's Study Goal"
+                android:textColor="@color/focivo_text_muted"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/widget_streak_goal_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/poppins_bold"
+                android:text="0 / 90m"
+                android:textColor="@color/focivo_text_primary"
+                android:textSize="11.5sp" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/widget_streak_progress_bar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="9dp"
+            android:layout_marginTop="5dp"
+            android:max="100"
+            android:progress="35"
+            android:progressDrawable="@drawable/widget_progress_drawable" />
+    </LinearLayout>
+</LinearLayout>

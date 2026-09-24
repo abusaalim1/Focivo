@@ -147,47 +147,7 @@ class AmbientAudioEngine {
     }
 
     fun playShieldWarningTone() {
-        scope.launch {
-            try {
-                val sampleRate = 22050
-                val durationSec = 0.35
-                val numSamples = (sampleRate * durationSec).toInt()
-                val buffer = ShortArray(numSamples)
-                val freq = 320.0
-                var phase = 0.0
-
-                for (i in 0 until numSamples) {
-                    val progress = i.toDouble() / numSamples
-                    val pulse = if ((progress * 10).toInt() % 2 == 0) 1.0 else 0.2
-                    val sample = sin(phase) * pulse * 0.5
-                    buffer[i] = (sample * 32767.0).toInt().coerceIn(-32768, 32767).toShort()
-                    phase += 2.0 * Math.PI * freq / sampleRate
-                }
-
-                val track = AudioTrack.Builder()
-                    .setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    .setAudioFormat(
-                        AudioFormat.Builder()
-                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                            .setSampleRate(sampleRate)
-                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                            .build()
-                    )
-                    .setBufferSizeInBytes(buffer.size * 2)
-                    .setTransferMode(AudioTrack.MODE_STATIC)
-                    .build()
-
-                track.write(buffer, 0, buffer.size)
-                track.play()
-            } catch (e: Exception) {
-                Log.w("AmbientAudioEngine", "Warning tone error: ${e.message}")
-            }
-        }
+        // App intercept noise muted per user request
     }
 
     fun playShieldUnlockChime() {

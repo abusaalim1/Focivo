@@ -181,7 +181,7 @@ fun PrivacyPolicySheet(
                         accentColor = limeAccent
                     ) {
                         Text(
-                            text = "Focivo is a study focus and app-blocking application designed to help students and professionals build better focus habits by blocking distracting apps during study sessions.\n\nFor any questions about this policy, you can reach us at: abusaalim.design@gmail.com",
+                            text = "Focivo is a study focus and app-blocking application designed to help students and professionals build better focus habits by blocking distracting apps during study sessions.\n\nFor any questions about this policy, you can reach us at: focivo.app@gmail.com",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = PoppinsFontFamily,
                                 color = textSecondary,
@@ -249,7 +249,7 @@ fun PrivacyPolicySheet(
                             fontFamily = PoppinsFontFamily
                         )
                         BulletPoint("We request Android's Accessibility Service permission", textSecondary)
-                        BulletPoint("This permission allows the app to read on-screen text only within the Claude and ChatGPT apps, and only while an active study session or scheduled study window is running", textSecondary)
+                        BulletPoint("This permission allows AI Academic Sentinel to verify study context only during an active study session or scheduled focus window. 100% private and on-device.", textSecondary)
                         BulletPoint("This is used solely to determine whether your activity in those apps appears study-related or not", textSecondary)
                         BulletPoint("We do not read, record, or monitor any other app on your device — not your messages, not your browser, not your photos, nothing else", textSecondary)
                         BulletPoint("All text analysis happens entirely on your device. We do not transmit any captured on-screen text to our servers or any third party", textSecondary)
@@ -270,13 +270,13 @@ fun PrivacyPolicySheet(
                     // Section 4
                     PolicySection(
                         number = "4",
-                        title = "Device Admin Permission (Strict Mode)",
+                        title = "Strict Study Mode",
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
                         accentColor = limeAccent
                     ) {
                         Text(
-                            text = "If you choose to enable \"Strict Mode,\" we request Device Admin privileges to make it more difficult to uninstall the app or disable its blocking features during an active study session. This is a voluntary, user-enabled feature intended to support self-discipline — it does not grant us any additional access to your personal data, and you can disable Device Admin at any time through your device's Settings.",
+                            text = "If you choose to enable \"Strict Mode,\" Focivo helps you avoid distractions by locking distraction-prone apps during your active study timer or scheduled focus hours. It is completely safe, customizable, and can be configured at any time within your app settings.",
                             color = textSecondary,
                             fontSize = 13.sp,
                             lineHeight = 19.sp,
@@ -369,11 +369,11 @@ fun PrivacyPolicySheet(
                         BulletPoint("Access the personal data we hold about you", textSecondary)
                         BulletPoint("Request correction of inaccurate data", textSecondary)
                         BulletPoint("Request deletion of your account and associated data", textSecondary)
-                        BulletPoint("Withdraw consent for optional features (Accessibility Service, Device Admin) at any time", textSecondary)
+                        BulletPoint("Withdraw consent for optional features (Accessibility Service, Focus Shield) at any time", textSecondary)
 
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "To exercise any of these rights, contact us at abusaalim.design@gmail.com.",
+                            text = "To exercise any of these rights, contact us at focivo.app@gmail.com.",
                             color = textSecondary,
                             fontSize = 13.sp,
                             fontFamily = PoppinsFontFamily
@@ -440,7 +440,7 @@ fun PrivacyPolicySheet(
                         accentColor = limeAccent
                     ) {
                         Text(
-                            text = "If you have any questions, concerns, or requests regarding this Privacy Policy or your data, please reach out to:\n\nEmail: abusaalim.design@gmail.com",
+                            text = "If you have any questions, concerns, or requests regarding this Privacy Policy or your data, please reach out to:\n\nEmail: focivo.app@gmail.com",
                             color = textSecondary,
                             fontSize = 13.sp,
                             lineHeight = 19.sp,

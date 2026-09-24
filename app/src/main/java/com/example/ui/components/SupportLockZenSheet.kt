@@ -7,7 +7,6 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -59,6 +59,7 @@ import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 
 data class PresetTier(
     val amount: Int,
@@ -79,17 +80,19 @@ fun SupportLockZenSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
 
     var selectedAmount by remember { mutableStateOf(99) }
     var customAmountText by remember { mutableStateOf("99") }
     var isCustomSelected by remember { mutableStateOf(false) }
+    var showPaymentConfirmDialog by remember { mutableStateOf(false) }
     var showThankYouDialog by remember { mutableStateOf(false) }
+    var lastPaymentMethod by remember { mutableStateOf("UPI") }
 
-    val bgSurface = if (isDark) MaterialTheme.colorScheme.surface else Color.White
-    val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
-    val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
-    val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
+    val bgSurface = if (isDark) Color(0xFF1D221C) else Color(0xFFFFFFFF)
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val cardBorder = if (isDark) Color(0x30FFFFFF) else Color(0xFFDCE6D2)
 
     val effectiveAmount = if (isCustomSelected) {
         customAmountText.toIntOrNull() ?: 99
@@ -103,20 +106,10 @@ fun SupportLockZenSheet(
         try {
             val chooser = Intent.createChooser(intent, "Pay via UPI App")
             context.startActivity(chooser)
-            showThankYouDialog = true
+            lastPaymentMethod = "UPI"
+            showPaymentConfirmDialog = true
         } catch (_: Exception) {
-            Toast.makeText(context, "No UPI app found. Please copy 7002395406@fam or use PayPal.", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    fun launchPaypalPayment() {
-        val paypalUrl = "https://www.paypal.com/paypalme/abusaalim/$effectiveAmount"
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(paypalUrl))
-        try {
-            context.startActivity(intent)
-            showThankYouDialog = true
-        } catch (_: Exception) {
-            Toast.makeText(context, "Unable to open browser for PayPal.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "No UPI app found. Please use UPI ID: 7002395406@fam", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -344,26 +337,10 @@ fun SupportLockZenSheet(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // PayPal Button
-            GlassButton(
-                text = "Pay via PayPal (International)",
-                onClick = { launchPaypalPayment() },
-                isPrimary = false,
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Payment,
-                        contentDescription = null,
-                        tint = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack,
-                        modifier = Modifier.size(18.dp)
-                    )
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Direct UPI ID: 7002395406@fam · PayPal: abusaalim.design@gmail.com",
+                text = "Direct UPI ID: 7002395406@fam · Contact: focivo.app@gmail.com",
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontFamily = PoppinsFontFamily,
                     color = textSecondary,
@@ -371,6 +348,66 @@ fun SupportLockZenSheet(
                 )
             )
         }
+    }
+
+    if (showPaymentConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showPaymentConfirmDialog = false
+            },
+            title = {
+                Text(
+                    text = "Confirm Payment 🌱",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = textPrimary
+                    )
+                )
+            },
+            text = {
+                Text(
+                    text = "Opened $lastPaymentMethod for ₹$effectiveAmount. Did you finish your payment?",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = PoppinsFontFamily,
+                        color = textPrimary
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPaymentConfirmDialog = false
+                        showThankYouDialog = true
+                    }
+                ) {
+                    Text(
+                        text = "I've Completed Payment ✅",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontFamily = PoppinsFontFamily,
+                            color = RegainLimeDeepText,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showPaymentConfirmDialog = false
+                    }
+                ) {
+                    Text(
+                        text = "Not Yet",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontFamily = PoppinsFontFamily,
+                            color = textSecondary
+                        )
+                    )
+                }
+            },
+            containerColor = bgSurface
+        )
     }
 
     if (showThankYouDialog) {
@@ -384,7 +421,8 @@ fun SupportLockZenSheet(
                     text = "Thank You! 💚",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = textPrimary
                     )
                 )
             },
@@ -392,7 +430,8 @@ fun SupportLockZenSheet(
                 Text(
                     text = "Thank you so much for your support! Every contribution helps keep Focivo free, independent, and continuously improving for everyone.",
                     style = MaterialTheme.typography.bodyMedium.copy(
-                        fontFamily = PoppinsFontFamily
+                        fontFamily = PoppinsFontFamily,
+                        color = textSecondary
                     )
                 )
             },
@@ -414,51 +453,64 @@ fun SupportLockZenSheet(
 @Composable
 fun SupportLockZenMilestoneDialog(
     onSupportClick: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onNeverShowAgain: () -> Unit = {}
 ) {
-    val isDark = isSystemInDarkTheme()
-    val bgSurface = if (isDark) MaterialTheme.colorScheme.surface else Color.White
-    val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
-    val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
+    val isDark = isAppInDarkTheme()
+    val bgSurface = if (isDark) Color(0xFF1D221C) else Color(0xFFFFFFFF)
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(RegainLimeContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Favorite,
-                    contentDescription = null,
-                    tint = RegainLimeDeepText,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            RegainMascotView(
+                width = 150.dp,
+                height = 200.dp,
+                pose = MascotPose.ACHIEVEMENT
+            )
         },
         title = {
             Text(
                 text = "Support Focivo 🌱",
                 style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = PoppinsFontFamily,
+                    fontFamily = AppleLinearFontFamily,
                     fontWeight = FontWeight.Bold,
                     color = textPrimary
                 )
             )
         },
         text = {
-            Text(
-                text = "Hey — if Focivo has helped you stay focused, it'd mean a lot if you considered supporting its growth. I built this solo, and every bit helps keep it alive. Totally optional, no pressure at all 🌱",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontFamily = PoppinsFontFamily,
-                    color = textPrimary,
-                    fontSize = 13.sp,
-                    lineHeight = 20.sp
+            Column {
+                Text(
+                    text = "Hey — if Focivo has helped you stay focused, it'd mean a lot if you considered supporting its growth. I built this solo, and every bit helps keep it alive. Totally optional, no pressure at all 🌱",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = AppleLinearFontFamily,
+                        color = textPrimary,
+                        fontSize = 13.5.sp,
+                        lineHeight = 20.sp
+                    )
                 )
-            )
+                Spacer(modifier = Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onNeverShowAgain() }
+                        .padding(vertical = 4.dp, horizontal = 2.dp)
+                        .testTag("milestone_dont_show_again_btn"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Don't show this again",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = AppleLinearFontFamily,
+                            color = textSecondary.copy(alpha = 0.75f),
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 11.5.sp
+                        )
+                    )
+                }
+            }
         },
         confirmButton = {
             TextButton(
@@ -470,7 +522,7 @@ fun SupportLockZenMilestoneDialog(
                 Text(
                     text = "Support Focivo",
                     style = MaterialTheme.typography.labelLarge.copy(
-                        fontFamily = PoppinsFontFamily,
+                        fontFamily = AppleLinearFontFamily,
                         color = RegainLimeDeepText,
                         fontWeight = FontWeight.Bold
                     )
@@ -482,7 +534,7 @@ fun SupportLockZenMilestoneDialog(
                 Text(
                     text = "Not now",
                     style = MaterialTheme.typography.labelLarge.copy(
-                        fontFamily = PoppinsFontFamily,
+                        fontFamily = AppleLinearFontFamily,
                         color = textSecondary
                     )
                 )

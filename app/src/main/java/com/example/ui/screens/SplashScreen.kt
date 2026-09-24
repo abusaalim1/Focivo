@@ -31,13 +31,15 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.LavenderSoft
-import com.example.ui.theme.VioletAccent
+import com.example.ui.theme.NearBlack
+import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(onSplashFinished: () -> Unit) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     var startAnim by remember { mutableStateOf(false) }
 
     val alphaAnim by animateFloatAsState(
@@ -58,10 +60,13 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
         onSplashFinished()
     }
 
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -88,21 +93,11 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
             Text(
                 text = "FOCIVO",
                 style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = PoppinsFontFamily,
                     letterSpacing = 6.sp,
-                    fontWeight = FontWeight.Light,
-                    fontSize = 17.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = alphaAnim)
-                )
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "DEEP WORK OS",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    letterSpacing = 3.sp,
-                    fontSize = 9.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alphaAnim * 0.7f)
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = textPrimary.copy(alpha = alphaAnim)
                 )
             )
         }

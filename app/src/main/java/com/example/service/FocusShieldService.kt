@@ -9,6 +9,7 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.util.Log
 import android.media.AudioManager
 import android.os.Build
@@ -76,9 +77,18 @@ class FocusShieldService : Service() {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val endTime = prefs.getLong(PREF_KEY_SHIELD_END_TIME, 0L)
             val isScheduled = ScheduledBlockScheduler.isScheduleCurrentlyActive(context)
-            val hasActivePunishment = com.example.util.AiStudyGuardManager.isAppUnderPunishment(context, "com.openai.chatgpt") ||
-                    com.example.util.AiStudyGuardManager.isAppUnderPunishment(context, "com.anthropic.claude")
-            return _isShieldActive.value || (endTime > System.currentTimeMillis()) || isScheduled || hasActivePunishment
+            val isPunishment = _isPunishmentLock.value || prefs.getBoolean(PREF_KEY_IS_PUNISHMENT, false)
+            return (_isShieldActive.value || (endTime > System.currentTimeMillis()) || isScheduled) && !isPunishment
+        }
+
+        fun getActiveBlockedPackages(context: Context): Set<String> {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val blockedRaw = prefs.getString(PREF_KEY_BLOCKED_LIST, "") ?: ""
+            val baseList = blockedRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }.toSet()
+            val scheduled = if (ScheduledBlockScheduler.isScheduleCurrentlyActive(context)) {
+                ScheduledBlockScheduler.getCurrentlyActiveBlockedPackages(context)
+            } else emptySet()
+            return com.example.util.EssentialAppsGuard.sanitizeBlockedPackages(context, baseList + scheduled)
         }
 
         fun getRemainingSeconds(context: Context): Int {
@@ -87,6 +97,20 @@ class FocusShieldService : Service() {
             val endTime = prefs.getLong(PREF_KEY_SHIELD_END_TIME, 0L)
             val diff = (endTime - System.currentTimeMillis()) / 1000L
             return if (diff > 0) diff.toInt() else 0
+        }
+
+        fun getForegroundPackage(usageStatsManager: android.app.usage.UsageStatsManager): String? {
+            val now = System.currentTimeMillis()
+            val events = usageStatsManager.queryEvents(now - 4000L, now)
+            val event = android.app.usage.UsageEvents.Event()
+            var latestPackage: String? = null
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                if (event.eventType == android.app.usage.UsageEvents.Event.ACTIVITY_RESUMED) {
+                    latestPackage = event.packageName
+                }
+            }
+            return latestPackage
         }
 
         fun friendlyAppName(context: Context, packageName: String): String {
@@ -143,13 +167,16 @@ class FocusShieldService : Service() {
                 val blockedListRaw = prefs.getString(PREF_KEY_BLOCKED_LIST, "") ?: ""
                 val scheduledPackages = if (isScheduledActive) ScheduledBlockScheduler.getCurrentlyActiveBlockedPackages(this) else emptySet()
                 val configuredPackages = blockedListRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }.toSet()
-                val allBlockedPackages = scheduledPackages + configuredPackages
+                val allBlockedPackages = com.example.util.EssentialAppsGuard.sanitizeBlockedPackages(
+                    this,
+                    scheduledPackages + configuredPackages
+                )
 
                 val effectiveSec = if (remainingTimer > 0) remainingTimer else 24 * 60 * 60
                 _isPunishmentLock.value = isPunishment
                 _punishedPackageTarget.value = punishedPkg
                 Log.d("FocusShieldService", "[ProcessRestart] Restoring shield for $effectiveSec seconds on packages: $allBlockedPackages")
-                startForeground(NOTIFICATION_ID, buildNotification(effectiveSec, isPunishment, punishedPkg))
+                safeStartForeground(NOTIFICATION_ID, buildNotification(effectiveSec, isPunishment, punishedPkg))
                 startMonitoring(effectiveSec, allBlockedPackages, isPunishment, punishedPkg)
                 return START_STICKY
             } else {
@@ -183,7 +210,7 @@ class FocusShieldService : Service() {
         }
 
         _isPunishmentLock.value = isPunishment
-        startForeground(NOTIFICATION_ID, buildNotification(durationSeconds, isPunishment, punishedPackage))
+        safeStartForeground(NOTIFICATION_ID, buildNotification(durationSeconds, isPunishment, punishedPackage))
         startMonitoring(durationSeconds, blockedPackages, isPunishment, punishedPackage)
 
         return START_STICKY
@@ -212,6 +239,28 @@ class FocusShieldService : Service() {
                 startForegroundService(restartIntent)
             } else {
                 startService(restartIntent)
+            }
+        }
+    }
+
+    private fun safeStartForeground(notificationId: Int, notification: Notification) {
+        try {
+            createNotificationChannel()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    notificationId,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(notificationId, notification)
+            }
+        } catch (e: Throwable) {
+            Log.e("FocusShieldService", "safeStartForeground with type failed: ${e.message}; attempting fallback", e)
+            try {
+                startForeground(notificationId, notification)
+            } catch (fallbackEx: Throwable) {
+                Log.e("FocusShieldService", "Foreground service fallback failed: ${fallbackEx.message}", fallbackEx)
             }
         }
     }
@@ -259,14 +308,16 @@ class FocusShieldService : Service() {
         }
 
         val text = if (isPunishment) {
-            val appTitle = punishedPkg?.let { friendlyAppName(this, it) } ?: "AI App"
+            val appTitle = punishedPkg?.let { friendlyAppName(this, it) } ?: "App"
             "$appTitle is locked due to non-study usage. All other apps remain unlocked."
         } else {
-            "Blocking distracting apps during study focus. Claude & ChatGPT allowed."
+            "Blocking distracting apps during study focus. Academic study tools allowed."
         }
 
+        val largeIcon = BitmapFactory.decodeResource(resources, R.drawable.ic_notification_large)
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .setSmallIcon(R.drawable.ic_notification_small)
+            .setLargeIcon(largeIcon)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(pendingIntent)
@@ -335,6 +386,7 @@ class FocusShieldService : Service() {
         _punishedPackageTarget.value = punishedPackage
 
         val endTime = System.currentTimeMillis() + (totalSeconds * 1000L)
+        com.example.util.StudyNotificationBlockerManager.activateStudyNotificationBlock(this)
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val edit = prefs.edit()
             .putBoolean(PREF_KEY_SHIELD_ACTIVE, true)
@@ -344,7 +396,8 @@ class FocusShieldService : Service() {
         if (isPunishment) {
             edit.putString(PREF_KEY_PUNISHED_PACKAGE, punishedPackage ?: "")
         } else {
-            edit.putString(PREF_KEY_BLOCKED_LIST, blockedPackages.joinToString(","))
+            val sanitized = com.example.util.EssentialAppsGuard.sanitizeBlockedPackages(this, blockedPackages)
+            edit.putString(PREF_KEY_BLOCKED_LIST, sanitized.joinToString(","))
         }
         edit.apply()
 
@@ -389,22 +442,31 @@ class FocusShieldService : Service() {
 
                     val foregroundPackage = getForegroundPackage(usageStatsManager)
                     if (foregroundPackage != null && foregroundPackage != packageName) {
+                        // PERMANENTLY PROTECTED: Phone, Contacts, Camera, Messages/SMS, Settings, Telecom
+                        if (com.example.util.EssentialAppsGuard.isEssentialApp(this@FocusShieldService, foregroundPackage)) {
+                            continue
+                        }
+
                         // Whitelist incoming calls, telecom, dialer, system phone
                         if (isTelecomOrSystemApp(foregroundPackage)) {
                             continue
                         }
 
-                        // Prevent uninstallation and opening Settings during active schedule or shield!
-                        if ((_isShieldActive.value || isScheduled) && isSettingsOrPackageInstallerApp(foregroundPackage)) {
-                            lastInterceptTime = System.currentTimeMillis()
-                            _lastInterceptedPackage.value = foregroundPackage
-                            violationCount++
-                            interceptDistraction(
-                                blockedPackage = foregroundPackage,
-                                remainingSec = secondsLeft,
-                                isPunishment = false,
-                                reason = "Settings & Uninstallation locked during active Study Schedule! Focus on your study goals."
-                            )
+                        // Prevent uninstallation and opening Settings during active schedule or shield (Strict mode only, never on punishment)
+                        val isStrictEnabled = com.example.util.StrictModeManager.isStrictModeEnabled(this@FocusShieldService)
+                        if (!isPunishment && (_isShieldActive.value || isScheduled) && isStrictEnabled && isSettingsOrPackageInstallerApp(foregroundPackage)) {
+                            val now = System.currentTimeMillis()
+                            if (now - lastInterceptTime > 3000L) {
+                                lastInterceptTime = now
+                                _lastInterceptedPackage.value = foregroundPackage
+                                violationCount++
+                                interceptDistraction(
+                                    blockedPackage = foregroundPackage,
+                                    remainingSec = secondsLeft,
+                                    isPunishment = false,
+                                    reason = "Settings & App Management are protected during your active study session."
+                                )
+                            }
                             continue
                         }
 
@@ -413,17 +475,20 @@ class FocusShieldService : Service() {
                                 com.example.util.AiStudyGuardManager.isAppUnderPunishment(this@FocusShieldService, foregroundPackage)
 
                         if (isForegroundPunished) {
-                            lastInterceptTime = System.currentTimeMillis()
-                            _lastInterceptedPackage.value = foregroundPackage
-                            val remainingLock = com.example.util.AiStudyGuardManager.getPunishmentRemainingSeconds(this@FocusShieldService, foregroundPackage)
-                            val effectiveRemaining = if (remainingLock > 0) remainingLock else secondsLeft
-                            val appTitle = friendlyAppName(this@FocusShieldService, foregroundPackage)
-                            interceptDistraction(
-                                blockedPackage = foregroundPackage,
-                                remainingSec = effectiveRemaining,
-                                isPunishment = true,
-                                reason = "3-Hour Penalty: $appTitle is locked for non-study conversation. Other apps remain unlocked."
-                            )
+                            val now = System.currentTimeMillis()
+                            if (now - lastInterceptTime > 2500L) {
+                                lastInterceptTime = now
+                                _lastInterceptedPackage.value = foregroundPackage
+                                val remainingLock = com.example.util.AiStudyGuardManager.getPunishmentRemainingSeconds(this@FocusShieldService, foregroundPackage)
+                                val effectiveRemaining = if (remainingLock > 0) remainingLock else secondsLeft
+                                val appTitle = friendlyAppName(this@FocusShieldService, foregroundPackage)
+                                interceptDistraction(
+                                    blockedPackage = foregroundPackage,
+                                    remainingSec = effectiveRemaining,
+                                    isPunishment = true,
+                                    reason = "3-Hour Penalty: $appTitle is locked for non-study conversation. Other apps remain unlocked."
+                                )
+                            }
                             continue
                         }
 
@@ -447,10 +512,13 @@ class FocusShieldService : Service() {
                         }
 
                         if (isBlocked) {
-                            lastInterceptTime = System.currentTimeMillis()
-                            _lastInterceptedPackage.value = foregroundPackage
-                            violationCount++
-                            interceptDistraction(foregroundPackage, secondsLeft)
+                            val now = System.currentTimeMillis()
+                            if (now - lastInterceptTime > 2500L) {
+                                lastInterceptTime = now
+                                _lastInterceptedPackage.value = foregroundPackage
+                                violationCount++
+                                interceptDistraction(foregroundPackage, secondsLeft)
+                            }
                         }
                     }
                 }
@@ -475,34 +543,36 @@ class FocusShieldService : Service() {
         return latestPackage
     }
 
+    private var lastInterceptPkg: String? = null
+    private var lastInterceptTimestamp: Long = 0L
+
     private fun interceptDistraction(
         blockedPackage: String,
         remainingSec: Int,
         isPunishment: Boolean = false,
         reason: String? = null
     ) {
-        // Direct back to home screen immediately
-        try {
-            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_HOME)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            startActivity(homeIntent)
-        } catch (_: Exception) {}
+        val now = System.currentTimeMillis()
+        if (blockedPackage == lastInterceptPkg && (now - lastInterceptTimestamp) < 2500L) {
+            return
+        }
+        lastInterceptPkg = blockedPackage
+        lastInterceptTimestamp = now
 
         val friendlyName = friendlyAppName(this, blockedPackage)
-        val interceptIntent = Intent(this, MainActivity::class.java).apply {
-            action = ACTION_INTERCEPT_BLOCKED_APP
-            putExtra(EXTRA_BLOCKED_PACKAGE, blockedPackage)
-            putExtra(EXTRA_BLOCKED_NAME, friendlyName)
-            putExtra(EXTRA_DURATION_SECONDS, remainingSec)
-            putExtra(EXTRA_IS_PUNISHMENT, isPunishment)
-            if (reason != null) {
-                putExtra(EXTRA_PUNISHMENT_REASON, reason)
-            }
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        val interceptIntent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+            context = this,
+            packageName = blockedPackage,
+            appName = friendlyName,
+            durationSec = remainingSec,
+            reason = reason,
+            isPunishment = isPunishment
+        )
+        try {
+            startActivity(interceptIntent)
+        } catch (e: Exception) {
+            Log.e("FocusShieldService", "Failed to launch BlockedAppLockActivity: ${e.message}")
         }
-        startActivity(interceptIntent)
     }
 
     private fun onShieldTimerComplete() {
@@ -530,8 +600,10 @@ class FocusShieldService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val largeIcon = BitmapFactory.decodeResource(resources, R.drawable.ic_notification_large)
         val completeNotification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .setSmallIcon(R.drawable.ic_notification_small)
+            .setLargeIcon(largeIcon)
             .setContentTitle("🎉 Unbroken Focus Achieved!")
             .setContentText("Focus Shield timer finished. Selected apps are now unlocked.")
             .setContentIntent(pendingIntent)
@@ -546,6 +618,7 @@ class FocusShieldService : Service() {
     }
 
     private fun stopShield() {
+        com.example.util.StudyNotificationBlockerManager.deactivateStudyNotificationBlock(this)
         monitorJob?.cancel()
         monitorJob = null
         _isShieldActive.value = false

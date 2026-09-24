@@ -58,7 +58,10 @@ import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.GlassButton
 import com.example.ui.components.GlassCard
 import com.example.ui.components.SegmentedControl
-import com.example.ui.theme.VioletAccent
+import com.example.ui.theme.isAppInDarkTheme
+import com.example.ui.theme.RegainLimePrimary
+import com.example.util.StudyNotificationBlockerManager
+import androidx.compose.material.icons.filled.NotificationsOff
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -75,11 +78,13 @@ fun SettingsScreen(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     val context = LocalContext.current
 
     var notificationsEnabled by remember { mutableStateOf(userPreferences?.notificationsEnabled ?: true) }
     var hapticsEnabled by remember { mutableStateOf(userPreferences?.hapticsEnabled ?: true) }
+    var blockStudyNotifications by remember { mutableStateOf(StudyNotificationBlockerManager.isBlockNotificationsDuringStudyEnabled(context)) }
+    var hasDndPermission by remember { mutableStateOf(StudyNotificationBlockerManager.hasDndPermission(context)) }
     var showAiGuardDisclosureDialog by remember { mutableStateOf(false) }
     var showPrivacyPolicySheet by remember { mutableStateOf(false) }
 
@@ -149,7 +154,7 @@ fun SettingsScreen(
                         Icon(
                             imageVector = Icons.Default.DarkMode,
                             contentDescription = null,
-                            tint = VioletAccent,
+                            tint = RegainLimePrimary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
@@ -195,7 +200,7 @@ fun SettingsScreen(
                         Icon(
                             imageVector = Icons.Default.Schedule,
                             contentDescription = null,
-                            tint = VioletAccent,
+                            tint = RegainLimePrimary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
@@ -223,7 +228,7 @@ fun SettingsScreen(
                                     .weight(1f)
                                     .clip(RoundedCornerShape(14.dp))
                                     .background(
-                                        if (isSelected) VioletAccent else (if (isDark) Color(0x18FFFFFF) else Color(0x0C000000))
+                                        if (isSelected) RegainLimePrimary else (if (isDark) Color(0x18FFFFFF) else Color(0x0C000000))
                                     )
                                     .clickable { onUpdateDailyGoal(minutes) }
                                     .padding(vertical = 12.dp),
@@ -264,7 +269,7 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = Icons.Default.Vibration,
                                 contentDescription = null,
-                                tint = VioletAccent,
+                                tint = RegainLimePrimary,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
@@ -282,7 +287,7 @@ fun SettingsScreen(
                             onCheckedChange = { hapticsEnabled = it },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = VioletAccent
+                                checkedTrackColor = RegainLimePrimary
                             )
                         )
                     }
@@ -298,7 +303,7 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = Icons.Default.Notifications,
                                 contentDescription = null,
-                                tint = VioletAccent,
+                                tint = RegainLimePrimary,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
@@ -316,9 +321,106 @@ fun SettingsScreen(
                             onCheckedChange = { notificationsEnabled = it },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
-                                checkedTrackColor = VioletAccent
+                                checkedTrackColor = RegainLimePrimary
                             )
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Block Notifications During Study Session
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (isDark) Color(0x18FFFFFF) else Color(0x08000000))
+                            .padding(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.NotificationsOff,
+                                    contentDescription = null,
+                                    tint = RegainLimePrimary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Block Notifications in Study",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    )
+                                    Text(
+                                        text = "Mutes distracting app alerts & pings while timer is running",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = blockStudyNotifications,
+                                onCheckedChange = { enabled ->
+                                    blockStudyNotifications = enabled
+                                    StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, enabled)
+                                    Toast.makeText(
+                                        context,
+                                        if (enabled) "Notifications will be blocked during study sessions" else "Study notification blocking disabled",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = RegainLimePrimary
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Action Button to Block / Manage DND access
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(38.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(RegainLimePrimary.copy(alpha = 0.18f))
+                                    .clickable {
+                                        if (!hasDndPermission) {
+                                            StudyNotificationBlockerManager.openDndSettings(context)
+                                        } else {
+                                            // Toggle test instant silence
+                                            StudyNotificationBlockerManager.activateStudyNotificationBlock(context)
+                                            Toast.makeText(context, "🔕 Study Notifications Muted Now!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (!hasDndPermission) "Enable Do Not Disturb Access" else "Block Notifications Now",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) RegainLimePrimary else Color(0xFF15803D)
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -345,13 +447,13 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(VioletAccent.copy(alpha = 0.15f)),
+                                .background(RegainLimePrimary.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Alarm,
                                 contentDescription = null,
-                                tint = VioletAccent,
+                                tint = RegainLimePrimary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -408,13 +510,13 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(VioletAccent.copy(alpha = 0.15f)),
+                                .background(RegainLimePrimary.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Security,
                                 contentDescription = null,
-                                tint = VioletAccent,
+                                tint = RegainLimePrimary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -470,13 +572,13 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(VioletAccent.copy(alpha = 0.15f)),
+                                .background(RegainLimePrimary.copy(alpha = 0.15f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Info,
                                 contentDescription = null,
-                                tint = VioletAccent,
+                                tint = RegainLimePrimary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -568,7 +670,6 @@ fun SettingsScreen(
                         text = "Sign Out of Local Account",
                         onClick = {
                             onLogout()
-                            Toast.makeText(context, "Signed out", Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.fillMaxWidth(),
                         isPrimary = false
@@ -592,12 +693,12 @@ fun SettingsScreen(
                         Icon(
                             imageVector = Icons.Default.Info,
                             contentDescription = null,
-                            tint = VioletAccent,
+                            tint = RegainLimePrimary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "ABOUT FOCIVO",
+                            text = "ABOUT REGAIN",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 letterSpacing = 1.2.sp
@@ -608,7 +709,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Focivo OS v1.0.0",
+                        text = "Regain OS v1.0.0",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp

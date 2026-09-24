@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.LavenderSoft
 import com.example.ui.theme.VioletAccent
+import com.example.ui.components.CivoChatBubble
 import com.example.util.PermissionUtils
 import kotlinx.coroutines.launch
 
@@ -160,30 +161,15 @@ fun NotificationAlarmPermissionSheet(
                 )
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text = "Enable Alarms & Notifications",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp,
-                    color = Color.White
-                )
+            CivoChatBubble(
+                text = "Almost there! Allow notifications and alarms so I can wake you up for breaks and study sprints.",
+                avatarSize = 48.dp,
+                typingSpeedMs = 30L
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "Ensure timer break chimes, completion alarms, and live countdowns wake your device on time.",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 13.sp,
-                    lineHeight = 19.sp
-                ),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(22.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Rationale Cards
             Column(

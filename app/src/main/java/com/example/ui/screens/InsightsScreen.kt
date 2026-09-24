@@ -41,6 +41,7 @@ import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.AuroraBackground
 import com.example.ui.components.GlassCard
 import com.example.ui.components.LiquidGlassCard
+import com.example.ui.components.WeeklyProductivityChart
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -49,6 +50,9 @@ import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -59,7 +63,7 @@ fun InsightsScreen(
     onSaveReflection: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
@@ -71,27 +75,6 @@ fun InsightsScreen(
         if (totalSeconds > 0) String.format(Locale.US, "%.1f", totalSeconds / 3600.0) else "0.0"
     }
     val sessionCount = sessions.size
-
-    val daysLabels = listOf(1 to "M", 2 to "T", 3 to "W", 4 to "T", 5 to "F", 6 to "S", 7 to "S")
-    val maxSecondsInADay = remember(sessions) {
-        (1..7).maxOfOrNull { day ->
-            sessions.filter { it.dayOfWeek == day }.sumOf { it.durationSeconds }
-        }?.coerceAtLeast(1) ?: 1
-    }
-
-    val weeklyBars = remember(sessions, maxSecondsInADay) {
-        daysLabels.map { (dayNum, label) ->
-            val daySecs = sessions.filter { it.dayOfWeek == dayNum }.sumOf { it.durationSeconds }
-            val fraction = if (sessions.isEmpty()) {
-                0.15f
-            } else if (daySecs > 0) {
-                (daySecs.toFloat() / maxSecondsInADay.toFloat()).coerceIn(0.18f, 1f)
-            } else {
-                0.15f
-            }
-            Pair(label, fraction)
-        }
-    }
 
     val completionRate = remember(sessions) {
         if (sessions.isNotEmpty()) {
@@ -124,8 +107,10 @@ fun InsightsScreen(
         }
     }
 
-    val streakText = remember(userPreferences?.currentStreak) {
-        "${userPreferences?.currentStreak ?: 0}d"
+    val activeDaysText = remember(sessions) {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val days = sessions.filter { it.completedAt > 0 }.map { sdf.format(Date(it.completedAt)) }.toSet().size
+        "${days}d"
     }
 
     val peakFlowText = remember(sessions) {
@@ -139,6 +124,25 @@ fun InsightsScreen(
             val endAmPm = if (endHour < 12) "AM" else "PM"
             val displayEnd = if (endHour % 12 == 0) 12 else endHour % 12
             String.format(Locale.US, "%02d:00 %s – %02d:00 %s", displayStart, startAmPm, displayEnd, endAmPm)
+        }
+    }
+
+    val subjectBreakdown = remember(sessions) {
+        if (sessions.isEmpty()) {
+            emptyList()
+        } else {
+            sessions.groupBy { it.taskTitle.ifBlank { "General" } }
+                .map { (subject, sessionList) ->
+                    val totalSecs = sessionList.sumOf { it.durationSeconds }
+                    val hrs = totalSecs / 3600.0
+                    val formatted = if (hrs >= 0.1) {
+                        String.format(Locale.US, "%.1f hrs", hrs)
+                    } else {
+                        "${(totalSecs / 60).coerceAtLeast(1)} mins"
+                    }
+                    Triple(subject, totalSecs, formatted)
+                }
+                .sortedByDescending { it.second }
         }
     }
 
@@ -179,98 +183,16 @@ fun InsightsScreen(
                 }
             }
 
-            // Total Flow Hours Card
+            // Weekly Productivity Visualization Chart
             item {
-                LiquidGlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp)
-                    ) {
-                        Text(
-                            text = "TOTAL FLOW TIME",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                color = textSecondary,
-                                letterSpacing = 1.6.sp,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(verticalAlignment = Alignment.Bottom) {
-                            Text(
-                                text = totalHours,
-                                style = androidx.compose.ui.text.TextStyle(
-                                    fontFamily = PoppinsFontFamily,
-                                    fontSize = 54.sp,
-                                    lineHeight = 60.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = textPrimary
-                                )
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "HOURS",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    color = accentLime,
-                                    letterSpacing = 1.sp
-                                ),
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        // Weekly Minimal Column Chart
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(110.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Bottom
-                        ) {
-                            weeklyBars.forEach { bar ->
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Bottom,
-                                    modifier = Modifier.fillMaxHeight()
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width(26.dp)
-                                            .height((76 * bar.second).dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(
-                                                if (bar.second >= 0.8f) {
-                                                    RegainLimePrimary
-                                                } else {
-                                                    if (isDark) MaterialTheme.colorScheme.surfaceVariant else RegainLimeContainer
-                                                }
-                                            )
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = bar.first,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontFamily = PoppinsFontFamily,
-                                            color = if (bar.second >= 0.8f) textPrimary else textSecondary,
-                                            fontWeight = if (bar.second >= 0.8f) FontWeight.Bold else FontWeight.Medium,
-                                            fontSize = 11.sp
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
+                val dailyGoalHours = remember(userPreferences) {
+                    (userPreferences?.dailyGoalMinutes?.toFloat() ?: 120f) / 60f
                 }
+                WeeklyProductivityChart(
+                    sessions = sessions,
+                    targetDailyGoalHours = dailyGoalHours,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             // Clean 3-Metric Horizontal Strip
@@ -345,7 +267,7 @@ fun InsightsScreen(
                         }
                     }
 
-                    // Metric 3: Streak
+                    // Metric 3: Active Days
                     GlassCard(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(20.dp)
@@ -357,7 +279,7 @@ fun InsightsScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = streakText,
+                                text = activeDaysText,
                                 style = MaterialTheme.typography.headlineSmall.copy(
                                     fontFamily = PoppinsFontFamily,
                                     fontWeight = FontWeight.Bold,
@@ -366,7 +288,7 @@ fun InsightsScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "STREAK",
+                                text = "ACTIVE DAYS",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontFamily = PoppinsFontFamily,
                                     color = textSecondary,
@@ -393,7 +315,10 @@ fun InsightsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .size(38.dp)
@@ -448,6 +373,69 @@ fun InsightsScreen(
                                     fontSize = 11.sp
                                 )
                             )
+                        }
+                    }
+                }
+            }
+
+            // NEW FEATURE 2: Focus Time by Subject
+            if (subjectBreakdown.isNotEmpty()) {
+                item {
+                    GlassCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp)
+                        ) {
+                            Text(
+                                text = "FOCUS TIME BY SUBJECT",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = PoppinsFontFamily,
+                                    color = textSecondary,
+                                    fontSize = 10.sp,
+                                    letterSpacing = 1.2.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                subjectBreakdown.forEach { (subject, _, formatted) ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .clip(CircleShape)
+                                                    .background(accentLime)
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                text = subject,
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontFamily = PoppinsFontFamily,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = textPrimary
+                                                )
+                                            )
+                                        }
+                                        Text(
+                                            text = formatted,
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontFamily = PoppinsFontFamily,
+                                                fontWeight = FontWeight.Bold,
+                                                color = accentLime
+                                            )
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

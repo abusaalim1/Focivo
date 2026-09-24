@@ -25,6 +25,27 @@ val RegainLimeDark = Color(0xFF72B800)         // Darker lime border
 val RegainLimeDeepText = Color(0xFF4C8000)     // High-contrast green text
 val RegainLimeContainer = Color(0xFFF0FCE1)    // Light pale lime container fill
 val RegainLimeContainerBorder = Color(0xFFD4F59A)
+val RegainLimeGlow = Color(0x338CE000)
+
+// Apple & Linear Style Special Tokens
+val LinearDarkCardBg = Color(0xEB161C16)
+val LinearDarkCardBorder = Color(0x2E8CE000)
+val LinearLightCardBg = Color(0xF8FFFFFF)
+val LinearLightCardBorder = Color(0xFFE4EED8)
+val AppleGlassHighlightLight = Color(0x99FFFFFF)
+val AppleGlassHighlightDark = Color(0x2EFFFFFF)
+val ApplePillBgLight = Color(0xEEFFFFFF)
+val ApplePillBgDark = Color(0xCC1A221A)
+
+val LinearLimeHeroGradient = Brush.horizontalGradient(
+    listOf(Color(0xFF8CE000), Color(0xFFAEF72A))
+)
+val LinearDarkHeroGradient = Brush.verticalGradient(
+    listOf(Color(0x308CE000), Color(0x058CE000))
+)
+val AppleGlassBorderGradient = Brush.verticalGradient(
+    listOf(Color(0x60FFFFFF), Color(0x15FFFFFF))
+)
 
 // 3. Text & Neutral Colors
 val NearBlack = Color(0xFF1B1E1B)              // Near-black dark charcoal for titles

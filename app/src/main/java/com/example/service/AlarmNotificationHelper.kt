@@ -5,9 +5,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
+import com.example.R
 import com.example.audio.AlarmAudioEngine
 
 object AlarmNotificationHelper {
@@ -89,8 +91,10 @@ object AlarmNotificationHelper {
         )
 
         val displayTitle = if (label.isBlank()) "Focus Studio Alarm" else label
+        val largeIcon = BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(R.drawable.ic_notification_small)
+            .setLargeIcon(largeIcon)
             .setContentTitle(displayTitle)
             .setContentText("Time for your deep study session! Ringtone: $ringtone")
             .setPriority(NotificationCompat.PRIORITY_MAX)

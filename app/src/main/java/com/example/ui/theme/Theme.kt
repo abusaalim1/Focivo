@@ -5,11 +5,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
+
+val LocalIsDarkTheme = compositionLocalOf { false }
+
+@Composable
+fun isAppInDarkTheme(): Boolean {
+    return LocalIsDarkTheme.current
+}
 
 private val RegainLightThemeColorScheme = lightColorScheme(
     primary = RegainLimePrimary,
-    onPrimary = PureWhite,
+    onPrimary = Color(0xFF021207),
     primaryContainer = RegainLimeContainer,
     onPrimaryContainer = RegainLimeDeepText,
     secondary = RegainLimeLight,
@@ -50,10 +59,12 @@ fun FocuslyTheme(
 ) {
     val colorScheme = if (darkTheme) RegainDarkThemeColorScheme else RegainLightThemeColorScheme
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalIsDarkTheme provides darkTheme) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
 

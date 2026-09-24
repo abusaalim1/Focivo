@@ -56,7 +56,8 @@ import com.example.ui.components.MascotPose
 import com.example.ui.components.RegainMascotView
 import com.example.ui.components.TaskBottomSheet
 import com.example.ui.theme.LavenderSoft
-import com.example.ui.theme.VioletAccent
+import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.isAppInDarkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,7 +70,7 @@ fun PlannerScreen(
     onOpenAlarmStudio: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     var showBottomSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -144,7 +145,7 @@ fun PlannerScreen(
                             Icon(
                                 imageVector = Icons.Default.Alarm,
                                 contentDescription = "Alarm Studio",
-                                tint = VioletAccent,
+                                tint = RegainLimePrimary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -155,13 +156,13 @@ fun PlannerScreen(
                             modifier = Modifier
                                 .size(42.dp)
                                 .clip(CircleShape)
-                                .background(VioletAccent)
+                                .background(RegainLimePrimary)
                                 .testTag("add_task_button")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = "Add Block",
-                                tint = Color.White,
+                                tint = Color.Black,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -181,7 +182,7 @@ fun PlannerScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(
-                                    if (isSelected) VioletAccent else (if (isDark) Color(0x12FFFFFF) else Color(0x08000000))
+                                    if (isSelected) RegainLimePrimary else (if (isDark) Color(0x12FFFFFF) else Color(0x08000000))
                                 )
                                 .clickable { selectedDayIndex = index }
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -190,7 +191,7 @@ fun PlannerScreen(
                             Text(
                                 text = day.first,
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = if (isSelected) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -225,7 +226,7 @@ fun PlannerScreen(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(VioletAccent)
+                                .background(RegainLimePrimary)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -348,10 +349,10 @@ private fun PlannerTaskRow(
                             .clip(CircleShape)
                             .border(
                                 width = 1.5.dp,
-                                color = if (task.isCompleted) VioletAccent else (if (isDark) Color(0x40FFFFFF) else Color(0x30000000)),
+                                color = if (task.isCompleted) RegainLimePrimary else (if (isDark) Color(0x40FFFFFF) else Color(0x30000000)),
                                 shape = CircleShape
                             )
-                            .background(if (task.isCompleted) VioletAccent else Color.Transparent)
+                            .background(if (task.isCompleted) RegainLimePrimary else Color.Transparent)
                             .clickable { onToggle() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -359,7 +360,7 @@ private fun PlannerTaskRow(
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = Color.Black,
                                 modifier = Modifier.size(13.dp)
                             )
                         }
@@ -384,7 +385,7 @@ private fun PlannerTaskRow(
                             Text(
                                 text = "${task.durationMinutes}m",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = VioletAccent,
+                                    color = RegainLimePrimary,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -407,12 +408,12 @@ private fun PlannerTaskRow(
                             modifier = Modifier
                                 .size(32.dp)
                                 .clip(CircleShape)
-                                .background(VioletAccent.copy(alpha = 0.15f))
+                                .background(RegainLimePrimary.copy(alpha = 0.15f))
                         ) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
                                 contentDescription = "Focus",
-                                tint = VioletAccent,
+                                tint = RegainLimePrimary,
                                 modifier = Modifier.size(18.dp)
                             )
                         }

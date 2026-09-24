@@ -65,6 +65,8 @@ import com.example.service.ScheduledBlockScheduler
 import com.example.ui.components.AuroraBackground
 import com.example.ui.components.GlassCard
 import com.example.ui.components.GlassSwitch
+import com.example.ui.components.MascotPose
+import com.example.ui.components.RegainMascotView
 import com.example.ui.components.ScheduleEditSheet
 import com.example.ui.components.pressFeedback
 import com.example.ui.theme.LavenderSoft
@@ -75,6 +77,7 @@ import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 import com.example.util.AppIconView
 import com.example.util.DeviceAppInfo
 
@@ -90,7 +93,7 @@ fun AutoStudyScheduleScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
 
     val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
@@ -386,20 +389,11 @@ fun AutoStudyScheduleScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(64.dp)
-                                        .clip(CircleShape)
-                                        .background(RegainLimeContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Schedule,
-                                        contentDescription = null,
-                                        tint = RegainLimeDeepText,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
+                                RegainMascotView(
+                                    width = 140.dp,
+                                    height = 160.dp,
+                                    pose = MascotPose.EMPTY_STATE
+                                )
 
                                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -494,6 +488,7 @@ fun AutoStudyScheduleScreen(
     if (isSheetOpen) {
         ScheduleEditSheet(
             schedule = activeSheetSchedule,
+            existingSchedules = scheduledBlocks,
             installedApps = installedApps,
             onSave = { saved ->
                 onSaveSchedule(saved)
@@ -537,7 +532,7 @@ fun AutoStudyScheduleScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
                 ) {
-                    Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Delete", color = MaterialTheme.colorScheme.onError, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -602,40 +597,56 @@ private fun ScheduleCardItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                Column(
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = schedule.label.ifBlank { "Study Routine" },
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            color = textPrimary,
-                            fontSize = 16.sp
-                        )
-                    )
-
-                    if (schedule.is_strict_mode) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(RegainLimeContainer)
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "STRICT",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    color = RegainLimeDeepText,
-                                    fontSize = 9.sp
-                                ),
-                                maxLines = 1,
-                                softWrap = false
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = schedule.label.ifBlank { "Study Routine" },
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontFamily = PoppinsFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = textPrimary,
+                                fontSize = 16.sp
                             )
+                        )
+
+                        if (schedule.is_strict_mode) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(RegainLimeContainer)
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "STRICT",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        color = RegainLimeDeepText,
+                                        fontSize = 9.sp
+                                    ),
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
                         }
+                    }
+
+                    if (!schedule.subject.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Subject: ${schedule.subject.trim()}",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = PoppinsFontFamily,
+                                fontWeight = FontWeight.Medium,
+                                color = textSecondary,
+                                fontSize = 12.sp
+                            )
+                        )
                     }
                 }
 
@@ -714,7 +725,7 @@ private fun ScheduleCardItem(
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                if (isSelected) RegainLimeContainer else (if (isSystemInDarkTheme()) Color(0xFF1E241E) else Color(0xFFF1F5F9))
+                                if (isSelected) RegainLimeContainer else (if (isAppInDarkTheme()) Color(0xFF1E241E) else Color(0xFFF1F5F9))
                             )
                             .padding(vertical = 4.dp),
                         contentAlignment = Alignment.Center

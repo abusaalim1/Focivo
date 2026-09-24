@@ -28,13 +28,17 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -57,6 +61,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -72,6 +77,8 @@ import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 import com.example.util.AppIconView
 import com.example.util.DeviceAppInfo
 import java.util.UUID
@@ -80,6 +87,7 @@ import java.util.UUID
 @Composable
 fun ScheduleEditSheet(
     schedule: SupabaseScheduledBlockDto?,
+    existingSchedules: List<SupabaseScheduledBlockDto> = emptyList(),
     installedApps: List<DeviceAppInfo>,
     onSave: (SupabaseScheduledBlockDto) -> Unit,
     onDelete: (String) -> Unit,
@@ -90,7 +98,17 @@ fun ScheduleEditSheet(
 
     val isEditMode = schedule != null
 
+    val allExistingSubjects = remember(existingSchedules, schedule) {
+        val fromParam = existingSchedules.mapNotNull { it.subject?.trim() }
+        val fromLocal = ScheduledBlockScheduler.getLocalSchedules(context).mapNotNull { it.subject?.trim() }
+        (fromParam + fromLocal)
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+
     var label by remember { mutableStateOf(schedule?.label ?: "Deep Study Routine") }
+    var subject by remember { mutableStateOf(schedule?.subject ?: "") }
+    var isSubjectDropdownExpanded by remember { mutableStateOf(false) }
     var startTime by remember { mutableStateOf(schedule?.start_time ?: "18:00") }
     var endTime by remember { mutableStateOf(schedule?.end_time ?: "22:00") }
 
@@ -125,16 +143,16 @@ fun ScheduleEditSheet(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
-    val surfaceDark = Color(0xFF121412)
-    val cardBackground = Color(0xFF1B221B)
-    val cardBorderColor = Color(0x358CE000)
+    val isDark = isAppInDarkTheme()
+    val surfaceDark = if (isDark) Color(0xFF121412) else Color(0xFFFFFFFF)
+    val cardBackground = if (isDark) Color(0xFF1B221B) else Color(0xFFF6FAF2)
+    val cardBorderColor = if (isDark) Color(0x358CE000) else Color(0xFFE0EAD4)
     val accentViolet = RegainLimePrimary
     val accentGreen = Color(0xFF10B981)
     val accentRed = Color(0xFFEF4444)
-    val textPrimary = Color(0xFFF0F4ED)
-    val textSecondary = Color(0xFFA0A89E)
-    val chipBackground = Color(0xFF242C23)
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val chipBackground = if (isDark) Color(0xFF242C23) else Color(0xFFEFF6E6)
 
     fun openTimePicker(initialTime: String, onTimePicked: (String) -> Unit) {
         val parts = initialTime.split(":")
@@ -193,7 +211,7 @@ fun ScheduleEditSheet(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Section 1: Label
+                // Section 1: Label & Subject
                 item {
                     Column {
                         Text(
@@ -217,6 +235,154 @@ fun ScheduleEditSheet(
                             ),
                             shape = RoundedCornerShape(12.dp)
                         )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        val matchingSubjects = remember(subject, allExistingSubjects) {
+                            val query = subject.trim()
+                            if (query.isEmpty()) {
+                                allExistingSubjects
+                            } else {
+                                allExistingSubjects.filter { it.contains(query, ignoreCase = true) }
+                            }
+                        }
+
+                        Text(
+                            text = "Subject / Topic",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = textSecondary,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+
+                        ExposedDropdownMenuBox(
+                            expanded = isSubjectDropdownExpanded && matchingSubjects.isNotEmpty(),
+                            onExpandedChange = { isSubjectDropdownExpanded = it },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = subject,
+                                onValueChange = {
+                                    subject = it
+                                    isSubjectDropdownExpanded = true
+                                },
+                                placeholder = { Text("e.g. Physics, Math, English (optional)", color = Color.Gray) },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor()
+                                    .onFocusChanged { focusState ->
+                                        if (focusState.isFocused && matchingSubjects.isNotEmpty()) {
+                                            isSubjectDropdownExpanded = true
+                                        }
+                                    },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = accentViolet,
+                                    unfocusedBorderColor = cardBorderColor,
+                                    focusedTextColor = textPrimary,
+                                    unfocusedTextColor = textPrimary
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                trailingIcon = if (allExistingSubjects.isNotEmpty()) {
+                                    {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isSubjectDropdownExpanded && matchingSubjects.isNotEmpty())
+                                    }
+                                } else null
+                            )
+
+                            if (matchingSubjects.isNotEmpty()) {
+                                ExposedDropdownMenu(
+                                    expanded = isSubjectDropdownExpanded,
+                                    onDismissRequest = { isSubjectDropdownExpanded = false },
+                                    modifier = Modifier
+                                        .background(cardBackground)
+                                        .border(1.dp, cardBorderColor, RoundedCornerShape(12.dp))
+                                ) {
+                                    matchingSubjects.forEach { suggestedSubject ->
+                                        val isExactMatch = suggestedSubject.equals(subject.trim(), ignoreCase = true)
+                                        DropdownMenuItem(
+                                            text = {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.History,
+                                                        contentDescription = null,
+                                                        tint = if (isExactMatch) accentViolet else textSecondary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        text = suggestedSubject,
+                                                        fontFamily = PoppinsFontFamily,
+                                                        color = textPrimary,
+                                                        fontWeight = if (isExactMatch) FontWeight.Bold else FontWeight.Normal,
+                                                        fontSize = 14.sp
+                                                    )
+                                                }
+                                            },
+                                            onClick = {
+                                                subject = suggestedSubject
+                                                isSubjectDropdownExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if (allExistingSubjects.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Previously used subjects:",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = textSecondary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                allExistingSubjects.forEach { prevSubject ->
+                                    val isSelected = subject.trim().equals(prevSubject, ignoreCase = true)
+                                    Surface(
+                                        onClick = {
+                                            subject = if (isSelected) "" else prevSubject
+                                            isSubjectDropdownExpanded = false
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isSelected) RegainLimeContainer else chipBackground,
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (isSelected) accentViolet else cardBorderColor
+                                        ),
+                                        modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.History,
+                                                contentDescription = null,
+                                                tint = if (isSelected) RegainLimeDeepText else textSecondary,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = prevSubject,
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) RegainLimeDeepText else textPrimary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -650,6 +816,7 @@ fun ScheduleEditSheet(
                             id = schedule?.id ?: UUID.randomUUID().toString(),
                             user_id = schedule?.user_id ?: "anonymous",
                             label = label.trim(),
+                            subject = subject.trim().ifBlank { null },
                             start_time = startTime,
                             end_time = endTime,
                             break_start_time = if (hasBreak) breakStartTime else null,

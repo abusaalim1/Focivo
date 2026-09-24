@@ -1,4 +1,14 @@
 <resources>
     <string name="app_name">Focivo</string>
-    <string name="accessibility_service_description">Focivo AI Study Guard analyzes on-screen text solely within Claude and ChatGPT directly on your device to help maintain study discipline. No text is ever saved or shared off-device.</string>
+    <string name="accessibility_service_description">Focivo AI Academic Sentinel · Intelligently protects study flow and verifies academic study inquiries in real-time. 100% private, on-device &amp; safe.</string>
+    <string name="widget_timer_title">Focivo Quick Timer</string>
+    <string name="widget_timer_description">Quickly start 25m Pomodoro or 50m Deep Work sessions with cute studying mascot.</string>
+    <string name="widget_streak_title">Daily Streak &amp; Motivation</string>
+    <string name="widget_streak_description">Track your daily study streak, daily goal progress, and inspiring student quotes.</string>
+    <string name="widget_schedule_title">Today\'s Timetable &amp; Targets</string>
+    <string name="widget_schedule_description">See your next upcoming study block and daily syllabus targets.</string>
+    <string name="widget_shield_title">Focus Shield &amp; Deep Lock</string>
+    <string name="widget_shield_description">Quickly arm Focus Shield, toggle Deep Focus, and monitor blocked apps.</string>
+    <string name="widget_zen_title">AI Study Coach &amp; Zen Break</string>
+    <string name="widget_zen_description">Get AI coaching advice, check your XP level, and take instant 5-minute Zen breathing breaks.</string>
 </resources>

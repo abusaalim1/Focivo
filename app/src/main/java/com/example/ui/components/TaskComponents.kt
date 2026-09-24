@@ -1,10 +1,15 @@
 package com.example.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,7 +46,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -49,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.TaskEntity
+import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -56,6 +64,7 @@ import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 
 @Composable
 fun PriorityItemRow(
@@ -65,18 +74,32 @@ fun PriorityItemRow(
     onStartFocus: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
-    val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
-    val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
-    val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
-    val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
+    val isDark = isAppInDarkTheme()
+    val cardBg = if (isDark) Color(0xEB161C16) else Color(0xFCFFFFFF)
+    val cardBorder = if (isDark) Color(0x338CE000) else Color(0xFFE2EBD6)
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
     val formattedIndex = String.format("%02d", index + 1)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val cardScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.98f else 1f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 400f),
+        label = "task_row_scale"
+    )
 
     val checkBg by animateColorAsState(
         targetValue = if (task.isCompleted) RegainLimePrimary else Color.Transparent,
-        animationSpec = tween(280),
+        animationSpec = tween(220),
         label = "check_bg"
+    )
+
+    val checkScale by animateFloatAsState(
+        targetValue = if (task.isCompleted) 1.05f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "check_scale"
     )
 
     val checkBorder = if (task.isCompleted) RegainLimePrimary else cardBorder
@@ -84,10 +107,23 @@ fun PriorityItemRow(
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = cardScale
+                scaleY = cardScale
+            }
+            .shadow(
+                elevation = 4.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = if (isDark) Color(0x188CE000) else Color(0x0A000000),
+                spotColor = if (isDark) Color(0x28000000) else Color(0x10000000)
+            )
             .clip(RoundedCornerShape(20.dp))
             .background(cardBg)
             .border(1.dp, cardBorder, RoundedCornerShape(20.dp))
-            .clickable { onToggleComplete() }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) { onToggleComplete() }
             .testTag("priority_item_$index")
     ) {
         Row(
@@ -100,10 +136,11 @@ fun PriorityItemRow(
             Text(
                 text = formattedIndex,
                 style = MaterialTheme.typography.labelLarge.copy(
-                    fontFamily = PoppinsFontFamily,
+                    fontFamily = AppleLinearFontFamily,
                     color = RegainLimeDeepText,
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
                 )
             )
 
@@ -114,11 +151,12 @@ fun PriorityItemRow(
                 Text(
                     text = task.title,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = PoppinsFontFamily,
+                        fontFamily = AppleLinearFontFamily,
                         fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
-                        color = if (task.isCompleted) textSecondary else textPrimary
+                        color = if (task.isCompleted) textSecondary else textPrimary,
+                        letterSpacing = (-0.1).sp
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -132,9 +170,9 @@ fun PriorityItemRow(
                     Text(
                         text = "${task.durationMinutes} min · ${task.category}",
                         style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = PoppinsFontFamily,
+                            fontFamily = AppleLinearFontFamily,
                             color = textSecondary,
-                            fontSize = 11.sp
+                            fontSize = 11.5.sp
                         )
                     )
                 }
@@ -146,21 +184,30 @@ fun PriorityItemRow(
             if (!task.isCompleted && onStartFocus != null) {
                 IconButton(
                     onClick = onStartFocus,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(if (isDark) Color(0x308CE000) else RegainLimeContainer)
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = "Start Focus",
                         tint = RegainLimeDeepText,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(19.dp)
                     )
                 }
             }
 
-            // Checkbox
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Animated Checkbox
             Box(
                 modifier = Modifier
                     .size(26.dp)
+                    .graphicsLayer {
+                        scaleX = checkScale
+                        scaleY = checkScale
+                    }
                     .clip(CircleShape)
                     .background(checkBg)
                     .border(1.5.dp, checkBorder, CircleShape),
@@ -179,6 +226,7 @@ fun PriorityItemRow(
     }
 }
 
+
 @Composable
 fun PlannerTaskCard(
     task: TaskEntity,
@@ -187,7 +235,7 @@ fun PlannerTaskCard(
     onStartFocus: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
@@ -333,7 +381,7 @@ fun TaskBottomSheet(
     onDismiss: () -> Unit,
     onSaveTask: (title: String, category: String, duration: Int, priority: Int, schedule: String, notes: String, isTopPriority: Boolean) -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
     val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight

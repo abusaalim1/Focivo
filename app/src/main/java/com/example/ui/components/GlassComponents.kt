@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -60,6 +62,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -71,13 +74,14 @@ import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 
 /**
- * High-performance tactile press feedback animation.
- * Scales down smoothly to 0.96f and lowers opacity slightly on tap.
+ * High-performance Apple & Linear tactile press feedback animation.
+ * Features fast damping spring physics, subtle elastic bounce, and smooth alpha reduction.
  */
 fun Modifier.pressFeedback(
-    scaleDown: Float = 0.96f,
+    scaleDown: Float = 0.965f,
     interactionSource: MutableInteractionSource? = null
 ): Modifier = composed {
     val source = interactionSource ?: remember { MutableInteractionSource() }
@@ -85,14 +89,17 @@ fun Modifier.pressFeedback(
     val scale by animateFloatAsState(
         targetValue = if (isPressed) scaleDown else 1f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            dampingRatio = 0.75f,
+            stiffness = 380f
         ),
         label = "press_scale"
     )
     val alpha by animateFloatAsState(
-        targetValue = if (isPressed) 0.88f else 1f,
-        animationSpec = tween(durationMillis = 100),
+        targetValue = if (isPressed) 0.86f else 1f,
+        animationSpec = spring(
+            dampingRatio = 0.85f,
+            stiffness = 450f
+        ),
         label = "press_alpha"
     )
     this
@@ -101,6 +108,79 @@ fun Modifier.pressFeedback(
             scaleY = scale
             this.alpha = alpha
         }
+}
+
+/**
+ * Linear-style ambient glowing rim card with razor-sharp micro-borders,
+ * inner refraction highlight, and elastic tactile press physics.
+ */
+@Composable
+fun LinearGlowCard(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(20.dp),
+    glowColor: Color = RegainLimePrimary,
+    glowAlpha: Float = 0.15f,
+    accentBorder: Boolean = false,
+    border: BorderStroke? = null,
+    onClick: (() -> Unit)? = null,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val isDark = isAppInDarkTheme()
+    val interactionSource = remember { MutableInteractionSource() }
+
+    val cardBg = if (isDark) Color(0xEB151A15) else Color(0xFCFFFFFF)
+    val cardBorder = if (isDark) Color(0x338CE000) else Color(0xFFE2EBD6)
+    val topHighlight = if (isDark) Color(0x35FFFFFF) else Color(0x99FFFFFF)
+
+    val effectiveBorder = border ?: if (accentBorder) {
+        BorderStroke(1.5.dp, RegainLimePrimary)
+    } else {
+        BorderStroke(1.dp, cardBorder)
+    }
+
+    val clickModifier = if (onClick != null) {
+        Modifier
+            .pressFeedback(interactionSource = interactionSource)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+    } else Modifier
+
+    Box(
+        modifier = modifier
+            .shadow(
+                elevation = 6.dp,
+                shape = shape,
+                ambientColor = if (isDark) glowColor.copy(alpha = glowAlpha) else Color(0x0C000000),
+                spotColor = if (isDark) Color(0x35000000) else Color(0x14000000)
+            )
+            .clip(shape)
+            .background(cardBg)
+            .drawBehind {
+                // Subtle top edge highlight simulating real physical glass refraction
+                drawLine(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            topHighlight,
+                            topHighlight.copy(alpha = 0.85f),
+                            Color.Transparent
+                        )
+                    ),
+                    start = Offset(0f, 1f),
+                    end = Offset(size.width, 1f),
+                    strokeWidth = 1.5f
+                )
+            }
+            .border(
+                border = effectiveBorder,
+                shape = shape
+            )
+            .then(clickModifier),
+        content = content
+    )
 }
 
 /**
@@ -145,13 +225,13 @@ fun GlassCard(
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     val interactionSource = remember { MutableInteractionSource() }
 
     // Existing dark charcoal and lime palette translucencies
-    val cardBg = if (isDark) Color(0xD91B221C) else Color(0xEBFFFFFF)
-    val cardBorder = if (isDark) Color(0x358CE000) else Color(0x18000000)
-    val topHighlight = if (isDark) Color(0x30FFFFFF) else Color(0x60FFFFFF)
+    val cardBg = if (isDark) Color(0xD91B221C) else Color(0xF5FFFFFF)
+    val cardBorder = if (isDark) Color(0x358CE000) else Color(0xFFE2EBD6)
+    val topHighlight = if (isDark) Color(0x30FFFFFF) else Color(0x80FFFFFF)
 
     val effectiveBorder = border ?: if (accentBorder) {
         BorderStroke(1.5.dp, RegainLimePrimary)
@@ -214,7 +294,7 @@ fun LiquidGlassCard(
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     val infiniteTransition = rememberInfiniteTransition(label = "refraction")
     val shimmerOffset by infiniteTransition.animateFloat(
         initialValue = -300f,
@@ -237,8 +317,8 @@ fun LiquidGlassCard(
             )
     } else Modifier
 
-    val cardBg = if (isDark) Color(0xDC1E241E) else Color(0xEEFFFFFF)
-    val cardBorder = if (isDark) Color(0x388CE000) else Color(0x1C000000)
+    val cardBg = if (isDark) Color(0xDC1E241E) else Color(0xF5FFFFFF)
+    val cardBorder = if (isDark) Color(0x388CE000) else Color(0xFFE0EBD4)
 
     val effectiveBorder = border ?: if (accentBorder) {
         BorderStroke(1.5.dp, RegainLimePrimary)
@@ -305,7 +385,7 @@ fun GlassSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     val interactionSource = remember { MutableInteractionSource() }
 
     val trackWidth = 48.dp
@@ -377,6 +457,96 @@ fun GlassSwitch(
     }
 }
 
+enum class LinearButtonVariant {
+    PRIMARY,
+    SECONDARY,
+    GHOST,
+    DANGER
+}
+
+@Composable
+fun LinearButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    variant: LinearButtonVariant = LinearButtonVariant.PRIMARY,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    enabled: Boolean = true,
+    fontSize: TextUnit = 13.5.sp
+) {
+    val isDark = isAppInDarkTheme()
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = CircleShape
+
+    val bg = when (variant) {
+        LinearButtonVariant.PRIMARY -> if (enabled) RegainLimePrimary else (if (isDark) Color(0xFF232A20) else Color(0xFFE5EBE0))
+        LinearButtonVariant.SECONDARY -> if (isDark) Color(0xEB1C231C) else Color(0xF5FFFFFF)
+        LinearButtonVariant.GHOST -> Color.Transparent
+        LinearButtonVariant.DANGER -> if (isDark) Color(0x33EF4444) else Color(0xFFFFEBEE)
+    }
+
+    val textColor = when (variant) {
+        LinearButtonVariant.PRIMARY -> if (enabled) NearBlack else (if (isDark) Color(0xFF6A7367) else Color(0xFFA0A89D))
+        LinearButtonVariant.SECONDARY -> if (isDark) Color(0xFFF0F4ED) else NearBlack
+        LinearButtonVariant.GHOST -> if (isDark) Color(0xFFCBD5E1) else SecondaryTextLight
+        LinearButtonVariant.DANGER -> Color(0xFFEF4444)
+    }
+
+    val border = when (variant) {
+        LinearButtonVariant.PRIMARY -> if (enabled) BorderStroke(1.dp, RegainLimePrimary) else null
+        LinearButtonVariant.SECONDARY -> BorderStroke(1.dp, if (isDark) Color(0x388CE000) else Color(0xFFDDE6D2))
+        LinearButtonVariant.GHOST -> null
+        LinearButtonVariant.DANGER -> BorderStroke(1.dp, if (isDark) Color(0x55EF4444) else Color(0xFFFFCDD2))
+    }
+
+    Box(
+        modifier = modifier
+            .pressFeedback(interactionSource = interactionSource)
+            .shadow(
+                elevation = if (variant == LinearButtonVariant.PRIMARY && enabled) 3.dp else 0.dp,
+                shape = shape,
+                ambientColor = Color(0x188CE000),
+                spotColor = Color(0x228CE000)
+            )
+            .clip(shape)
+            .background(bg)
+            .then(if (border != null) Modifier.border(border, shape) else Modifier)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            )
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = textColor,
+                    modifier = Modifier.size(17.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontFamily = AppleLinearFontFamily,
+                    color = textColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = fontSize,
+                    letterSpacing = 0.2.sp
+                )
+            )
+        }
+    }
+}
+
 @Composable
 fun GlassButton(
     text: String,
@@ -391,11 +561,11 @@ fun GlassButton(
     leadingIcon: (@Composable () -> Unit)? = null
 ) {
     val pillShape = CircleShape
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     val interactionSource = remember { MutableInteractionSource() }
 
     val backgroundModifier = if (!enabled) {
-        Modifier.background(MaterialTheme.colorScheme.outlineVariant)
+        Modifier.background(if (isDark) Color(0xFF262C24) else Color(0xFFE8EFE2))
     } else if (isPrimary) {
         Modifier.background(RegainLimePrimary)
     } else {
@@ -403,17 +573,17 @@ fun GlassButton(
             .background(if (isDark) Color(0xD81D221C) else PureWhite)
             .border(
                 width = 1.5.dp,
-                color = RegainLimePrimary,
+                color = if (isDark) RegainLimePrimary else RegainLimeDeepText,
                 shape = pillShape
             )
     }
 
     val textColor = if (!enabled) {
-        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        if (isDark) Color(0xFF6E756C) else Color(0xFFA0A89B)
     } else if (isPrimary) {
-        NearBlack
+        Color(0xFF021207)
     } else {
-        MaterialTheme.colorScheme.onSurface
+        if (isDark) Color(0xFFF0F4ED) else NearBlack
     }
 
     Box(
@@ -505,11 +675,11 @@ fun SegmentedControl(
     onSelectIndex: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
-    val containerBg = if (isDark) MaterialTheme.colorScheme.surfaceVariant else RegainLimeContainer.copy(alpha = 0.6f)
-    val selectedBg = if (isDark) MaterialTheme.colorScheme.surface else PureWhite
-    val selectedText = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
-    val unselectedText = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
+    val isDark = isAppInDarkTheme()
+    val containerBg = if (isDark) Color(0xFF262C24) else Color(0xFFEFF6E6)
+    val selectedBg = if (isDark) Color(0xFF1D221C) else PureWhite
+    val selectedText = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val unselectedText = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
     Surface(
         color = containerBg,

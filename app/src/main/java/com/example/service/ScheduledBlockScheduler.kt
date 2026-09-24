@@ -6,11 +6,13 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.example.R
 import com.example.data.SupabaseManager
 import com.example.data.SupabaseScheduledBlockDto
 import com.example.data.SupabaseService
@@ -316,13 +318,18 @@ object ScheduledBlockScheduler {
 
         if (activeSchedule != null) {
             val currentMin = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+            val subjectPrefix = if (!activeSchedule.subject.isNullOrBlank()) {
+                "Studying ${activeSchedule.subject.trim()}"
+            } else {
+                "Study window active"
+            }
             if (!activeSchedule.break_start_time.isNullOrBlank() && !activeSchedule.break_end_time.isNullOrBlank()) {
                 val bStart = parseTimeToMinutes(activeSchedule.break_start_time)
                 if (bStart > currentMin) {
-                    return "Study window active until ${formatDisplayTime(activeSchedule.break_start_time)} (Break at ${formatDisplayTime(activeSchedule.break_start_time)})"
+                    return "$subjectPrefix until ${formatDisplayTime(activeSchedule.break_start_time)} (Break at ${formatDisplayTime(activeSchedule.break_start_time)})"
                 }
             }
-            return "Study window active until ${formatDisplayTime(activeSchedule.end_time)}"
+            return "$subjectPrefix until ${formatDisplayTime(activeSchedule.end_time)}"
         }
 
         val breakSchedule = schedules.firstOrNull { schedule ->
@@ -339,7 +346,8 @@ object ScheduledBlockScheduler {
         }
 
         if (breakSchedule != null && !breakSchedule.break_end_time.isNullOrBlank()) {
-            return "In Break until ${formatDisplayTime(breakSchedule.break_end_time)}"
+            val breakSubject = if (!breakSchedule.subject.isNullOrBlank()) " (${breakSchedule.subject.trim()})" else ""
+            return "In Break until ${formatDisplayTime(breakSchedule.break_end_time)}$breakSubject"
         }
 
         val nextTransitionMillis = getNextTransitionMillis(context)
@@ -493,8 +501,10 @@ object ScheduledBlockScheduler {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val largeIcon = BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large)
         val builder = NotificationCompat.Builder(context, SCHEDULE_NOTIF_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(R.drawable.ic_notification_small)
+            .setLargeIcon(largeIcon)
             .setContentTitle(title)
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -540,10 +550,22 @@ object ScheduledBlockScheduler {
             statePrefs.edit().putString("last_state", currentState).apply()
             when (currentState) {
                 "STUDY" -> {
+                    val activeBlock = getActiveStudySchedule(context)
+                    val subjectText = activeBlock?.subject?.trim()
                     if (prevState == "BREAK") {
-                        notifyScheduleEvent(context, "🔔 Break Ended - Study Resumed!", "Break time is over. Focus Shield is active and apps are locked!")
+                        val breakResumeMsg = if (!subjectText.isNullOrBlank()) {
+                            "Break time is over. Focus Shield is active for '$subjectText' and apps are locked!"
+                        } else {
+                            "Break time is over. Focus Shield is active and apps are locked!"
+                        }
+                        notifyScheduleEvent(context, "🔔 Break Ended - Study Resumed!", breakResumeMsg)
                     } else {
-                        notifyScheduleEvent(context, "📚 Study Schedule Started!", "Your study block has started. Focus Shield is active and apps are locked.")
+                        val studyStartMsg = if (!subjectText.isNullOrBlank()) {
+                            "Your study block for '$subjectText' has started. Focus Shield is active and apps are locked."
+                        } else {
+                            "Your study block has started. Focus Shield is active and apps are locked."
+                        }
+                        notifyScheduleEvent(context, "📚 Study Schedule Started!", studyStartMsg)
                     }
                 }
                 "BREAK" -> {

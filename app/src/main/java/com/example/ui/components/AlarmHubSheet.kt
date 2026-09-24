@@ -4,7 +4,6 @@ import android.app.TimePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,6 +59,7 @@ import com.example.ui.theme.NearBlack
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,16 +77,16 @@ fun AlarmHubSheet(
     onSetDefaultRingtone: (String) -> Unit,
     onTestAlarm: () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
 
     // High-contrast Theme Tokens
     val sheetBg = if (isDark) Color(0xFF13151C) else Color(0xFFFAF9F6)
     val cardBg = if (isDark) Color(0xFF1E212B) else Color(0xFFFFFFFF)
-    val cardBorder = if (isDark) Color(0x35FFFFFF) else MutedBorderLight
+    val cardBorder = if (isDark) Color(0x358CE000) else Color(0xFFE2EBD6)
 
-    val textPrimary = if (isDark) Color(0xFFFFFFFF) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFE2E8F0) else SecondaryTextLight
-    val textMuted = if (isDark) Color(0xFFA0AEC0) else Color(0xFF718096)
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textMuted = if (isDark) Color(0xFF80887E) else Color(0xFF718096)
 
     val limeAccent = RegainLimePrimary
     val limeText = if (isDark) RegainLimePrimary else RegainLimeDeepText
@@ -669,7 +669,7 @@ fun AlarmHubSheet(
                                     .size(36.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (isPreviewing) limeAccent else (if (isDark) Color(0x28FFFFFF) else Color(0x0C000000))
+                                        if (isPreviewing) limeAccent else (if (isDark) Color(0x28FFFFFF) else Color(0xFFEFF6E4))
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -728,7 +728,8 @@ fun AlarmHubSheet(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isDark) Color(0x25FFFFFF) else Color(0x10000000))
+                                    .background(if (isDark) Color(0x25FFFFFF) else Color(0xFFEFF5E8))
+                                    .border(1.dp, if (isDark) Color(0x20FFFFFF) else Color(0xFFD8E4CB), RoundedCornerShape(10.dp))
                                     .clickable { onSetDefaultRingtone(item.title) }
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {

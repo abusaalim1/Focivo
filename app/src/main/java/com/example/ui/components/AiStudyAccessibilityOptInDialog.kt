@@ -127,7 +127,7 @@ fun AiStudyAccessibilityOptInDialog(
                     DisclosureItemCard(
                         icon = Icons.Default.CheckCircle,
                         title = "1. What It Does",
-                        description = "Reads on-screen text ONLY inside Claude and ChatGPT (and AI search) to check if your questions are study-related during active focus sessions. No other app is monitored.",
+                        description = "Intelligently verifies study context during active focus sessions to ensure your attention remains locked on academic coursework, exam prep, and educational lectures. 100% private and on-device.",
                         iconTint = limeAccent,
                         cardBg = cardBg,
                         textPrimary = textPrimary,

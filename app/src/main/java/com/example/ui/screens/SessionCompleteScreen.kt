@@ -26,7 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -49,7 +49,11 @@ import com.example.ui.components.GlassButton
 import com.example.ui.components.MascotPose
 import com.example.ui.components.RegainMascotView
 import com.example.ui.theme.LavenderSoft
-import com.example.ui.theme.VioletAccent
+import com.example.ui.theme.NearBlack
+import com.example.ui.theme.RegainLimeDeepText
+import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -58,7 +62,7 @@ fun SessionCompleteScreen(
     session: FocusSessionEntity,
     onDismiss: () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     val minutesSpent = session.durationSeconds / 60
 
     // Particle / Light Orbit Animation
@@ -86,7 +90,7 @@ fun SessionCompleteScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xF20D0E11) else Color(0xEEF7F7F4)),
+            .background(if (isDark) Color(0xF2111411) else Color(0xF5FAFBF8)),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -107,7 +111,7 @@ fun SessionCompleteScreen(
 
                     // Halo Ring
                     drawCircle(
-                        color = VioletAccent.copy(alpha = 0.2f),
+                        color = RegainLimePrimary.copy(alpha = 0.2f),
                         radius = radius * pulseScale,
                         center = center,
                         style = Stroke(width = 12.dp.toPx())
@@ -116,7 +120,7 @@ fun SessionCompleteScreen(
                     // Complete Solid Circular Ring
                     drawCircle(
                         brush = Brush.sweepGradient(
-                            colors = listOf(VioletAccent, LavenderSoft, VioletAccent),
+                            colors = listOf(RegainLimePrimary, RegainLimePrimary.copy(alpha = 0.4f), RegainLimePrimary),
                             center = center
                         ),
                         radius = radius,
@@ -130,7 +134,7 @@ fun SessionCompleteScreen(
                         val px = center.x + (radius + 14.dp.toPx()) * cos(angle).toFloat()
                         val py = center.y + (radius + 14.dp.toPx()) * sin(angle).toFloat()
                         drawCircle(
-                            color = VioletAccent.copy(alpha = 0.6f),
+                            color = RegainLimePrimary.copy(alpha = 0.7f),
                             radius = (2 + (i % 3)).dp.toPx(),
                             center = Offset(px, py)
                         )
@@ -140,7 +144,8 @@ fun SessionCompleteScreen(
                 // Center Celebrating Mascot
                 RegainMascotView(
                     pose = MascotPose.CELEBRATING,
-                    size = 110.dp
+                    width = 180.dp,
+                    height = 240.dp
                 )
             }
 
@@ -149,9 +154,9 @@ fun SessionCompleteScreen(
             Text(
                 text = "Well done.",
                 style = MaterialTheme.typography.displayMedium.copy(
-                    fontWeight = FontWeight.Light,
-                    fontSize = 38.sp,
-                    color = MaterialTheme.colorScheme.onBackground
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 36.sp,
+                    color = if (isDark) Color(0xFFF0F4ED) else NearBlack
                 )
             )
 
@@ -160,7 +165,7 @@ fun SessionCompleteScreen(
             Text(
                 text = "$minutesSpent minutes of focused work.",
                 style = MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight,
                     fontSize = 16.sp
                 )
             )
@@ -173,17 +178,17 @@ fun SessionCompleteScreen(
                     .shadow(
                         elevation = 8.dp,
                         shape = RoundedCornerShape(24.dp),
-                        ambientColor = VioletAccent.copy(alpha = 0.2f),
-                        spotColor = VioletAccent.copy(alpha = 0.3f)
+                        ambientColor = RegainLimePrimary.copy(alpha = 0.2f),
+                        spotColor = RegainLimePrimary.copy(alpha = 0.3f)
                     )
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(if (isDark) Color(0xFF1B1E28) else Color.White)
-                    .border(
-                        1.dp,
-                        if (isDark) Color(0x33FFFFFF) else Color(0x18000000),
-                        RoundedCornerShape(24.dp)
-                    )
-                    .padding(horizontal = 24.dp, vertical = 14.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(if (isDark) Color(0xFF1D221C) else Color.White)
+                .border(
+                    1.dp,
+                    if (isDark) Color(0x358CE000) else Color(0xFFDCE6D2),
+                    RoundedCornerShape(24.dp)
+                )
+                .padding(horizontal = 24.dp, vertical = 14.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -191,17 +196,17 @@ fun SessionCompleteScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.Stars,
+                            imageVector = Icons.Default.TaskAlt,
                             contentDescription = null,
-                            tint = VioletAccent,
+                            tint = if (isDark) RegainLimePrimary else RegainLimeDeepText,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "+${session.focusPointsEarned} Focus Points",
+                            text = "Session Completed",
                             style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                color = VioletAccent,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) RegainLimePrimary else RegainLimeDeepText,
                                 fontSize = 15.sp
                             )
                         )
@@ -210,13 +215,13 @@ fun SessionCompleteScreen(
                     Box(
                         modifier = Modifier
                             .size(width = 1.dp, height = 20.dp)
-                            .background(if (isDark) Color(0x33FFFFFF) else Color(0x18000000))
+                            .background(if (isDark) Color(0x33FFFFFF) else Color(0xFFDCE6D2))
                     )
 
                     Text(
                         text = if (session.distractionsCount == 0) "0 Distractions" else "${session.distractionsCount} Distractions",
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight,
                             fontSize = 13.sp
                         )
                     )

@@ -102,6 +102,7 @@ import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -181,11 +182,11 @@ fun AuthScreen(
         }
     }
 
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme() || MaterialTheme.colorScheme.background != RegainBgTop
-    val textColorPrimary = if (isDark) PureWhite else NearBlack
-    val textColorSecondary = if (isDark) Color(0xFFCBD5E1) else SecondaryTextLight
-    val fieldBgColor = if (isDark) MaterialTheme.colorScheme.surface else PureWhite
-    val fieldBorderColor = if (isDark) MaterialTheme.colorScheme.outline else MutedBorderLight
+    val isDark = isAppInDarkTheme()
+    val textColorPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textColorSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val fieldBgColor = if (isDark) Color(0xFF1B221B) else Color(0xFFFFFFFF)
+    val fieldBorderColor = if (isDark) Color(0x358CE000) else Color(0xFFD2DEC4)
 
     AuroraBackground(
         modifier = modifier
@@ -350,63 +351,6 @@ fun AuthScreen(
             }
 
             Spacer(modifier = Modifier.height(18.dp))
-
-            // Google Button
-            Button(
-                onClick = {
-                    localError = null
-                    onClearError()
-                    showGoogleAccountDialog = true
-                },
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = fieldBgColor,
-                    contentColor = textColorPrimary
-                ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, fieldBorderColor),
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .testTag("btn_google")
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = RegainLimePrimary,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Authenticating...",
-                            style = TextStyle(
-                                fontFamily = PoppinsFontFamily,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = textColorPrimary
-                            )
-                        )
-                    } else {
-                        GoogleGIcon(modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Continue with Google",
-                            style = TextStyle(
-                                fontFamily = PoppinsFontFamily,
-                                fontSize = 14.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = textColorPrimary
-                            )
-                        )
-                    }
-                }
-            }
 
             // Divider
             Row(
@@ -881,7 +825,7 @@ fun AuthScreen(
                 shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = RegainLimePrimary,
-                    contentColor = PureWhite,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     disabledContainerColor = RegainLimeContainer
                 ),
                 contentPadding = PaddingValues(0.dp),
@@ -903,7 +847,7 @@ fun AuthScreen(
                     if (isLoading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(22.dp),
-                            color = PureWhite,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             strokeWidth = 2.5.dp
                         )
                     } else {
@@ -913,7 +857,7 @@ fun AuthScreen(
                                 fontFamily = PoppinsFontFamily,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = PureWhite
+                                color = MaterialTheme.colorScheme.onPrimary
                             )
                         )
                     }
@@ -973,42 +917,6 @@ fun AuthScreen(
                         fontWeight = FontWeight.Medium,
                         color = textColorSecondary,
                         textAlign = TextAlign.Center
-                    )
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Sync Status Indicator
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .padding(top = 4.dp, bottom = 8.dp)
-                    .testTag("sync_status_badge")
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(RegainLimePrimary.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(RegainLimePrimary)
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Cloud Sync & Local Backup Active",
-                    style = TextStyle(
-                        fontFamily = PoppinsFontFamily,
-                        fontSize = 12.sp,
-                        color = textColorSecondary,
-                        fontWeight = FontWeight.Normal
                     )
                 )
             }
@@ -1078,12 +986,12 @@ fun GoogleAccountSelectDialog(
     var googleEmail by remember { mutableStateOf("") }
     var inputError by remember { mutableStateOf<String?>(null) }
 
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme() || MaterialTheme.colorScheme.background != RegainBgTop
-    val dialogBg = if (isDark) MaterialTheme.colorScheme.surfaceVariant else PureWhite
-    val dialogFieldBg = if (isDark) MaterialTheme.colorScheme.surface else PureWhite
+    val isDark = isAppInDarkTheme()
+    val dialogBg = if (isDark) Color(0xFF1B221B) else PureWhite
+    val dialogFieldBg = if (isDark) Color(0xFF242C23) else PureWhite
     val dialogTextColor = if (isDark) PureWhite else NearBlack
-    val dialogSecondaryText = if (isDark) Color(0xFFCBD5E1) else SecondaryTextLight
-    val dialogBorder = if (isDark) MaterialTheme.colorScheme.outline else MutedBorderLight
+    val dialogSecondaryText = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val dialogBorder = if (isDark) Color(0x358CE000) else MutedBorderLight
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1214,7 +1122,7 @@ fun GoogleAccountSelectDialog(
                         onSelectAccount(name, googleEmail.trim())
                     },
                     shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = RegainLimePrimary, contentColor = PureWhite),
+                    colors = ButtonDefaults.buttonColors(containerColor = RegainLimePrimary, contentColor = MaterialTheme.colorScheme.onPrimary),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)

@@ -3,7 +3,6 @@ package com.example.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,8 +30,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.LavenderSoft
-import com.example.ui.theme.VioletAccent
+import com.example.ui.theme.NearBlack
+import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.RegainLimeContainer
+import com.example.ui.theme.RegainLimeDeepText
+import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 
 data class AchievementItem(
     val id: String,
@@ -47,7 +51,9 @@ fun AchievementBadgeCard(
     achievement: AchievementItem,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
     GlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -66,21 +72,23 @@ fun AchievementBadgeCard(
                     .clip(CircleShape)
                     .background(
                         if (achievement.isUnlocked) {
-                            if (isDark) Color(0x228B7CFF) else Color(0x148B7CFF)
+                            if (isDark) Color(0x358CE000) else RegainLimeContainer
                         } else {
-                            if (isDark) Color(0x10FFFFFF) else Color(0x0A000000)
+                            if (isDark) Color(0x15FFFFFF) else Color(0xFFEFF4EA)
                         }
                     )
                     .border(
                         1.dp,
-                        if (achievement.isUnlocked) VioletAccent.copy(alpha = 0.5f) else Color.Transparent,
+                        if (achievement.isUnlocked) (if (isDark) RegainLimePrimary else RegainLimeDeepText.copy(alpha = 0.4f)) else Color.Transparent,
                         CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Canvas(modifier = Modifier.size(26.dp)) {
                     val strokeW = 1.6.dp.toPx()
-                    val badgeColor = if (achievement.isUnlocked) VioletAccent else Color.Gray.copy(alpha = 0.4f)
+                    val badgeColor = if (achievement.isUnlocked) {
+                        if (isDark) RegainLimePrimary else RegainLimeDeepText
+                    } else Color.Gray.copy(alpha = 0.5f)
 
                     when (achievement.id) {
                         "first_focus" -> {
@@ -127,9 +135,10 @@ fun AchievementBadgeCard(
                     Text(
                         text = achievement.title,
                         style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = PoppinsFontFamily,
                             fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (achievement.isUnlocked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                            fontWeight = FontWeight.Bold,
+                            color = if (achievement.isUnlocked) textPrimary else textSecondary
                         )
                     )
                     if (achievement.isUnlocked) {
@@ -137,13 +146,15 @@ fun AchievementBadgeCard(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(VioletAccent.copy(alpha = 0.15f))
+                                .background(RegainLimeContainer)
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = "UNLOCKED",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = VioletAccent,
+                                    fontFamily = PoppinsFontFamily,
+                                    color = RegainLimeDeepText,
+                                    fontWeight = FontWeight.Bold,
                                     fontSize = 9.sp
                                 )
                             )
@@ -156,7 +167,8 @@ fun AchievementBadgeCard(
                 Text(
                     text = achievement.description,
                     style = MaterialTheme.typography.bodySmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontFamily = PoppinsFontFamily,
+                        color = textSecondary,
                         fontSize = 12.sp
                     )
                 )
@@ -166,7 +178,8 @@ fun AchievementBadgeCard(
                     Text(
                         text = "Achieved ${achievement.unlockedDate}",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            fontFamily = PoppinsFontFamily,
+                            color = textSecondary.copy(alpha = 0.7f),
                             fontSize = 10.sp
                         )
                     )

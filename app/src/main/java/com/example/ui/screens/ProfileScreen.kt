@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HourglassTop
@@ -35,7 +36,11 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberModalBottomSheetState
+import com.example.ui.components.WidgetsShowcaseSheet
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -57,6 +62,7 @@ import coil.compose.AsyncImage
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import java.io.ByteArrayOutputStream
+import java.util.Calendar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -84,6 +90,10 @@ import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun ProfileAvatarImage(
@@ -148,15 +158,18 @@ fun ProfileScreen(
     onOpenSettings: () -> Unit,
     onOpenAlarmStudio: () -> Unit = {},
     onOpenShieldHub: () -> Unit = {},
+    onOpenSundayRecap: () -> Unit = {},
     onOpenSupportLockZen: () -> Unit = {},
     onLogout: () -> Unit = {},
     onUpdateProfile: (newName: String, avatarBytes: ByteArray?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var showPrivacyPolicySheet by remember { mutableStateOf(false) }
+    var showWidgetsSheet by remember { mutableStateOf(false) }
+    val widgetSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Semantic colors for Dark / Light mode compatibility
     val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
@@ -164,8 +177,15 @@ fun ProfileScreen(
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
     val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
 
-    val level = userPreferences?.userLevel ?: 1
-    val points = userPreferences?.focusPoints ?: 0
+    val sessionCount = sessions.count { it.durationSeconds > 0 }
+    val totalSeconds = sessions.sumOf { it.durationSeconds }
+    val hoursFocused = if (totalSeconds >= 3600) {
+        "${totalSeconds / 3600}h"
+    } else if (totalSeconds > 0) {
+        "${totalSeconds / 60}m"
+    } else {
+        "0h"
+    }
     val persona = userPreferences?.focusIdentity ?: "The Scholar of Deep Study"
     val alarmRingtone = userPreferences?.alarmRingtone ?: "Zen Bell"
 
@@ -179,17 +199,6 @@ fun ProfileScreen(
         else -> "Student"
     }
     val userEmail = rawEmail.orEmpty()
-
-    val sessionCount = sessions.size
-    val totalSeconds = sessions.sumOf { it.durationSeconds }
-    val hoursFocused = if (totalSeconds >= 3600) {
-        "${totalSeconds / 3600}h"
-    } else if (totalSeconds > 0) {
-        "${totalSeconds / 60}m"
-    } else {
-        "0h"
-    }
-    val currentStreak = userPreferences?.currentStreak ?: 0
 
     // Dynamic Monogram Avatar (Never hardcoded DW)
     val monogram = if (!userName.isNullOrBlank() && userName != "Student") {
@@ -205,12 +214,33 @@ fun ProfileScreen(
         "S"
     }
 
-    val levelProgress = (points % 100) / 100f
+    val distinctDaysCount = remember(sessions) {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        sessions.filter { it.completedAt > 0 && it.durationSeconds > 0 }.map { sdf.format(Date(it.completedAt)) }.toSet().size
+    }
+
+    val dailyGoalMinutes = (userPreferences?.dailyGoalMinutes ?: 240).coerceAtLeast(60)
+    val todayStart = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+    val todayMinutes = remember(sessions, todayStart) {
+        sessions.filter { it.completedAt >= todayStart && it.durationSeconds > 0 }.sumOf { it.durationSeconds } / 60
+    }
+    val dailyProgress = if (dailyGoalMinutes > 0 && todayMinutes > 0) {
+        (todayMinutes.toFloat() / dailyGoalMinutes).coerceIn(0f, 1f)
+    } else {
+        0.1f
+    }
 
     val badges = listOf(
         CleanBadge("First Flow", Icons.Default.Star, sessionCount >= 1),
         CleanBadge("60m Deep", Icons.Default.HourglassTop, sessions.any { it.durationSeconds >= 3600 }),
-        CleanBadge("7d Streak", Icons.Default.LocalFireDepartment, currentStreak >= 7),
+        CleanBadge("7 Days Flow", Icons.Default.DateRange, distinctDaysCount >= 7),
         CleanBadge("25h Master", Icons.Default.MilitaryTech, totalSeconds >= 25 * 3600),
         CleanBadge("Focus Shield", Icons.Default.Security, (userPreferences?.isAppBlockerEnabled == true) || ((userPreferences?.shieldBlockedAttempts ?: 0) > 0)),
         CleanBadge("100 Blocks", Icons.Default.WorkspacePremium, sessionCount >= 100)
@@ -423,7 +453,7 @@ fun ProfileScreen(
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = "Level $level · $points Points",
+                                            text = "$sessionCount Completed Sessions · $hoursFocused Logged",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = PoppinsFontFamily,
                                                 color = textSecondary,
@@ -435,7 +465,7 @@ fun ProfileScreen(
 
                                 Spacer(modifier = Modifier.height(18.dp))
 
-                                // XP Progress
+                                // Daily Study Progress
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -445,7 +475,7 @@ fun ProfileScreen(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxWidth(levelProgress.coerceAtLeast(0.08f))
+                                            .fillMaxWidth(dailyProgress.coerceAtLeast(0.08f))
                                             .fillMaxHeight()
                                             .clip(CircleShape)
                                             .background(RegainLimePrimary)
@@ -526,6 +556,7 @@ fun ProfileScreen(
                     }
 
                     // Streak
+                    val currentStreakDays = userPreferences?.currentStreak ?: 0
                     GlassCard(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(20.dp)
@@ -537,7 +568,7 @@ fun ProfileScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "${currentStreak}d",
+                                text = "${currentStreakDays}d",
                                 style = MaterialTheme.typography.titleLarge.copy(
                                     fontFamily = PoppinsFontFamily,
                                     fontWeight = FontWeight.Bold,
@@ -636,6 +667,186 @@ fun ProfileScreen(
                             contentDescription = null,
                             tint = textSecondary,
                             modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
+
+            // Apple Glassmorphism Home Widgets Card
+            item {
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    onClick = { showWidgetsSheet = true }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(RegainLimeContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Widgets,
+                                    contentDescription = "Home Widgets",
+                                    tint = RegainLimeDeepText,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Home Screen Widgets",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontFamily = PoppinsFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textPrimary,
+                                            fontSize = 15.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(RegainLimeContainer)
+                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "5 WIDGETS",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontFamily = PoppinsFontFamily,
+                                                color = RegainLimeDeepText,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 9.sp
+                                            )
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Apple Glassmorphism & Poppins fonts",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        color = textSecondary,
+                                        fontSize = 12.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                            contentDescription = null,
+                            tint = textSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
+
+            // Sunday Study Recap Card (Glassmorphism & Real-time Supabase Data - Sunday Only)
+            item {
+                val isTodaySunday = remember {
+                    java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK) == java.util.Calendar.SUNDAY
+                }
+
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    onClick = {
+                        if (isTodaySunday) {
+                            onOpenSundayRecap()
+                        } else {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Sunday Study Recap is only available on Sundays!",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isTodaySunday) RegainLimeContainer else Color(0xFF232A25)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Sunday Recap",
+                                    tint = if (isTodaySunday) RegainLimeDeepText else Color(0xFFA0A89E),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Sunday Focus Recap",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontFamily = PoppinsFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textPrimary,
+                                            fontSize = 15.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(if (isTodaySunday) RegainLimeContainer else Color(0xFF2A342B))
+                                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isTodaySunday) "READY" else "SUNDAY ONLY",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontFamily = PoppinsFontFamily,
+                                                color = if (isTodaySunday) RegainLimeDeepText else Color(0xFFB0B8AE),
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 9.sp
+                                            )
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (isTodaySunday) "Weekly analytics & subject breakdown" else "Unlocks every Sunday with your weekly study review",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        color = textSecondary,
+                                        fontSize = 12.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = textSecondary,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -1063,6 +1274,13 @@ fun ProfileScreen(
     if (showPrivacyPolicySheet) {
         com.example.ui.components.PrivacyPolicySheet(
             onDismiss = { showPrivacyPolicySheet = false }
+        )
+    }
+
+    if (showWidgetsSheet) {
+        WidgetsShowcaseSheet(
+            sheetState = widgetSheetState,
+            onDismiss = { showWidgetsSheet = false }
         )
     }
 }

@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,14 +26,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -58,7 +61,9 @@ fun BlockShieldOverlay(
     onReturnToFocus: () -> Unit,
     onEmergencyBypass: () -> Unit,
     modifier: Modifier = Modifier,
-    isPunishment: Boolean = false
+    isPunishment: Boolean = false,
+    reason: String? = null,
+    isGeminiDetected: Boolean = false
 ) {
     // Prevent bypass via Android hardware / gesture back button
     BackHandler(enabled = true) {
@@ -99,9 +104,8 @@ fun BlockShieldOverlay(
     ) {
         // Aurora starry backdrop
         AuroraBackground {
-            // Floating Decorative App Icons (like Screenshot 3)
+            // Floating Decorative App Icons
             Box(modifier = Modifier.fillMaxSize()) {
-                // Floating top-left Snapchat-style yellow ghost badge
                 FloatingDistractionBadge(
                     text = "👻",
                     bgColor = Color(0xFFFFFC00),
@@ -110,81 +114,115 @@ fun BlockShieldOverlay(
                         .padding(start = 36.dp, top = 90.dp)
                 )
 
-                // Floating top-right Reddit-style orange badge
                 FloatingDistractionBadge(
-                    text = "🤖",
-                    bgColor = Color(0xFFFF4500),
+                    text = "▶",
+                    bgColor = Color(0xFFFF0000),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(end = 40.dp, top = 120.dp)
+                        .padding(end = 40.dp, top = 110.dp)
                 )
 
-                // Floating mid-left Facebook-style blue badge
                 FloatingDistractionBadge(
-                    text = "f",
-                    bgColor = Color(0xFF1877F2),
+                    text = "📸",
+                    bgColor = Color(0xFFE1306C),
                     modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 24.dp, top = 80.dp)
+                        .align(Alignment.BottomStart)
+                        .padding(start = 44.dp, bottom = 140.dp)
                 )
 
-                // Floating mid-right TikTok-style badge
                 FloatingDistractionBadge(
-                    text = "🎵",
-                    bgColor = Color(0xFF111111),
+                    text = "💬",
+                    bgColor = Color(0xFF25D366),
                     modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 28.dp, bottom = 40.dp)
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 44.dp, bottom = 130.dp)
                 )
             }
 
+            // Central Mascot & Lock Intercept Content
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Mascot waving "Stop!" next to App Block Icon
+                // Character Mascot with Stop Sign & Pulsing Aura
                 Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(175.dp)
-                        .scale(pulseScale),
-                    contentAlignment = Alignment.Center
+                        .size(130.dp)
+                        .scale(pulseScale)
                 ) {
-                    // Center Mascot with Stop Sign pose
-                    RegainMascotView(
-                        size = 160.dp,
-                        pose = MascotPose.STOP_SIGN
+                    // Outer warning glow
+                    Box(
+                        modifier = Modifier
+                            .size(130.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(
+                                        if (isGeminiDetected) Color(0x6080CBC4) else Color(0x60E53935),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
                     )
 
-                    // Floating Lock Badge
+                    // Inner mascot circle
+                    Box(
+                        modifier = Modifier
+                            .size(96.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1E2836))
+                            .border(
+                                2.dp,
+                                if (isGeminiDetected) RegainNeonEmerald else Color(0xFFFF5252),
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        RegainMascotView(
+                            pose = MascotPose.STOP_SIGN,
+                            size = 72.dp
+                        )
+                    }
+
+                    // Floating Mini Shield
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .size(38.dp)
+                            .size(34.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFE53935))
-                            .border(2.dp, Color.White, CircleShape),
+                            .background(if (isGeminiDetected) Color(0xFF004D40) else Color(0xFFB71C1C))
+                            .border(1.5.dp, Color.White, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = "Locked",
+                            imageVector = if (isGeminiDetected) Icons.Default.AutoAwesome else Icons.Default.Shield,
+                            contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Status Badge
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(if (effectivePunishment) Color(0x45E53935) else Color(0x35E53935))
-                        .border(1.dp, Color(0x80E53935), RoundedCornerShape(20.dp))
+                        .background(
+                            if (isGeminiDetected) Color(0x3500E676)
+                            else if (effectivePunishment) Color(0x45E53935)
+                            else Color(0x35E53935)
+                        )
+                        .border(
+                            1.dp,
+                            if (isGeminiDetected) RegainNeonEmerald.copy(alpha = 0.8f) else Color(0x80E53935),
+                            RoundedCornerShape(20.dp)
+                        )
                         .padding(horizontal = 14.dp, vertical = 5.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -192,22 +230,24 @@ fun BlockShieldOverlay(
                             modifier = Modifier
                                 .size(7.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFFFF5252))
+                                .background(if (isGeminiDetected) RegainNeonEmerald else Color(0xFFFF5252))
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (effectivePunishment) "⚠️ 6-HOUR AI DISCIPLINE LOCK" else "STRICT STUDY LOCK ACTIVE",
+                            text = if (isGeminiDetected) "✨ GEMINI AI REAL-TIME SCREEN GUARD"
+                            else if (effectivePunishment) "⚠️ 6-HOUR AI DISCIPLINE LOCK"
+                            else "STRICT STUDY LOCK ACTIVE",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = Color(0xFFFF8A80),
+                                color = if (isGeminiDetected) RegainNeonEmerald else Color(0xFFFF8A80),
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp,
+                                letterSpacing = 1.1.sp,
                                 fontSize = 10.sp
                             )
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Bold Title: "{App Name} is Blocked"
                 Text(
@@ -215,64 +255,97 @@ fun BlockShieldOverlay(
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        fontSize = 24.sp,
-                        lineHeight = 30.sp
+                        fontSize = 22.sp,
+                        lineHeight = 28.sp
                     ),
                     textAlign = TextAlign.Center
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Subtitle
-                Text(
-                    text = if (effectivePunishment) {
-                        "AI detected distraction during study routine. Distracting apps are locked for 6 hours so you can complete your syllabus."
-                    } else {
-                        "Stay focused on your student study goals.\nApps unlock automatically when study timer ends."
-                    },
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color(0xFFB0BEC5),
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
-                    ),
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Remaining time countdown pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0x301B3B24))
-                        .border(1.dp, RegainNeonEmerald.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 20.dp, vertical = 8.dp)
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "REMAINING LOCK TIME",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = RegainNeonEmerald,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.2.sp,
-                                fontSize = 9.sp
+                // Subtitle / Gemini AI Reason
+                if (!reason.isNullOrBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0x25004D40))
+                            .border(1.dp, RegainNeonEmerald.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = RegainNeonEmerald,
+                                modifier = Modifier
+                                    .size(15.dp)
+                                    .padding(top = 1.dp)
                             )
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = timeFormatted,
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontSize = 26.sp
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = reason,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = Color(0xFFE0F2F1),
+                                    fontSize = 11.5.sp,
+                                    lineHeight = 15.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
                             )
-                        )
+                        }
                     }
+                } else {
+                    Text(
+                        text = if (effectivePunishment) {
+                            "AI detected non-study distraction during your study routine. Distracting apps are locked so you can complete your syllabus."
+                        } else {
+                            "Stay focused on your student study goals.\nApps unlock automatically when study timer ends."
+                        },
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = Color(0xFFB0BEC5),
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        ),
+                        textAlign = TextAlign.Center
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Student Safe Pass Notice (Calls & ChatGPT/Claude allowed)
+                // Remaining time countdown pill
+                if (remainingSeconds > 0) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0x301B3B24))
+                            .border(1.dp, RegainNeonEmerald.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                            .padding(horizontal = 20.dp, vertical = 6.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "REMAINING STUDY TIME",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = RegainNeonEmerald,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 1.2.sp,
+                                    fontSize = 9.sp
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = timeFormatted,
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    fontSize = 24.sp
+                                )
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                // Student Safe Pass Notice
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.92f)
@@ -291,7 +364,7 @@ fun BlockShieldOverlay(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Incoming phone calls will never be blocked",
+                                text = "Incoming phone calls are never blocked",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = Color(0xFFE0E0E0),
                                     fontSize = 11.sp
@@ -307,7 +380,7 @@ fun BlockShieldOverlay(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Claude & ChatGPT allowed for educational doubts",
+                                text = "AI Academic Sentinel · Educational Lectures & Study Tools Allowed",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = Color(0xFFE0E0E0),
                                     fontSize = 11.sp
@@ -326,49 +399,47 @@ fun BlockShieldOverlay(
                         .shadow(
                             elevation = 12.dp,
                             shape = RoundedCornerShape(28.dp),
-                            ambientColor = RegainAuroraGreen.copy(alpha = 0.3f),
-                            spotColor = RegainAuroraGreen.copy(alpha = 0.5f)
+                            spotColor = RegainNeonEmerald.copy(alpha = 0.5f)
                         )
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(
-                            Brush.horizontalGradient(
-                                colors = listOf(RegainAuroraGreen, RegainNeonEmerald)
-                            )
-                        )
-                        .clickable { onReturnToFocus() }
-                        .padding(vertical = 14.dp)
-                        .testTag("return_to_study_button"),
-                    contentAlignment = Alignment.Center
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = null,
-                            tint = Color(0xFF04200C),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = onReturnToFocus,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                            .testTag("return_to_focus_button"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = RegainNeonEmerald,
+                            contentColor = Color(0xFF0A1F14)
+                        ),
+                        shape = RoundedCornerShape(28.dp)
+                    ) {
                         Text(
                             text = "Return to Study",
                             style = MaterialTheme.typography.titleMedium.copy(
-                                color = Color(0xFF04200C),
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
+                                fontSize = 16.sp
                             )
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Strict Lock Note
-                Text(
-                    text = "🔒 Cannot be bypassed or backed out until timer expires",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = Color(0x99FFFFFF),
-                        fontSize = 11.sp
-                    )
-                )
+                // Emergency Bypass Button (only if not punishment lock)
+                if (!effectivePunishment) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    TextButton(
+                        onClick = onEmergencyBypass,
+                        modifier = Modifier.testTag("emergency_bypass_button")
+                    ) {
+                        Text(
+                            text = "Dismiss Shield",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = Color(0xFF90A4AE),
+                                fontSize = 12.sp
+                            )
+                        )
+                    }
+                }
             }
         }
     }
@@ -382,18 +453,71 @@ private fun FloatingDistractionBadge(
 ) {
     Box(
         modifier = modifier
-            .size(46.dp)
+            .size(38.dp)
             .shadow(6.dp, CircleShape)
             .clip(CircleShape)
-            .background(bgColor)
-            .border(1.5.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+            .background(bgColor.copy(alpha = 0.85f))
+            .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
-            fontSize = 20.sp,
-            color = Color.White,
-            fontWeight = FontWeight.Bold
+            fontSize = 16.sp,
+            color = Color.White
         )
+    }
+}
+
+@Composable
+private fun AuroraBackground(
+    content: @Composable () -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "aurora_bg")
+    val shiftX by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(8000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shift_x"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0D1B1E))
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val width = size.width
+            val height = size.height
+
+            // Deep space radial glow
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF1B4931).copy(alpha = 0.45f),
+                        Color(0xFF0F2B22).copy(alpha = 0.2f),
+                        Color.Transparent
+                    ),
+                    center = androidx.compose.ui.geometry.Offset(width * (0.3f + 0.4f * shiftX), height * 0.35f),
+                    radius = width * 0.85f
+                )
+            )
+
+            // Accent emerald aurora wave
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF00E676).copy(alpha = 0.12f),
+                        Color.Transparent
+                    ),
+                    center = androidx.compose.ui.geometry.Offset(width * (0.7f - 0.4f * shiftX), height * 0.7f),
+                    radius = width * 0.7f
+                )
+            )
+        }
+
+        content()
     }
 }

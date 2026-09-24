@@ -29,7 +29,8 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
                 val pendingResult = goAsync()
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        val localAlarms = AlarmScheduler.getLocalAlarms(context)
+                        val dummyLabels = setOf("Morning Deep Focus", "Midday Reset", "Day Review")
+                        val localAlarms = AlarmScheduler.getLocalAlarms(context).filterNot { it.label in dummyLabels }
                         if (localAlarms.isNotEmpty()) {
                             AlarmScheduler.rescheduleAllEnabled(context, localAlarms)
                             Log.d(TAG, "[BootCompleted] Re-registered ${localAlarms.size} local cached alarms")
@@ -37,7 +38,7 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
 
                         val uid = SupabaseService.getInstance().getCurrentUserId()
                         if (!uid.isNullOrBlank()) {
-                            val alarmsDto = SupabaseService.getInstance().fetchAlarms(uid)
+                            val alarmsDto = SupabaseService.getInstance().fetchAlarms(uid).filterNot { it.label in dummyLabels }
                             if (alarmsDto.isNotEmpty()) {
                                 val alarmItems = alarmsDto.map { dto ->
                                     AlarmItem(

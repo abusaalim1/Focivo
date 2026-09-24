@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tune
@@ -37,24 +40,34 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.model.FocusSessionEntity
 import com.example.data.model.TaskEntity
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.AuroraBackground
-import com.example.ui.components.FocusScoreRing
+import com.example.ui.components.LinearButton
+import com.example.ui.components.LinearButtonVariant
+import com.example.ui.components.LinearGlowCard
 import com.example.ui.components.PriorityItemRow
 import com.example.ui.components.SegmentedProgressBar
+import com.example.ui.components.pressFeedback
+import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -62,6 +75,7 @@ import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.isAppInDarkTheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -84,33 +98,113 @@ fun HomeScreen(
     onOpenAutoSchedule: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
 
     // Semantic colors for Light/Dark mode
-    val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
-    val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
-    val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
-    val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
+    val cardBg = if (isDark) Color(0xD91B221C) else Color(0xFFFFFFFF)
+    val cardBorder = if (isDark) Color(0x358CE000) else Color(0xFFE2EBD6)
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else Color(0xFF121814)
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else Color(0xFF4A564C)
+    val headerDateColor = Color.White.copy(alpha = 0.88f)
+    val headerTitleColor = Color.White
+    val headerButtonBg = if (isDark) cardBg else Color(0xEEFFFFFF)
+    val headerButtonBorder = if (isDark) cardBorder else Color(0xFFD0DCC4)
 
-    // Dynamic score calculation based on real local database sessions
-    val todayCal = Calendar.getInstance()
-    val todayDayOfWeek = if (todayCal.get(Calendar.DAY_OF_WEEK) == 1) 7 else todayCal.get(Calendar.DAY_OF_WEEK) - 1
-    val todaySessions = sessions.filter { it.dayOfWeek == todayDayOfWeek }
-    val todayMinutes = todaySessions.sumOf { it.durationSeconds } / 60
-    val dailyGoalMinutes = (userPreferences?.dailyGoalMinutes ?: 240).coerceAtLeast(60)
+    val totalFocusSeconds = remember(sessions) { sessions.sumOf { it.durationSeconds } }
+    val totalFocusHours = totalFocusSeconds / 3600.0
+    val totalFocusHoursStr = remember(totalFocusSeconds) {
+        if (totalFocusHours >= 10.0) {
+            "${totalFocusHours.toInt()}h"
+        } else if (totalFocusHours >= 1.0) {
+            String.format(Locale.US, "%.1fh", totalFocusHours)
+        } else if (totalFocusSeconds > 0) {
+            "${totalFocusSeconds / 60}m"
+        } else {
+            "0h"
+        }
+    }
+    val totalSessionsCount = sessions.size
 
-    val score = if (sessions.isEmpty()) {
-        0
-    } else {
-        ((todayMinutes.toFloat() / dailyGoalMinutes) * 100).toInt().coerceIn(10, 100)
+    // Weekly Study Time Calculations
+    val currentWeekStart = remember {
+        val cal = Calendar.getInstance()
+        val dow = cal.get(Calendar.DAY_OF_WEEK)
+        val daysFromMonday = if (dow == Calendar.SUNDAY) 6 else (dow - Calendar.MONDAY)
+        cal.add(Calendar.DAY_OF_MONTH, -daysFromMonday)
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        cal.timeInMillis
+    }
+    val lastWeekStart = remember(currentWeekStart) {
+        currentWeekStart - (7 * 24 * 3600 * 1000L)
+    }
+    val thisWeekSessions = remember(sessions, currentWeekStart) {
+        sessions.filter { it.completedAt >= currentWeekStart }
+    }
+    val lastWeekSessions = remember(sessions, currentWeekStart, lastWeekStart) {
+        sessions.filter { it.completedAt >= lastWeekStart && it.completedAt < currentWeekStart }
+    }
+    val thisWeekSeconds = remember(thisWeekSessions) { thisWeekSessions.sumOf { it.durationSeconds } }
+    val lastWeekSeconds = remember(lastWeekSessions) { lastWeekSessions.sumOf { it.durationSeconds } }
+
+    val thisWeekHours = thisWeekSeconds / 3600.0
+    val lastWeekHours = lastWeekSeconds / 3600.0
+    val weekDiffHours = thisWeekHours - lastWeekHours
+
+    val weeklyHoursHeadlineStr = remember(thisWeekSeconds, thisWeekHours) {
+        if (thisWeekSeconds == 0) {
+            "0.0 hrs"
+        } else {
+            String.format(Locale.US, "%.1f hrs", thisWeekHours)
+        }
     }
 
-    val scoreSubtitle = if (sessions.isEmpty()) {
+    val weeklyTrendText = remember(thisWeekSeconds, weekDiffHours, thisWeekSessions) {
+        if (thisWeekSeconds == 0) {
+            "No sessions yet this week — let's start!"
+        } else if (kotlin.math.abs(weekDiffHours) < 0.1) {
+            "${thisWeekSessions.size} session${if (thisWeekSessions.size != 1) "s" else ""} completed this week"
+        } else if (weekDiffHours > 0) {
+            String.format(Locale.US, "+%.1f hrs vs last week", weekDiffHours)
+        } else {
+            String.format(Locale.US, "%.1f hrs vs last week", weekDiffHours)
+        }
+    }
+
+    // Dynamic study metrics based on real local database sessions
+    val todayStart = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+    val todaySessions = remember(sessions, todayStart) {
+        sessions.filter { it.completedAt >= todayStart && it.durationSeconds > 0 }
+    }
+    val todayMinutes = remember(todaySessions) {
+        todaySessions.sumOf { it.durationSeconds } / 60
+    }
+    val totalCompletedSessions = remember(sessions) {
+        sessions.count { it.durationSeconds > 0 }
+    }
+    val dailyGoalMinutes = (userPreferences?.dailyGoalMinutes ?: 240).coerceAtLeast(60)
+
+    val dailyProgress = if (dailyGoalMinutes > 0 && todayMinutes > 0) {
+        (todayMinutes.toFloat() / dailyGoalMinutes).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+
+    val scoreSubtitle = if (totalCompletedSessions == 0) {
         "No focus sessions yet · Start your first timer below!"
     } else if (todayMinutes > 0) {
-        "$todayMinutes min logged today of $dailyGoalMinutes min daily goal"
+        "${todaySessions.size} session${if (todaySessions.size > 1) "s" else ""} today · $todayMinutes of $dailyGoalMinutes min daily goal"
     } else {
-        "Ready to begin today's first deep work session"
+        "$totalCompletedSessions total completed sessions · Ready for your next session"
     }
 
     // Dynamic greeting based on current time
@@ -128,87 +222,301 @@ fun HomeScreen(
         sdf.format(Date())
     }
 
-    val currentStreak = remember(sessions, userPreferences?.currentStreak) {
-        calculateConsecutiveStudyStreak(sessions, userPreferences?.currentStreak ?: 0)
-    }
-    val bestStreak = remember(sessions, userPreferences?.bestStreak, currentStreak) {
-        maxOf(userPreferences?.bestStreak ?: 0, currentStreak)
-    }
-
     Box(modifier = modifier.fillMaxSize()) {
         AuroraBackground(modifier = Modifier.fillMaxSize())
+
+        // Top Atmospheric Header Backdrop Image Layer
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(260.dp)
+                .align(Alignment.TopCenter)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.home_header_bg),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+
+            // High-contrast scrim overlay to ensure white greeting text pops crisply in both dark & light modes
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0x99000000), // ~60% dark overlay at top for crisp white text legibility
+                                Color(0x50000000),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            // Smooth vertical gradient fade into background surface before cards
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)
+                            )
+                        )
+                    )
+            )
+        }
 
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
                 .testTag("home_screen"),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            contentPadding = PaddingValues(top = 16.dp, bottom = 220.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 1. Header
+            // 1. Header with clean greeting and quiet action icons
             item {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                        .padding(top = 8.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = currentDateStr.uppercase(),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                color = textSecondary,
-                                letterSpacing = 1.6.sp,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        val userName = userPreferences?.currentUserName?.takeIf { it.isNotBlank() && it != "Deep Worker" }
-                        val displayGreeting = if (userName != null) "$greeting, $userName." else "$greeting."
-                        Text(
-                            text = displayGreeting,
-                            style = MaterialTheme.typography.headlineLarge.copy(
-                                fontFamily = PoppinsFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                color = textPrimary,
-                                fontSize = 24.sp
-                            )
-                        )
-                        Text(
-                            text = "Ready to focus?",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontFamily = PoppinsFontFamily,
-                                fontWeight = FontWeight.SemiBold,
-                                color = RegainLimeDeepText,
-                                fontSize = 18.sp
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Prominent Auto Study Schedule Pill Button
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(RegainLimeContainer)
-                                .border(1.5.dp, RegainLimePrimary, RoundedCornerShape(18.dp))
-                                .clickable { onOpenAutoSchedule() }
-                                .padding(horizontal = 12.dp, vertical = 10.dp)
-                                .testTag("home_auto_schedule_button"),
-                            contentAlignment = Alignment.Center
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = currentDateStr.uppercase(),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = PoppinsFontFamily,
+                                    color = headerDateColor,
+                                    letterSpacing = 1.6.sp,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            val userName = userPreferences?.currentUserName?.takeIf { it.isNotBlank() && it != "Deep Worker" }
+                            val displayGreeting = if (userName != null) "$greeting, $userName" else greeting
+                            Text(
+                                text = displayGreeting,
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontFamily = PoppinsFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = headerTitleColor,
+                                    fontSize = 24.sp
+                                )
+                            )
+                        }
+
+                        // Compact quiet action icons for Schedule and Alarms
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = onOpenAutoSchedule,
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(headerButtonBg)
+                                    .border(1.dp, headerButtonBorder, CircleShape)
+                                    .testTag("home_auto_schedule_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = "Auto Schedule",
+                                    tint = if (isDark) RegainLimeDeepText else Color(0xFF2E6800),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            IconButton(
+                                onClick = onOpenAlarmStudio,
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(headerButtonBg)
+                                    .border(1.dp, headerButtonBorder, CircleShape)
+                                    .testTag("home_alarm_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Alarm,
+                                    contentDescription = "Alarms",
+                                    tint = if (isDark) textPrimary else Color(0xFF151916),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Consolidated Primary Hero: Weekly Study Time Card with Integrated Focus Score Badge
+            item {
+                LinearGlowCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("home_weekly_study_hero_card"),
+                    shape = RoundedCornerShape(24.dp),
+                    glowColor = RegainLimePrimary,
+                    glowAlpha = 0.2f
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        // Top Row: Weekly Study Time Label + Integrated Focus Score Badge
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(RegainLimeContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Schedule,
+                                        contentDescription = null,
+                                        tint = RegainLimeDeepText,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "WEEKLY STUDY TIME",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontFamily = AppleLinearFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textSecondary,
+                                        letterSpacing = 1.4.sp,
+                                        fontSize = 10.5.sp
+                                    )
+                                )
+                            }
+
+                            // Compact integrated Sessions badge with mini mascot
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(if (isDark) Color(0x30FFFFFF) else Color(0xFFF0F4EC))
+                                    .border(1.dp, cardBorder, CircleShape)
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                                    .testTag("home_integrated_sessions_badge")
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Image(
+                                        painter = painterResource(id = R.drawable.mascot_focus_score),
+                                        contentDescription = "Mascot",
+                                        modifier = Modifier.size(20.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                    Text(
+                                        text = "$totalCompletedSessions sessions",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = AppleLinearFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textPrimary,
+                                            fontSize = 11.sp
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Large Headline Number
+                        Text(
+                            text = "$weeklyHoursHeadlineStr this week",
+                            style = MaterialTheme.typography.headlineLarge.copy(
+                                fontFamily = AppleLinearFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = textPrimary,
+                                fontSize = 30.sp,
+                                letterSpacing = (-0.6).sp
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Subtitle / Trend Indicator
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (thisWeekSeconds > 0 && weekDiffHours > 0) {
+                                Icon(
+                                    imageVector = Icons.Default.Bolt,
+                                    contentDescription = null,
+                                    tint = RegainLimeDeepText,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Text(
+                                text = weeklyTrendText,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = AppleLinearFontFamily,
+                                    color = if (thisWeekSeconds == 0) textSecondary else if (weekDiffHours >= 0) RegainLimeDeepText else textSecondary,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 13.sp
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 3. Combined Compact Status Row: Auto Study Routine + Focus Shield
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(cardBg)
+                        .border(1.dp, cardBorder, RoundedCornerShape(20.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                        .testTag("home_combined_status_row")
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Left Item: Auto Study Routine
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onOpenAutoSchedule() }
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(RegainLimeContainer),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Schedule,
@@ -216,349 +524,123 @@ fun HomeScreen(
                                     tint = RegainLimeDeepText,
                                     modifier = Modifier.size(18.dp)
                                 )
-                                Text(
-                                    text = "Schedule",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontFamily = PoppinsFontFamily,
-                                        color = RegainLimeDeepText,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                )
                             }
-                        }
 
-                        // Prominent Alarm Studio Pill Button
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(if (isDark) Color(0xFF232136) else Color(0xFFF1F5F9))
-                                .border(1.dp, cardBorder, RoundedCornerShape(18.dp))
-                                .clickable { onOpenAlarmStudio() }
-                                .padding(horizontal = 12.dp, vertical = 10.dp)
-                                .testTag("home_alarm_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Alarm,
-                                    contentDescription = "Alarm Studio",
-                                    tint = textPrimary,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Alarms",
-                                    style = MaterialTheme.typography.labelMedium.copy(
+                                    text = "Auto Study",
+                                    style = MaterialTheme.typography.titleSmall.copy(
                                         fontFamily = PoppinsFontFamily,
+                                        fontWeight = FontWeight.Bold,
                                         color = textPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
+                                        fontSize = 13.sp
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. Focus Score Card
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(cardBg)
-                        .border(1.dp, cardBorder, RoundedCornerShape(28.dp))
-                        .padding(vertical = 24.dp, horizontal = 20.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        FocusScoreRing(
-                            score = score,
-                            size = 180.dp
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Text(
-                            text = scoreSubtitle,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = PoppinsFontFamily,
-                                color = textSecondary,
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 13.sp
-                            )
-                        )
-                    }
-                }
-            }
-
-            // 2b. Focus Streak Widget (Activity Logs / Supabase consecutive study days)
-            item {
-                FocusStreakWidget(
-                    currentStreak = currentStreak,
-                    bestStreak = bestStreak,
-                    sessions = sessions,
-                    textPrimary = textPrimary,
-                    textSecondary = textSecondary,
-                    cardBg = cardBg,
-                    cardBorder = cardBorder,
-                    isDark = isDark
-                )
-            }
-
-            // 3. Auto Study Schedule Card (Standalone AI Planner Section)
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(cardBg)
-                        .border(1.dp, cardBorder, RoundedCornerShape(24.dp))
-                        .padding(20.dp)
-                        .testTag("home_auto_study_schedule_card")
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(RegainLimeContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Schedule,
-                                        contentDescription = "Auto Study Schedule",
-                                        tint = RegainLimeDeepText,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Auto Study Schedule",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontFamily = PoppinsFontFamily,
-                                            fontWeight = FontWeight.Bold,
-                                            color = textPrimary,
-                                            fontSize = 15.sp
-                                        ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = scheduleStatusSummary,
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontFamily = PoppinsFontFamily,
-                                            color = textSecondary,
-                                            fontWeight = FontWeight.Medium,
-                                            fontSize = 12.5.sp
-                                        ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(RegainLimeContainer)
-                                        .padding(horizontal = 9.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = "AUTOMATED",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontFamily = PoppinsFontFamily,
-                                            color = RegainLimeDeepText,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 10.sp
-                                        ),
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(RegainLimePrimary)
-                                        .clickable { onOpenAutoSchedule() }
-                                        .padding(horizontal = 13.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = "Manage",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontFamily = PoppinsFontFamily,
-                                            color = NearBlack,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp
-                                        ),
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-                            }
-                        }
-
-                        if (scheduledBlocksCount > 0) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "$scheduledBlocksCount active study routines · Automated app blocking during study & break windows",
-                                    style = MaterialTheme.typography.labelSmall.copy(
+                                    text = scheduleStatusSummary,
+                                    style = MaterialTheme.typography.bodySmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         color = textSecondary,
                                         fontSize = 11.sp
-                                    )
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
-                    }
-                }
-            }
 
-            // 4. Focus Shield Card
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(cardBg)
-                        .border(1.dp, cardBorder, RoundedCornerShape(24.dp))
-                        .padding(20.dp)
-                        .testTag("focus_shield_card")
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                        // Vertical Divider
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 10.dp)
+                                .width(1.dp)
+                                .height(32.dp)
+                                .background(cardBorder)
+                        )
+
+                        // Right Item: Focus Shield
                         Row(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onOpenShieldHub() }
+                                .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(RegainLimeContainer),
+                                    .size(34.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (userPreferences?.isAppBlockerEnabled == true) RegainLimeContainer else (if (isDark) Color(0x30FFFFFF) else Color(0xFFF0F4EC))),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Security,
                                     contentDescription = "Focus Shield",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(22.dp)
+                                    tint = if (userPreferences?.isAppBlockerEnabled == true) RegainLimeDeepText else textSecondary,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(14.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
 
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         text = "Focus Shield",
-                                        style = MaterialTheme.typography.titleMedium.copy(
+                                        style = MaterialTheme.typography.titleSmall.copy(
                                             fontFamily = PoppinsFontFamily,
                                             fontWeight = FontWeight.Bold,
                                             color = textPrimary,
-                                            fontSize = 15.sp
+                                            fontSize = 13.sp
                                         )
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(CircleShape)
-                                            .background(if (userPreferences?.isAppBlockerEnabled == true) RegainLimeContainer else (if (isDark) Color(0x30FFFFFF) else Color(0xFFF0F4EC)))
-                                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = if (userPreferences?.isAppBlockerEnabled == true) "ARMED" else "OFF",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontFamily = PoppinsFontFamily,
-                                                color = if (userPreferences?.isAppBlockerEnabled == true) RegainLimeDeepText else textSecondary,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 9.sp
-                                            ),
-                                            maxLines = 1,
-                                            softWrap = false
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (userPreferences?.isAppBlockerEnabled == true) "ON" else "OFF",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = PoppinsFontFamily,
+                                            color = if (userPreferences?.isAppBlockerEnabled == true) RegainLimeDeepText else textSecondary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 9.sp
                                         )
-                                    }
+                                    )
                                 }
-                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Blocks Reels, Shorts & distracting apps",
+                                    text = if (userPreferences?.isAppBlockerEnabled == true) "12 apps blocked" else "Tap to enable",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         color = textSecondary,
-                                        fontSize = 12.sp
-                                    )
+                                        fontSize = 11.sp
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(RegainLimeContainer)
-                                .clickable { onOpenShieldHub() }
-                                .padding(horizontal = 14.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = "Manage",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    color = RegainLimeDeepText,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
-                            )
                         }
                     }
                 }
             }
 
-            // 4. Quick Focus Card
+            // 5. Streamlined Quick Focus Card
             item {
-                Box(
+                LinearGlowCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(26.dp))
-                        .background(cardBg)
-                        .border(1.dp, cardBorder, RoundedCornerShape(26.dp))
-                        .padding(22.dp)
-                        .testTag("quick_focus_card")
+                        .testTag("quick_focus_card"),
+                    shape = RoundedCornerShape(24.dp),
+                    glowColor = RegainLimePrimary,
+                    glowAlpha = 0.15f
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp)
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -567,7 +649,7 @@ fun HomeScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier
-                                        .size(32.dp)
+                                        .size(30.dp)
                                         .clip(CircleShape)
                                         .background(RegainLimeContainer),
                                     contentAlignment = Alignment.Center
@@ -576,14 +658,14 @@ fun HomeScreen(
                                         imageVector = Icons.Default.Bolt,
                                         contentDescription = null,
                                         tint = RegainLimeDeepText,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "QUICK FOCUS",
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = PoppinsFontFamily,
+                                        fontFamily = AppleLinearFontFamily,
                                         color = RegainLimeDeepText,
                                         letterSpacing = 1.4.sp,
                                         fontSize = 11.sp,
@@ -594,98 +676,59 @@ fun HomeScreen(
 
                             Text(
                                 text = "25 min",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontFamily = PoppinsFontFamily,
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontFamily = AppleLinearFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     color = textPrimary
                                 )
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         Text(
-                            text = "Ready for a focused session?",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontFamily = PoppinsFontFamily,
+                            text = "Start a 25m Focus Sprint",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontFamily = AppleLinearFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
+                                fontSize = 16.sp,
                                 color = textPrimary
                             )
                         )
                         Text(
-                            text = "Clear distractions and enter your zone with classic 25m cadence.",
+                            text = "Clear distractions and enter flow state with classic cadence.",
                             style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = PoppinsFontFamily,
+                                fontFamily = AppleLinearFontFamily,
                                 color = textSecondary,
                                 fontSize = 12.sp
                             )
                         )
 
-                        Spacer(modifier = Modifier.height(18.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Box(
+                            LinearButton(
+                                text = "Start Focus",
+                                icon = Icons.Default.PlayArrow,
+                                onClick = { onStartFocus("Deep Work Sprint", 25) },
                                 modifier = Modifier
                                     .weight(1.2f)
-                                    .height(48.dp)
-                                    .clip(CircleShape)
-                                    .background(RegainLimePrimary)
-                                    .clickable { onStartFocus("Deep Work Sprint", 25) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = null,
-                                        tint = NearBlack,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Start Focus",
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontFamily = PoppinsFontFamily,
-                                            color = NearBlack,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
-                                        )
-                                    )
-                                }
-                            }
+                                    .height(44.dp),
+                                variant = LinearButtonVariant.PRIMARY
+                            )
 
-                            Box(
+                            LinearButton(
+                                text = "Customize",
+                                icon = Icons.Default.Tune,
+                                onClick = onCustomizeFocus,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(48.dp)
-                                    .clip(CircleShape)
-                                    .background(cardBg)
-                                    .border(1.dp, cardBorder, CircleShape)
-                                    .clickable { onCustomizeFocus() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Tune,
-                                        contentDescription = null,
-                                        tint = textPrimary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Customize",
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontFamily = PoppinsFontFamily,
-                                            color = textPrimary,
-                                            fontWeight = FontWeight.Medium,
-                                            fontSize = 13.sp
-                                        )
-                                    )
-                                }
-                            }
+                                    .height(44.dp),
+                                variant = LinearButtonVariant.SECONDARY
+                            )
                         }
                     }
                 }
@@ -816,292 +859,4 @@ fun HomeScreen(
             }
         }
     }
-}
-
-@Composable
-fun FocusStreakWidget(
-    currentStreak: Int,
-    bestStreak: Int,
-    sessions: List<FocusSessionEntity>,
-    textPrimary: Color,
-    textSecondary: Color,
-    cardBg: Color,
-    cardBorder: Color,
-    isDark: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(26.dp))
-            .background(cardBg)
-            .border(1.dp, cardBorder, RoundedCornerShape(26.dp))
-            .padding(20.dp)
-            .testTag("focus_streak_widget")
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = if (currentStreak > 0) listOf(
-                                        Color(0xFFFF6D00),
-                                        Color(0xFFFFAB00)
-                                    ) else listOf(
-                                        Color(0xFF8E8E93),
-                                        Color(0xFFAEAEC0)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LocalFireDepartment,
-                            contentDescription = "Focus Streak Flame",
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(14.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "FOCUS STREAK",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    color = RegainLimeDeepText,
-                                    letterSpacing = 1.3.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                ),
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(RegainLimeContainer)
-                                    .padding(horizontal = 8.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = if (currentStreak > 0) "ACTIVE 🔥" else "START TODAY",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = PoppinsFontFamily,
-                                        color = RegainLimeDeepText,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 9.sp
-                                    ),
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(2.dp))
-
-                        Text(
-                            text = if (currentStreak == 1) "1 Day Streak" else "$currentStreak Days Streak",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontFamily = PoppinsFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                color = textPrimary,
-                                fontSize = 18.sp
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(if (isDark) Color(0x20FFFFFF) else Color(0xFFF1F5F9))
-                        .border(1.dp, cardBorder, RoundedCornerShape(14.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.EmojiEvents,
-                            contentDescription = "Best Streak",
-                            tint = Color(0xFFFFB300),
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = "Best: ${maxOf(bestStreak, currentStreak)}d",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                color = textSecondary,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 11.sp
-                            ),
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Text(
-                text = if (currentStreak > 0) {
-                    "You've maintained study consistency for $currentStreak consecutive day${if (currentStreak > 1) "s" else ""}! Keep the flame alive."
-                } else {
-                    "No consecutive study streak yet. Complete a focus session today to light the flame!"
-                },
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = PoppinsFontFamily,
-                    color = textSecondary,
-                    fontSize = 12.5.sp,
-                    lineHeight = 17.sp
-                )
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            val past7Days = remember(sessions) {
-                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                val dayFormat = SimpleDateFormat("E", Locale.getDefault())
-                val datesWithStudy = sessions.filter { it.completedAt > 0 }.map { sdf.format(Date(it.completedAt)) }.toSet()
-
-                (6 downTo 0).map { daysAgo ->
-                    val c = Calendar.getInstance()
-                    c.add(Calendar.DAY_OF_YEAR, -daysAgo)
-                    val dateStr = sdf.format(c.time)
-                    val label = dayFormat.format(c.time).take(1)
-                    val isToday = daysAgo == 0
-                    val hasStudied = datesWithStudy.contains(dateStr)
-                    Triple(label, hasStudied, isToday)
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                past7Days.forEach { (dayLabel, hasStudied, isToday) ->
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = dayLabel,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                color = if (isToday) RegainLimeDeepText else textSecondary,
-                                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 11.sp
-                            )
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    when {
-                                        hasStudied -> Color(0xFFFF6D00)
-                                        isToday -> RegainLimeContainer
-                                        else -> if (isDark) Color(0x1AFFFFFF) else Color(0xFFE2E8F0)
-                                    }
-                                )
-                                .border(
-                                    width = if (isToday) 1.5.dp else 0.dp,
-                                    color = if (isToday) RegainLimePrimary else Color.Transparent,
-                                    shape = CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (hasStudied) {
-                                Icon(
-                                    imageVector = Icons.Default.LocalFireDepartment,
-                                    contentDescription = "Studied",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            } else if (isToday) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = "Today",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(textSecondary.copy(alpha = 0.4f))
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-fun calculateConsecutiveStudyStreak(sessions: List<FocusSessionEntity>, fallbackStreak: Int): Int {
-    if (sessions.isEmpty()) {
-        return fallbackStreak
-    }
-    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-
-    val studyDates = sessions
-        .filter { it.completedAt > 0 }
-        .map { sdf.format(Date(it.completedAt)) }
-        .toSet()
-
-    if (studyDates.isEmpty()) {
-        return fallbackStreak
-    }
-
-    val cal = Calendar.getInstance()
-    val todayStr = sdf.format(cal.time)
-
-    cal.add(Calendar.DAY_OF_YEAR, -1)
-    val yesterdayStr = sdf.format(cal.time)
-
-    val startCal = Calendar.getInstance()
-    if (studyDates.contains(todayStr)) {
-        startCal.time = Date()
-    } else if (studyDates.contains(yesterdayStr)) {
-        startCal.add(Calendar.DAY_OF_YEAR, -1)
-    } else {
-        return maxOf(0, fallbackStreak)
-    }
-
-    var streak = 0
-    while (true) {
-        val dateStr = sdf.format(startCal.time)
-        if (studyDates.contains(dateStr)) {
-            streak++
-            startCal.add(Calendar.DAY_OF_YEAR, -1)
-        } else {
-            break
-        }
-    }
-    return maxOf(streak, fallbackStreak)
 }

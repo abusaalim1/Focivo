@@ -134,7 +134,14 @@ data class SupabaseUserPreferencesDto(
     val shield_blocked_attempts: Int = 0,
     val allowed_education_apps: String = "com.google.android.youtube,com.openai.chatgpt,com.anthropic.claude",
     val is_auto_study_blocker_enabled: Boolean = true,
-    val penalty_block_end_time: Long = 0L
+    val penalty_block_end_time: Long = 0L,
+    val buddy_growth_stage: Int = 1,
+    val buddy_total_focus_minutes: Int = 0,
+    val last_donation_prompt_shown_at: String? = null,
+    val donation_prompt_dismissed_count: Int = 0,
+    @kotlinx.serialization.Transient
+    val never_show_donation_prompt: Boolean = false,
+    val last_viewed_sunday_recap_week: String? = null
 )
 
 @Serializable
@@ -142,9 +149,22 @@ data class SupabaseStudyLeaderboardDto(
     val user_id: String,
     val display_name: String = "Student",
     val study_seconds: Long = 0L,
+    val weekly_study_seconds: Long = 0L,
+    val current_week_start: String? = null,
     val streak: Int = 1,
     val subject_tag: String = "General Study",
+    var avatar_url: String? = null,
     val last_updated: String? = null
+)
+
+@Serializable
+data class SupabaseHallOfFameDto(
+    val user_id: String = "",
+    val display_name: String = "Student",
+    val week_start: String = "",
+    val week_end: String = "",
+    val winning_study_seconds: Long = 0L,
+    val created_at: String? = null
 )
 
 @Serializable
@@ -152,6 +172,7 @@ data class SupabaseScheduledBlockDto(
     val id: String = java.util.UUID.randomUUID().toString(),
     val user_id: String,
     val label: String = "Study Block",
+    val subject: String? = null,
     val start_time: String = "18:00",
     val end_time: String = "22:00",
     val break_start_time: String? = null,
@@ -186,6 +207,7 @@ object SupabaseManager {
 
     fun initialize(context: Context) {
         appContext = context.applicationContext
+        AndroidPreferenceSessionManager.appContext = context.applicationContext
     }
 
     private fun getContext(): Context? {

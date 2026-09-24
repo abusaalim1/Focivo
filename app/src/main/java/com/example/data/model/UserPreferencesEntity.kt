@@ -50,5 +50,14 @@ data class UserPreferencesEntity(
     val preferredStudyTimeWindow: String = "Evening",
     val motivationStyle: String = "Streaks",
     val hasCompletedIntakeSurvey: Boolean = false,
-    val lastDonationPromptTimestamp: Long = 0L
+    val lastDonationPromptTimestamp: Long = 0L,
+    val buddyGrowthStage: Int = 1,
+    val buddyTotalFocusMinutes: Int = 0,
+    val lastWeeklyReviewShownAt: Long = 0L,
+    val lastDonationPromptShownAt: Long = 0L,
+    val donationPromptDismissedCount: Int = 0,
+    val neverShowDonationPrompt: Boolean = false,
+    val lastViewedSundayRecapWeek: String = "",
+    val autoBlockStudyAppsWithoutAsking: Boolean = false,
+    val isDeepFocusEnabled: Boolean = false
 )

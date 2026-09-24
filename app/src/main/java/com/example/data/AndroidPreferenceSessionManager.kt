@@ -16,12 +16,39 @@ class AndroidPreferenceSessionManager(private val context: Context) : SessionMan
         private const val KEY_SESSION = "supabase_user_session"
         private const val KEY_USER_ID = "supabase_persisted_user_id"
         private const val KEY_EMAIL = "supabase_persisted_email"
+        private const val KEY_AVATAR_URL = "supabase_persisted_avatar_url"
         private const val KEY_ACCESS_TOKEN = "supabase_persisted_access_token"
         private const val KEY_REFRESH_TOKEN = "supabase_persisted_refresh_token"
+
+        @Volatile
+        var appContext: Context? = null
+
+        fun setStoredUserId(context: Context, userId: String) {
+            if (userId.isBlank()) return
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_USER_ID, userId)
+                .commit()
+            Log.d(TAG, "[SessionPersistence] Synchronously stored active userId: $userId")
+        }
 
         fun getStoredUserId(context: Context): String? {
             return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .getString(KEY_USER_ID, null)
+        }
+
+        fun setStoredAvatarUrl(context: Context, avatarUrl: String) {
+            if (avatarUrl.isBlank()) return
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_AVATAR_URL, avatarUrl)
+                .commit()
+            Log.d(TAG, "[SessionPersistence] Stored avatar url: ${avatarUrl.take(60)}...")
+        }
+
+        fun getStoredAvatarUrl(context: Context): String? {
+            return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_AVATAR_URL, null)
         }
 
         fun getStoredEmail(context: Context): String? {

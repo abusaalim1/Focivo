@@ -5,12 +5,14 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.media.RingtoneManager
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
+import com.example.data.AndroidPreferenceSessionManager
 import com.example.data.SupabaseManager
 import com.example.data.SupabasePunishmentLogDto
 import com.example.data.SupabaseService
@@ -26,7 +28,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.time.Instant
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import java.util.UUID
 
 data class ActiveAiWarning(
@@ -97,8 +102,10 @@ object AiStudyGuardManager {
     }
 
     fun isAiGuardEnabled(context: Context): Boolean {
+        val hasPerm = isAccessibilityPermissionGranted(context)
+        if (!hasPerm) return false
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(KEY_AI_GUARD_ENABLED, true)
+        return prefs.getBoolean(KEY_AI_GUARD_ENABLED, false)
     }
 
     fun setAiGuardEnabled(context: Context, enabled: Boolean) {
@@ -114,20 +121,25 @@ object AiStudyGuardManager {
      * 3. Focus Shield otherwise actively armed
      */
     fun isStudyPeriodActive(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
+        val now = System.currentTimeMillis()
         // 1. Manual timer running
-        val isTimerRunning = prefs.getBoolean("is_manual_timer_running", false)
-        val timerEndTime = prefs.getLong("manual_timer_end_time_ms", 0L)
-        val isTimerActive = isTimerRunning && (timerEndTime > System.currentTimeMillis())
+        val localPrefs = context.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
+        val isManualRunning = localPrefs.getBoolean("is_manual_timer_running", false)
+        val timerEndTime = localPrefs.getLong("manual_timer_end_time_ms", 0L)
+        val timerStatePrefs = context.getSharedPreferences("focusly_timer_state", Context.MODE_PRIVATE)
+        val isTimerStateRunning = timerStatePrefs.getBoolean("is_timer_running", false)
+        val isTimerActive = (isManualRunning || isTimerStateRunning) && (timerEndTime > now)
 
         // 2. Active Auto Study Schedule window
         val isScheduleActive = ScheduledBlockScheduler.isScheduleCurrentlyActive(context)
 
-        // 3. Focus Shield running (standalone or punishment)
-        val isShieldRunning = FocusShieldService.isShieldRunning(context)
+        // 3. Focus Shield running (general study shield only, NOT app-specific punishment)
+        val isShieldRunning = FocusShieldService.isShieldActive.value && !FocusShieldService.isPunishmentLock.value
 
-        return isTimerActive || isScheduleActive || isShieldRunning
+        // 4. Strict Mode Session with active timer
+        val isStrictActive = StrictModeManager.isSessionActive(context) && isTimerActive
+
+        return isTimerActive || isScheduleActive || isShieldRunning || isStrictActive
     }
 
     fun updateGuardStatusNotification(context: Context) {
@@ -137,13 +149,8 @@ object AiStudyGuardManager {
             return
         }
 
-        val isArmed = isStudyPeriodActive(context)
-        val title = if (isArmed) "🛡️ AI Study Guard Armed" else "🟢 AI Study Guard Idle (Free Time)"
-        val text = if (isArmed) {
-            "Monitoring Claude & ChatGPT for study focus during active study time"
-        } else {
-            "Claude & ChatGPT unrestricted — Guard only monitors during active study time"
-        }
+        val title = "🛡️ AI Academic Sentinel Armed"
+        val text = "Smart Study Sentinel · AI Tutor & Academic Focus Protection"
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -155,12 +162,15 @@ object AiStudyGuardManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val largeIcon = BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification_small)
+            .setLargeIcon(largeIcon)
             .setContentTitle(title)
             .setContentText(text)
-            .setOngoing(isArmed)
-            .setPriority(if (isArmed) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_MIN)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setSound(null)
             .setContentIntent(pi)
 
@@ -173,6 +183,13 @@ object AiStudyGuardManager {
         return endTime > System.currentTimeMillis()
     }
 
+    fun isAnyPunishmentActive(context: Context): Boolean {
+        return isAppUnderPunishment(context, "com.openai.chatgpt") ||
+                isAppUnderPunishment(context, "com.anthropic.claude") ||
+                isAppUnderPunishment(context, "com.google.android.youtube") ||
+                isAppUnderPunishment(context, "com.instagram.android")
+    }
+
     fun getPunishmentRemainingSeconds(context: Context, packageName: String): Int {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val endTime = prefs.getLong("$KEY_PUNISHMENT_PREFIX$packageName", 0L)
@@ -180,41 +197,45 @@ object AiStudyGuardManager {
         return if (diff > 0) diff.toInt() else 0
     }
 
+    private val nonStudyMessageCounts = mutableMapOf<String, Int>()
     private var nonStudyFirstDetectedMs = 0L
     private var currentMonitoredPackage: String? = null
 
+    fun getNonStudyCount(packageName: String): Int = nonStudyMessageCounts[packageName] ?: 0
+
     fun resetSessionCounters() {
+        nonStudyMessageCounts.clear()
         nonStudyFirstDetectedMs = 0L
         currentMonitoredPackage = null
     }
 
-    fun onStudyActivityDetected(context: Context, packageName: String) {
-        if (currentMonitoredPackage == packageName) {
-            Log.d(TAG, "[AiGuard] Educational study activity confirmed in $packageName — resetting non-study timer")
-            nonStudyFirstDetectedMs = 0L
-            currentMonitoredPackage = null
-        }
+    fun onStudyActivityDetected(context: Context, packageName: String, messageText: String = "") {
+        val count = nonStudyMessageCounts[packageName] ?: 0
+        Log.d(TAG, "[AiGuard Classification] App: $packageName | Result: STUDY | Message: '$messageText' | Running Counter: $count")
+
         val cur = _activeWarning.value
         if (cur != null && cur.packageName == packageName) {
-            Log.d(TAG, "Study activity detected for ${cur.appName}; resolving warning early")
-            triggerStage3Resolved(context, cur, "Study content detected on screen")
+            Log.i(TAG, "[AiGuard] User sent study message after warning for ${cur.appName}. Resolving warning and resetting counter to 0.")
+            triggerStage3Resolved(context, cur, "Study content detected: '$messageText'")
+            nonStudyMessageCounts[packageName] = 0
         }
     }
 
     /**
      * Entry point for detected non-study activity in ChatGPT, Claude, or Chrome.
-     * Evaluates continuous 35-second observation window (30-40 sec range):
-     * - Requires non-study activity to persist for 35 seconds before triggering Stage 1 Warning
-     * - Prevents 1-second notification spam completely
-     * - Stage 1: Shows ONE warning popup + ONE high-priority notification
-     * - Subsequent non-study activity during grace window: Triggers STAGE 2 (3-Hour BLOCK)
+     * Evaluates message-based 2-then-warn counter:
+     * - Message 1 & 2: Silently count (no visible warning)
+     * - Message 3: Fires exactly ONE warning (popup + heads-up notification)
+     * - Message 4+: Continued non-study usage after warning triggers 3-Hour BLOCK for this app only
      */
-    fun onNonStudyDetected(context: Context, packageName: String, reason: String, textHash: Int = 0) {
+    fun onNonStudyDetected(
+        context: Context,
+        packageName: String,
+        messageText: String = "",
+        reason: String = "",
+        textHash: Int = 0
+    ) {
         if (!isAiGuardEnabled(context)) return
-        if (!isStudyPeriodActive(context)) {
-            Log.d(TAG, "Non-study detected in $packageName during free/unscheduled time — ignoring")
-            return
-        }
 
         val appName = when {
             packageName.contains("claude") -> "Claude"
@@ -229,34 +250,31 @@ object AiStudyGuardManager {
             return
         }
 
-        val now = System.currentTimeMillis()
+        // Increment running counter
+        val count = (nonStudyMessageCounts[packageName] ?: 0) + 1
+        nonStudyMessageCounts[packageName] = count
 
-        if (currentMonitoredPackage != packageName || nonStudyFirstDetectedMs == 0L) {
-            currentMonitoredPackage = packageName
-            nonStudyFirstDetectedMs = now
-        }
+        Log.d(TAG, "[AiGuard Classification] App: $packageName ($appName) | Result: NON-STUDY | Message: '$messageText' | Running Counter: $count")
 
         val currentWarning = _activeWarning.value
 
-        if (currentWarning != null && currentWarning.packageName == packageName) {
-            // User continued off-topic messaging during warning window! Trigger STAGE 2 BLOCK!
-            val warningTimeMs = currentWarning.warnedAtMillis
-            if (now - warningTimeMs > 8000L) {
-                Log.w(TAG, "Stage 2 triggered: Non-study activity repeated after warning for $appName")
-                nonStudyFirstDetectedMs = 0L
-                currentMonitoredPackage = null
-                triggerStage2Block(context, currentWarning, reason)
-            }
-        } else {
-            val elapsedSec = (now - nonStudyFirstDetectedMs) / 1000L
-            Log.w(TAG, "[AiGuard] Non-study usage duration: ${elapsedSec}s for $appName (Threshold: 35s)")
-
-            if (elapsedSec >= 35L) {
-                Log.w(TAG, "Stage 1 triggered: Sustained 35s non-study usage for $appName -> Showing Warning")
-                nonStudyFirstDetectedMs = 0L
-                currentMonitoredPackage = null
-                triggerStage1Warning(context, packageName, appName, reason)
-            }
+        if (count == 1) {
+            // 1st non-study message: Immediately trigger Stage 1 Warning
+            Log.w(TAG, "[AiGuard] Non-study message #1 detected for $appName! Triggering Stage 1 Warning.")
+            triggerStage1Warning(context, packageName, appName, reason.ifBlank { "Non-study conversation: '$messageText'" })
+        } else if (count >= 2) {
+            // Continued non-study messaging after warning: Trigger Stage 2 Block / Punishment
+            Log.w(TAG, "[AiGuard] Continued non-study usage (count=$count) after warning for $appName! Triggering Stage 2 Block.")
+            val warningToUse = currentWarning ?: ActiveAiWarning(
+                logId = java.util.UUID.randomUUID().toString(),
+                packageName = packageName,
+                appName = appName,
+                reason = reason.ifBlank { "Non-study conversation: '$messageText'" },
+                warnedAtMillis = System.currentTimeMillis(),
+                graceExpiresAtMillis = System.currentTimeMillis() + (GRACE_PERIOD_SECONDS * 1000L),
+                warnedAtIso = getIsoNow()
+            )
+            triggerStage2Block(context, warningToUse, reason.ifBlank { "Continued non-study messaging: '$messageText'" })
         }
     }
 
@@ -274,7 +292,7 @@ object AiStudyGuardManager {
         reason: String
     ) {
         val nowMillis = System.currentTimeMillis()
-        val nowIso = Instant.now().toString()
+        val nowIso = getIsoNow()
         val graceExpiresAtMillis = nowMillis + (GRACE_PERIOD_SECONDS * 1000L)
         val logId = UUID.randomUUID().toString()
 
@@ -293,10 +311,24 @@ object AiStudyGuardManager {
         // Show High-Priority Heads-up Notification
         showWarningNotification(context, warning)
 
+        // Launch Mascot Warning Dialog overlay on-screen
+        try {
+            val popupIntent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+                context = context,
+                packageName = packageName,
+                appName = appName,
+                durationSec = GRACE_PERIOD_SECONDS,
+                reason = "⚠️ Stage 1 Academic Warning: $reason\nPlease keep questions study & exam-related to avoid a 3-hour lock!",
+                isPunishment = false
+            )
+            context.startActivity(popupIntent)
+        } catch (_: Exception) {}
+
         // Log to Supabase and Local Storage
+        val validUid = resolveValidUserId(context)
         val logDto = SupabasePunishmentLogDto(
             id = logId,
-            user_id = SupabaseService.getInstance().getCurrentUserId() ?: "anonymous",
+            user_id = validUid,
             app_package = packageName,
             status = "warned",
             reason = reason,
@@ -342,12 +374,21 @@ object AiStudyGuardManager {
         val lockDurationMinutes = 180
         val lockDurationSeconds = lockDurationMinutes * 60
         val nowMillis = System.currentTimeMillis()
-        val nowIso = Instant.now().toString()
+        val nowIso = getIsoNow()
         val lockEndTime = nowMillis + (lockDurationSeconds * 1000L)
 
         // Enforce lock in preferences
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putLong("$KEY_PUNISHMENT_PREFIX${warning.packageName}", lockEndTime).apply()
+
+        // Kick user out of the blocked app immediately
+        try {
+            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(homeIntent)
+        } catch (_: Exception) {}
 
         // Launch FocusShieldService with 3-hour block
         try {
@@ -366,6 +407,19 @@ object AiStudyGuardManager {
             Log.e(TAG, "Error starting punishment shield service: ${e.message}")
         }
 
+        // Show Mascot Block Overlay inside blocked app
+        try {
+            val interceptIntent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+                context = context,
+                packageName = warning.packageName,
+                appName = warning.appName,
+                durationSec = lockDurationSeconds,
+                reason = "3-Hour Penalty: ${warning.appName} is locked for non-study conversation. Other apps remain unlocked.",
+                isPunishment = true
+            )
+            context.startActivity(interceptIntent)
+        } catch (_: Exception) {}
+
         val blockState = ActiveAiBlock(
             logId = warning.logId,
             packageName = warning.packageName,
@@ -380,9 +434,10 @@ object AiStudyGuardManager {
         showBlockedNotification(context, blockState)
 
         // Update punishment log
+        val validUid = resolveValidUserId(context)
         val logDto = SupabasePunishmentLogDto(
             id = warning.logId,
-            user_id = SupabaseService.getInstance().getCurrentUserId() ?: "anonymous",
+            user_id = validUid,
             app_package = warning.packageName,
             status = "blocked",
             reason = "Ignored warning: $repeatReason",
@@ -423,9 +478,10 @@ object AiStudyGuardManager {
         showResolvedNotification(context, resolvedState)
 
         // Update punishment log in Supabase & local
+        val validUid = resolveValidUserId(context)
         val logDto = SupabasePunishmentLogDto(
             id = warning.logId,
-            user_id = SupabaseService.getInstance().getCurrentUserId() ?: "anonymous",
+            user_id = validUid,
             app_package = warning.packageName,
             status = "warned_resolved",
             reason = "${warning.reason} ($resolutionNote)",
@@ -493,9 +549,11 @@ object AiStudyGuardManager {
         )
 
         val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val largeIcon = BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification_small)
+            .setLargeIcon(largeIcon)
             .setContentTitle("⚠️ Study Discipline Warning: ${warning.appName}")
             .setContentText("Casual/non-study activity detected. Return to studying within 3 min or this app locks for 3 hours!")
             .setStyle(
@@ -524,8 +582,10 @@ object AiStudyGuardManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val largeIcon = BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification_small)
+            .setLargeIcon(largeIcon)
             .setContentTitle("⛔ ${block.appName} Blocked for 3 Hours")
             .setContentText("Study warning was ignored. ${block.appName} is now locked for 3 hours.")
             .setStyle(
@@ -554,8 +614,10 @@ object AiStudyGuardManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val largeIcon = BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification_small)
+            .setLargeIcon(largeIcon)
             .setContentTitle("✅ Good — No Block Applied")
             .setContentText("You corrected course in ${resolved.appName} in time. Keep up the great focus!")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -656,5 +718,25 @@ object AiStudyGuardManager {
             }
             context.startActivity(intent)
         } catch (_: Exception) {}
+    }
+
+    private fun resolveValidUserId(context: Context): String {
+        val uid = SupabaseService.getInstance().getCurrentUserId()
+            ?: AndroidPreferenceSessionManager.getStoredUserId(context)
+        if (!uid.isNullOrBlank()) {
+            try {
+                java.util.UUID.fromString(uid)
+                return uid
+            } catch (_: Exception) {
+                return java.util.UUID.nameUUIDFromBytes(uid.toByteArray()).toString()
+            }
+        }
+        return java.util.UUID.nameUUIDFromBytes("local_student_device".toByteArray()).toString()
+    }
+
+    private fun getIsoNow(): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
+        return sdf.format(Date())
     }
 }

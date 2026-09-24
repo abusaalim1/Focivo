@@ -43,7 +43,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.LavenderSoft
-import com.example.ui.theme.VioletAccent
+import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.isAppInDarkTheme
 
 @Composable
 fun MetricCard(
@@ -53,7 +54,7 @@ fun MetricCard(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
 
     GlassCard(
         modifier = modifier,
@@ -81,7 +82,7 @@ fun MetricCard(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = VioletAccent,
+                        tint = RegainLimePrimary,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -117,7 +118,7 @@ fun WeeklyFocusChart(
     maxMinutes: Int = 180,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
 
     LiquidGlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -165,7 +166,7 @@ fun WeeklyFocusChart(
                     Text(
                         text = "Avg: $formattedAvg/day",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = VioletAccent,
+                            color = RegainLimePrimary,
                             fontSize = 11.sp
                         )
                     )
@@ -205,7 +206,7 @@ fun WeeklyFocusChart(
                                 text = label,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 9.sp,
-                                    color = if (isToday) VioletAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    color = if (isToday) RegainLimePrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                 )
                             )
                         } else {
@@ -231,13 +232,13 @@ fun WeeklyFocusChart(
                                     .background(
                                         if (isToday) {
                                             Brush.verticalGradient(
-                                                colors = listOf(LavenderSoft, VioletAccent)
+                                                colors = listOf(RegainLimePrimary, Color(0xFFAEF72A))
                                             )
                                         } else {
                                             Brush.verticalGradient(
                                                 colors = listOf(
-                                                    VioletAccent.copy(alpha = 0.55f),
-                                                    VioletAccent.copy(alpha = 0.35f)
+                                                    RegainLimePrimary.copy(alpha = 0.55f),
+                                                    RegainLimePrimary.copy(alpha = 0.35f)
                                                 )
                                             )
                                         }
@@ -250,7 +251,7 @@ fun WeeklyFocusChart(
                         Text(
                             text = day,
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = if (isToday) VioletAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (isToday) RegainLimePrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
                                 fontSize = 11.sp
                             )
@@ -267,7 +268,7 @@ fun ProductivityHeatmap(
     strongestWindow: String = "9:00 AM – 11:00 AM",
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
 
     GlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -293,7 +294,7 @@ fun ProductivityHeatmap(
                 Icon(
                     imageVector = Icons.Default.AutoAwesome,
                     contentDescription = null,
-                    tint = VioletAccent,
+                    tint = RegainLimePrimary,
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -305,10 +306,10 @@ fun ProductivityHeatmap(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(if (isDark) Color(0x228B7CFF) else Color(0x148B7CFF))
+                    .background(if (isDark) Color(0x1A8CE000) else Color(0x108CE000))
                     .border(
                         1.dp,
-                        VioletAccent.copy(alpha = 0.3f),
+                        RegainLimePrimary.copy(alpha = 0.3f),
                         RoundedCornerShape(16.dp)
                     )
                     .padding(14.dp)
@@ -318,7 +319,7 @@ fun ProductivityHeatmap(
                         modifier = Modifier
                             .size(8.dp)
                             .clip(CircleShape)
-                            .background(VioletAccent)
+                            .background(RegainLimePrimary)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
@@ -332,7 +333,7 @@ fun ProductivityHeatmap(
                         Text(
                             text = strongestWindow,
                             style = MaterialTheme.typography.titleMedium.copy(
-                                color = VioletAccent,
+                                color = RegainLimePrimary,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 16.sp
                             )
@@ -391,7 +392,7 @@ fun ProductivityHeatmap(
                                         .fillMaxWidth(score)
                                         .fillMaxHeight()
                                         .clip(CircleShape)
-                                        .background(VioletAccent)
+                                        .background(RegainLimePrimary)
                                 )
                             }
                         }
@@ -408,7 +409,7 @@ fun StreakCalendarCard(
     bestStreak: Int = 18,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
 
     GlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -428,7 +429,7 @@ fun StreakCalendarCard(
                     Icon(
                         imageVector = Icons.Default.LocalFireDepartment,
                         contentDescription = "Streak",
-                        tint = VioletAccent,
+                        tint = RegainLimePrimary,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -436,7 +437,7 @@ fun StreakCalendarCard(
                         text = "$currentStreak DAY STREAK",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.SemiBold,
-                            color = VioletAccent,
+                            color = RegainLimePrimary,
                             fontSize = 16.sp
                         )
                     )
@@ -475,7 +476,7 @@ fun StreakCalendarCard(
                             .size(16.dp)
                             .clip(CircleShape)
                             .background(
-                                if (completed) VioletAccent else (if (isDark) Color(0x22FFFFFF) else Color(0x18000000))
+                                if (completed) RegainLimePrimary else (if (isDark) Color(0x22FFFFFF) else Color(0x18000000))
                             )
                     )
                 }
@@ -493,7 +494,7 @@ fun WeeklyReflectionCard(
     onSaveReflection: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppInDarkTheme()
     var reflectionText by remember { mutableStateOf(initialReflection) }
     var isSaved by remember { mutableStateOf(initialReflection.isNotBlank()) }
 
@@ -522,7 +523,7 @@ fun WeeklyReflectionCard(
                 Text(
                     text = "$completionRate% Complete",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = VioletAccent,
+                        color = RegainLimePrimary,
                         fontSize = 11.sp
                     )
                 )
@@ -574,7 +575,7 @@ fun WeeklyReflectionCard(
                 shape = RoundedCornerShape(16.dp),
                 maxLines = 3,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = VioletAccent,
+                    focusedBorderColor = RegainLimePrimary,
                     unfocusedBorderColor = if (isDark) Color(0x22FFFFFF) else Color(0x18000000)
                 )
             )
