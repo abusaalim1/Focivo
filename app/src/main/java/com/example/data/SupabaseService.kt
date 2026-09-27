@@ -827,9 +827,6 @@ class SupabaseService {
                     put("last_donation_prompt_shown_at", prefsDto.last_donation_prompt_shown_at)
                 }
                 put("donation_prompt_dismissed_count", prefsDto.donation_prompt_dismissed_count)
-                if (!prefsDto.last_viewed_sunday_recap_week.isNullOrBlank()) {
-                    put("last_viewed_sunday_recap_week", prefsDto.last_viewed_sunday_recap_week)
-                }
             }
 
             val requestBody = json.toString().toRequestBody(mediaType)

@@ -163,7 +163,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             if (isWindowStateChanged && isStudyPeriod) {
                 val blockedList = FocusShieldService.getActiveBlockedPackages(applicationContext)
                 if (blockedList.any { blocked -> pkg.equals(blocked, ignoreCase = true) || pkg.startsWith(blocked, ignoreCase = true) }) {
-                    if (nowTime - lastGeneralAppInterceptTimeMs > 2000L || lastGeneralInterceptedPkg != pkg) {
+                    if (!com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing || (nowTime - lastGeneralAppInterceptTimeMs > 1000L) || lastGeneralInterceptedPkg != pkg) {
                         lastGeneralAppInterceptTimeMs = nowTime
                         lastGeneralInterceptedPkg = pkg
                         Log.w(TAG, "[Focus Shield Lock] Opening blocked app ($pkg) during active study!")
@@ -203,12 +203,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 return
             }
 
-            // 7. YouTube Shorts & AI Study Filter
+            // 7. YouTube Shorts & AI Study Filter (Active ONLY during scheduled study time or active timer)
             val isYouTube = pkg == "com.google.android.youtube" || pkg.contains("youtube", ignoreCase = true)
             if (isYouTube) {
+                if (!isStudyPeriod) return
+
                 // If YouTube is explicitly in the user's blocked list during active study, block the entire app!
                 val blockedList = FocusShieldService.getActiveBlockedPackages(applicationContext)
-                val isYouTubeBlocked = isStudyPeriod && blockedList.any { it.contains("youtube", ignoreCase = true) }
+                val isYouTubeBlocked = blockedList.any { it.contains("youtube", ignoreCase = true) }
                 if (isYouTubeBlocked && isWindowStateChanged) {
                     val now = System.currentTimeMillis()
                     if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
@@ -226,8 +228,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 }
 
                 // If Shorts Lock is on, check active screen
-                val isShortsLockOn = ShortsLockManager.isShortsLockEnabled(applicationContext) || isStudyPeriod
-                val isYouTubeAiFilterOn = YouTubeStudyGuardManager.isFilterEnabled(applicationContext) || isStudyPeriod
+                val isShortsLockOn = ShortsLockManager.isShortsLockEnabled(applicationContext)
+                val isYouTubeAiFilterOn = YouTubeStudyGuardManager.isFilterEnabled(applicationContext)
 
                 if (isShortsLockOn || isYouTubeAiFilterOn) {
                     val rootNode = rootInActiveWindow
@@ -243,7 +245,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                         context = applicationContext,
                                         blockedPackage = "com.google.android.youtube.shorts",
                                         appName = "YouTube Shorts",
-                                        reason = "YouTube Shorts are locked to protect your focus! Normal educational lectures and tutorials are allowed.",
+                                        reason = "YouTube Shorts are locked during active study sessions.",
                                         isGeminiIntercept = true
                                     )
                                 }
@@ -324,11 +326,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 return
             }
 
-            // 8. Instagram Reels Detection
+            // 8. Instagram Reels Detection (Active ONLY during scheduled study time or active timer)
             val isInstagram = pkg == "com.instagram.android" || pkg.contains("instagram", ignoreCase = true)
             if (isInstagram) {
+                if (!isStudyPeriod) return
+
                 val blockedList = FocusShieldService.getActiveBlockedPackages(applicationContext)
-                val isFullInstagramBlocked = isStudyPeriod && blockedList.any { it.contains("instagram", ignoreCase = true) }
+                val isFullInstagramBlocked = blockedList.any { it.contains("instagram", ignoreCase = true) }
 
                 if (isFullInstagramBlocked && isWindowStateChanged) {
                     Log.w(TAG, "[Shield] Instagram is fully blocked!")
@@ -342,7 +346,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     return
                 }
 
-                if (ShortsLockManager.isReelsLockEnabled(applicationContext) || isStudyPeriod) {
+                if (ShortsLockManager.isReelsLockEnabled(applicationContext)) {
                     val rootNode = rootInActiveWindow
                     if (rootNode != null) {
                         try {
@@ -355,7 +359,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                         context = applicationContext,
                                         blockedPackage = "com.instagram.android.reels",
                                         appName = "Instagram Reels",
-                                        reason = "Instagram Reels are locked to protect your focus!",
+                                        reason = "Instagram Reels are locked during active study sessions.",
                                         isGeminiIntercept = true
                                     )
                                 }
@@ -370,6 +374,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             }
 
             // 9. AI Study Guard on AI chat apps (ChatGPT, Claude, Copilot, Perplexity)
+            // Strictly active ONLY when a study timer is running or within scheduled study hours!
             val isAiApp = pkg == "com.openai.chatgpt" ||
                     pkg == "com.anthropic.claude" ||
                     pkg == "com.google.android.apps.bard" ||
@@ -380,7 +385,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     pkg.contains("perplexity", ignoreCase = true) ||
                     pkg.contains("copilot", ignoreCase = true)
 
-            if (isAiApp && (eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED || isWindowStateChanged) && AiStudyGuardManager.isAiGuardEnabled(applicationContext)) {
+            if (isAiApp && isStudyPeriod && (eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED || isWindowStateChanged) && AiStudyGuardManager.isAiGuardEnabled(applicationContext)) {
                 AiStudyGuardManager.updateGuardStatusNotification(applicationContext)
                 val rootNode = rootInActiveWindow
                 if (rootNode != null) {

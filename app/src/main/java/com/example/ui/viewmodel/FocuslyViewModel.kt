@@ -1735,11 +1735,11 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         }
         val app = getApplication<Application>()
         val prefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
-        val hasUsage = com.example.ui.components.FocusShieldPermissions.hasUsageStatsPermission(app)
-        val hasOverlay = com.example.ui.components.FocusShieldPermissions.hasOverlayPermission(app)
-        val hasAccessibility = com.example.util.AiStudyGuardManager.isAccessibilityPermissionGranted(app)
+        val hasBlockedApps = prefs.blockedAppsList.split(",").map { it.trim() }.any { it.isNotBlank() }
 
-        if (!prefs.autoBlockStudyAppsWithoutAsking || !hasAccessibility || !hasOverlay || !hasUsage) {
+        // If user already added blocked apps, start immediately without popup.
+        // If not added yet, show the app blocker selection popup.
+        if (!hasBlockedApps) {
             _showPreStudyBlockSheet.value = true
         } else {
             startTimer()

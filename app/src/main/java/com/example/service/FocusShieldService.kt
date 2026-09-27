@@ -553,7 +553,7 @@ class FocusShieldService : Service() {
         reason: String? = null
     ) {
         val now = System.currentTimeMillis()
-        if (blockedPackage == lastInterceptPkg && (now - lastInterceptTimestamp) < 2500L) {
+        if (com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing && blockedPackage == lastInterceptPkg && (now - lastInterceptTimestamp) < 1500L) {
             return
         }
         lastInterceptPkg = blockedPackage

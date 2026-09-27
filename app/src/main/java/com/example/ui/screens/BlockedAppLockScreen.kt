@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import com.example.MainActivity
@@ -27,6 +28,9 @@ class BlockedAppLockActivity : ComponentActivity() {
         const val EXTRA_DURATION_SECONDS = "extra_duration_seconds"
         const val EXTRA_REASON = "extra_reason"
         const val EXTRA_IS_PUNISHMENT = "extra_is_punishment"
+
+        @Volatile
+        var isCurrentlyShowing: Boolean = false
 
         fun createIntent(
             context: Context,
@@ -51,6 +55,7 @@ class BlockedAppLockActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         parseIntentData(intent)
 
@@ -83,6 +88,31 @@ class BlockedAppLockActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        isCurrentlyShowing = true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isCurrentlyShowing = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isCurrentlyShowing = false
+    }
+
+    override fun onStop() {
+        super.onStop()
+        isCurrentlyShowing = false
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        isCurrentlyShowing = false
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         parseIntentData(intent)
@@ -106,7 +136,7 @@ class BlockedAppLockActivity : ComponentActivity() {
         try {
             val homeIntent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_HOME)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
             startActivity(homeIntent)
         } catch (_: Exception) {}

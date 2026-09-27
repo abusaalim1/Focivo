@@ -101,28 +101,33 @@ fun RegainStudyDial(
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(size)) {
-            val strokeWidth = 12.dp.toPx()
+            val strokeWidth = 10.dp.toPx()
             val centerOffset = Offset(this.size.width / 2f, this.size.height / 2f)
-            val radius = (this.size.width - 36.dp.toPx()) / 2f
+            val radius = (this.size.width - 32.dp.toPx()) / 2f
 
-            // 1. Ambient outer background radial aura (Subtle Aurora Glow, no harsh white blob)
+            // 1. Obsidian Black Dial Disc (Solid, deep premium obsidian background)
             drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        (if (isDark) RegainLimePrimary.copy(alpha = pulseGlow * 0.25f) else RegainLimePrimary.copy(alpha = pulseGlow * 0.20f)),
-                        (if (isDark) Color(0xFF00E5FF).copy(alpha = pulseGlow * 0.16f) else Color(0xFF00B4D8).copy(alpha = pulseGlow * 0.12f)),
-                        (if (isDark) Color(0xFF69F0AE).copy(alpha = pulseGlow * 0.08f) else RegainLimeLight.copy(alpha = pulseGlow * 0.08f)),
-                        Color.Transparent
-                    ),
-                    center = centerOffset,
-                    radius = radius + 36.dp.toPx()
-                ),
-                radius = radius + 36.dp.toPx(),
+                color = if (isDark) Color(0xFF0D0E12) else Color(0xFF121316),
+                radius = radius + 10.dp.toPx(),
                 center = centerOffset
             )
 
-            // 2. Dial track background (Sleek translucent glass track gradient)
-            val trackColor = if (isDark) Color(0x28FFFFFF) else Color(0x18000000)
+            // Subtle outer ambient obsidian halo
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = pulseGlow * 0.06f),
+                        Color.Transparent
+                    ),
+                    center = centerOffset,
+                    radius = radius + 24.dp.toPx()
+                ),
+                radius = radius + 24.dp.toPx(),
+                center = centerOffset
+            )
+
+            // 2. Dial track background (Sleek minimalist translucent white track)
+            val trackColor = Color(0x1FFFFFFF)
             drawCircle(
                 color = trackColor,
                 radius = radius,
@@ -130,49 +135,31 @@ fun RegainStudyDial(
                 style = Stroke(width = strokeWidth)
             )
 
-            // 3. Glowing premium gradient progress arc & soft bleeding halo (no white hotspot)
+            // 3. Minimalist White Gradient Progress Arc
             val sweepAngle = 360f * progress
             if (sweepAngle > 0f) {
                 val arcTopLeft = Offset(centerOffset.x - radius, centerOffset.y - radius)
                 val arcSize = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
 
-                val haloColors = if (isDark) {
-                    listOf(
-                        RegainLimePrimary.copy(alpha = pulseGlow * 0.35f),
-                        Color(0xFF00E5FF).copy(alpha = pulseGlow * 0.25f),
-                        Color(0xFF69F0AE).copy(alpha = pulseGlow * 0.30f),
-                        RegainLimeLight.copy(alpha = pulseGlow * 0.18f),
-                        RegainLimePrimary.copy(alpha = pulseGlow * 0.35f)
-                    )
-                } else {
-                    listOf(
-                        RegainLimeDeepText.copy(alpha = pulseGlow * 0.35f),
-                        RegainLimePrimary.copy(alpha = pulseGlow * 0.30f),
-                        Color(0xFF00B4D8).copy(alpha = pulseGlow * 0.20f),
-                        RegainLimeDeepText.copy(alpha = pulseGlow * 0.35f)
-                    )
-                }
+                val haloColors = listOf(
+                    Color.White.copy(alpha = pulseGlow * 0.22f),
+                    Color.White.copy(alpha = pulseGlow * 0.12f),
+                    Color.White.copy(alpha = pulseGlow * 0.04f),
+                    Color.White.copy(alpha = pulseGlow * 0.18f),
+                    Color.White.copy(alpha = pulseGlow * 0.22f)
+                )
 
-                val arcGradient = if (isDark) {
-                    listOf(
-                        RegainLimePrimary,
-                        Color(0xFF00E5FF),
-                        Color(0xFF69F0AE),
-                        RegainLimeLight,
-                        RegainLimePrimary
-                    )
-                } else {
-                    listOf(
-                        RegainLimeDeepText,
-                        RegainLimePrimary,
-                        Color(0xFF00B4D8),
-                        RegainLimeDeepText
-                    )
-                }
+                val arcGradient = listOf(
+                    Color(0xFFFFFFFF),
+                    Color(0xDDFFFFFF),
+                    Color(0x88FFFFFF),
+                    Color(0xCCFFFFFF),
+                    Color(0xFFFFFFFF)
+                )
 
-                // Rotated smoothly to -90f so the sweep gradient starts at the top and seamlessly follows the arc
+                // Rotated smoothly to -90f so the sweep starts at the top
                 rotate(degrees = -90f, pivot = centerOffset) {
-                    // Soft outer blurred halo bleeding outward along progress arc
+                    // Soft outer white glow bleeding along progress arc
                     drawArc(
                         brush = Brush.sweepGradient(
                             colors = haloColors,
@@ -183,10 +170,10 @@ fun RegainStudyDial(
                         useCenter = false,
                         topLeft = arcTopLeft,
                         size = arcSize,
-                        style = Stroke(width = strokeWidth * 2.0f, cap = StrokeCap.Round)
+                        style = Stroke(width = strokeWidth * 1.8f, cap = StrokeCap.Round)
                     )
 
-                    // Crisp, premium gradient progress ring
+                    // Crisp minimal white gradient progress ring
                     drawArc(
                         brush = Brush.sweepGradient(
                             colors = arcGradient,
@@ -201,20 +188,20 @@ fun RegainStudyDial(
                     )
                 }
 
-                // Refined luminous pearl indicator dot at leading edge (no harsh white blob)
+                // Minimal luminous pearl indicator dot at leading edge
                 val angleRad = Math.toRadians((-90.0 + sweepAngle))
                 val dotX = centerOffset.x + (radius * cos(angleRad)).toFloat()
                 val dotY = centerOffset.y + (radius * sin(angleRad)).toFloat()
                 val dotCenter = Offset(dotX, dotY)
 
                 drawCircle(
-                    color = (if (isDark) RegainLimePrimary else RegainLimeDeepText).copy(alpha = 0.40f),
-                    radius = 9.dp.toPx(),
+                    color = Color.White.copy(alpha = 0.35f),
+                    radius = 8.dp.toPx(),
                     center = dotCenter
                 )
                 drawCircle(
-                    color = if (isDark) Color(0xFFF4FFE0) else RegainLimeLight,
-                    radius = 5.dp.toPx(),
+                    color = Color.White,
+                    radius = 4.5.dp.toPx(),
                     center = dotCenter
                 )
             }
@@ -225,61 +212,34 @@ fun RegainStudyDial(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // 1. "Deep Work Session" / Tag Glass Dropdown Chip
+            // 1. Tag Glass Dropdown Chip (Obsidian Glass style)
             Box(
                 modifier = Modifier
-                    .offset(y = 4.dp)
-                    .shadow(
-                        elevation = 6.dp,
-                        shape = CircleShape,
-                        ambientColor = RegainLimePrimary.copy(alpha = 0.25f),
-                        spotColor = RegainLimePrimary.copy(alpha = 0.35f)
-                    )
+                    .offset(y = 2.dp)
                     .clip(CircleShape)
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0x388CFF00),
-                                Color(0x228CFF00),
-                                Color(0x2B141518)
-                            )
-                        )
-                    )
+                    .background(Color(0x35FFFFFF))
                     .border(
-                        width = 1.2.dp,
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xA68CFF00),
-                                Color(0x388CFF00)
-                            )
-                        ),
+                        width = 1.dp,
+                        color = Color(0x38FFFFFF),
                         shape = CircleShape
                     )
                     .clickable(enabled = !isRunning) { onTagClick() }
                     .padding(horizontal = 12.dp, vertical = 4.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Pulsing green status dot with outer aura
+                    // Status dot
                     Box(
                         modifier = Modifier
-                            .size(10.dp)
+                            .size(6.dp)
                             .clip(CircleShape)
-                            .background(RegainLimePrimary.copy(alpha = 0.3f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(5.dp)
-                                .clip(CircleShape)
-                                .background(RegainLimeLight)
-                        )
-                    }
+                            .background(Color.White.copy(alpha = 0.9f))
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = activeTag,
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontFamily = AppleLinearFontFamily,
-                            color = if (isDark) RegainLimeLight else RegainLimeDeepText,
+                            color = Color.White.copy(alpha = 0.95f),
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 12.sp,
                             letterSpacing = 0.3.sp
@@ -290,34 +250,36 @@ fun RegainStudyDial(
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
                             contentDescription = "Switch tag",
-                            tint = if (isDark) RegainLimeLight else RegainLimeDeepText,
+                            tint = Color.White.copy(alpha = 0.8f),
                             modifier = Modifier.size(14.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // 2. Giant Bold Apple/Linear Countdown Text with Soft Glow Shadow
+            // 2. Giant Bold Apple/Linear Countdown Text with Minimal White Shadow
             Text(
                 text = timeFormatted,
                 style = androidx.compose.ui.text.TextStyle(
                     fontFamily = AppleLinearFontFamily,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 50.sp,
-                    lineHeight = 56.sp,
-                    color = textPrimary,
+                    fontSize = if (isRunning) 40.sp else 48.sp,
+                    lineHeight = if (isRunning) 44.sp else 54.sp,
+                    color = Color.White,
                     letterSpacing = (-0.5).sp,
                     shadow = Shadow(
-                        color = RegainLimePrimary.copy(alpha = 0.35f),
-                        blurRadius = 14f
+                        color = Color.White.copy(alpha = 0.25f),
+                        blurRadius = 8f
                     )
-                )
+                ),
+                modifier = Modifier
+                    .padding(top = 2.dp)
             )
 
             if (!isRunning) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // 3. "Take a break" Frosted Glass Button
                 Box(
@@ -326,25 +288,20 @@ fun RegainStudyDial(
                             elevation = 4.dp,
                             shape = CircleShape,
                             ambientColor = Color.Black.copy(alpha = 0.3f),
-                            spotColor = RegainLimePrimary.copy(alpha = 0.25f)
+                            spotColor = Color.White.copy(alpha = 0.15f)
                         )
                         .clip(CircleShape)
                         .background(
                             brush = Brush.verticalGradient(
                                 colors = listOf(
-                                    if (isDark) Color(0x28FFFFFF) else Color(0xF2FFFFFF),
-                                    if (isDark) Color(0x1A141518) else Color(0xE8F0F4EC)
+                                    Color(0x28FFFFFF),
+                                    Color(0x14FFFFFF)
                                 )
                             )
                         )
                         .border(
                             width = 1.dp,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0x4DFFFFFF),
-                                    Color(0x2B8CFF00)
-                                )
-                            ),
+                            color = Color(0x35FFFFFF),
                             shape = CircleShape
                         )
                         .clickable { onTakeBreakClick() }
@@ -354,31 +311,24 @@ fun RegainStudyDial(
                         text = "Take a break",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontFamily = AppleLinearFontFamily,
-                            color = if (isDark) Color.White.copy(alpha = 0.92f) else NearBlack,
+                            color = Color.White.copy(alpha = 0.92f),
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 0.6.sp
                         )
                     )
                 }
-            }
+            } else {
+                Spacer(modifier = Modifier.height(2.dp))
 
-            Spacer(modifier = Modifier.height(2.dp))
-
-            // 4. Mascot Video Embedded inside Timer Circle Box (Hands touching bottom circle arc)
-            Box(
-                modifier = Modifier
-                    .width(220.dp)
-                    .height(112.dp)
-                    .offset(y = 8.dp)
-                    .clipToBounds()
-                    .clickable { onMascotClick() },
-                contentAlignment = Alignment.TopCenter
-            ) {
+                // Animated mascot video playing on seamless loop during active session (perfectly framed with full cap and table visible)
                 RegainMascotView(
-                    size = if (mascotPose == MascotPose.STUDYING) 205.dp else 195.dp,
-                    pose = mascotPose,
-                    modifier = Modifier.offset(y = 2.dp)
+                    width = 145.dp,
+                    height = 125.dp,
+                    pose = MascotPose.STUDYING,
+                    modifier = Modifier
+                        .clipToBounds()
+                        .clickable { onMascotClick() }
                 )
             }
         }

@@ -597,7 +597,7 @@ object WeeklyRecapImageGenerator {
 
         // 12. Viral CTA & App Promotion Footer (Driving Installs!)
         val footerAppLogo: Bitmap? = try {
-            BitmapFactory.decodeResource(context.resources, R.drawable.focivo_logo)
+            BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
         } catch (e: Exception) {
             null
         }

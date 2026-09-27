@@ -114,7 +114,7 @@ fun OfflineScreen(
                     )
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.focivo_logo),
+                    painter = painterResource(id = R.drawable.app_logo),
                     contentDescription = "Focivo Logo",
                     modifier = Modifier.size(92.dp)
                 )

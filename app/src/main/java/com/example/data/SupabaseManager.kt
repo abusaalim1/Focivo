@@ -141,6 +141,7 @@ data class SupabaseUserPreferencesDto(
     val donation_prompt_dismissed_count: Int = 0,
     @kotlinx.serialization.Transient
     val never_show_donation_prompt: Boolean = false,
+    @kotlinx.serialization.Transient
     val last_viewed_sunday_recap_week: String? = null
 )
 

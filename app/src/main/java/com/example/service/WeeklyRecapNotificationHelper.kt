@@ -64,7 +64,7 @@ object WeeklyRecapNotificationHelper {
             append("🔥 Tap to see your full weekly study breakdown & share with friends!")
         }
 
-        val largeIcon = android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.focivo_logo)
+        val largeIcon = android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)

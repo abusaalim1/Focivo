@@ -132,12 +132,12 @@ fun BlockedAppOverlay(
         label = "pulseScale"
     )
 
-    // Full screen frosted backdrop overlaying the blocked application
+    // Full screen solid dark backdrop completely obscuring the blocked application
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xDD030712)) // Dark translucent scrim allowing user to see context
-            .padding(16.dp),
+            .background(Color(0xFF070A14)) // 100% Solid Opaque Dark Background - No Underlying Screen Bleed!
+            .padding(20.dp),
         contentAlignment = Alignment.Center
     ) {
         // Floating glassmorphism card
@@ -156,14 +156,15 @@ fun BlockedAppOverlay(
                     )
                 )
                 .border(
-                    width = 1.5.dp,
+                    width = 1.2.dp,
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            accentColor.copy(alpha = 0.6f),
-                            Color(0xFF334155).copy(alpha = 0.4f)
+                            Color(0x50FFFFFF),
+                            Color(0x18FFFFFF),
+                            Color(0x0AFFFFFF)
                         )
                     ),
-                    shape = RoundedCornerShape(28.dp)
+                    shape = RoundedCornerShape(26.dp)
                 )
                 .shadow(elevation = 24.dp, shape = RoundedCornerShape(28.dp), spotColor = accentColor)
                 .padding(horizontal = 22.dp, vertical = 24.dp)

@@ -87,7 +87,7 @@
         <activity
             android:name=".ui.screens.BlockedAppLockActivity"
             android:exported="false"
-            android:theme="@style/Theme.Focusly.TranslucentOverlay"
+            android:theme="@style/Theme.MyApplication"
             android:launchMode="singleInstance"
             android:taskAffinity="com.example.blocked.overlay"
             android:excludeFromRecents="true"

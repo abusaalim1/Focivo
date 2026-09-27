@@ -71,7 +71,6 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.AuroraBackground
 import com.example.ui.components.DistractionDialog
-import com.example.ui.components.MascotBuddySheet
 import com.example.ui.components.MascotPose
 import com.example.ui.components.PreStudyAppBlockSheet
 import com.example.ui.components.RegainMascotView
@@ -130,9 +129,8 @@ fun FocusScreen(
     var showDistractionModal by remember { mutableStateOf(false) }
     var showSoundSelector by remember { mutableStateOf(false) }
     var showStudyTypeDialog by remember { mutableStateOf(false) }
-    var showBuddySheet by remember { mutableStateOf(false) }
     var currentTag by remember { mutableStateOf(currentTaskTitle.ifBlank { "Deep Study" }) }
-    var timerStyle by remember { mutableStateOf("aurora") }
+    var timerStyle by remember { mutableStateOf("classic") }
 
     LaunchedEffect(currentTaskTitle) {
         if (currentTaskTitle.isNotBlank()) {
@@ -164,30 +162,28 @@ fun FocusScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (!isRunning) {
-                    // Buddy Companion Level Pill (Encouraging companion)
-                    val buddyLevel = userPreferences?.buddyGrowthStage ?: 1
+                    // Current streak pill
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(RegainLimeContainer)
-                            .border(1.dp, RegainLimePrimary.copy(alpha = 0.5f), CircleShape)
-                            .clickable { showBuddySheet = true }
+                            .background(if (isDark) Color(0x28FFFFFF) else Color(0x10000000))
+                            .border(1.dp, if (isDark) Color(0x358CE000) else Color(0x208CE000), CircleShape)
                             .padding(horizontal = 10.dp, vertical = 5.dp)
-                            .testTag("focus_buddy_pill")
+                            .testTag("focus_streak_pill")
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = Icons.Default.Stars,
-                                contentDescription = "Focus Buddy",
-                                tint = RegainLimeDeepText,
+                                imageVector = Icons.Default.LocalFireDepartment,
+                                contentDescription = "Streak",
+                                tint = Color(0xFFFF9800),
                                 modifier = Modifier.size(13.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Buddy",
+                                text = "${userStreak}d",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontFamily = PoppinsFontFamily,
-                                    color = RegainLimeDeepText,
+                                    color = textPrimary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp
                                 )
@@ -357,7 +353,7 @@ fun FocusScreen(
                                         .testTag("timer_style_aurora_btn")
                                 ) {
                                     Text(
-                                        text = "✨ Aurora Timer",
+                                        text = "Aurora Timer",
                                         fontFamily = PoppinsFontFamily,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 11.sp,
@@ -419,9 +415,7 @@ fun FocusScreen(
                             onTakeBreakClick = {
                                 onSkipBreak()
                             },
-                            onMascotClick = {
-                                showBuddySheet = true
-                            },
+                            onMascotClick = {},
                             mascotPose = if (isRunning) MascotPose.STUDYING else MascotPose.IDLE
                         )
                     }
@@ -515,7 +509,13 @@ fun FocusScreen(
                                 .clip(CircleShape)
                                 .background(RegainLimePrimary)
                                 .clickable {
-                                    if (isRunning) onPauseTimer() else onResumeTimer()
+                                    if (isRunning) {
+                                        onPauseTimer()
+                                    } else if (remainingSeconds < targetSeconds) {
+                                        onResumeTimer()
+                                    } else {
+                                        onStartTimer()
+                                    }
                                 }
                                 .testTag("play_pause_button"),
                             contentAlignment = Alignment.Center
@@ -791,15 +791,6 @@ fun FocusScreen(
                         Text("Cancel")
                     }
                 }
-            )
-        }
-
-        if (showBuddySheet) {
-            MascotBuddySheet(
-                buddyGrowthStage = userPreferences?.buddyGrowthStage ?: 1,
-                buddyTotalFocusMinutes = userPreferences?.buddyTotalFocusMinutes ?: 0,
-                currentStreak = userPreferences?.currentStreak ?: 0,
-                onDismiss = { showBuddySheet = false }
             )
         }
 

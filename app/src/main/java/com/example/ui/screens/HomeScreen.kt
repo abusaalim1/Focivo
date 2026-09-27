@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,6 +34,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -73,6 +77,7 @@ import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
+import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
@@ -170,6 +175,51 @@ fun HomeScreen(
             String.format(Locale.US, "+%.1f hrs vs last week", weekDiffHours)
         } else {
             String.format(Locale.US, "%.1f hrs vs last week", weekDiffHours)
+        }
+    }
+
+    // Weekly Study Goal & Daily Active Distribution calculations
+    val weeklyGoalMinutes = remember(userPreferences?.dailyGoalMinutes) {
+        val daily = (userPreferences?.dailyGoalMinutes ?: 240).coerceAtLeast(60)
+        daily * 7
+    }
+    val weeklyGoalHours = remember(weeklyGoalMinutes) {
+        weeklyGoalMinutes / 60.0
+    }
+    val thisWeekMinutes = remember(thisWeekSeconds) {
+        thisWeekSeconds / 60
+    }
+    val weeklyGoalProgress = remember(thisWeekMinutes, weeklyGoalMinutes) {
+        if (weeklyGoalMinutes > 0) {
+            (thisWeekMinutes.toFloat() / weeklyGoalMinutes.toFloat()).coerceIn(0f, 1f)
+        } else 0f
+    }
+    val weeklyGoalProgressPercent = remember(weeklyGoalProgress) {
+        (weeklyGoalProgress * 100).toInt()
+    }
+    val remainingWeeklyMinutes = remember(thisWeekMinutes, weeklyGoalMinutes) {
+        (weeklyGoalMinutes - thisWeekMinutes).coerceAtLeast(0)
+    }
+    val remainingWeeklyHoursStr = remember(remainingWeeklyMinutes) {
+        val hrs = remainingWeeklyMinutes / 60.0
+        if (hrs >= 1.0) String.format(Locale.US, "%.1fh", hrs) else "${remainingWeeklyMinutes}m"
+    }
+
+    val weekDaysStatus = remember(thisWeekSessions, currentWeekStart) {
+        val dayNames = listOf("M", "T", "W", "T", "F", "S", "S")
+        val cal = Calendar.getInstance()
+        val todayDayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
+        val todayIdx = if (todayDayOfWeek == Calendar.SUNDAY) 6 else (todayDayOfWeek - Calendar.MONDAY)
+
+        (0..6).map { dayOffset ->
+            val dayStart = currentWeekStart + (dayOffset * 24 * 3600 * 1000L)
+            val dayEnd = dayStart + (24 * 3600 * 1000L)
+            val daySecs = thisWeekSessions
+                .filter { it.completedAt >= dayStart && it.completedAt < dayEnd }
+                .sumOf { it.durationSeconds }
+            val isToday = dayOffset == todayIdx
+            val isCompleted = daySecs > 0
+            Triple(dayNames[dayOffset], isCompleted, isToday)
         }
     }
 
@@ -481,6 +531,160 @@ fun HomeScreen(
                                     fontSize = 13.sp
                                 )
                             )
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        // Visual Weekly Goal Progress Bar Header
+                        val animatedWeeklyProgress by animateFloatAsState(
+                            targetValue = weeklyGoalProgress,
+                            animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+                            label = "weekly_goal_progress_anim"
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "WEEKLY GOAL",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = AppleLinearFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textSecondary,
+                                        fontSize = 10.5.sp,
+                                        letterSpacing = 1.1.sp
+                                    )
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(RegainLimePrimary.copy(alpha = 0.16f))
+                                        .border(1.dp, RegainLimePrimary.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "$weeklyGoalProgressPercent%",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = AppleLinearFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = RegainLimeDeepText,
+                                            fontSize = 10.5.sp
+                                        )
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = String.format(Locale.US, "%.1fh / %.0fh", thisWeekHours, weeklyGoalHours),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = AppleLinearFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = textPrimary,
+                                    fontSize = 11.5.sp
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // High-Precision Visual Progress Bar Track
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(10.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(if (isDark) Color(0x24FFFFFF) else Color(0xFFE5EED9))
+                                .border(1.dp, if (isDark) Color(0x18FFFFFF) else Color(0x12000000), RoundedCornerShape(5.dp))
+                                .testTag("home_weekly_goal_progress_bar")
+                        ) {
+                            if (animatedWeeklyProgress > 0f) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(animatedWeeklyProgress)
+                                        .height(10.dp)
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                colors = listOf(
+                                                    RegainLimePrimary,
+                                                    Color(0xFFAEF72A),
+                                                    RegainLimeLight
+                                                )
+                                            )
+                                        )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Weekly Active Days Continuity Tracker (M T W T F S S)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            weekDaysStatus.forEach { (dayLabel, isCompleted, isToday) ->
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(26.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                when {
+                                                    isCompleted -> RegainLimePrimary
+                                                    isToday -> if (isDark) Color(0x35FFFFFF) else Color(0xFFE2EBD6)
+                                                    else -> if (isDark) Color(0x14FFFFFF) else Color(0xFFF1F5EB)
+                                                }
+                                            )
+                                            .border(
+                                                width = if (isToday) 1.5.dp else 1.dp,
+                                                color = when {
+                                                    isCompleted -> RegainLimePrimary
+                                                    isToday -> RegainLimePrimary.copy(alpha = 0.8f)
+                                                    else -> if (isDark) Color(0x18FFFFFF) else Color(0xFFE2EBD6)
+                                                },
+                                                shape = CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isCompleted) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Day active",
+                                                tint = NearBlack,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        } else if (isToday) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .clip(CircleShape)
+                                                    .background(RegainLimePrimary)
+                                            )
+                                        }
+                                    }
+
+                                    Text(
+                                        text = dayLabel,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = AppleLinearFontFamily,
+                                            fontWeight = if (isToday || isCompleted) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isToday) textPrimary else textSecondary,
+                                            fontSize = 10.sp
+                                        )
+                                    )
+                                }
+                            }
                         }
                     }
                 }
