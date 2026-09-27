@@ -32,7 +32,8 @@ object ShortsLockManager {
     fun isShortsLockEnabled(context: Context): Boolean {
         val hasPerm = AiStudyGuardManager.isAccessibilityPermissionGranted(context)
         if (!hasPerm) return false
-        return getPrefs(context).getBoolean(KEY_SHORTS_LOCK_ENABLED, true) || AiStudyGuardManager.isStudyPeriodActive(context)
+        if (!AiStudyGuardManager.isStudyPeriodActive(context)) return false
+        return getPrefs(context).getBoolean(KEY_SHORTS_LOCK_ENABLED, true)
     }
 
     fun setShortsLockEnabled(context: Context, enabled: Boolean) {
@@ -44,7 +45,8 @@ object ShortsLockManager {
     fun isReelsLockEnabled(context: Context): Boolean {
         val hasPerm = AiStudyGuardManager.isAccessibilityPermissionGranted(context)
         if (!hasPerm) return false
-        return getPrefs(context).getBoolean(KEY_REELS_LOCK_ENABLED, true) || AiStudyGuardManager.isStudyPeriodActive(context)
+        if (!AiStudyGuardManager.isStudyPeriodActive(context)) return false
+        return getPrefs(context).getBoolean(KEY_REELS_LOCK_ENABLED, true)
     }
 
     fun setReelsLockEnabled(context: Context, enabled: Boolean) {

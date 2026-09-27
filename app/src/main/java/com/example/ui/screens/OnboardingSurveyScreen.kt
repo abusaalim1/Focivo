@@ -899,23 +899,17 @@ fun OnboardingSurveyScreen(
                                                 selectedOption = selectedClassLevel,
                                                 onSelect = {
                                                     selectedClassLevel = it
-                                                    if (!isNotificationsGranted) {
-                                                        activeOverlayType = PermissionOverlayType.NOTIFICATIONS
-                                                    }
                                                 }
                                             )
                                         }
 
-                                        2 -> { // Step 3: Milestone Exam -> Triggers Battery Optimization Overlay on Click
+                                        2 -> { // Step 3: Milestone Exam
                                             val boardOptions = question.options ?: emptyList()
                                             OptionList(
                                                 options = boardOptions,
                                                 selectedOption = if (isBoardExamYear) boardOptions.getOrNull(0) ?: "" else boardOptions.getOrNull(1) ?: "",
                                                 onSelect = { option ->
                                                     isBoardExamYear = option.startsWith("Yes")
-                                                    if (!isBatteryOptimizationDisabled) {
-                                                        activeOverlayType = PermissionOverlayType.BATTERY_OPTIMIZATION
-                                                    }
                                                 }
                                             )
                                         }
@@ -926,14 +920,11 @@ fun OnboardingSurveyScreen(
                                                 selectedOption = selectedGoal,
                                                 onSelect = {
                                                     selectedGoal = it
-                                                    if (!isNotificationsGranted) {
-                                                        activeOverlayType = PermissionOverlayType.NOTIFICATIONS
-                                                    }
                                                 }
                                             )
                                         }
 
-                                        4 -> { // Step 5: Distraction Apps -> Accessibility Permission on selection
+                                        4 -> { // Step 5: Distraction Apps
                                             MultiSelectOptionList(
                                                 options = question.options ?: emptyList(),
                                                 selectedOptions = selectedDistractionApps,
@@ -942,9 +933,6 @@ fun OnboardingSurveyScreen(
                                                         selectedDistractionApps - option
                                                     } else {
                                                         selectedDistractionApps + option
-                                                    }
-                                                    if (!isAccessibilityGranted) {
-                                                        activeOverlayType = PermissionOverlayType.ACCESSIBILITY_SHIELD
                                                     }
                                                 }
                                             )
@@ -956,14 +944,11 @@ fun OnboardingSurveyScreen(
                                                 selectedOption = selectedTimeWindow,
                                                 onSelect = {
                                                     selectedTimeWindow = it
-                                                    if (!isUsageStatsGranted) {
-                                                        activeOverlayType = PermissionOverlayType.USAGE_ACCESS
-                                                    }
                                                 }
                                             )
                                         }
 
-                                        6 -> { // Step 7: Daily Focus Target -> Usage Access Permission on selection
+                                        6 -> { // Step 7: Daily Focus Target
                                             val focusOptions = question.options ?: emptyList()
                                             val currentSelectedOption = when (selectedDailyFocusMinutes) {
                                                 60 -> focusOptions.getOrNull(0) ?: ""
@@ -981,14 +966,11 @@ fun OnboardingSurveyScreen(
                                                         option.contains("3 Hours") -> 180
                                                         else -> 240
                                                     }
-                                                    if (!isUsageStatsGranted) {
-                                                        activeOverlayType = PermissionOverlayType.USAGE_ACCESS
-                                                    }
                                                 }
                                             )
                                         }
 
-                                        7 -> { // Step 8: Accountability / Blocker -> Overlay Permission
+                                        7 -> { // Step 8: Accountability / Blocker
                                             MultiSelectOptionList(
                                                 options = question.options ?: emptyList(),
                                                 selectedOptions = selectedMotivationStyles,
@@ -997,9 +979,6 @@ fun OnboardingSurveyScreen(
                                                         selectedMotivationStyles - option
                                                     } else {
                                                         selectedMotivationStyles + option
-                                                    }
-                                                    if (!isOverlayGranted) {
-                                                        activeOverlayType = PermissionOverlayType.OVERLAY_LOCK
                                                     }
                                                 }
                                             )

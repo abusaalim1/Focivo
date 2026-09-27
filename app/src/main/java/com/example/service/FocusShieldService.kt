@@ -74,11 +74,7 @@ class FocusShieldService : Service() {
         val punishedPackageTarget: StateFlow<String?> = _punishedPackageTarget.asStateFlow()
 
         fun isShieldRunning(context: Context): Boolean {
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val endTime = prefs.getLong(PREF_KEY_SHIELD_END_TIME, 0L)
-            val isScheduled = ScheduledBlockScheduler.isScheduleCurrentlyActive(context)
-            val isPunishment = _isPunishmentLock.value || prefs.getBoolean(PREF_KEY_IS_PUNISHMENT, false)
-            return (_isShieldActive.value || (endTime > System.currentTimeMillis()) || isScheduled) && !isPunishment
+            return com.example.util.AiStudyGuardManager.isStudyPeriodActive(context)
         }
 
         fun getActiveBlockedPackages(context: Context): Set<String> {
@@ -431,6 +427,11 @@ class FocusShieldService : Service() {
                 if (secondsLeft % 15 == 0) {
                     val manager = getSystemService(NotificationManager::class.java)
                     manager?.notify(NOTIFICATION_ID, buildNotification(secondsLeft, isPunishment, punishedPackage))
+                }
+
+                val isStudyActive = com.example.util.AiStudyGuardManager.isStudyPeriodActive(this@FocusShieldService)
+                if (!isStudyActive) {
+                    continue
                 }
 
                 // Check foreground app (reduced delay to 800ms for immediate reaction)

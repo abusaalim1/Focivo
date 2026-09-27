@@ -49,12 +49,7 @@ object StrictModeManager {
      */
     fun shouldBlockUninstallation(context: Context): Boolean {
         if (!isStrictModeEnabled(context)) return false
-
-        val isScheduleActive = ScheduledBlockScheduler.isScheduleCurrentlyActive(context)
-        val isShieldActive = FocusShieldService.isShieldActive.value && !FocusShieldService.isPunishmentLock.value
-        val isTimerOrSessionActive = isSessionActive(context)
-
         // Only block uninstallation when an active scheduled focus session or manual study timer is genuinely running
-        return isScheduleActive || isShieldActive || isTimerOrSessionActive
+        return AiStudyGuardManager.isStudyPeriodActive(context)
     }
 }

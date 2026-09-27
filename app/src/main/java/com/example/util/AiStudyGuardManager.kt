@@ -116,9 +116,10 @@ object AiStudyGuardManager {
 
     /**
      * Evaluates in real-time whether current wall-clock time is an active study period:
-     * 1. Active Quick Focus / manual focus timer running
+     * 1. Active Quick Focus / manual focus timer running (is_manual_timer_running && manual_timer_end_time_ms > now)
      * 2. Inside an active Auto Study Schedule window (checking start_time, end_time, active day, break window)
-     * 3. Focus Shield otherwise actively armed
+     *
+     * Protection ONLY applies during genuine active study sessions or triggered schedules.
      */
     fun isStudyPeriodActive(context: Context): Boolean {
         val now = System.currentTimeMillis()
@@ -133,13 +134,7 @@ object AiStudyGuardManager {
         // 2. Active Auto Study Schedule window
         val isScheduleActive = ScheduledBlockScheduler.isScheduleCurrentlyActive(context)
 
-        // 3. Focus Shield running (general study shield only, NOT app-specific punishment)
-        val isShieldRunning = FocusShieldService.isShieldActive.value && !FocusShieldService.isPunishmentLock.value
-
-        // 4. Strict Mode Session with active timer
-        val isStrictActive = StrictModeManager.isSessionActive(context) && isTimerActive
-
-        return isTimerActive || isScheduleActive || isShieldRunning || isStrictActive
+        return isTimerActive || isScheduleActive
     }
 
     fun updateGuardStatusNotification(context: Context) {

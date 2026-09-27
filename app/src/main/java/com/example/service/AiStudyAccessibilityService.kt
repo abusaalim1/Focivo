@@ -107,10 +107,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 return
             }
 
+            // CRITICAL: App blocking and study guard ONLY run during an active study session or active triggered schedule!
+            val isStudyPeriod = AiStudyGuardManager.isStudyPeriodActive(applicationContext)
+            if (!isStudyPeriod) {
+                // When user is not studying, apps are 100% free and never intercepted/locked.
+                return
+            }
+
             val isWindowStateChanged = eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-            val isScheduleActive = ScheduledBlockScheduler.isScheduleCurrentlyActive(applicationContext)
-            val isShieldActive = FocusShieldService.isShieldActive.value && !FocusShieldService.isPunishmentLock.value
-            val isStudyPeriod = isScheduleActive || isShieldActive || AiStudyGuardManager.isStudyPeriodActive(applicationContext)
             val isStrictActive = StrictModeManager.shouldBlockUninstallation(applicationContext)
 
             val nowTime = System.currentTimeMillis()

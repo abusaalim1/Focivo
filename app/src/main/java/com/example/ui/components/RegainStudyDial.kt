@@ -321,10 +321,10 @@ fun RegainStudyDial(
             } else {
                 Spacer(modifier = Modifier.height(2.dp))
 
-                // Animated mascot video playing on seamless loop during active session (perfectly framed with full cap and table visible)
+                // Mascot during active study session - slightly larger and cleanly rendered without black background
                 RegainMascotView(
-                    width = 145.dp,
-                    height = 125.dp,
+                    width = 175.dp,
+                    height = 150.dp,
                     pose = MascotPose.STUDYING,
                     modifier = Modifier
                         .clipToBounds()

@@ -36,8 +36,9 @@ object YouTubeStudyGuardManager {
     fun isFilterEnabled(context: Context): Boolean {
         val hasPerm = AiStudyGuardManager.isAccessibilityPermissionGranted(context)
         if (!hasPerm) return false
+        if (!AiStudyGuardManager.isStudyPeriodActive(context)) return false
         val prefs = getPrefs(context)
-        return prefs.getBoolean(KEY_FILTER_ENABLED, true) || AiStudyGuardManager.isStudyPeriodActive(context)
+        return prefs.getBoolean(KEY_FILTER_ENABLED, true)
     }
 
     fun setFilterEnabled(context: Context, enabled: Boolean) {
