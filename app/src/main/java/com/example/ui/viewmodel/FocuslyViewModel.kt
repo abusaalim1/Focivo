@@ -569,28 +569,91 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             val remainingSecs = FocusShieldService.getRemainingSeconds(app)
             val isScheduleActive = ScheduledBlockScheduler.isScheduleCurrentlyActive(app)
 
-            if (isShieldRunning || isScheduleActive) {
+            if (isShieldRunning && remainingSecs > 0) {
                 _isStandaloneShieldActive.value = true
-                val effectiveSecs = if (remainingSecs > 0) remainingSecs else 25 * 60
-                _standaloneShieldRemainingSeconds.value = effectiveSecs
-                startShieldTicker(effectiveSecs)
+                _standaloneShieldRemainingSeconds.value = remainingSecs
+                startShieldTicker(remainingSecs)
                 val currentPrefs = repository.userPreferences.firstOrNull() ?: UserPreferencesEntity()
                 repository.savePreferences(currentPrefs.copy(isAppBlockerEnabled = true))
+            } else if (!isScheduleActive) {
+                _isStandaloneShieldActive.value = false
+                _standaloneShieldRemainingSeconds.value = 0
             }
 
-            // 2. Restore persistent Supabase session on cold start before UI rendering
+            // 2. Restore persistent Supabase or local Guest session on cold start before UI rendering
             _isAuthChecking.value = true
             val restoredUid: String? = SupabaseService.getInstance().awaitSessionRestoration()
             if (!restoredUid.isNullOrBlank()) {
                 restoreUserAccount(restoredUid)
             } else {
-                // Not authenticated in Supabase - strictly clear any placeholder account
-                _currentUser.value = null
+                // Check if user is a logged-in Guest or has existing local account stored
+                val isGuest = AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.isGuestSession(it) } ?: false
+                val storedUid = AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredUserId(it) }
+                val localPrefs = repository.userPreferences.firstOrNull() ?: UserPreferencesEntity()
+                val localUser = if (!localPrefs.currentUserEmail.isNullOrBlank()) {
+                    repository.getUserByEmail(localPrefs.currentUserEmail)
+                } else if (localPrefs.currentUserId != null) {
+                    repository.getUserById(localPrefs.currentUserId)
+                } else null
+
+                if (localUser != null) {
+                    _currentUser.value = localUser
+                    val isSurveyCompleted = localPrefs.hasCompletedIntakeSurvey || localPrefs.hasCompletedOnboarding || localUser.hasCompletedIntakeSurvey
+                    _showQuestionnaire.value = !isSurveyCompleted
+                    Log.d("StartupAuth", "[SessionRestore] Restored local account from database: ${localUser.email}, surveyCompleted=$isSurveyCompleted")
+                } else if (isGuest || !storedUid.isNullOrBlank()) {
+                    val finalUid = if (!storedUid.isNullOrBlank()) storedUid else "guest_${System.currentTimeMillis()}"
+                    val guestName = AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredGuestName(it) }
+                        ?: localPrefs.currentUserName
+                        ?: "Guest Deep Worker"
+                    val guestEmail = AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredEmail(it) }
+                        ?: localPrefs.currentUserEmail
+                        ?: "guest_${finalUid.take(8)}@focusly.app"
+
+                    val guestUser = UserAccountEntity(
+                        id = Math.abs(finalUid.hashCode().toLong()).coerceAtLeast(1L),
+                        email = guestEmail,
+                        fullName = guestName,
+                        firebaseUid = finalUid,
+                        photoUrl = localPrefs.currentUserPhotoUrl,
+                        hasCompletedIntakeSurvey = localPrefs.hasCompletedIntakeSurvey || localPrefs.hasCompletedOnboarding,
+                        isGoogleUser = false
+                    )
+                    repository.registerUser(guestUser)
+                    _currentUser.value = guestUser
+                    val isSurveyCompleted = localPrefs.hasCompletedIntakeSurvey || localPrefs.hasCompletedOnboarding
+                    _showQuestionnaire.value = !isSurveyCompleted
+                    Log.d("StartupAuth", "[SessionRestore] Restored local Guest account: $finalUid, name=$guestName, surveyCompleted=$isSurveyCompleted")
+                } else {
+                    _currentUser.value = null
+                }
             }
             _isAuthChecking.value = false
 
-            // Set initial mode
-            setMode("Study", 25)
+            // Restore active study timer if running, otherwise set standard initial mode
+            val timerPrefs = app.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
+            val isManualRunning = timerPrefs.getBoolean("is_manual_timer_running", false)
+            val timerEndTime = timerPrefs.getLong("manual_timer_end_time_ms", 0L)
+            val now = System.currentTimeMillis()
+            if (isManualRunning && timerEndTime > now) {
+                val rem = ((timerEndTime - now) / 1000L).toInt().coerceIn(1, 4 * 3600)
+                _isTimerRunning.value = true
+                _remainingSeconds.value = rem
+                _targetSeconds.value = rem
+                timerJob?.cancel()
+                timerJob = viewModelScope.launch {
+                    while (isActive && _remainingSeconds.value > 0) {
+                        delay(1000L)
+                        _remainingSeconds.value -= 1
+                    }
+                    if (_remainingSeconds.value <= 0) {
+                        onTimerCompleted()
+                    }
+                }
+            } else {
+                timerPrefs.edit().putBoolean("is_manual_timer_running", false).putLong("manual_timer_end_time_ms", 0L).apply()
+                setMode("Study", 25)
+            }
             startAlarmChecker()
             refreshInstalledApps()
         }
@@ -1105,9 +1168,14 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                     )
                 )
 
-                // Persist guest user in Supabase
+                // Persist guest user locally and in Supabase
                 AndroidPreferenceSessionManager.appContext?.let { ctx ->
-                    AndroidPreferenceSessionManager.setStoredUserId(ctx, authData.uid)
+                    AndroidPreferenceSessionManager.setStoredGuestSession(
+                        context = ctx,
+                        guestId = authData.uid,
+                        guestName = createdUser.fullName,
+                        guestEmail = createdUser.email
+                    )
                 }
                 val guestUserDto = com.example.data.SupabaseUserDto(
                     id = authData.uid,
@@ -2240,7 +2308,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             // Auto-start a study timer session when a schedule with mode="Study" becomes active
             if (activeStudySchedule != null) {
                 val studyRemaining = ScheduledBlockScheduler.getSecondsRemainingInActiveBlock(app, activeStudySchedule)
-                if (!_isTimerRunning.value || isAutoScheduledSession) {
+                if (studyRemaining > 10 && (!_isTimerRunning.value || isAutoScheduledSession)) {
                     if (!isAutoScheduledSession) {
                         _shouldNavigateToStudyTab.value = true
                     }

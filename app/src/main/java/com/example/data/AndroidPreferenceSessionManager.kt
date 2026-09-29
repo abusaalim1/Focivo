@@ -19,9 +19,32 @@ class AndroidPreferenceSessionManager(private val context: Context) : SessionMan
         private const val KEY_AVATAR_URL = "supabase_persisted_avatar_url"
         private const val KEY_ACCESS_TOKEN = "supabase_persisted_access_token"
         private const val KEY_REFRESH_TOKEN = "supabase_persisted_refresh_token"
+        private const val KEY_IS_GUEST = "supabase_persisted_is_guest"
+        private const val KEY_GUEST_NAME = "supabase_persisted_guest_name"
 
         @Volatile
         var appContext: Context? = null
+
+        fun setStoredGuestSession(context: Context, guestId: String, guestName: String, guestEmail: String) {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_USER_ID, guestId)
+                .putString(KEY_EMAIL, guestEmail)
+                .putString(KEY_GUEST_NAME, guestName)
+                .putBoolean(KEY_IS_GUEST, true)
+                .commit()
+            Log.d(TAG, "[SessionPersistence] Stored local guest session: $guestId ($guestName)")
+        }
+
+        fun isGuestSession(context: Context): Boolean {
+            return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_IS_GUEST, false)
+        }
+
+        fun getStoredGuestName(context: Context): String? {
+            return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_GUEST_NAME, null)
+        }
 
         fun setStoredUserId(context: Context, userId: String) {
             if (userId.isBlank()) return

@@ -5,11 +5,18 @@ import android.media.MediaPlayer
 import android.view.Surface
 import android.view.TextureView
 import androidx.annotation.RawRes
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -82,9 +90,35 @@ fun RegainMascotView(
         contentAlignment = Alignment.Center
     ) {
         if (isStudying) {
-            MascotVideoPlayer(
-                videoResId = R.raw.mascot_study_timer,
-                modifier = Modifier.fillMaxSize()
+            // High-resolution clean transparent studying mascot with zero black background
+            val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "study_mascot_float")
+            val floatOffset by infiniteTransition.animateFloat(
+                initialValue = -3f,
+                targetValue = 3f,
+                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                    animation = androidx.compose.animation.core.tween(2400, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                ),
+                label = "mascot_y_offset"
+            )
+            val scaleEffect by infiniteTransition.animateFloat(
+                initialValue = 0.98f,
+                targetValue = 1.02f,
+                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                    animation = androidx.compose.animation.core.tween(2400, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                ),
+                label = "mascot_scale"
+            )
+
+            Image(
+                painter = painterResource(id = R.drawable.mascot_studying),
+                contentDescription = "Focivo Mascot Studying",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .offset(y = floatOffset.dp)
+                    .graphicsLayer(scaleX = scaleEffect, scaleY = scaleEffect),
+                contentScale = ContentScale.Fit
             )
         } else {
             Image(

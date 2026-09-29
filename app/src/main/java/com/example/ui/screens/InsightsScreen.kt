@@ -113,6 +113,24 @@ fun InsightsScreen(
         "${days}d"
     }
 
+    val flowPercentageText = remember(sessions) {
+        if (sessions.isEmpty()) {
+            "0% Flow"
+        } else {
+            val peakHour = sessions.groupBy { it.hourOfDay }.maxByOrNull { it.value.size }?.key ?: 9
+            val peakSessions = sessions.filter { it.hourOfDay in peakHour..(peakHour + 2) }
+            val peakDuration = peakSessions.sumOf { it.durationSeconds }
+            val totalDuration = sessions.sumOf { it.durationSeconds }
+            if (totalDuration > 0) {
+                val pct = ((peakDuration.toFloat() / totalDuration.toFloat()) * 100).toInt().coerceIn(1, 100)
+                "+$pct% Flow"
+            } else {
+                val completedRatio = ((sessions.count { it.durationSeconds >= it.targetDurationSeconds * 0.8 }.toFloat() / sessions.size) * 100).toInt().coerceIn(1, 100)
+                "+$completedRatio% Flow"
+            }
+        }
+    }
+
     val peakFlowText = remember(sessions) {
         if (sessions.isEmpty()) {
             "First session unlocks peak window"
@@ -365,7 +383,7 @@ fun InsightsScreen(
                                 .padding(horizontal = 10.dp, vertical = 5.dp)
                         ) {
                             Text(
-                                text = "+42% Flow",
+                                text = flowPercentageText,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontFamily = PoppinsFontFamily,
                                     color = RegainLimeDeepText,

@@ -291,6 +291,8 @@ object ScheduledBlockScheduler {
      */
     fun getSecondsRemainingInActiveBlock(context: Context, schedule: SupabaseScheduledBlockDto): Int {
         val now = Calendar.getInstance()
+        if (!isScheduleActiveAt(schedule, now)) return 0
+
         val currentMin = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
         val currentSec = now.get(Calendar.SECOND)
 
@@ -304,9 +306,12 @@ object ScheduledBlockScheduler {
         }
 
         var diffMin = targetMin - currentMin
-        if (diffMin <= 0) diffMin += 1440 // Wrap around midnight if necessary
+        if (diffMin < 0) {
+            diffMin += 1440 // Overnight window wrap
+        }
         val totalSec = diffMin * 60 - currentSec
-        return totalSec.coerceAtLeast(1)
+        // Maximum study timer from a block is capped safely between 10s and 4 hours (never 24 hours)
+        return totalSec.coerceIn(10, 4 * 3600)
     }
 
     fun getScheduleStatusSummary(context: Context): String {
