@@ -90,35 +90,9 @@ fun RegainMascotView(
         contentAlignment = Alignment.Center
     ) {
         if (isStudying) {
-            // High-resolution clean transparent studying mascot with zero black background
-            val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "study_mascot_float")
-            val floatOffset by infiniteTransition.animateFloat(
-                initialValue = -3f,
-                targetValue = 3f,
-                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                    animation = androidx.compose.animation.core.tween(2400, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-                ),
-                label = "mascot_y_offset"
-            )
-            val scaleEffect by infiniteTransition.animateFloat(
-                initialValue = 0.98f,
-                targetValue = 1.02f,
-                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                    animation = androidx.compose.animation.core.tween(2400, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-                ),
-                label = "mascot_scale"
-            )
-
-            Image(
-                painter = painterResource(id = R.drawable.mascot_studying),
-                contentDescription = "Focivo Mascot Studying",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .offset(y = floatOffset.dp)
-                    .graphicsLayer(scaleX = scaleEffect, scaleY = scaleEffect),
-                contentScale = ContentScale.Fit
+            MascotVideoPlayer(
+                videoResId = R.raw.mascot_study_timer,
+                modifier = Modifier.fillMaxSize()
             )
         } else {
             Image(

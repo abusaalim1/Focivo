@@ -1801,16 +1801,12 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             pauseTimer()
             return
         }
-        val app = getApplication<Application>()
         val prefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
-        val hasBlockedApps = prefs.blockedAppsList.split(",").map { it.trim() }.any { it.isNotBlank() }
-
-        // If user already added blocked apps, start immediately without popup.
-        // If not added yet, show the app blocker selection popup.
-        if (!hasBlockedApps) {
-            _showPreStudyBlockSheet.value = true
-        } else {
+        // If user clicked "Save & Block", auto-block saved apps without asking. Otherwise show selection sheet.
+        if (prefs.autoBlockStudyAppsWithoutAsking && prefs.blockedAppsList.isNotBlank()) {
             startTimer()
+        } else {
+            _showPreStudyBlockSheet.value = true
         }
     }
 
@@ -1818,15 +1814,15 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         _showPreStudyBlockSheet.value = false
     }
 
-    fun confirmPreStudyBlock(selectedPackages: Set<String>, dontShowAgain: Boolean) {
+    fun confirmPreStudyBlock(selectedPackages: Set<String>, saveForFuture: Boolean) {
         val app = getApplication<Application>()
         val sanitized = com.example.util.EssentialAppsGuard.sanitizeBlockedPackages(app, selectedPackages)
         val joined = sanitized.joinToString(",")
         val currentPrefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
         val updated = currentPrefs.copy(
-            blockedAppsList = joined,
+            blockedAppsList = if (saveForFuture) joined else currentPrefs.blockedAppsList,
             isAppBlockerEnabled = true,
-            autoBlockStudyAppsWithoutAsking = dontShowAgain
+            autoBlockStudyAppsWithoutAsking = saveForFuture
         )
         viewModelScope.launch {
             repository.savePreferences(updated)
@@ -2396,21 +2392,12 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 standaloneShieldJob?.cancel()
                 standaloneShieldJob = null
             } else {
-                // If user turns on master shield / distraction blocker, start background service immediately
-                val intent = Intent(app, FocusShieldService::class.java).apply {
-                    action = FocusShieldService.ACTION_START_SHIELD
-                    putExtra(FocusShieldService.EXTRA_DURATION_SECONDS, 24 * 60 * 60)
-                    putExtra(FocusShieldService.EXTRA_BLOCKED_LIST, prefs.blockedAppsList)
-                }
-                try {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        app.startForegroundService(intent)
-                    } else {
-                        app.startService(intent)
-                    }
-                } catch (e: Exception) {
-                    Log.e("FocuslyViewModel", "Failed to start FocusShieldService: ${e.message}")
-                }
+                // Distraction blocker is enabled and armed for study sessions.
+                // Background service & notifications are NOT started when user is not studying.
+                _isStandaloneShieldActive.value = false
+                _standaloneShieldRemainingSeconds.value = 0
+                standaloneShieldJob?.cancel()
+                standaloneShieldJob = null
             }
 
             firebaseSyncManager.syncBlockerState(

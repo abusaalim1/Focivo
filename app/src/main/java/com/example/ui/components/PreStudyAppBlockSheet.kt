@@ -516,123 +516,84 @@ fun PreStudyAppBlockSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            var rememberChoiceChecked by remember { mutableStateOf(false) }
-
-            // Don't show again Checkbox row
+            // Action Buttons: "Block" (this session only) vs "Save & Block" (save permanently for auto-block)
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { rememberChoiceChecked = !rememberChoiceChecked }
-                    .padding(vertical = 4.dp, horizontal = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = rememberChoiceChecked,
-                    onCheckedChange = { rememberChoiceChecked = it },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = RegainLimePrimary,
-                        uncheckedColor = Color(0xFFA0A89E),
-                        checkmarkColor = Color(0xFF021207)
-                    ),
-                    modifier = Modifier.testTag("dont_show_again_checkbox")
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Column {
-                    Text(
-                        text = "Don't show again before study",
-                        fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 13.sp,
-                        color = Color.White
-                    )
-                    Text(
-                        text = "Always auto-block selected apps for future study sessions",
-                        fontFamily = PoppinsFontFamily,
-                        fontSize = 11.sp,
-                        color = Color(0xFFA0A89E)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Action Buttons
-            Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // 1. "Block" Button
                 Button(
                     onClick = {
                         val chosen = selectedPackages.filter { it.value }.keys.toSet()
-                        onConfirmAndStart(chosen, rememberChoiceChecked)
+                        onConfirmAndStart(chosen, false)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2A342B),
+                        contentColor = Color(0xFFE0E6DC)
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .testTag("block_current_session_button")
+                ) {
+                    Icon(imageVector = Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(16.dp), tint = RegainLimePrimary)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Block ($totalSelectedCount)",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
+                    )
+                }
+
+                // 2. "Save & Block" Button
+                Button(
+                    onClick = {
+                        val chosen = selectedPackages.filter { it.value }.keys.toSet()
+                        onConfirmAndStart(chosen, true)
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RegainLimePrimary,
                         contentColor = Color(0xFF021207)
                     ),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .weight(1.3f)
                         .height(48.dp)
-                        .testTag("start_study_and_block_button")
+                        .testTag("save_and_block_button")
                 ) {
-                    Icon(imageVector = Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (totalSelectedCount > 0) "Start Study & Block ($totalSelectedCount Apps)" else "Start Study Without Blocking",
+                        text = "Save & Block",
                         fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        fontSize = 13.sp
                     )
                 }
+            }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            val chosen = selectedPackages.filter { it.value }.keys.toSet()
-                            onConfirmAndStart(chosen, true)
-                        },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = RegainLimePrimary
-                        ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, RegainLimePrimary),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp)
-                            .testTag("save_and_dont_show_again_button")
-                    ) {
-                        Text(
-                            text = "Save & Don't Show Again",
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp,
-                            maxLines = 1
-                        )
-                    }
+            Spacer(modifier = Modifier.height(6.dp))
 
-                    TextButton(
-                        onClick = onDismiss,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .height(44.dp)
-                            .testTag("cancel_pre_study_sheet_button")
-                    ) {
-                        Text(
-                            text = "Cancel",
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 13.sp,
-                            color = Color(0xFFA0A89E)
-                        )
-                    }
-                }
+            // Cancel button
+            TextButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .testTag("cancel_pre_study_sheet_button")
+            ) {
+                Text(
+                    text = "Cancel",
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 12.sp,
+                    color = Color(0xFFA0A89E)
+                )
             }
         }
     }
