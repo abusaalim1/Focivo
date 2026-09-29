@@ -491,7 +491,12 @@ fun SettingsScreen(
 
         // Focus Shield (App Blocker) Hub
         item {
-            val isShieldEnabled = userPreferences?.isAppBlockerEnabled ?: false
+            val hasShieldPerms = remember(context) {
+                com.example.util.PermissionUtils.hasUsageStatsPermission(context) &&
+                com.example.util.PermissionUtils.hasOverlayPermission(context) &&
+                com.example.util.AiStudyGuardManager.isAccessibilityPermissionGranted(context)
+            }
+            val isShieldEnabled = (userPreferences?.isAppBlockerEnabled ?: false) && hasShieldPerms
             GlassCard(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -533,7 +538,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (isShieldEnabled) "Armed · Distractions Blocked" else "Configured · Tap to manage apps & timer",
+                                text = if (isShieldEnabled) "Armed · Distractions Blocked During Study" else if (!hasShieldPerms) "Permissions Needed · Tap to setup shield" else "Configured · Tap to manage apps & timer",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 12.sp

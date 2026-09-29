@@ -81,12 +81,19 @@ fun RegainMascotView(
             .height(actualHeight),
         contentAlignment = Alignment.Center
     ) {
-        Image(
-            painter = painterResource(id = targetResId),
-            contentDescription = "Focivo Mascot $pose",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
-        )
+        if (isStudying) {
+            MascotVideoPlayer(
+                videoResId = R.raw.mascot_study_timer,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Image(
+                painter = painterResource(id = targetResId),
+                contentDescription = "Focivo Mascot $pose",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+        }
     }
 }
 

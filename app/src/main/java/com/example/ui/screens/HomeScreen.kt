@@ -115,6 +115,14 @@ fun HomeScreen(
     val headerButtonBg = if (isDark) cardBg else Color(0xEEFFFFFF)
     val headerButtonBorder = if (isDark) cardBorder else Color(0xFFD0DCC4)
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val hasShieldPermissions = remember(context) {
+        com.example.util.PermissionUtils.hasUsageStatsPermission(context) &&
+        com.example.util.PermissionUtils.hasOverlayPermission(context) &&
+        com.example.util.AiStudyGuardManager.isAccessibilityPermissionGranted(context)
+    }
+    val isShieldActive = hasShieldPermissions && (userPreferences?.isAppBlockerEnabled == true)
+
     val totalFocusSeconds = remember(sessions) { sessions.sumOf { it.durationSeconds } }
     val totalFocusHours = totalFocusSeconds / 3600.0
     val totalFocusHoursStr = remember(totalFocusSeconds) {
@@ -779,13 +787,13 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .size(34.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (userPreferences?.isAppBlockerEnabled == true) RegainLimeContainer else (if (isDark) Color(0x30FFFFFF) else Color(0xFFF0F4EC))),
+                                    .background(if (isShieldActive) RegainLimeContainer else (if (isDark) Color(0x30FFFFFF) else Color(0xFFF0F4EC))),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Security,
                                     contentDescription = "Focus Shield",
-                                    tint = if (userPreferences?.isAppBlockerEnabled == true) RegainLimeDeepText else textSecondary,
+                                    tint = if (isShieldActive) RegainLimeDeepText else textSecondary,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -805,17 +813,17 @@ fun HomeScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = if (userPreferences?.isAppBlockerEnabled == true) "ON" else "OFF",
+                                        text = if (isShieldActive) "ON" else if (!hasShieldPermissions) "SETUP" else "OFF",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontFamily = PoppinsFontFamily,
-                                            color = if (userPreferences?.isAppBlockerEnabled == true) RegainLimeDeepText else textSecondary,
+                                            color = if (isShieldActive) RegainLimeDeepText else textSecondary,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 9.sp
                                         )
                                     )
                                 }
                                 Text(
-                                    text = if (userPreferences?.isAppBlockerEnabled == true) "12 apps blocked" else "Tap to enable",
+                                    text = if (isShieldActive) "Protected during study" else if (!hasShieldPermissions) "Permissions needed" else "Tap to enable",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         color = textSecondary,

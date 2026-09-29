@@ -219,6 +219,13 @@ fun ProfileScreen(
         sessions.filter { it.completedAt > 0 && it.durationSeconds > 0 }.map { sdf.format(Date(it.completedAt)) }.toSet().size
     }
 
+    val hasShieldPermissions = remember(context) {
+        com.example.util.PermissionUtils.hasUsageStatsPermission(context) &&
+        com.example.util.PermissionUtils.hasOverlayPermission(context) &&
+        com.example.util.AiStudyGuardManager.isAccessibilityPermissionGranted(context)
+    }
+    val isShieldActive = hasShieldPermissions && (userPreferences?.isAppBlockerEnabled == true)
+
     val dailyGoalMinutes = (userPreferences?.dailyGoalMinutes ?: 240).coerceAtLeast(60)
     val todayStart = remember {
         Calendar.getInstance().apply {
@@ -636,14 +643,14 @@ fun ProfileScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(if (userPreferences?.isAppBlockerEnabled == true) RegainLimeContainer else (if (isDark) Color(0x30FFFFFF) else Color(0xFFF0F4EC)))
+                                            .background(if (isShieldActive) RegainLimeContainer else (if (isDark) Color(0x30FFFFFF) else Color(0xFFF0F4EC)))
                                             .padding(horizontal = 8.dp, vertical = 2.dp)
                                     ) {
                                         Text(
-                                            text = if (userPreferences?.isAppBlockerEnabled == true) "ARMED" else "IDLE",
+                                            text = if (isShieldActive) "ARMED" else if (!hasShieldPermissions) "SETUP" else "IDLE",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = PoppinsFontFamily,
-                                                color = if (userPreferences?.isAppBlockerEnabled == true) RegainLimeDeepText else textSecondary,
+                                                color = if (isShieldActive) RegainLimeDeepText else textSecondary,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 9.sp
                                             )

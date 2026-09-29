@@ -50,6 +50,7 @@ import com.example.ui.components.SupportLockZenMilestoneDialog
 import com.example.ui.components.SessionDonationPromptSheet
 import com.example.ui.components.SundayRecapGlassDialog
 import com.example.ui.components.TaskBottomSheet
+import com.example.util.AiStudyGuardManager
 import com.example.util.PermissionUtils
 import kotlinx.coroutines.delay
 import com.example.ui.screens.AuthScreen
@@ -460,6 +461,10 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                     )
                                 }
                                 NavTab.FOCUS.name -> {
+                                    val hasCoreShieldPerms = PermissionUtils.hasUsageStatsPermission(context) &&
+                                        PermissionUtils.hasOverlayPermission(context) &&
+                                        AiStudyGuardManager.isAccessibilityPermissionGranted(context)
+
                                     FocusScreen(
                                         remainingSeconds = remainingSeconds,
                                         targetSeconds = targetSeconds,
@@ -470,7 +475,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         ambientSound = ambientSound,
                                         userStreak = userPreferences?.currentStreak ?: 0,
                                         userPreferences = userPreferences,
-                                        isShieldActive = userPreferences?.isAppBlockerEnabled == true || isTimerRunning || isStandaloneShieldActive,
+                                        isShieldActive = hasCoreShieldPerms && (userPreferences?.isAppBlockerEnabled == true || isTimerRunning || isStandaloneShieldActive),
                                         isDeepFocusEnabled = isDeepFocusEnabled,
                                         isDeepFocusSessionActive = isDeepFocusSessionActive,
                                         onToggleDeepFocus = { viewModel.toggleDeepFocus(it) },

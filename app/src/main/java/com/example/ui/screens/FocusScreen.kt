@@ -401,6 +401,9 @@ fun FocusScreen(
                                 }
                             },
                             onReset = onFinishEarly,
+                            onTagClick = {
+                                if (!isRunning) showStudyTypeDialog = true
+                            },
                             modifier = Modifier.testTag("aurora_timer_component")
                         )
                     } else {

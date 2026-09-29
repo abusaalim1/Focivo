@@ -423,7 +423,7 @@ fun FocusShieldHubSheet(
                 LiquidGlassCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    accentBorder = isShieldEnabled
+                    accentBorder = isShieldEnabled && isAllPermissionsGranted
                 ) {
                     Row(
                         modifier = Modifier
@@ -445,21 +445,23 @@ fun FocusShieldHubSheet(
                             Text(
                                 text = if (isShieldTimerRunning) {
                                     "🔒 Strict Lock Active · Master switch locked until timer ends"
+                                } else if (!isAllPermissionsGranted) {
+                                    "⚠️ Permissions Needed · Tap switch to grant permissions"
                                 } else if (isShieldEnabled) {
                                     "Armed · Distracting apps will be blocked during focus"
                                 } else {
                                     "Disabled · Distracting apps will remain open"
                                 },
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    color = if (isShieldTimerRunning) Color(0xFFFF8A80) else if (isShieldEnabled) accentGreen else textSecondary,
+                                    color = if (isShieldTimerRunning) Color(0xFFFF8A80) else if (!isAllPermissionsGranted) accentAmber else if (isShieldEnabled) accentGreen else textSecondary,
                                     fontSize = 12.sp,
-                                    fontWeight = if (isShieldTimerRunning || isShieldEnabled) FontWeight.Medium else FontWeight.Normal
+                                    fontWeight = if (isShieldTimerRunning || (isShieldEnabled && isAllPermissionsGranted) || !isAllPermissionsGranted) FontWeight.Medium else FontWeight.Normal
                                 )
                             )
                         }
 
                         Switch(
-                            checked = isShieldEnabled,
+                            checked = isShieldEnabled && isAllPermissionsGranted,
                             enabled = !isShieldTimerRunning,
                             onCheckedChange = { isChecked ->
                                 if (isChecked && !isAllPermissionsGranted) {

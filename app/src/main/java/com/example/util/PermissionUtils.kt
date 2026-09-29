@@ -24,7 +24,7 @@ object PermissionUtils {
                 context,
                 NotificationManager::class.java
             )
-            notificationManager?.areNotificationsEnabled() ?: true
+            notificationManager?.areNotificationsEnabled() ?: false
         }
     }
 
@@ -81,8 +81,8 @@ object PermissionUtils {
     fun isBatteryOptimizationDisabled(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val pm = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
-            pm?.isIgnoringBatteryOptimizations(context.packageName) ?: true
-        } else true
+            pm?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+        } else false
     }
 
     fun openBatteryOptimizationSettings(context: Context) {

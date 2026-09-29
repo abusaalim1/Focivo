@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -86,6 +87,7 @@ fun AuroraTimer(
     dialSize: Dp = 290.dp,
     onTogglePlay: () -> Unit = {},
     onReset: () -> Unit = {},
+    onTagClick: (() -> Unit)? = null,
     onSwitchMode: (() -> Unit)? = null
 ) {
     val isDark = isAppInDarkTheme()
@@ -283,7 +285,7 @@ fun AuroraTimer(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(horizontal = 24.dp)
         ) {
-            // Atmospheric Phase Pill (Deep Focus / Break / Sprint)
+            // Atmospheric Phase Pill (Deep Focus / Break / Sprint / Custom Subject)
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(14.dp))
@@ -299,7 +301,12 @@ fun AuroraTimer(
                         if (isBreak) Color(0x4569F0AE) else Color(0x458CE000),
                         RoundedCornerShape(14.dp)
                     )
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .then(
+                        if (onTagClick != null && !isRunning) {
+                            Modifier.clickable(onClick = onTagClick)
+                        } else Modifier
+                    )
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -328,6 +335,15 @@ fun AuroraTimer(
                         },
                         maxLines = 1
                     )
+                    if (!isRunning && onTagClick != null && !isBreak) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Change Subject & Timer",
+                            tint = if (isDark) RegainLimePrimary else RegainLimeDeepText,
+                            modifier = Modifier.size(11.dp)
+                        )
+                    }
                 }
             }
 
