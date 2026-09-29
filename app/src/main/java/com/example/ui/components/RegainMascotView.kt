@@ -83,25 +83,32 @@ fun RegainMascotView(
     val actualWidth = width ?: size
     val actualHeight = height ?: size
 
+    val infiniteTransition = rememberInfiniteTransition(label = "mascot_anim")
+    val floatOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = if (isStudying) -5f else if (isBlocked) 2f else -2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(if (isStudying) 1800 else 2200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "float"
+    )
+
     Box(
         modifier = modifier
             .width(actualWidth)
-            .height(actualHeight),
+            .height(actualHeight)
+            .graphicsLayer {
+                translationY = floatOffset
+            },
         contentAlignment = Alignment.Center
     ) {
-        if (isStudying) {
-            MascotVideoPlayer(
-                videoResId = R.raw.mascot_study_timer,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            Image(
-                painter = painterResource(id = targetResId),
-                contentDescription = "Focivo Mascot $pose",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
-        }
+        Image(
+            painter = painterResource(id = targetResId),
+            contentDescription = "Focivo Mascot $pose",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
     }
 }
 

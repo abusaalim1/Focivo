@@ -50,6 +50,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.ui.theme.NearBlack
+import com.example.ui.theme.RegainLimeContainer
+import com.example.ui.theme.RegainLimeDeepText
+import com.example.ui.theme.RegainLimePrimary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,10 +92,10 @@ fun FocusShieldPermissionSheet(
 
     val isAllGranted = hasUsagePermission && hasOverlayPermission && hasAccessibilityPermission
 
-    val sheetBackground = Color(0xFF0F0B1E)
-    val accentGreen = Color(0xFF69F0AE)
-    val accentAmber = Color(0xFFFFB74D)
-    val accentLime = Color(0xFF76FF03)
+    val sheetBackground = Color(0xFF0C1017)
+    val accentLime = RegainLimePrimary
+    val accentLimeContainer = RegainLimeContainer
+    val accentLimeDeep = RegainLimeDeepText
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -115,7 +119,7 @@ fun FocusShieldPermissionSheet(
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            listOf(Color(0xFF6200EE), Color(0xFF00E676))
+                            listOf(Color(0xFF8CE000), Color(0xFF5CA300))
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -123,7 +127,7 @@ fun FocusShieldPermissionSheet(
                 Icon(
                     imageVector = Icons.Default.Shield,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = NearBlack,
                     modifier = Modifier.size(34.dp)
                 )
             }
@@ -250,8 +254,8 @@ private fun PermissionItemCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit
 ) {
-    val accentGreen = Color(0xFF69F0AE)
-    val accentAmber = Color(0xFFFFB74D)
+    val accentLime = RegainLimePrimary
+    val accentLimeDeep = RegainLimeDeepText
 
     Row(
         modifier = Modifier
@@ -260,7 +264,7 @@ private fun PermissionItemCard(
             .background(Color(0x18FFFFFF))
             .border(
                 1.dp,
-                if (isGranted) accentGreen.copy(alpha = 0.5f) else Color(0x22FFFFFF),
+                if (isGranted) accentLime.copy(alpha = 0.5f) else Color(0x22FFFFFF),
                 RoundedCornerShape(18.dp)
             )
             .clickable { onClick() }
@@ -271,13 +275,13 @@ private fun PermissionItemCard(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(if (isGranted) accentGreen.copy(alpha = 0.18f) else accentAmber.copy(alpha = 0.18f)),
+                .background(if (isGranted) accentLime.copy(alpha = 0.22f) else Color(0x22FFFFFF)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (isGranted) accentGreen else accentAmber,
+                tint = if (isGranted) accentLime else Color(0xFFE2E8F0),
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -297,7 +301,7 @@ private fun PermissionItemCard(
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall.copy(
-                    color = if (isGranted) accentGreen else Color.White.copy(alpha = 0.65f),
+                    color = if (isGranted) accentLime else Color.White.copy(alpha = 0.65f),
                     fontSize = 11.5.sp
                 )
             )
@@ -309,31 +313,32 @@ private fun PermissionItemCard(
             Icon(
                 imageVector = Icons.Default.CheckCircle,
                 contentDescription = "Granted",
-                tint = accentGreen,
+                tint = accentLime,
                 modifier = Modifier.size(22.dp)
             )
         } else {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(accentAmber.copy(alpha = 0.2f))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .background(accentLime)
+                    .clickable { onClick() }
+                    .padding(horizontal = 12.dp, vertical = 7.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "Enable",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = accentAmber,
+                            color = NearBlack,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
+                            fontSize = 11.5.sp
                         )
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Icon(
                         imageVector = Icons.Default.OpenInNew,
                         contentDescription = null,
-                        tint = accentAmber,
-                        modifier = Modifier.size(13.dp)
+                        tint = NearBlack,
+                        modifier = Modifier.size(12.dp)
                     )
                 }
             }

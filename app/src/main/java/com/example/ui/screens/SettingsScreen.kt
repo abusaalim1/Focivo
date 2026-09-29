@@ -398,9 +398,9 @@ fun SettingsScreen(
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(38.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(RegainLimePrimary.copy(alpha = 0.18f))
+                                    .height(42.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(RegainLimePrimary)
                                     .clickable {
                                         if (!hasDndPermission) {
                                             StudyNotificationBlockerManager.openDndSettings(context)
@@ -416,7 +416,7 @@ fun SettingsScreen(
                                     text = if (!hasDndPermission) "Enable Do Not Disturb Access" else "Block Notifications Now",
                                     style = MaterialTheme.typography.labelMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isDark) RegainLimePrimary else Color(0xFF15803D)
+                                        color = Color(0xFF021207)
                                     )
                                 )
                             }

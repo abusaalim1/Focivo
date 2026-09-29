@@ -148,7 +148,7 @@ fun NotificationAlarmPermissionSheet(
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            listOf(Color(0xFF7C4DFF), Color(0xFFFF5252))
+                            listOf(Color(0xFF8CE000), Color(0xFF5CA300))
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -156,7 +156,7 @@ fun NotificationAlarmPermissionSheet(
                 Icon(
                     imageVector = Icons.Default.NotificationsActive,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = Color(0xFF021207),
                     modifier = Modifier.size(36.dp)
                 )
             }
@@ -178,21 +178,21 @@ fun NotificationAlarmPermissionSheet(
             ) {
                 PermissionFeatureRow(
                     icon = Icons.Default.Alarm,
-                    iconTint = Color(0xFFFF5252),
+                    iconTint = Color(0xFF8CE000),
                     title = "Precise Focus & Break Alarms",
                     description = "Plays your custom Zen Bell loudly when a 25m or 50m sprint finishes, even if your phone screen is turned off."
                 )
 
                 PermissionFeatureRow(
                     icon = Icons.Default.Notifications,
-                    iconTint = accentViolet,
+                    iconTint = Color(0xFF8CE000),
                     title = "Live Background Countdown",
                     description = "Keeps remaining session time visible in your notification tray so you never lose track of deep work."
                 )
 
                 PermissionFeatureRow(
                     icon = Icons.Default.Vibration,
-                    iconTint = accentGreen,
+                    iconTint = Color(0xFF8CE000),
                     title = "Haptic Transition Signals",
                     description = "Subtle tactile pulses notify you when moving from deep focus to relaxation breaks."
                 )
