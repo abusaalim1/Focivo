@@ -65,7 +65,25 @@ fun RegainMascotView(
     height: Dp? = null,
     pose: MascotPose = MascotPose.IDLE
 ) {
-    val isStudying = pose == MascotPose.STUDYING
+    val actualWidth = width ?: size
+    val actualHeight = height ?: size
+
+    if (pose == MascotPose.STUDYING) {
+        Box(
+            modifier = modifier
+                .width(actualWidth)
+                .height(actualHeight),
+            contentAlignment = Alignment.Center
+        ) {
+            MascotVideoPlayer(
+                modifier = Modifier.fillMaxSize(),
+                videoResId = R.raw.mascot_study_timer,
+                zoomFactor = 0.96f
+            )
+        }
+        return
+    }
+
     val isBlocked = pose == MascotPose.STOP_SIGN || pose == MascotPose.ANGRY
 
     val targetResId = when (pose) {
@@ -80,15 +98,12 @@ fun RegainMascotView(
         MascotPose.IDLE -> R.drawable.mascot_base
     }
 
-    val actualWidth = width ?: size
-    val actualHeight = height ?: size
-
     val infiniteTransition = rememberInfiniteTransition(label = "mascot_anim")
     val floatOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = if (isStudying) -5f else if (isBlocked) 2f else -2f,
+        targetValue = if (isBlocked) 2f else -2f,
         animationSpec = infiniteRepeatable(
-            animation = tween(if (isStudying) 1800 else 2200, easing = FastOutSlowInEasing),
+            animation = tween(2200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "float"
