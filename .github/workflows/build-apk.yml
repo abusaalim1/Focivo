@@ -48,12 +48,27 @@ jobs:
           fi
           echo "Java environment verified successfully."
 
-      - name: Set up Android SDK & Accept Licenses
+      - name: Set up Android SDK & Accept All Licenses
         run: |
-          echo "Accepting Android SDK licenses..."
+          echo "Configuring Android SDK licenses..."
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf "24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479edd01e217609cb32e753ac077a977\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          printf "601085b94cd77f0b54ff86406957099ebe79c4d6\n" > "$ANDROID_HOME/licenses/android-googletv-license"
+          printf "33b6a2b64607f11b759f320ef9dff4ae5c47d97a\n" > "$ANDROID_HOME/licenses/google-gdk-license"
+          printf "859f317696f67ef3d7f30a50a5560e7834b43903\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
+          printf "ceff83576aac4f7f37cb98fe189e9fb3c49d3b81\n" > "$ANDROID_HOME/licenses/android-googlexr-license"
+          printf "e9acab5b5fbb560a72cfaecce8946896ff6aab9d\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
+
+          echo "Accepting any interactive licenses..."
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || yes | sdkmanager --licenses 2>/dev/null || true
-          echo "Ensuring platform tools and SDK platform 36..."
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" 2>/dev/null || true
+
+          echo "Installing Android 36 SDK Platform components..."
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36.1" \
+            "platforms;android-36" \
+            "build-tools;36.1.0" \
+            "build-tools;36.0.0" 2>/dev/null || true
 
       - name: Ensure environment configuration
         run: |
@@ -73,7 +88,7 @@ jobs:
         run: |
           if [ ! -f ./debug.keystore ]; then
             echo "Creating temporary debug keystore..."
-            "$JAVA_HOME/bin/keytool" -genkey -v \
+            "$JAVA_HOME/bin/keytool" -genkeypair -v \
               -keystore ./debug.keystore \
               -storepass android \
               -alias androiddebugkey \
@@ -81,10 +96,14 @@ jobs:
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -storetype JKS
           else
             echo "./debug.keystore already exists."
           fi
+
+          mkdir -p ~/.android
+          cp ./debug.keystore ~/.android/debug.keystore 2>/dev/null || true
 
           if [ ! -f ./debug.keystore ]; then
             echo "Error: Failed to create ./debug.keystore."
@@ -94,9 +113,9 @@ jobs:
 
       - name: Build debug APK
         env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false"
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3584m -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false"
         run: |
-          gradle :app:assembleDebug --stacktrace --no-daemon
+          gradle :app:assembleDebug --stacktrace --no-configuration-cache
 
       - name: Verify debug APK
         run: |
