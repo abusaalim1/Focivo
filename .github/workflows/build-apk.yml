@@ -18,11 +18,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Temurin Java 17
+      - name: Set up Temurin Java 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Verify Java environment
         run: |
@@ -42,11 +42,27 @@ jobs:
           fi
 
           echo "Detected active Java major version: $JAVA_MAJOR_VERSION"
-          if [ "$JAVA_MAJOR_VERSION" -lt 17 ]; then
-            echo "Error: Java major version must be 17 or higher. Found: $JAVA_MAJOR_VERSION"
+          if [ "$JAVA_MAJOR_VERSION" -lt 21 ]; then
+            echo "Error: Java major version must be 21 or higher for AGP 9.1.1. Found: $JAVA_MAJOR_VERSION"
             exit 1
           fi
           echo "Java environment verified successfully."
+
+      - name: Set up Android SDK & Accept Licenses
+        run: |
+          echo "Accepting Android SDK licenses..."
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || yes | sdkmanager --licenses 2>/dev/null || true
+          echo "Ensuring platform tools and SDK platform 36..."
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" 2>/dev/null || true
+
+      - name: Ensure environment configuration
+        run: |
+          if [ ! -f .env ] && [ -f .env.example ]; then
+            echo "Creating .env from .env.example..."
+            cp .env.example .env
+          elif [ ! -f .env ]; then
+            touch .env
+          fi
 
       - name: Set up Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
@@ -77,6 +93,8 @@ jobs:
           echo "Temporary debug keystore verified."
 
       - name: Build debug APK
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false"
         run: |
           gradle :app:assembleDebug --stacktrace --no-daemon
 
