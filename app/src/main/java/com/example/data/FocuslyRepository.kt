@@ -78,6 +78,7 @@ class FocuslyRepository(private val context: Context) {
     }
 
     private fun loadTasksFromLocal(): List<TaskEntity> {
+        val guestTasks = GuestDataStorageManager.getInstance(context).loadGuestTasks()
         val jsonStr = localDataPrefs.getString("tasks", "[]") ?: "[]"
         val list = mutableListOf<TaskEntity>()
         try {
@@ -103,7 +104,14 @@ class FocuslyRepository(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Error loading tasks from local JSON: ${e.message}")
         }
-        return list
+        val mergedMap = LinkedHashMap<Long, TaskEntity>()
+        for (t in list) mergedMap[t.id] = t
+        for (gt in guestTasks) mergedMap[gt.id] = gt
+        val result = mergedMap.values.toList()
+        if (guestTasks.isEmpty() && result.isNotEmpty()) {
+            GuestDataStorageManager.getInstance(context).saveGuestTasks(result)
+        }
+        return result
     }
 
     private fun saveTasksToLocal(list: List<TaskEntity>) {
@@ -126,12 +134,14 @@ class FocuslyRepository(private val context: Context) {
                 array.put(obj)
             }
             localDataPrefs.edit().putString("tasks", array.toString()).apply()
+            GuestDataStorageManager.getInstance(context).saveGuestTasks(list)
         } catch (e: Exception) {
             Log.e(TAG, "Error saving tasks to local JSON: ${e.message}")
         }
     }
 
     private fun loadSessionsFromLocal(): List<FocusSessionEntity> {
+        val guestSessions = GuestDataStorageManager.getInstance(context).loadGuestSessions()
         val jsonStr = localDataPrefs.getString("focus_sessions", "[]") ?: "[]"
         val list = mutableListOf<FocusSessionEntity>()
         try {
@@ -159,7 +169,14 @@ class FocuslyRepository(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Error loading sessions from local JSON: ${e.message}")
         }
-        return list.sortedByDescending { it.completedAt }
+        val mergedMap = LinkedHashMap<Long, FocusSessionEntity>()
+        for (s in list) mergedMap[s.id] = s
+        for (g in guestSessions) mergedMap[g.id] = g
+        val result = mergedMap.values.sortedByDescending { it.completedAt }
+        if (guestSessions.isEmpty() && result.isNotEmpty()) {
+            GuestDataStorageManager.getInstance(context).saveGuestSessions(result)
+        }
+        return result
     }
 
     private fun saveSessionsToLocal(list: List<FocusSessionEntity>) {
@@ -183,12 +200,27 @@ class FocuslyRepository(private val context: Context) {
                 array.put(obj)
             }
             localDataPrefs.edit().putString("focus_sessions", array.toString()).apply()
+
+            // Persist guest sessions to dedicated guest_data directory using FileOutputStream
+            GuestDataStorageManager.getInstance(context).saveGuestSessions(list)
+
+            // Update guest profile aggregate statistics
+            val totalMins = list.sumOf { it.durationSeconds } / 60
+            val existingProfile = GuestDataStorageManager.getInstance(context).loadGuestProfile() ?: GuestProfileData()
+            GuestDataStorageManager.getInstance(context).saveGuestProfile(
+                existingProfile.copy(
+                    totalFocusMinutes = totalMins,
+                    totalSessionsCompleted = list.size,
+                    lastSessionTimestamp = list.firstOrNull()?.completedAt ?: System.currentTimeMillis()
+                )
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Error saving sessions to local JSON: ${e.message}")
         }
     }
 
     private fun loadReflectionsFromLocal(): List<ReflectionEntity> {
+        val guestRefs = GuestDataStorageManager.getInstance(context).loadGuestReflections()
         val jsonStr = localDataPrefs.getString("reflections", "[]") ?: "[]"
         val list = mutableListOf<ReflectionEntity>()
         try {
@@ -211,7 +243,14 @@ class FocuslyRepository(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Error loading reflections from local JSON: ${e.message}")
         }
-        return list
+        val mergedMap = LinkedHashMap<Long, ReflectionEntity>()
+        for (r in list) mergedMap[r.id] = r
+        for (gr in guestRefs) mergedMap[gr.id] = gr
+        val result = mergedMap.values.toList()
+        if (guestRefs.isEmpty() && result.isNotEmpty()) {
+            GuestDataStorageManager.getInstance(context).saveGuestReflections(result)
+        }
+        return result
     }
 
     private fun saveReflectionsToLocal(list: List<ReflectionEntity>) {
@@ -231,19 +270,24 @@ class FocuslyRepository(private val context: Context) {
                 array.put(obj)
             }
             localDataPrefs.edit().putString("reflections", array.toString()).apply()
+            GuestDataStorageManager.getInstance(context).saveGuestReflections(list)
         } catch (e: Exception) {
             Log.e(TAG, "Error saving reflections to local JSON: ${e.message}")
         }
     }
 
     private fun loadPreferencesFromLocal(): UserPreferencesEntity {
+        val guestPrefs = GuestDataStorageManager.getInstance(context).loadGuestPreferences()
         val jsonStr = localDataPrefs.getString("user_preferences", null)
         if (jsonStr == null) {
+            if (guestPrefs != null) {
+                return guestPrefs
+            }
             return UserPreferencesEntity()
         }
         try {
             val obj = JSONObject(jsonStr)
-            return UserPreferencesEntity(
+            val prefs = UserPreferencesEntity(
                 id = obj.optInt("id", 1),
                 themeMode = obj.optString("themeMode", "system"),
                 dailyGoalMinutes = obj.optInt("dailyGoalMinutes", 360),
@@ -303,9 +347,13 @@ class FocuslyRepository(private val context: Context) {
                 lastViewedSundayRecapWeek = obj.optString("lastViewedSundayRecapWeek", ""),
                 autoBlockStudyAppsWithoutAsking = obj.optBoolean("autoBlockStudyAppsWithoutAsking", false)
             )
+            if (guestPrefs == null) {
+                GuestDataStorageManager.getInstance(context).saveGuestPreferences(prefs)
+            }
+            return prefs
         } catch (e: Exception) {
             Log.e(TAG, "Error loading preferences from local JSON: ${e.message}")
-            return UserPreferencesEntity()
+            return guestPrefs ?: UserPreferencesEntity()
         }
     }
 
@@ -372,6 +420,7 @@ class FocuslyRepository(private val context: Context) {
                 put("autoBlockStudyAppsWithoutAsking", prefs.autoBlockStudyAppsWithoutAsking)
             }
             localDataPrefs.edit().putString("user_preferences", obj.toString()).commit()
+            GuestDataStorageManager.getInstance(context).saveGuestPreferences(prefs)
         } catch (e: Exception) {
             Log.e(TAG, "Error saving preferences to local JSON: ${e.message}")
         }

@@ -359,9 +359,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 onGuestSignIn = { viewModel.signInAsGuest() },
                 onClearError = { viewModel.clearAuthError() }
             )
-        } else if (showQuestionnaire || userPreferences?.hasCompletedIntakeSurvey == false || userPreferences?.hasCompletedOnboarding == false) {
+        } else if (!viewModel.isGuestUser(currentUser) && (showQuestionnaire || userPreferences?.hasCompletedIntakeSurvey == false || userPreferences?.hasCompletedOnboarding == false)) {
             OnboardingSurveyScreen(
-                initialUserName = currentUser?.fullName ?: userPreferences?.currentUserName ?: "Guest Deep Worker",
+                initialUserName = currentUser?.fullName ?: userPreferences?.currentUserName ?: "Scholar",
                 onFinishSurvey = { name, studentClassLevel, isBoardExamYear, primaryStudyGoal, biggestDistractionApp, preferredStudyTimeWindow, dailyScreenTimeGoalMinutes, motivationStyle ->
                     viewModel.submitIntakeSurvey(
                         name = name,

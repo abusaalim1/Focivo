@@ -146,6 +146,19 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     private val _sessionProtectionNote = MutableStateFlow<String?>(null)
     val sessionProtectionNote: StateFlow<String?> = _sessionProtectionNote.asStateFlow()
 
+    fun isGuestUser(user: UserAccountEntity? = null): Boolean {
+        val target = user ?: _currentUser.value
+        val isGuestByPref = AndroidPreferenceSessionManager.appContext?.let {
+            AndroidPreferenceSessionManager.isGuestSession(it)
+        } ?: false
+        if (isGuestByPref) return true
+        if (target == null) return false
+        val email = target.email.lowercase(Locale.ROOT)
+        val uid = target.firebaseUid.lowercase(Locale.ROOT)
+        val name = target.fullName.lowercase(Locale.ROOT)
+        return email.contains("guest") || uid.startsWith("guest_") || name.contains("guest")
+    }
+
     fun dismissSessionConfirmation() {
         _sessionStartConfirmation.value = null
     }
@@ -589,6 +602,8 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 // Check if user is a logged-in Guest or has existing local account stored
                 val isGuest = AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.isGuestSession(it) } ?: false
                 val storedUid = AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredUserId(it) }
+                val guestStorage = com.example.data.GuestDataStorageManager.getInstance(app)
+                val storedGuestProfile = guestStorage.loadGuestProfile()
                 val localPrefs = repository.userPreferences.firstOrNull() ?: UserPreferencesEntity()
                 val localUser = if (!localPrefs.currentUserEmail.isNullOrBlank()) {
                     repository.getUserByEmail(localPrefs.currentUserEmail)
@@ -601,12 +616,15 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                     val isSurveyCompleted = localPrefs.hasCompletedIntakeSurvey || localPrefs.hasCompletedOnboarding || localUser.hasCompletedIntakeSurvey
                     _showQuestionnaire.value = !isSurveyCompleted
                     Log.d("StartupAuth", "[SessionRestore] Restored local account from database: ${localUser.email}, surveyCompleted=$isSurveyCompleted")
-                } else if (isGuest || !storedUid.isNullOrBlank()) {
-                    val finalUid = if (!storedUid.isNullOrBlank()) storedUid else "guest_${System.currentTimeMillis()}"
-                    val guestName = AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredGuestName(it) }
+                } else if (isGuest || storedGuestProfile != null || !storedUid.isNullOrBlank()) {
+                    val finalUid = storedGuestProfile?.guestId
+                        ?: (if (!storedUid.isNullOrBlank()) storedUid else "guest_${System.currentTimeMillis()}")
+                    val guestName = storedGuestProfile?.guestName
+                        ?: AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredGuestName(it) }
                         ?: localPrefs.currentUserName
-                        ?: "Guest Deep Worker"
-                    val guestEmail = AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredEmail(it) }
+                        ?: "Guest Scholar"
+                    val guestEmail = storedGuestProfile?.guestEmail
+                        ?: AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredEmail(it) }
                         ?: localPrefs.currentUserEmail
                         ?: "guest_${finalUid.take(8)}@focusly.app"
 
@@ -623,7 +641,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                     _currentUser.value = guestUser
                     val isSurveyCompleted = localPrefs.hasCompletedIntakeSurvey || localPrefs.hasCompletedOnboarding
                     _showQuestionnaire.value = !isSurveyCompleted
-                    Log.d("StartupAuth", "[SessionRestore] Restored local Guest account: $finalUid, name=$guestName, surveyCompleted=$isSurveyCompleted")
+                    Log.d("StartupAuth", "[SessionRestore] Restored local Guest account from guest_data: $finalUid, name=$guestName, surveyCompleted=$isSurveyCompleted")
                 } else {
                     _currentUser.value = null
                 }
@@ -1151,8 +1169,9 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 val guestUser = UserAccountEntity(
                     id = Math.abs(authData.uid.hashCode().toLong()).let { if (it == 0L) System.currentTimeMillis() else it },
                     email = authData.email,
-                    fullName = "Guest Deep Worker",
+                    fullName = "Guest Scholar",
                     firebaseUid = authData.uid,
+                    hasCompletedIntakeSurvey = true,
                     isGoogleUser = false
                 )
                 val newId = repository.registerUser(guestUser)
@@ -1164,11 +1183,13 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                         currentUserId = newId,
                         currentUserEmail = createdUser.email,
                         currentUserName = createdUser.fullName,
+                        hasCompletedOnboarding = true,
+                        hasCompletedIntakeSurvey = true,
                         isGoogleAuth = false
                     )
                 )
 
-                // Persist guest user locally and in Supabase
+                // Persist guest user locally, in guest_data JSON directory, and in Supabase
                 AndroidPreferenceSessionManager.appContext?.let { ctx ->
                     AndroidPreferenceSessionManager.setStoredGuestSession(
                         context = ctx,
@@ -1177,35 +1198,83 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                         guestEmail = createdUser.email
                     )
                 }
+                com.example.data.GuestDataStorageManager.getInstance(getApplication()).saveGuestProfile(
+                    com.example.data.GuestProfileData(
+                        guestId = authData.uid,
+                        guestName = createdUser.fullName,
+                        guestEmail = createdUser.email
+                    )
+                )
+
                 val guestUserDto = com.example.data.SupabaseUserDto(
                     id = authData.uid,
                     email = authData.email,
-                    full_name = "Guest Deep Worker",
-                    has_completed_intake_survey = false
+                    full_name = "Guest Scholar",
+                    has_completed_intake_survey = true
                 )
                 com.example.data.SupabaseService.getInstance().upsertUserProfile(guestUserDto)
 
                 val guestPrefsDto = com.example.data.SupabaseUserPreferencesDto(
                     user_id = authData.uid,
-                    has_completed_onboarding = false
+                    has_completed_onboarding = true
                 )
                 com.example.data.SupabaseService.getInstance().upsertUserPreferences(guestPrefsDto)
 
                 val guestLeaderboardDto = com.example.data.SupabaseStudyLeaderboardDto(
                     user_id = authData.uid,
-                    display_name = "Guest Deep Worker",
+                    display_name = "Guest Scholar",
                     study_seconds = 0L,
                     streak = 1,
                     subject_tag = "General Study"
                 )
                 com.example.data.SupabaseService.getInstance().upsertLeaderboard(guestLeaderboardDto)
 
-                // Guest users see the onboarding survey setup screen
-                _showQuestionnaire.value = true
+                // Guest users bypass onboarding directly to homepage
+                _showQuestionnaire.value = false
                 _isAuthLoading.value = false
             }.onFailure { ex ->
+                // Even if Supabase auth is offline or failed, persist guest session locally in guest_data
+                val fallbackUid = "guest_${System.currentTimeMillis()}"
+                val guestUser = UserAccountEntity(
+                    id = Math.abs(fallbackUid.hashCode().toLong()).coerceAtLeast(1L),
+                    email = "guest@focivo.local",
+                    fullName = "Guest Scholar",
+                    firebaseUid = fallbackUid,
+                    hasCompletedIntakeSurvey = true,
+                    isGoogleUser = false
+                )
+                val newId = repository.registerUser(guestUser)
+                val createdUser = guestUser.copy(id = newId)
+                _currentUser.value = createdUser
+                val prefs = userPreferences.value ?: UserPreferencesEntity()
+                repository.savePreferences(
+                    prefs.copy(
+                        currentUserId = newId,
+                        currentUserEmail = createdUser.email,
+                        currentUserName = createdUser.fullName,
+                        hasCompletedOnboarding = true,
+                        hasCompletedIntakeSurvey = true,
+                        isGoogleAuth = false
+                    )
+                )
+                AndroidPreferenceSessionManager.appContext?.let { ctx ->
+                    AndroidPreferenceSessionManager.setStoredGuestSession(
+                        context = ctx,
+                        guestId = fallbackUid,
+                        guestName = createdUser.fullName,
+                        guestEmail = createdUser.email
+                    )
+                }
+                com.example.data.GuestDataStorageManager.getInstance(getApplication()).saveGuestProfile(
+                    com.example.data.GuestProfileData(
+                        guestId = fallbackUid,
+                        guestName = createdUser.fullName,
+                        guestEmail = createdUser.email
+                    )
+                )
+                // Guest users bypass onboarding directly to homepage
+                _showQuestionnaire.value = false
                 _isAuthLoading.value = false
-                _authError.value = ex.localizedMessage ?: "Guest login failed"
             }
         }
     }
