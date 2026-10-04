@@ -59,8 +59,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.NearBlack
-import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
@@ -78,23 +78,29 @@ fun DeepFocusToggleCard(
     var showInfoDialog by remember { mutableStateOf(false) }
 
     val cardBg = if (isDark) {
-        if (isEnabled) Color(0xFF132A1C) else MaterialTheme.colorScheme.surface
+        if (isEnabled) Color(0xEB162419) else Color(0xF21C1C1E)
     } else {
-        if (isEnabled) Color(0xFFF1FBEA) else Color.White
+        if (isEnabled) Color(0xFFF2FBE9) else Color(0xFFFFFFFF)
     }
 
     val cardBorder = if (isEnabled) {
-        RegainLimePrimary.copy(alpha = 0.6f)
+        RegainLimePrimary.copy(alpha = 0.75f)
     } else {
-        if (isDark) MaterialTheme.colorScheme.outlineVariant else Color(0xFFE5E7EB)
+        if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
     }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .shadow(
+                elevation = if (isEnabled) 5.dp else 3.dp,
+                shape = RoundedCornerShape(22.dp),
+                ambientColor = if (isEnabled) Color(0x258CE000) else (if (isDark) Color(0x15000000) else Color(0x08000000)),
+                spotColor = if (isEnabled) Color(0x308CE000) else (if (isDark) Color(0x30000000) else Color(0x0E000000))
+            )
+            .clip(RoundedCornerShape(22.dp))
             .background(cardBg)
-            .border(1.5.dp, cardBorder, RoundedCornerShape(20.dp))
+            .border(0.8.dp, cardBorder, RoundedCornerShape(22.dp))
             .padding(horizontal = 16.dp, vertical = 14.dp)
             .testTag("deep_focus_toggle_card")
     ) {
@@ -140,7 +146,7 @@ fun DeepFocusToggleCard(
                             Text(
                                 text = "Deep Focus",
                                 style = MaterialTheme.typography.titleMedium.copy(
-                                    fontFamily = PoppinsFontFamily,
+                                    fontFamily = AppleLinearFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
                                     color = if (isDark) Color.White else NearBlack
@@ -159,7 +165,7 @@ fun DeepFocusToggleCard(
                                 Text(
                                     text = if (isEnabled) "TASK LOCK" else "OPTIONAL",
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = PoppinsFontFamily,
+                                        fontFamily = AppleLinearFontFamily,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 9.sp,
                                         color = if (isEnabled) RegainLimeDeepText else (if (isDark) Color(0xFFB0BEC5) else Color(0xFF6B7280))
@@ -177,7 +183,7 @@ fun DeepFocusToggleCard(
                                 "Prevent minimizing or switching to other apps during study"
                             },
                             style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = PoppinsFontFamily,
+                                fontFamily = AppleLinearFontFamily,
                                 fontSize = 11.5.sp,
                                 color = if (isDark) Color(0xFFB0BEC5) else Color(0xFF6B7280),
                                 lineHeight = 15.sp

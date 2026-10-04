@@ -684,7 +684,20 @@ object AiStudyGuardManager {
     }
 
     fun isAccessibilityPermissionGranted(context: Context): Boolean {
+        if (com.example.service.AiStudyAccessibilityService.isServiceConnected) {
+            return true
+        }
         return try {
+            val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? android.view.accessibility.AccessibilityManager
+            val enabledList = am?.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            if (enabledList != null) {
+                for (service in enabledList) {
+                    val id = service.id ?: continue
+                    if (id.contains("AiStudyAccessibilityService", ignoreCase = true)) {
+                        return true
+                    }
+                }
+            }
             val expectedServiceName = "${context.packageName}/com.example.service.AiStudyAccessibilityService"
             val enabledServices = android.provider.Settings.Secure.getString(
                 context.contentResolver,
@@ -695,7 +708,8 @@ object AiStudyGuardManager {
             while (colonSplitter.hasNext()) {
                 val componentName = colonSplitter.next()
                 if (componentName.equals(expectedServiceName, ignoreCase = true) ||
-                    componentName.endsWith("AiStudyAccessibilityService", ignoreCase = true)
+                    componentName.endsWith("AiStudyAccessibilityService", ignoreCase = true) ||
+                    componentName.contains("AiStudyAccessibilityService", ignoreCase = true)
                 ) {
                     return true
                 }

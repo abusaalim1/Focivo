@@ -30,6 +30,11 @@ class AiStudyAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val TAG = "AiAccessibility"
+
+        @Volatile
+        var isServiceConnected: Boolean = false
+            private set
+
         private var lastShortsInterceptTimeMs: Long = 0L
         private var lastYouTubeAiInterceptTimeMs: Long = 0L
         private var lastScreenAiInterceptTimeMs: Long = 0L
@@ -41,7 +46,18 @@ class AiStudyAccessibilityService : AccessibilityService() {
         private val lastEvaluatedScreenSignatures = LinkedHashMap<String, Long>()
     }
 
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        isServiceConnected = true
+    }
+
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
+        isServiceConnected = false
+        return super.onUnbind(intent)
+    }
+
     override fun onDestroy() {
+        isServiceConnected = false
         super.onDestroy()
         serviceScope.cancel()
     }

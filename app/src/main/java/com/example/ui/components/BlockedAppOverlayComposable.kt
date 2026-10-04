@@ -51,6 +51,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -199,8 +200,9 @@ fun BlockedAppOverlay(
                         painter = painterResource(id = R.drawable.mascot_blocked),
                         contentDescription = "Focus Mascot Locked",
                         modifier = Modifier
-                            .size(110.dp)
-                            .scale(pulseScale)
+                            .size(118.dp)
+                            .scale(pulseScale),
+                        contentScale = ContentScale.Fit
                     )
 
                     // Glowing Lock Badge at corner

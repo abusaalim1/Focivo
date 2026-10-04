@@ -1,9 +1,13 @@
 package com.example.ui.components
 
+import android.graphics.ImageDecoder
 import android.graphics.SurfaceTexture
+import android.graphics.drawable.AnimatedImageDrawable
 import android.media.MediaPlayer
+import android.os.Build
 import android.view.Surface
 import android.view.TextureView
+import android.widget.ImageView
 import androidx.annotation.RawRes
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -128,89 +132,59 @@ fun RegainMascotView(
 }
 
 /**
- * Plays the mascot study video animation in a seamless muted loop using TextureView.
- * Directly streams the looping video without any static mascot placeholder image.
+ * Plays the mascot study video animation in a seamless muted loop without any black background.
+ * Uses hardware-accelerated animated WebP with 100% transparent alpha channel.
+ * Centers the graduation cap at the top and study desk at the bottom perfectly.
  */
 @Composable
 fun MascotVideoPlayer(
     modifier: Modifier = Modifier,
     @RawRes videoResId: Int = R.raw.mascot_study_timer,
-    zoomFactor: Float = 0.94f
+    zoomFactor: Float = 0.96f
 ) {
     AndroidView(
         factory = { ctx ->
-            val textureView = TextureView(ctx)
-            textureView.apply {
-                isOpaque = false
-                surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                    private var mediaPlayer: MediaPlayer? = null
-                    private var vWidth = 720
-                    private var vHeight = 1280
+            ImageView(ctx).apply {
+                scaleType = ImageView.ScaleType.MATRIX
 
-                    private fun updateTransform(tv: TextureView) {
-                        val viewW = tv.width
-                        val viewH = tv.height
-                        if (viewW <= 0 || viewH <= 0 || vWidth <= 0 || vHeight <= 0) return
+                fun applyTransform(vw: Int, vh: Int) {
+                    if (vw <= 0 || vh <= 0) return
+                    // Content region inside 400x711 transparent webp:
+                    // Character and study desk are 400px wide, 505px tall, top padding 147px
+                    val contentW = 400f
+                    val contentH = 505f
+                    val topPadding = 147f
 
-                        val videoAspect = vWidth.toFloat() / vHeight.toFloat()
-                        val viewAspect = viewW.toFloat() / viewH.toFloat()
+                    val scale = minOf(vw.toFloat() / contentW, vh.toFloat() / contentH) * zoomFactor
+                    val dx = (vw.toFloat() - contentW * scale) / 2f
+                    val dy = (vh.toFloat() - contentH * scale) / 2f - (topPadding * scale)
 
-                        // Full vertical scene fit: ensures the entire graduation cap at the top
-                        // and the study table & books at the bottom are 100% completely visible
-                        val verticalSpanFraction = 0.72f
-                        val scaleY = (1.0f / verticalSpanFraction) * zoomFactor
-                        val scaleX = scaleY * (videoAspect / viewAspect)
+                    val matrix = android.graphics.Matrix()
+                    matrix.setScale(scale, scale)
+                    matrix.postTranslate(dx, dy)
+                    imageMatrix = matrix
+                }
 
-                        val matrix = android.graphics.Matrix()
-                        val pivotY = viewH * 0.54f
-                        matrix.setScale(scaleX, scaleY, viewW / 2f, pivotY)
-                        tv.setTransform(matrix)
+                addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+                    val w = right - left
+                    val h = bottom - top
+                    applyTransform(w, h)
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    try {
+                        val source = ImageDecoder.createSource(ctx.resources, R.drawable.mascot_active_study)
+                        val drawable = ImageDecoder.decodeDrawable(source)
+                        setImageDrawable(drawable)
+                        if (drawable is AnimatedImageDrawable) {
+                            drawable.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
+                            drawable.start()
+                        }
+                    } catch (_: Exception) {
+                        setImageResource(R.drawable.mascot_studying)
                     }
-
-                    override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
-                        try {
-                            val surface = Surface(surfaceTexture)
-                            mediaPlayer = MediaPlayer().apply {
-                                setSurface(surface)
-                                val afd = ctx.resources.openRawResourceFd(videoResId)
-                                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                                afd.close()
-                                isLooping = true
-                                setVolume(0f, 0f)
-                                setOnVideoSizeChangedListener { _, vw, vh ->
-                                    if (vw > 0 && vh > 0) {
-                                        vWidth = vw
-                                        vHeight = vh
-                                        textureView.post { updateTransform(textureView) }
-                                    }
-                                }
-                                setOnPreparedListener { mp ->
-                                    if (mp.videoWidth > 0 && mp.videoHeight > 0) {
-                                        vWidth = mp.videoWidth
-                                        vHeight = mp.videoHeight
-                                    }
-                                    textureView.post { updateTransform(textureView) }
-                                    mp.start()
-                                }
-                                prepareAsync()
-                            }
-                        } catch (_: Exception) {}
-                    }
-
-                    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
-                        textureView.post { updateTransform(textureView) }
-                    }
-
-                    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-                        try {
-                            mediaPlayer?.stop()
-                            mediaPlayer?.release()
-                            mediaPlayer = null
-                        } catch (_: Exception) {}
-                        return true
-                    }
-
-                    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
+                } else {
+                    setImageResource(R.drawable.mascot_studying)
                 }
             }
         },

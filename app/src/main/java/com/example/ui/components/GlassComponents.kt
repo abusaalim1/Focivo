@@ -128,14 +128,14 @@ fun LinearGlowCard(
     val isDark = isAppInDarkTheme()
     val interactionSource = remember { MutableInteractionSource() }
 
-    val cardBg = if (isDark) Color(0xEB151A15) else Color(0xFCFFFFFF)
-    val cardBorder = if (isDark) Color(0x338CE000) else Color(0xFFE2EBD6)
-    val topHighlight = if (isDark) Color(0x35FFFFFF) else Color(0x99FFFFFF)
+    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
+    val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
+    val topHighlight = if (isDark) Color(0x28FFFFFF) else Color(0x90FFFFFF)
 
     val effectiveBorder = border ?: if (accentBorder) {
-        BorderStroke(1.5.dp, RegainLimePrimary)
+        BorderStroke(1.dp, RegainLimePrimary)
     } else {
-        BorderStroke(1.dp, cardBorder)
+        BorderStroke(0.8.dp, cardBorder)
     }
 
     val clickModifier = if (onClick != null) {
@@ -228,15 +228,15 @@ fun GlassCard(
     val isDark = isAppInDarkTheme()
     val interactionSource = remember { MutableInteractionSource() }
 
-    // Existing dark charcoal and lime palette translucencies
-    val cardBg = if (isDark) Color(0xD91B221C) else Color(0xF5FFFFFF)
-    val cardBorder = if (isDark) Color(0x358CE000) else Color(0xFFE2EBD6)
-    val topHighlight = if (isDark) Color(0x30FFFFFF) else Color(0x80FFFFFF)
+    // Apple-inspired minimal glass surface
+    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
+    val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
+    val topHighlight = if (isDark) Color(0x28FFFFFF) else Color(0x90FFFFFF)
 
     val effectiveBorder = border ?: if (accentBorder) {
-        BorderStroke(1.5.dp, RegainLimePrimary)
+        BorderStroke(1.dp, RegainLimePrimary)
     } else {
-        BorderStroke(1.dp, cardBorder.copy(alpha = borderAlpha))
+        BorderStroke(0.8.dp, cardBorder.copy(alpha = borderAlpha.coerceAtLeast(0.75f)))
     }
 
     val clickModifier = if (onClick != null) {
@@ -317,13 +317,13 @@ fun LiquidGlassCard(
             )
     } else Modifier
 
-    val cardBg = if (isDark) Color(0xDC1E241E) else Color(0xF5FFFFFF)
-    val cardBorder = if (isDark) Color(0x388CE000) else Color(0xFFE0EBD4)
+    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
+    val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
 
     val effectiveBorder = border ?: if (accentBorder) {
-        BorderStroke(1.5.dp, RegainLimePrimary)
+        BorderStroke(1.dp, RegainLimePrimary)
     } else {
-        BorderStroke(1.dp, cardBorder)
+        BorderStroke(0.8.dp, cardBorder)
     }
 
     Box(
@@ -331,8 +331,8 @@ fun LiquidGlassCard(
             .shadow(
                 elevation = 8.dp,
                 shape = shape,
-                ambientColor = if (isDark) Color(0x288CE000) else Color(0x12000000),
-                spotColor = if (isDark) Color(0x35000000) else Color(0x1A000000)
+                ambientColor = if (isDark) Color(0x288CE000) else Color(0x0C000000),
+                spotColor = if (isDark) Color(0x35000000) else Color(0x14000000)
             )
             .clip(shape)
             .background(cardBg)
@@ -356,7 +356,7 @@ fun LiquidGlassCard(
                     brush = Brush.horizontalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            Color(0x40FFFFFF),
+                            if (isDark) Color(0x28FFFFFF) else Color(0x90FFFFFF),
                             Color.Transparent
                         )
                     ),
@@ -373,6 +373,47 @@ fun LiquidGlassCard(
         content = content
     )
 }
+
+/**
+ * Apple-style minimal and premium card container modifier with continuous squircle clipping,
+ * ultra-refined hairline border, physical specular highlight refraction, and soft ambient shadow.
+ */
+fun Modifier.appleCard(
+    shape: Shape = RoundedCornerShape(22.dp),
+    isDark: Boolean,
+    accentBorder: Boolean = false,
+    accentColor: Color = RegainLimePrimary,
+    elevation: Dp = 4.dp
+): Modifier = this
+    .shadow(
+        elevation = elevation,
+        shape = shape,
+        ambientColor = if (isDark) Color(0x18000000) else Color(0x08000000),
+        spotColor = if (isDark) Color(0x35000000) else Color(0x0E000000)
+    )
+    .clip(shape)
+    .background(if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF))
+    .drawBehind {
+        val topHighlight = if (isDark) Color(0x28FFFFFF) else Color(0x90FFFFFF)
+        drawLine(
+            brush = Brush.horizontalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    topHighlight,
+                    topHighlight.copy(alpha = 0.85f),
+                    Color.Transparent
+                )
+            ),
+            start = Offset(0f, 1f),
+            end = Offset(size.width, 1f),
+            strokeWidth = 1.5f
+        )
+    }
+    .border(
+        width = 0.8.dp,
+        color = if (accentBorder) accentColor.copy(alpha = 0.85f) else (if (isDark) Color(0x22FFFFFF) else Color(0x12000000)),
+        shape = shape
+    )
 
 /**
  * Premium Glass Toggle Switch with smooth animated thumb movement,
@@ -494,7 +535,7 @@ fun LinearButton(
 
     val border = when (variant) {
         LinearButtonVariant.PRIMARY -> if (enabled) BorderStroke(1.dp, RegainLimePrimary) else null
-        LinearButtonVariant.SECONDARY -> BorderStroke(1.dp, if (isDark) Color(0x388CE000) else Color(0xFFDDE6D2))
+        LinearButtonVariant.SECONDARY -> BorderStroke(0.8.dp, if (isDark) Color(0x24FFFFFF) else Color(0x14000000))
         LinearButtonVariant.GHOST -> null
         LinearButtonVariant.DANGER -> BorderStroke(1.dp, if (isDark) Color(0x55EF4444) else Color(0xFFFFCDD2))
     }
@@ -619,7 +660,7 @@ fun GlassButton(
             Text(
                 text = text,
                 style = MaterialTheme.typography.titleMedium.copy(
-                    fontFamily = PoppinsFontFamily,
+                    fontFamily = AppleLinearFontFamily,
                     fontSize = fontSize,
                     color = textColor,
                     fontWeight = FontWeight.Bold
@@ -658,7 +699,7 @@ fun PriorityBadge(priority: Int, modifier: Modifier = Modifier) {
             Text(
                 text = " $label",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontFamily = PoppinsFontFamily,
+                    fontFamily = AppleLinearFontFamily,
                     color = color,
                     fontWeight = FontWeight.Bold,
                     fontSize = 10.sp
@@ -713,7 +754,7 @@ fun SegmentedControl(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.labelLarge.copy(
-                            fontFamily = PoppinsFontFamily,
+                            fontFamily = AppleLinearFontFamily,
                             fontSize = 13.sp,
                             color = textColor,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium

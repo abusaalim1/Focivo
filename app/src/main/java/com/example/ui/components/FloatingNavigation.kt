@@ -81,11 +81,11 @@ fun FloatingNavigation(
     val view = LocalView.current
     val isDark = isAppInDarkTheme()
 
-    val barBg = if (isDark) Color(0xF0181F19) else Color(0xF8FFFFFF)
-    val barBorder = if (isDark) Color(0x308CE000) else Color(0xFFE2EBD6)
-    val activeBg = if (isDark) RegainLimePrimary else NearBlack
-    val activeContent = if (isDark) Color(0xFF061505) else PureWhite
-    val inactiveContent = if (isDark) Color(0xFF8E998D) else SecondaryTextLight
+    val barBg = if (isDark) Color(0xE61C1C1E) else Color(0xF8FFFFFF)
+    val barBorder = if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
+    val activeBg = RegainLimePrimary
+    val activeContent = Color(0xFF061505)
+    val inactiveContent = if (isDark) Color(0xFF8E8E93) else Color(0xFF6C6C70)
 
     Box(
         modifier = modifier
@@ -94,18 +94,18 @@ fun FloatingNavigation(
             .padding(horizontal = 20.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Apple / Linear Floating Dock
+        // Apple-inspired Floating Dock
         Box(
             modifier = Modifier
                 .shadow(
-                    elevation = 10.dp,
+                    elevation = 12.dp,
                     shape = CircleShape,
-                    ambientColor = if (isDark) Color(0x258CE000) else Color(0x10000000),
-                    spotColor = if (isDark) Color(0x35000000) else Color(0x18000000)
+                    ambientColor = if (isDark) Color(0x18000000) else Color(0x0C000000),
+                    spotColor = if (isDark) Color(0x35000000) else Color(0x14000000)
                 )
                 .clip(CircleShape)
                 .background(barBg)
-                .border(1.dp, barBorder, CircleShape)
+                .border(0.8.dp, barBorder, CircleShape)
                 .padding(horizontal = 7.dp, vertical = 5.dp)
         ) {
             Row(

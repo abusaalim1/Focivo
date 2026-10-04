@@ -28,14 +28,21 @@ val RegainLimeContainerBorder = Color(0xFFD4F59A)
 val RegainLimeGlow = Color(0x338CE000)
 
 // Apple & Linear Style Special Tokens
-val LinearDarkCardBg = Color(0xEB161C16)
-val LinearDarkCardBorder = Color(0x2E8CE000)
-val LinearLightCardBg = Color(0xF8FFFFFF)
-val LinearLightCardBorder = Color(0xFFE4EED8)
+val LinearDarkCardBg = Color(0xF21C1C1E)
+val LinearDarkCardBorder = Color(0x22FFFFFF)        // Apple dark hairline border (~13.5% white)
+val LinearLightCardBg = Color(0xFFFFFFFF)
+val LinearLightCardBorder = Color(0x12000000)       // Apple light hairline border (~7% black)
 val AppleGlassHighlightLight = Color(0x99FFFFFF)
-val AppleGlassHighlightDark = Color(0x2EFFFFFF)
-val ApplePillBgLight = Color(0xEEFFFFFF)
-val ApplePillBgDark = Color(0xCC1A221A)
+val AppleGlassHighlightDark = Color(0x25FFFFFF)
+val ApplePillBgLight = Color(0xF2FFFFFF)
+val ApplePillBgDark = Color(0xCC2C2C2E)
+
+val AppleCardBgLight = Color(0xFFFFFFFF)
+val AppleCardBgDark = Color(0xF21C1C1E)
+val AppleCardBorderLight = Color(0x12000000)
+val AppleCardBorderDark = Color(0x22FFFFFF)
+val AppleCardHighlightLight = Color(0x99FFFFFF)
+val AppleCardHighlightDark = Color(0x25FFFFFF)
 
 val LinearLimeHeroGradient = Brush.horizontalGradient(
     listOf(Color(0xFF8CE000), Color(0xFFAEF72A))
@@ -44,7 +51,7 @@ val LinearDarkHeroGradient = Brush.verticalGradient(
     listOf(Color(0x308CE000), Color(0x058CE000))
 )
 val AppleGlassBorderGradient = Brush.verticalGradient(
-    listOf(Color(0x60FFFFFF), Color(0x15FFFFFF))
+    listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0.05f))
 )
 
 // 3. Text & Neutral Colors
@@ -52,7 +59,8 @@ val NearBlack = Color(0xFF1B1E1B)              // Near-black dark charcoal for t
 val DarkCharcoal = Color(0xFF2B2F2B)
 val SecondaryTextLight = Color(0xFF6E756C)     // Medium gray for supporting labels
 val MutedTextLight = Color(0xFF9DA49B)          // Disabled/placeholder text
-val MutedBorderLight = Color(0xFFE4ECD9)        // Soft card border
+val MutedBorderLight = Color(0x12000000)        // Apple clean subtle hairline
+val MutedBorderDark = Color(0x22FFFFFF)         // Apple dark clean subtle hairline
 
 // 4. Cards & Floating Surfaces
 val PureWhite = Color(0xFFFFFFFF)

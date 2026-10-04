@@ -70,6 +70,7 @@ import com.example.ui.components.LinearButtonVariant
 import com.example.ui.components.LinearGlowCard
 import com.example.ui.components.PriorityItemRow
 import com.example.ui.components.SegmentedProgressBar
+import com.example.ui.components.appleCard
 import com.example.ui.components.pressFeedback
 import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.MutedBorderLight
@@ -105,15 +106,15 @@ fun HomeScreen(
 ) {
     val isDark = isAppInDarkTheme()
 
-    // Semantic colors for Light/Dark mode
-    val cardBg = if (isDark) Color(0xD91B221C) else Color(0xFFFFFFFF)
-    val cardBorder = if (isDark) Color(0x358CE000) else Color(0xFFE2EBD6)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else Color(0xFF121814)
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else Color(0xFF4A564C)
-    val headerDateColor = Color.White.copy(alpha = 0.88f)
+    // Semantic colors for Light/Dark mode - Apple-inspired minimal glass aesthetic
+    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
+    val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
+    val textPrimary = if (isDark) Color(0xFFF2F2F7) else Color(0xFF1C1C1E)
+    val textSecondary = if (isDark) Color(0xFF8E8E93) else Color(0xFF6C6C70)
+    val headerDateColor = Color.White.copy(alpha = 0.90f)
     val headerTitleColor = Color.White
-    val headerButtonBg = if (isDark) cardBg else Color(0xEEFFFFFF)
-    val headerButtonBorder = if (isDark) cardBorder else Color(0xFFD0DCC4)
+    val headerButtonBg = if (isDark) Color(0xCC2C2C2E) else Color(0xF0FFFFFF)
+    val headerButtonBorder = if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val hasShieldPermissions = remember(context) {
@@ -353,7 +354,7 @@ fun HomeScreen(
                             Text(
                                 text = currentDateStr.uppercase(),
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = PoppinsFontFamily,
+                                    fontFamily = AppleLinearFontFamily,
                                     color = headerDateColor,
                                     letterSpacing = 1.6.sp,
                                     fontSize = 11.sp,
@@ -366,7 +367,7 @@ fun HomeScreen(
                             Text(
                                 text = displayGreeting,
                                 style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontFamily = PoppinsFontFamily,
+                                    fontFamily = AppleLinearFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     color = headerTitleColor,
                                     fontSize = 24.sp
@@ -703,9 +704,7 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(cardBg)
-                        .border(1.dp, cardBorder, RoundedCornerShape(20.dp))
+                        .appleCard(shape = RoundedCornerShape(22.dp), isDark = isDark)
                         .padding(horizontal = 14.dp, vertical = 12.dp)
                         .testTag("home_combined_status_row")
                 ) {
@@ -951,9 +950,7 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(cardBg)
-                        .border(1.dp, cardBorder, RoundedCornerShape(24.dp))
+                        .appleCard(shape = RoundedCornerShape(24.dp), isDark = isDark)
                         .padding(20.dp)
                 ) {
                     val goal = userPreferences?.dailyGoalMinutes ?: 360
@@ -975,7 +972,7 @@ fun HomeScreen(
                         Text(
                             text = "TODAY'S PRIORITIES",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                fontFamily = PoppinsFontFamily,
+                                fontFamily = AppleLinearFontFamily,
                                 color = textSecondary,
                                 letterSpacing = 1.4.sp,
                                 fontWeight = FontWeight.Bold,
@@ -985,7 +982,7 @@ fun HomeScreen(
                         Text(
                             text = "Essential Focus",
                             style = MaterialTheme.typography.titleMedium.copy(
-                                fontFamily = PoppinsFontFamily,
+                                fontFamily = AppleLinearFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 color = textPrimary
                             )
@@ -998,7 +995,7 @@ fun HomeScreen(
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(cardBg)
-                            .border(1.dp, cardBorder, CircleShape)
+                            .border(0.8.dp, cardBorder, CircleShape)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
@@ -1015,9 +1012,7 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(cardBg)
-                            .border(1.dp, cardBorder, RoundedCornerShape(20.dp))
+                            .appleCard(shape = RoundedCornerShape(22.dp), isDark = isDark)
                             .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1025,7 +1020,7 @@ fun HomeScreen(
                             Text(
                                 text = "No priorities set for today.",
                                 style = MaterialTheme.typography.titleMedium.copy(
-                                    fontFamily = PoppinsFontFamily,
+                                    fontFamily = AppleLinearFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     color = textPrimary
                                 )
@@ -1034,7 +1029,7 @@ fun HomeScreen(
                             Text(
                                 text = "Dedicate time to the 3 tasks that will move the needle.",
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    fontFamily = PoppinsFontFamily,
+                                    fontFamily = AppleLinearFontFamily,
                                     color = textSecondary
                                 )
                             )

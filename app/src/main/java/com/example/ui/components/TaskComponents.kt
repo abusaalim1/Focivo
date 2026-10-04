@@ -75,8 +75,8 @@ fun PriorityItemRow(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
-    val cardBg = if (isDark) Color(0xEB161C16) else Color(0xFCFFFFFF)
-    val cardBorder = if (isDark) Color(0x338CE000) else Color(0xFFE2EBD6)
+    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
+    val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
     val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
     val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
@@ -102,7 +102,7 @@ fun PriorityItemRow(
         label = "check_scale"
     )
 
-    val checkBorder = if (task.isCompleted) RegainLimePrimary else cardBorder
+    val checkBorder = if (task.isCompleted) RegainLimePrimary else (if (isDark) Color(0x35FFFFFF) else Color(0x25000000))
 
     Box(
         modifier = modifier
@@ -113,13 +113,13 @@ fun PriorityItemRow(
             }
             .shadow(
                 elevation = 4.dp,
-                shape = RoundedCornerShape(20.dp),
-                ambientColor = if (isDark) Color(0x188CE000) else Color(0x0A000000),
-                spotColor = if (isDark) Color(0x28000000) else Color(0x10000000)
+                shape = RoundedCornerShape(22.dp),
+                ambientColor = if (isDark) Color(0x15000000) else Color(0x08000000),
+                spotColor = if (isDark) Color(0x30000000) else Color(0x0E000000)
             )
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(cardBg)
-            .border(1.dp, cardBorder, RoundedCornerShape(20.dp))
+            .border(0.8.dp, cardBorder, RoundedCornerShape(22.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
@@ -236,17 +236,23 @@ fun PlannerTaskCard(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
-    val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
-    val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
-    val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
-    val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
+    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
+    val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .shadow(
+                elevation = 3.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = if (isDark) Color(0x15000000) else Color(0x08000000),
+                spotColor = if (isDark) Color(0x25000000) else Color(0x0E000000)
+            )
+            .clip(RoundedCornerShape(20.dp))
             .background(cardBg)
-            .border(1.dp, cardBorder, RoundedCornerShape(18.dp))
+            .border(0.8.dp, cardBorder, RoundedCornerShape(20.dp))
     ) {
         Row(
             modifier = Modifier
@@ -274,7 +280,7 @@ fun PlannerTaskCard(
                 Text(
                     text = task.title,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = PoppinsFontFamily,
+                        fontFamily = AppleLinearFontFamily,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
@@ -286,7 +292,7 @@ fun PlannerTaskCard(
                     Text(
                         text = "${task.scheduledTime} · ${task.durationMinutes}m",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontFamily = PoppinsFontFamily,
+                            fontFamily = AppleLinearFontFamily,
                             color = RegainLimeDeepText,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
@@ -295,7 +301,7 @@ fun PlannerTaskCard(
                     Text(
                         text = " · ${task.category}",
                         style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = PoppinsFontFamily,
+                            fontFamily = AppleLinearFontFamily,
                             color = textSecondary,
                             fontSize = 11.sp
                         )
@@ -305,7 +311,7 @@ fun PlannerTaskCard(
                     Text(
                         text = task.notes,
                         style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = PoppinsFontFamily,
+                            fontFamily = AppleLinearFontFamily,
                             color = textSecondary,
                             fontSize = 11.sp
                         ),

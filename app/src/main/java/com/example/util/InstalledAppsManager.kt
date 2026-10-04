@@ -6,16 +6,43 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Build
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class DeviceAppInfo(
     val packageName: String,
     val appName: String,
     val icon: Drawable?,
+    val iconBitmap: ImageBitmap? = null,
     val category: String,
     val isBlocked: Boolean
 )
 
 object InstalledAppsManager {
+
+    @Volatile
+    private var inMemoryCachedApps: List<DeviceAppInfo>? = null
+
+    fun getCachedApps(): List<DeviceAppInfo>? = inMemoryCachedApps
+
+    fun preloadApps(context: Context, blockedPackages: Set<String> = emptySet()) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                getInstalledApps(context.applicationContext, blockedPackages)
+            } catch (_: Exception) {}
+        }
+    }
+
+    suspend fun getInstalledAppsAsync(context: Context, blockedPackages: Set<String>): List<DeviceAppInfo> {
+        return withContext(Dispatchers.IO) {
+            getInstalledApps(context, blockedPackages)
+        }
+    }
 
     const val CATEGORY_SOCIAL = "Social Media"
     const val CATEGORY_GAMES = "Games"
@@ -57,12 +84,18 @@ object InstalledAppsManager {
     )
 
     fun getInstalledApps(context: Context, blockedPackages: Set<String>): List<DeviceAppInfo> {
+        inMemoryCachedApps?.let { cached ->
+            if (cached.isNotEmpty()) {
+                return cached.map { it.copy(isBlocked = blockedPackages.contains(it.packageName)) }
+            }
+        }
+
         val pm = context.packageManager
         val selfPackage = context.packageName
         val appMap = mutableMapOf<String, DeviceAppInfo>()
 
         try {
-            // 1. Query all launcher apps
+            // 1. Query all launcher apps (fastest and most relevant for distraction blocking)
             val launcherIntent = Intent(Intent.ACTION_MAIN, null).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
             }
@@ -80,6 +113,11 @@ object InstalledAppsManager {
                 } catch (_: Exception) {
                     null
                 }
+                val iconBitmap = try {
+                    icon?.toBitmap(width = 72, height = 72)?.asImageBitmap()
+                } catch (_: Exception) {
+                    null
+                }
 
                 val appInfo = try {
                     pm.getApplicationInfo(pkg, 0)
@@ -94,13 +132,14 @@ object InstalledAppsManager {
                     packageName = pkg,
                     appName = appName,
                     icon = icon,
+                    iconBitmap = iconBitmap,
                     category = category,
                     isBlocked = isBlocked
                 )
             }
 
-            // 2. Also check installed applications to catch any user installed apps
-            val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            // 2. Also check installed applications to catch user-installed apps without primary launcher tag
+            val installedApps = pm.getInstalledApplications(0)
             for (appInfo in installedApps) {
                 val pkg = appInfo.packageName
                 if (pkg == selfPackage || appMap.containsKey(pkg)) continue
@@ -118,6 +157,11 @@ object InstalledAppsManager {
                     } catch (_: Exception) {
                         null
                     }
+                    val iconBitmap = try {
+                        icon?.toBitmap(width = 72, height = 72)?.asImageBitmap()
+                    } catch (_: Exception) {
+                        null
+                    }
                     val category = categorizeApp(pkg, appName, appInfo)
                     val isBlocked = blockedPackages.contains(pkg)
 
@@ -125,6 +169,7 @@ object InstalledAppsManager {
                         packageName = pkg,
                         appName = appName,
                         icon = icon,
+                        iconBitmap = iconBitmap,
                         category = category,
                         isBlocked = isBlocked
                     )
@@ -164,10 +209,12 @@ object InstalledAppsManager {
             }
         }
 
-        return appMap.values.sortedWith(
+        val sortedList = appMap.values.sortedWith(
             compareByDescending<DeviceAppInfo> { it.isBlocked }
                 .thenBy { it.appName.lowercase() }
         )
+        inMemoryCachedApps = sortedList
+        return sortedList
     }
 
     private fun isDistractingApp(pkg: String, appInfo: ApplicationInfo): Boolean {

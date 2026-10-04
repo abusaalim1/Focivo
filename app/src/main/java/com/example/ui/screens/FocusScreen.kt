@@ -60,6 +60,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -131,6 +132,11 @@ fun FocusScreen(
     var showStudyTypeDialog by remember { mutableStateOf(false) }
     var currentTag by remember { mutableStateOf(currentTaskTitle.ifBlank { "Deep Study" }) }
     var timerStyle by remember { mutableStateOf("classic") }
+
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        com.example.util.InstalledAppsManager.preloadApps(context)
+    }
 
     LaunchedEffect(currentTaskTitle) {
         if (currentTaskTitle.isNotBlank()) {

@@ -557,6 +557,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             val app = getApplication<Application>()
             com.example.util.AiStudyGuardManager.init(app)
             com.example.util.DeepFocusManager.init(app)
+            com.example.util.InstalledAppsManager.preloadApps(app)
 
             // Load local alarms immediately on cold launch
             val rawLocal = com.example.service.AlarmScheduler.getLocalAlarms(app)
