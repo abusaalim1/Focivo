@@ -50,6 +50,10 @@ jobs:
 
       - name: Set up Android SDK & Accept All Licenses
         run: |
+          echo "Taking ownership of Android SDK directory..."
+          sudo chown -R $USER:$USER "$ANDROID_HOME" 2>/dev/null || true
+          sudo chmod -R u+rwX "$ANDROID_HOME" 2>/dev/null || true
+
           echo "Configuring Android SDK licenses..."
           mkdir -p "$ANDROID_HOME/licenses"
           printf "24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479edd01e217609cb32e753ac077a977\n" > "$ANDROID_HOME/licenses/android-sdk-license"
@@ -61,14 +65,17 @@ jobs:
           printf "e9acab5b5fbb560a72cfaecce8946896ff6aab9d\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
 
           echo "Accepting any interactive licenses..."
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses 2>/dev/null || yes | sdkmanager --licenses 2>/dev/null || true
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
           echo "Installing Android 36 SDK Platform components..."
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" \
             "platforms;android-36.1" \
             "platforms;android-36" \
-            "build-tools;36.1.0" \
-            "build-tools;36.0.0" 2>/dev/null || true
+            "build-tools;36.0.0" || true
+
+          echo "Writing local.properties..."
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
 
       - name: Ensure environment configuration
         run: |
@@ -104,6 +111,7 @@ jobs:
 
           mkdir -p ~/.android
           cp ./debug.keystore ~/.android/debug.keystore 2>/dev/null || true
+          cp ./debug.keystore app/debug.keystore 2>/dev/null || true
 
           if [ ! -f ./debug.keystore ]; then
             echo "Error: Failed to create ./debug.keystore."
@@ -115,7 +123,26 @@ jobs:
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3584m -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false"
         run: |
-          gradle :app:assembleDebug --stacktrace --no-configuration-cache
+          echo "Starting Gradle debug build..."
+          gradle :app:assembleDebug --stacktrace --no-configuration-cache 2>&1 | tee gradle-build.log
+
+      - name: Capture build failure details
+        if: failure()
+        run: |
+          if [ -f gradle-build.log ]; then
+            echo "## ❌ Gradle Build Error Details" >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 120 gradle-build.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: gradle-build.log
+          if-no-files-found: ignore
 
       - name: Verify debug APK
         run: |

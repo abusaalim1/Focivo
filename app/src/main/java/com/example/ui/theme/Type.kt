@@ -8,17 +8,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.R
 
-// High-precision Apple SF Pro style typography powered by locally installed Inter multi-weight font family
-val InterFontFamily = FontFamily(
-    Font(R.font.inter_regular, FontWeight.Normal),
-    Font(R.font.inter_medium, FontWeight.Medium),
-    Font(R.font.inter_semibold, FontWeight.SemiBold),
-    Font(R.font.inter_bold, FontWeight.Bold),
-    Font(R.font.inter_extrabold, FontWeight.ExtraBold)
+// High-precision Apple SF Pro / Poppins style typography powered by locally installed font family
+val PoppinsFontFamily = FontFamily(
+    Font(R.font.poppins_regular, FontWeight.Normal),
+    Font(R.font.poppins_medium, FontWeight.Medium),
+    Font(R.font.poppins_semibold, FontWeight.SemiBold),
+    Font(R.font.poppins_bold, FontWeight.Bold)
 )
 
-val AppleLinearFontFamily = InterFontFamily
-val PoppinsFontFamily = InterFontFamily
+val InterFontFamily = PoppinsFontFamily
+val AppleLinearFontFamily = PoppinsFontFamily
 
 // Apple-inspired Material 3 Typography with crisp kerning, optical metrics & subtle tracking
 val Typography = Typography(

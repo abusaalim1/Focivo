@@ -93,7 +93,6 @@ val DarkSurface = Color(0xFFFFFFFF)
 val DarkSurfaceElevated = Color(0xFFF4FAEE)
 val DarkTextPrimary = NearBlack
 val DarkTextSecondary = SecondaryTextLight
-val MutedBorderDark = MutedBorderLight
 val GlassSurfaceDark = GlassSurfaceLight
 val GlassCardDark = GlassCardLight
 
