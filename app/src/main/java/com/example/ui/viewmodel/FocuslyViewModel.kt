@@ -286,10 +286,14 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             val modeName = if (quickMins >= 50) "Deep Work" else if (quickMins <= 15) "Sprint" else "Classic"
             setMode(modeName, quickMins)
             _shouldNavigateToStudyTab.value = true
-            requestStudySessionStart()
+            if (!_isTimerRunning.value) {
+                startTimer()
+            }
         } else if (startTimer) {
             _shouldNavigateToStudyTab.value = true
-            requestStudySessionStart()
+            if (!_isTimerRunning.value) {
+                startTimer()
+            }
         } else if (tab == "FOCUS") {
             _shouldNavigateToStudyTab.value = true
         }

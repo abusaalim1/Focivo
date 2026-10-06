@@ -103,7 +103,7 @@ object FocivoWidgetHelper {
         val timerPrefs = context.getSharedPreferences("focusly_timer_state", Context.MODE_PRIVATE)
         val isRunning = timerPrefs.getBoolean("is_timer_running", false)
         val remainingSecs = timerPrefs.getInt("remaining_seconds", 25 * 60)
-        val currentTask = timerPrefs.getString("current_task_title", "Ready for Study Session") ?: "Ready for Study Session"
+        val currentTask = timerPrefs.getString("current_task_title", "Deep Work Session") ?: "Deep Work Session"
 
         val minutes = remainingSecs / 60
         val seconds = remainingSecs % 60
@@ -112,21 +112,26 @@ object FocivoWidgetHelper {
         views.setTextViewText(R.id.widget_timer_clock, if (isRunning) timeDisplay else "25:00")
         views.setTextViewText(
             R.id.widget_timer_task_title,
-            if (isRunning) "Studying: $currentTask" else "Ready for Study Session"
+            if (isRunning) "Focus: $currentTask" else "Ready to Focus"
         )
         views.setTextViewText(
             R.id.widget_timer_status_badge,
-            if (isRunning) "STUDYING" else "READY"
+            if (isRunning) "• FOCUSING" else "• READY"
         )
         views.setTextViewText(
             R.id.widget_timer_subtitle,
-            if (isRunning) "Deep focus session in progress · Stay on track 🎯" else "Tap 25m or 50m to start instant study ⚡"
+            if (isRunning) "Deep focus session in progress · Stay on track 🎯" else "Tap 25m or Start for instant deep work ⚡"
+        )
+        views.setTextViewText(
+            R.id.widget_btn_open_timer,
+            if (isRunning) "⏸ Focus" else "▶ Start"
         )
 
         val start25Intent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_START_25M
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("EXTRA_QUICK_START_MINS", 25)
+            putExtra("EXTRA_START_TIMER_IMMEDIATELY", true)
             putExtra("EXTRA_NAV_TAB", "FOCUS")
         }
         val p25 = PendingIntent.getActivity(
@@ -139,6 +144,7 @@ object FocivoWidgetHelper {
             action = ACTION_START_50M
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("EXTRA_QUICK_START_MINS", 50)
+            putExtra("EXTRA_START_TIMER_IMMEDIATELY", true)
             putExtra("EXTRA_NAV_TAB", "FOCUS")
         }
         val p50 = PendingIntent.getActivity(
@@ -153,6 +159,7 @@ object FocivoWidgetHelper {
             putExtra("EXTRA_NAV_TAB", "FOCUS")
             if (!isRunning) {
                 putExtra("EXTRA_START_TIMER_IMMEDIATELY", true)
+                putExtra("EXTRA_QUICK_START_MINS", 25)
             }
         }
         val pOpen = PendingIntent.getActivity(

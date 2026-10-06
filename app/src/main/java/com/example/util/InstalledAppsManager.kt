@@ -113,18 +113,8 @@ object InstalledAppsManager {
                 } catch (_: Exception) {
                     null
                 }
-                val iconBitmap = try {
-                    icon?.toBitmap(width = 72, height = 72)?.asImageBitmap()
-                } catch (_: Exception) {
-                    null
-                }
 
-                val appInfo = try {
-                    pm.getApplicationInfo(pkg, 0)
-                } catch (_: Exception) {
-                    null
-                }
-
+                val appInfo = resolveInfo.activityInfo.applicationInfo
                 val category = categorizeApp(pkg, appName, appInfo)
                 val isBlocked = blockedPackages.contains(pkg)
 
@@ -132,48 +122,10 @@ object InstalledAppsManager {
                     packageName = pkg,
                     appName = appName,
                     icon = icon,
-                    iconBitmap = iconBitmap,
+                    iconBitmap = null,
                     category = category,
                     isBlocked = isBlocked
                 )
-            }
-
-            // 2. Also check installed applications to catch user-installed apps without primary launcher tag
-            val installedApps = pm.getInstalledApplications(0)
-            for (appInfo in installedApps) {
-                val pkg = appInfo.packageName
-                if (pkg == selfPackage || appMap.containsKey(pkg)) continue
-
-                // Exclude permanently protected essential apps
-                if (EssentialAppsGuard.isEssentialApp(context, pkg)) continue
-
-                val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                val isTarget = isDistractingApp(pkg, appInfo)
-
-                if (!isSystem || isTarget) {
-                    val appName = pm.getApplicationLabel(appInfo).toString()
-                    val icon = try {
-                        pm.getApplicationIcon(appInfo)
-                    } catch (_: Exception) {
-                        null
-                    }
-                    val iconBitmap = try {
-                        icon?.toBitmap(width = 72, height = 72)?.asImageBitmap()
-                    } catch (_: Exception) {
-                        null
-                    }
-                    val category = categorizeApp(pkg, appName, appInfo)
-                    val isBlocked = blockedPackages.contains(pkg)
-
-                    appMap[pkg] = DeviceAppInfo(
-                        packageName = pkg,
-                        appName = appName,
-                        icon = icon,
-                        iconBitmap = iconBitmap,
-                        category = category,
-                        isBlocked = isBlocked
-                    )
-                }
             }
         } catch (_: Exception) {}
 

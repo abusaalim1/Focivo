@@ -23,8 +23,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
@@ -42,13 +44,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.RegainAuroraGreen
@@ -69,17 +71,6 @@ fun BlockShieldOverlay(
     BackHandler(enabled = true) {
         onReturnToFocus()
     }
-
-    val transition = rememberInfiniteTransition(label = "pulse_block")
-    val pulseScale by transition.animateFloat(
-        initialValue = 0.96f,
-        targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_scale"
-    )
 
     val hours = remainingSeconds / 3600
     val minutes = (remainingSeconds % 3600) / 60
@@ -143,21 +134,20 @@ fun BlockShieldOverlay(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp, vertical = 32.dp),
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Character Mascot with Stop Sign & Pulsing Aura
+                // Character Mascot with Stop Sign (Static & slightly enlarged)
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(130.dp)
-                        .scale(pulseScale)
+                    modifier = Modifier.size(136.dp)
                 ) {
                     // Outer warning glow
                     Box(
                         modifier = Modifier
-                            .size(130.dp)
+                            .size(136.dp)
                             .clip(CircleShape)
                             .background(
                                 Brush.radialGradient(
@@ -169,10 +159,10 @@ fun BlockShieldOverlay(
                             )
                     )
 
-                    // Inner mascot circle
+                    // Inner mascot circle (enlarged from 96dp to 106dp)
                     Box(
                         modifier = Modifier
-                            .size(96.dp)
+                            .size(106.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF1E2836))
                             .border(
@@ -182,9 +172,11 @@ fun BlockShieldOverlay(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
+                        // Static mascot with slightly enlarged size (86dp instead of 72dp)
                         RegainMascotView(
                             pose = MascotPose.STOP_SIGN,
-                            size = 72.dp
+                            size = 86.dp,
+                            animate = false
                         )
                     }
 
@@ -192,7 +184,7 @@ fun BlockShieldOverlay(
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .size(34.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(if (isGeminiDetected) Color(0xFF004D40) else Color(0xFFB71C1C))
                             .border(1.5.dp, Color.White, CircleShape),
@@ -202,7 +194,7 @@ fun BlockShieldOverlay(
                             imageVector = if (isGeminiDetected) Icons.Default.AutoAwesome else Icons.Default.Shield,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                 }
@@ -258,22 +250,31 @@ fun BlockShieldOverlay(
                         fontSize = 22.sp,
                         lineHeight = 28.sp
                     ),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Subtitle / Gemini AI Reason
+                // Subtitle / Gemini AI Reason (Fully adjusted so text never overflows)
                 if (!reason.isNullOrBlank()) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(0.92f)
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0x25004D40))
                             .border(1.dp, RegainNeonEmerald.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.Top) {
+                        Row(
+                            verticalAlignment = Alignment.Top,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.AutoAwesome,
                                 contentDescription = null,
@@ -282,7 +283,7 @@ fun BlockShieldOverlay(
                                     .size(15.dp)
                                     .padding(top = 1.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = reason,
                                 style = MaterialTheme.typography.bodySmall.copy(
@@ -290,7 +291,8 @@ fun BlockShieldOverlay(
                                     fontSize = 11.5.sp,
                                     lineHeight = 15.sp,
                                     fontWeight = FontWeight.Medium
-                                )
+                                ),
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     }
@@ -306,7 +308,10 @@ fun BlockShieldOverlay(
                             fontSize = 12.sp,
                             lineHeight = 16.sp
                         ),
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
                     )
                 }
 
@@ -345,46 +350,58 @@ fun BlockShieldOverlay(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // Student Safe Pass Notice
+                // Student Safe Pass Notice (Fully adjusted so text never overflows outside box)
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.92f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color(0x20FFFFFF))
                         .border(1.dp, Color(0x30FFFFFF), RoundedCornerShape(12.dp))
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Phone,
                                 contentDescription = null,
                                 tint = RegainNeonEmerald,
-                                modifier = Modifier.size(13.dp)
+                                modifier = Modifier.size(14.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "Incoming phone calls are never blocked",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = Color(0xFFE0E0E0),
                                     fontSize = 11.sp
-                                )
+                                ),
+                                modifier = Modifier.weight(1f)
                             )
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
                                 tint = RegainNeonEmerald,
-                                modifier = Modifier.size(13.dp)
+                                modifier = Modifier.size(14.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "AI Academic Sentinel · Educational Lectures & Study Tools Allowed",
+                                text = "Educational lectures & study tools allowed",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = Color(0xFFE0E0E0),
                                     fontSize = 11.sp
-                                )
+                                ),
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     }
@@ -395,7 +412,7 @@ fun BlockShieldOverlay(
                 // Primary Return to Study Action Button
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.85f)
+                        .fillMaxWidth(0.9f)
                         .shadow(
                             elevation = 12.dp,
                             shape = RoundedCornerShape(28.dp),
@@ -406,7 +423,7 @@ fun BlockShieldOverlay(
                         onClick = onReturnToFocus,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp)
+                            .height(50.dp)
                             .testTag("return_to_focus_button"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = RegainNeonEmerald,
@@ -418,7 +435,7 @@ fun BlockShieldOverlay(
                             text = "Return to Study",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
+                                fontSize = 15.5.sp
                             )
                         )
                     }
@@ -426,7 +443,7 @@ fun BlockShieldOverlay(
 
                 // Emergency Bypass Button (only if not punishment lock)
                 if (!effectivePunishment) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     TextButton(
                         onClick = onEmergencyBypass,
                         modifier = Modifier.testTag("emergency_bypass_button")

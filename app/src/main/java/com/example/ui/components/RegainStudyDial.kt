@@ -321,13 +321,11 @@ fun RegainStudyDial(
             } else {
                 Spacer(modifier = Modifier.height(2.dp))
 
-                // Mascot during active study session - slightly larger and cleanly rendered without black background
+                // Mascot during active study session (slightly enlarged as requested)
                 RegainMascotView(
-                    width = 175.dp,
-                    height = 150.dp,
+                    size = 142.dp,
                     pose = MascotPose.STUDYING,
                     modifier = Modifier
-                        .clipToBounds()
                         .clickable { onMascotClick() }
                 )
             }

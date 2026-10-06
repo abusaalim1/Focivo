@@ -10,24 +10,27 @@
     <color name="splash_window_bg">#FFFAFBF7</color>
 
     <!-- Focivo Aesthetic Apple Glassmorphism Palette for Widgets -->
-    <color name="focivo_lime_primary">#FFD4FF00</color>
-    <color name="focivo_lime_dark">#FF8CE000</color>
-    <color name="focivo_lime_deep">#FF598C00</color>
-    <color name="focivo_lime_container">#24D4FF00</color>
-    <color name="focivo_dark_bg">#FF0A0F1D</color>
-    <color name="focivo_dark_card">#E6111927</color>
-    <color name="focivo_dark_card_subtle">#B3182234</color>
-    <color name="focivo_dark_card_border">#33FFFFFF</color>
-    <color name="focivo_emerald">#FF10B981</color>
-    <color name="focivo_emerald_container">#2410B981</color>
-    <color name="focivo_orange">#FFFF9500</color>
-    <color name="focivo_orange_container">#28FF9500</color>
-    <color name="focivo_purple">#FFA855F7</color>
-    <color name="focivo_purple_container">#28A855F7</color>
-    <color name="focivo_cyan">#FF00F0FF</color>
-    <color name="focivo_cyan_container">#2800F0FF</color>
+    <color name="focivo_lime_primary">#FF8CE000</color>
+    <color name="focivo_lime_light">#FFA7F432</color>
+    <color name="focivo_lime_dark">#FF70B800</color>
+    <color name="focivo_lime_deep">#FF487500</color>
+    <color name="focivo_lime_container">#248CE000</color>
+    <color name="focivo_dark_bg">#FF0F1117</color>
+    <color name="focivo_dark_card">#F0141722</color>
+    <color name="focivo_dark_card_subtle">#CC181C2A</color>
+    <color name="focivo_dark_card_border">#26FFFFFF</color>
+    <color name="focivo_glass_inner">#14FFFFFF</color>
+    <color name="focivo_glass_inner_border">#1AFFFFFF</color>
+    <color name="focivo_emerald">#FF30D158</color>
+    <color name="focivo_emerald_container">#2430D158</color>
+    <color name="focivo_orange">#FFFF9F0A</color>
+    <color name="focivo_orange_container">#28FF9F0A</color>
+    <color name="focivo_purple">#FFBF5AF2</color>
+    <color name="focivo_purple_container">#28BF5AF2</color>
+    <color name="focivo_cyan">#FF64D2FF</color>
+    <color name="focivo_cyan_container">#2864D2FF</color>
     <color name="focivo_text_primary">#FFFFFFFF</color>
-    <color name="focivo_text_secondary">#FFCBD5E1</color>
+    <color name="focivo_text_secondary">#FFE2E8F0</color>
     <color name="focivo_text_muted">#FF94A3B8</color>
-    <color name="focivo_near_black">#FF080C14</color>
+    <color name="focivo_near_black">#FF080A0F</color>
 </resources>

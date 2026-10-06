@@ -237,46 +237,50 @@ fun PrivacyPolicySheet(
                     // Section 3
                     PolicySection(
                         number = "3",
+                        title = "No Device Administrator Permission Used",
+                        textPrimary = textPrimary,
+                        textSecondary = textSecondary,
+                        accentColor = limeAccent
+                    ) {
+                        Text(
+                            text = "Focivo does NOT request or use Android Device Administrator permissions (BIND_DEVICE_ADMIN, Device Owner, or Profile Owner).",
+                            color = textPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            lineHeight = 19.sp,
+                            fontFamily = PoppinsFontFamily
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        BulletPoint("Focivo never takes administrative control of your device.", textSecondary)
+                        BulletPoint("You maintain 100% control over your phone at all times.", textSecondary)
+                        BulletPoint("You can configure, disable, or uninstall Focivo at any time without any administrator restrictions or forced device lockouts.", textSecondary)
+                        BulletPoint("App blocking is achieved entirely through standard Android Accessibility, Usage Access, and Overlay APIs.", textSecondary)
+                    }
+
+                    // Section 4
+                    PolicySection(
+                        number = "4",
                         title = "Accessibility Service Permission (AI Study Guard)",
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
                         accentColor = limeAccent
                     ) {
                         Text(
-                            text = "If you choose to enable our optional \"AI Study Guard\" feature:",
+                            text = "To detect distracting apps and provide focus guidance during active study sessions:",
                             color = textSecondary,
                             fontSize = 13.sp,
                             fontFamily = PoppinsFontFamily
                         )
-                        BulletPoint("We request Android's Accessibility Service permission", textSecondary)
-                        BulletPoint("This permission allows AI Academic Sentinel to verify study context only during an active study session or scheduled focus window. 100% private and on-device.", textSecondary)
-                        BulletPoint("This is used solely to determine whether your activity in those apps appears study-related or not", textSecondary)
-                        BulletPoint("We do not read, record, or monitor any other app on your device — not your messages, not your browser, not your photos, nothing else", textSecondary)
-                        BulletPoint("All text analysis happens entirely on your device. We do not transmit any captured on-screen text to our servers or any third party", textSecondary)
-                        BulletPoint("This feature is entirely optional. Declining it does not affect any other part of the app", textSecondary)
-                        BulletPoint("You can revoke this permission at any time from your device's Settings → Accessibility, or from within Focivo's own settings", textSecondary)
+                        BulletPoint("We request Android's Accessibility Service permission.", textSecondary)
+                        BulletPoint("This permission allows Focivo to identify when a user-selected distracting app is opened during a timer session and display a focus reminder overlay.", textSecondary)
+                        BulletPoint("100% Private & On-Device: We do NOT read, record, store, or transmit your keystrokes, passwords, private chats, emails, banking information, or photos.", textSecondary)
+                        BulletPoint("All detection occurs strictly locally on your Android device.", textSecondary)
+                        BulletPoint("This permission is completely optional and can be toggled or revoked at any time in Android Settings → Accessibility.", textSecondary)
 
                         Spacer(modifier = Modifier.height(8.dp))
                         SubSectionHeader("Battery Usage", textPrimary)
                         Text(
-                            text = "Enabling this feature runs a background monitoring service, which may result in a modest increase in battery consumption. You can disable it at any time if this becomes a concern, with no impact on any other app feature.",
-                            color = textSecondary,
-                            fontSize = 13.sp,
-                            lineHeight = 19.sp,
-                            fontFamily = PoppinsFontFamily
-                        )
-                    }
-
-                    // Section 4
-                    PolicySection(
-                        number = "4",
-                        title = "Strict Study Mode",
-                        textPrimary = textPrimary,
-                        textSecondary = textSecondary,
-                        accentColor = limeAccent
-                    ) {
-                        Text(
-                            text = "If you choose to enable \"Strict Mode,\" Focivo helps you avoid distractions by locking distraction-prone apps during your active study timer or scheduled focus hours. It is completely safe, customizable, and can be configured at any time within your app settings.",
+                            text = "The background service operates with minimal power consumption during active study sessions. You can disable it at any time with no impact on other app features.",
                             color = textSecondary,
                             fontSize = 13.sp,
                             lineHeight = 19.sp,
@@ -287,13 +291,23 @@ fun PrivacyPolicySheet(
                     // Section 5
                     PolicySection(
                         number = "5",
-                        title = "Usage Access Permission",
+                        title = "Usage Access & Screen Overlay Permissions",
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
                         accentColor = limeAccent
                     ) {
+                        SubSectionHeader("5.1 Usage Access (PACKAGE_USAGE_STATS)", textPrimary)
                         Text(
-                            text = "To detect how long certain apps are used and to enforce app-blocking schedules, we request Usage Access (PACKAGE_USAGE_STATS) permission. This tells us which apps are open and for how long — it does not let us see the content inside those apps.",
+                            text = "Used to measure your focus duration, study session statistics, and app usage limits. This allows Focivo to calculate your study streaks and daily analytics without reading any content inside your apps.",
+                            color = textSecondary,
+                            fontSize = 13.sp,
+                            lineHeight = 19.sp,
+                            fontFamily = PoppinsFontFamily
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        SubSectionHeader("5.2 Display Over Other Apps (SYSTEM_ALERT_WINDOW)", textPrimary)
+                        Text(
+                            text = "Used solely to display the focus reminder shield and mascot encouragement when a blocked application is launched during an active study session.",
                             color = textSecondary,
                             fontSize = 13.sp,
                             lineHeight = 19.sp,

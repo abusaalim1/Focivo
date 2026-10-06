@@ -126,36 +126,21 @@ fun PreStudyAppBlockSheet(
         }
     }
 
-    // Active polling fallback so permissions flip within milliseconds when toggled
-    LaunchedEffect(Unit) {
-        while (isActive) {
-            delay(1000)
-            refreshPermissions()
-        }
-    }
-
-    val isAllPermissionsGranted = hasAccessibility && hasOverlay && hasUsageStats
+    val isAllPermissionsGranted = hasOverlay && hasUsageStats
     val needsPermissions = !isAllPermissionsGranted
 
     val initialBlockedSet = remember(currentBlockedList) {
         currentBlockedList.split(",").map { it.trim() }.filter { it.isNotBlank() }.toSet()
     }
 
-    // 2. High-speed app loading: Use pre-cached list instantly (0ms delay) or fetch asynchronously
-    val cached = remember { InstalledAppsManager.getCachedApps() }
+    // 2. High-speed app loading: Use pre-cached list instantly (0ms delay)
     var allInstalled by remember {
-        mutableStateOf<List<DeviceAppInfo>>(cached ?: emptyList())
+        mutableStateOf<List<DeviceAppInfo>>(
+            InstalledAppsManager.getCachedApps() ?: InstalledAppsManager.getInstalledApps(context, initialBlockedSet)
+        )
     }
     var isLoadingApps by remember {
-        mutableStateOf(allInstalled.isEmpty())
-    }
-
-    LaunchedEffect(initialBlockedSet) {
-        if (allInstalled.isEmpty()) {
-            val loaded = InstalledAppsManager.getInstalledAppsAsync(context, initialBlockedSet)
-            allInstalled = loaded
-            isLoadingApps = false
-        }
+        mutableStateOf(false)
     }
 
     // Filter out essential apps (Phone, Contacts, Camera, Gallery, YouTube, Payment/Banking)
@@ -163,22 +148,17 @@ fun PreStudyAppBlockSheet(
         allInstalled.filterNot { EssentialAppsGuard.isEssentialApp(context, it.packageName) }
     }
 
-    val selectedPackages = remember {
-        mutableStateMapOf<String, Boolean>()
-    }
-
-    // Populate default selections once apps are ready
-    LaunchedEffect(availableApps) {
-        if (availableApps.isNotEmpty() && selectedPackages.isEmpty()) {
+    val selectedPackages = remember(availableApps) {
+        mutableStateMapOf<String, Boolean>().apply {
             val initialSanitized = EssentialAppsGuard.sanitizeBlockedPackages(context, initialBlockedSet)
             if (initialSanitized.isNotEmpty()) {
-                initialSanitized.forEach { selectedPackages[it] = true }
+                initialSanitized.forEach { put(it, true) }
             } else {
                 // Default pre-select Social and Games
                 availableApps.filter {
                     it.category == InstalledAppsManager.CATEGORY_SOCIAL ||
                     it.category == InstalledAppsManager.CATEGORY_GAMES
-                }.forEach { selectedPackages[it.packageName] = true }
+                }.forEach { put(it.packageName, true) }
             }
         }
     }
@@ -591,6 +571,22 @@ fun PreStudyAppBlockSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Helper function to ensure permissions are granted before starting block
+            fun handleBlockAction(savePermanently: Boolean) {
+                if (!hasOverlay) {
+                    android.widget.Toast.makeText(context, "Please grant Display Over Other Apps permission to show block shield", android.widget.Toast.LENGTH_SHORT).show()
+                    PermissionUtils.openOverlaySettings(context)
+                    return
+                }
+                if (!hasUsageStats) {
+                    android.widget.Toast.makeText(context, "Please grant Usage Access permission to track study sessions", android.widget.Toast.LENGTH_SHORT).show()
+                    PermissionUtils.openUsageStatsSettings(context)
+                    return
+                }
+                val chosen = selectedPackages.filter { it.value }.keys.toSet()
+                onConfirmAndStart(chosen, savePermanently)
+            }
+
             // Action Buttons: "Block" (this session only) vs "Save & Block" (save permanently for auto-block)
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -598,10 +594,7 @@ fun PreStudyAppBlockSheet(
             ) {
                 // 1. "Block" Button
                 Button(
-                    onClick = {
-                        val chosen = selectedPackages.filter { it.value }.keys.toSet()
-                        onConfirmAndStart(chosen, false)
-                    },
+                    onClick = { handleBlockAction(false) },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF2A342B),
                         contentColor = Color(0xFFE0E6DC)
@@ -624,10 +617,7 @@ fun PreStudyAppBlockSheet(
 
                 // 2. "Save & Block" Button
                 Button(
-                    onClick = {
-                        val chosen = selectedPackages.filter { it.value }.keys.toSet()
-                        onConfirmAndStart(chosen, true)
-                    },
+                    onClick = { handleBlockAction(true) },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RegainLimePrimary,
                         contentColor = Color(0xFF021207)

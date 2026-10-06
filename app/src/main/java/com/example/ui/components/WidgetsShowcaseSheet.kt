@@ -4,7 +4,6 @@ import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -13,8 +12,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -26,11 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.SelfImprovement
-import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -39,20 +35,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -76,33 +70,34 @@ fun WidgetsShowcaseSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF0F172A),
+        containerColor = Color(0xFF0F1117),
         scrimColor = Color(0x99000000),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 18.dp)
                 .padding(bottom = 32.dp)
         ) {
             // Header
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(40.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(RegainLimePrimary.copy(alpha = 0.25f), Color(0x2000F0FF))
-                                )
-                            )
-                            .border(1.dp, RegainLimePrimary.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                            .background(Color(0x208CE000))
+                            .border(1.dp, Color(0x408CE000), RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -117,16 +112,16 @@ fun WidgetsShowcaseSheet(
 
                     Column {
                         Text(
-                            text = "Apple-Style Home Widgets",
-                            style = MaterialTheme.typography.titleLarge.copy(
+                            text = "Home Screen Widgets",
+                            style = MaterialTheme.typography.titleMedium.copy(
                                 fontFamily = PoppinsFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
-                                fontSize = 18.sp
+                                fontSize = 17.sp
                             )
                         )
                         Text(
-                            text = "Frosted glassmorphism & Poppins typography",
+                            text = "Apple-style minimal widgets for your home screen",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
                                 color = Color(0xFF94A3B8),
@@ -139,36 +134,31 @@ fun WidgetsShowcaseSheet(
                 IconButton(
                     onClick = onDismiss,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(34.dp)
                         .clip(CircleShape)
-                        .background(Color(0x22FFFFFF))
+                        .background(Color(0x1AFFFFFF))
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
                         tint = Color.White,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
-
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 // 1. Study Timer Widget
                 item {
                     WidgetItemPreviewCard(
-                        title = "Quick Study Timer",
-                        description = "25m / 50m 1-tap sessions with live countdown and mascot state",
-                        badge = "POPULAR",
+                        title = "Focus Timer",
+                        description = "Live countdown timer with 25m & 50m 1-tap instant study start.",
+                        badge = "TIMER",
                         badgeColor = RegainLimePrimary,
-                        icon = Icons.Default.Timer,
                         mascotRes = R.drawable.mascot_studying,
-                        accentGradient = listOf(Color(0xFF262D3D), Color(0xFF141A29)),
-                        borderColor = RegainLimePrimary.copy(alpha = 0.45f),
                         onPin = { pinWidget(context, StudyTimerWidgetProvider::class.java) }
                     )
                 }
@@ -176,14 +166,11 @@ fun WidgetsShowcaseSheet(
                 // 2. Streak & Motivation Widget
                 item {
                     WidgetItemPreviewCard(
-                        title = "Streak & Motivational Flame",
-                        description = "Current streak count, daily study goal progress bar, and student quotes",
+                        title = "Daily Streak & Goal",
+                        description = "Streak flame, daily study goal progress bar, and student quotes.",
                         badge = "STREAK",
-                        badgeColor = Color(0xFFFF9500),
-                        icon = Icons.Default.LocalFireDepartment,
+                        badgeColor = Color(0xFFFF9F0A),
                         mascotRes = R.drawable.mascot_celebration,
-                        accentGradient = listOf(Color(0xFF382215), Color(0xFF201524)),
-                        borderColor = Color(0xFFFF9500).copy(alpha = 0.45f),
                         onPin = { pinWidget(context, StreakMotivationWidgetProvider::class.java) }
                     )
                 }
@@ -191,14 +178,11 @@ fun WidgetsShowcaseSheet(
                 // 3. Focus Shield Widget
                 item {
                     WidgetItemPreviewCard(
-                        title = "Focus Shield & Blocker",
-                        description = "Armed state status, blocked app counts, and instant shield hub control",
-                        badge = "SECURITY",
-                        badgeColor = Color(0xFF10B981),
-                        icon = Icons.Default.Security,
+                        title = "Focus Shield",
+                        description = "Armed status, blocked app count, and instant shield hub control.",
+                        badge = "SHIELD",
+                        badgeColor = Color(0xFF30D158),
                         mascotRes = R.drawable.mascot_blocked,
-                        accentGradient = listOf(Color(0xFF1E3A2E), Color(0xFF10251E)),
-                        borderColor = Color(0xFF10B981).copy(alpha = 0.45f),
                         onPin = { pinWidget(context, FocusShieldWidgetProvider::class.java) }
                     )
                 }
@@ -206,14 +190,11 @@ fun WidgetsShowcaseSheet(
                 // 4. Today's Timetable Widget
                 item {
                     WidgetItemPreviewCard(
-                        title = "Today's Study Timetable",
-                        description = "Next upcoming study block target, pending tasks, and planner shortcut",
+                        title = "Today's Schedule",
+                        description = "Next upcoming study block target, pending tasks, and planner.",
                         badge = "SCHEDULE",
-                        badgeColor = Color(0xFF818CF8),
-                        icon = Icons.Default.Schedule,
+                        badgeColor = Color(0xFFBF5AF2),
                         mascotRes = R.drawable.mascot_studying,
-                        accentGradient = listOf(Color(0xFF222B48), Color(0xFF141A2E)),
-                        borderColor = Color(0xFF818CF8).copy(alpha = 0.45f),
                         onPin = { pinWidget(context, TodayScheduleWidgetProvider::class.java) }
                     )
                 }
@@ -221,14 +202,11 @@ fun WidgetsShowcaseSheet(
                 // 5. Zen Study Companion Widget
                 item {
                     WidgetItemPreviewCard(
-                        title = "AI Companion & Zen Break",
-                        description = "Mindful study tips, XP points, and 5-minute guided breath breaks",
+                        title = "AI Companion & Zen",
+                        description = "Mindful focus tips, XP points, and 5-minute guided breath breaks.",
                         badge = "ZEN",
-                        badgeColor = Color(0xFFA855F7),
-                        icon = Icons.Default.SelfImprovement,
+                        badgeColor = Color(0xFF64D2FF),
                         mascotRes = R.drawable.mascot_grateful,
-                        accentGradient = listOf(Color(0xFF331E48), Color(0xFF1E1430)),
-                        borderColor = Color(0xFFA855F7).copy(alpha = 0.45f),
                         onPin = { pinWidget(context, ZenStudyCoachWidgetProvider::class.java) }
                     )
                 }
@@ -243,20 +221,20 @@ private fun WidgetItemPreviewCard(
     description: String,
     badge: String,
     badgeColor: Color,
-    icon: ImageVector,
     mascotRes: Int,
-    accentGradient: List<Color>,
-    borderColor: Color,
     onPin: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(Brush.linearGradient(accentGradient))
-            .border(1.5.dp, borderColor, RoundedCornerShape(22.dp))
-            .shadow(12.dp, RoundedCornerShape(22.dp), spotColor = badgeColor)
-            .padding(16.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(Color(0xFF191D28), Color(0xFF12141C))
+                )
+            )
+            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(20.dp))
+            .padding(14.dp)
     ) {
         Column {
             Row(
@@ -264,90 +242,110 @@ private fun WidgetItemPreviewCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Image(
                         painter = painterResource(id = mascotRes),
                         contentDescription = null,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(34.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontFamily = PoppinsFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontSize = 15.sp
-                            )
-                        )
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(badgeColor.copy(alpha = 0.18f))
-                                .border(1.dp, badgeColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 7.dp, vertical = 2.dp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = badge,
-                                style = MaterialTheme.typography.labelSmall.copy(
+                                text = title,
+                                style = MaterialTheme.typography.titleMedium.copy(
                                     fontFamily = PoppinsFontFamily,
                                     fontWeight = FontWeight.Bold,
-                                    color = badgeColor,
-                                    fontSize = 9.sp
-                                )
+                                    color = Color.White,
+                                    fontSize = 14.5.sp
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(badgeColor.copy(alpha = 0.16f))
+                                    .border(0.8.dp, badgeColor.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                            ) {
+                                Text(
+                                    text = badge,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        color = badgeColor,
+                                        fontSize = 8.5.sp
+                                    )
+                                )
+                            }
                         }
                     }
                 }
 
+                Spacer(modifier = Modifier.width(8.dp))
+
                 Button(
                     onClick = onPin,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = badgeColor,
+                        containerColor = RegainLimePrimary,
                         contentColor = NearBlack
                     ),
-                    modifier = Modifier.height(36.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    modifier = Modifier
+                        .height(32.dp)
+                        .defaultMinSize(minWidth = 68.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = null,
-                            modifier = Modifier.size(15.dp),
+                            modifier = Modifier.size(13.dp),
                             tint = NearBlack
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = "Add",
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
+                            fontSize = 11.5.sp,
                             color = NearBlack
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Subtitle Description in Glass Pill
+            // Subtitle Description in Clean Frosted Pill
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x18FFFFFF))
-                    .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0x10FFFFFF))
+                    .border(0.8.dp, Color(0x14FFFFFF), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontFamily = PoppinsFontFamily,
                         color = Color(0xFFCBD5E1),
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp
-                    )
+                        fontSize = 11.5.sp,
+                        lineHeight = 15.sp
+                    ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

@@ -67,7 +67,8 @@ fun RegainMascotView(
     size: Dp = 100.dp,
     width: Dp? = null,
     height: Dp? = null,
-    pose: MascotPose = MascotPose.IDLE
+    pose: MascotPose = MascotPose.IDLE,
+    animate: Boolean = true
 ) {
     val actualWidth = width ?: size
     val actualHeight = height ?: size
@@ -80,15 +81,14 @@ fun RegainMascotView(
             contentAlignment = Alignment.Center
         ) {
             MascotVideoPlayer(
-                modifier = Modifier.fillMaxSize(),
-                videoResId = R.raw.mascot_study_timer,
-                zoomFactor = 0.96f
+                modifier = Modifier.fillMaxSize()
             )
         }
         return
     }
 
     val isBlocked = pose == MascotPose.STOP_SIGN || pose == MascotPose.ANGRY
+    val shouldAnimate = animate && !isBlocked
 
     val targetResId = when (pose) {
         MascotPose.WELCOME -> R.drawable.mascot_welcome
@@ -105,7 +105,7 @@ fun RegainMascotView(
     val infiniteTransition = rememberInfiniteTransition(label = "mascot_anim")
     val floatOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = if (isBlocked) 2f else -2f,
+        targetValue = if (shouldAnimate) -2.5f else 0f,
         animationSpec = infiniteRepeatable(
             animation = tween(2200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -117,9 +117,11 @@ fun RegainMascotView(
         modifier = modifier
             .width(actualWidth)
             .height(actualHeight)
-            .graphicsLayer {
-                translationY = floatOffset
-            },
+            .then(
+                if (shouldAnimate) {
+                    Modifier.graphicsLayer { translationY = floatOffset }
+                } else Modifier
+            ),
         contentAlignment = Alignment.Center
     ) {
         Image(
@@ -134,42 +136,18 @@ fun RegainMascotView(
 /**
  * Plays the mascot study video animation in a seamless muted loop without any black background.
  * Uses hardware-accelerated animated WebP with 100% transparent alpha channel.
- * Centers the graduation cap at the top and study desk at the bottom perfectly.
+ * Cleanly centered and fitted inside the timer dial.
  */
 @Composable
 fun MascotVideoPlayer(
     modifier: Modifier = Modifier,
-    @RawRes videoResId: Int = R.raw.mascot_study_timer,
-    zoomFactor: Float = 0.96f
+    @RawRes videoResId: Int = R.raw.mascot_study_timer
 ) {
     AndroidView(
         factory = { ctx ->
             ImageView(ctx).apply {
-                scaleType = ImageView.ScaleType.MATRIX
-
-                fun applyTransform(vw: Int, vh: Int) {
-                    if (vw <= 0 || vh <= 0) return
-                    // Content region inside 400x711 transparent webp:
-                    // Character and study desk are 400px wide, 505px tall, top padding 147px
-                    val contentW = 400f
-                    val contentH = 505f
-                    val topPadding = 147f
-
-                    val scale = minOf(vw.toFloat() / contentW, vh.toFloat() / contentH) * zoomFactor
-                    val dx = (vw.toFloat() - contentW * scale) / 2f
-                    val dy = (vh.toFloat() - contentH * scale) / 2f - (topPadding * scale)
-
-                    val matrix = android.graphics.Matrix()
-                    matrix.setScale(scale, scale)
-                    matrix.postTranslate(dx, dy)
-                    imageMatrix = matrix
-                }
-
-                addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
-                    val w = right - left
-                    val h = bottom - top
-                    applyTransform(w, h)
-                }
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                adjustViewBounds = true
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     try {
