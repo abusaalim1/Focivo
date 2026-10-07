@@ -63,6 +63,13 @@ import com.example.ui.theme.RegainLimePrimary
 import com.example.util.StudyNotificationBlockerManager
 import androidx.compose.material.icons.filled.NotificationsOff
 
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import com.example.ui.theme.NearBlack
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -76,6 +83,9 @@ fun SettingsScreen(
     onOpenAlarmStudio: () -> Unit = {},
     onOpenShieldHub: () -> Unit = {},
     onLogout: () -> Unit = {},
+    onCheckForUpdates: () -> Unit = {},
+    isCheckingForUpdates: Boolean = false,
+    manualUpdateMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
@@ -714,20 +724,80 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Regain OS v1.0.0",
+                        text = "Focivo v1.0.0",
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Medium,
+                            fontWeight = FontWeight.Bold,
                             fontSize = 15.sp
                         )
                     )
                     Text(
-                        text = "Crafted for deep workers, creators, and thinkers. Zero backend telemetry, 100% offline-first local persistence and generative audio synthesis.",
+                        text = "Crafted for students, deep workers, and thinkers. Real-time study protection, academic AI monitoring, and offline persistence.",
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,
                             lineHeight = 18.sp
                         )
                     )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // In-App Update Check Button
+                    OutlinedButton(
+                        onClick = onCheckForUpdates,
+                        enabled = !isCheckingForUpdates,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("check_for_updates_button"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = RegainLimePrimary
+                        )
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            if (isCheckingForUpdates) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = RegainLimePrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Checking for updates...",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.SystemUpdate,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = RegainLimePrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Check for Updates",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    if (!manualUpdateMessage.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = manualUpdateMessage,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = if (manualUpdateMessage.contains("available", ignoreCase = true)) RegainLimePrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
                 }
             }
         }

@@ -207,6 +207,15 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     private var sessionDonationRotationIndex = 0
 
     // App Blocker / Focus Shield State
+    private val _availableAppUpdate = MutableStateFlow<com.example.util.AppUpdateInfo?>(null)
+    val availableAppUpdate: StateFlow<com.example.util.AppUpdateInfo?> = _availableAppUpdate.asStateFlow()
+
+    private val _isCheckingForUpdates = MutableStateFlow(false)
+    val isCheckingForUpdates: StateFlow<Boolean> = _isCheckingForUpdates.asStateFlow()
+
+    private val _manualUpdateCheckResult = MutableStateFlow<String?>(null)
+    val manualUpdateCheckResult: StateFlow<String?> = _manualUpdateCheckResult.asStateFlow()
+
     private val _isShieldHubOpen = MutableStateFlow(false)
     val isShieldHubOpen: StateFlow<Boolean> = _isShieldHubOpen.asStateFlow()
 
@@ -2724,6 +2733,53 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
 
     fun dismissMilestoneDonationPrompt() {
         _showMilestoneDonationPrompt.value = false
+    }
+
+    // In-App Update Management
+    fun checkForAppUpdates(context: Context, isManual: Boolean = false) {
+        viewModelScope.launch {
+            if (isManual) {
+                _isCheckingForUpdates.value = true
+                _manualUpdateCheckResult.value = null
+            }
+            try {
+                val updateInfo = com.example.util.AppUpdateManager.checkForUpdates(context, isManualCheck = isManual)
+                if (updateInfo != null && updateInfo.isUpdateAvailable) {
+                    _availableAppUpdate.value = updateInfo
+                    if (isManual) {
+                        _manualUpdateCheckResult.value = "New version v${updateInfo.latestVersionName} is available!"
+                    }
+                } else {
+                    if (isManual) {
+                        _manualUpdateCheckResult.value = "Focivo is up to date (v${updateInfo?.currentVersionName ?: "1.0.0"})"
+                    }
+                }
+            } catch (e: Exception) {
+                if (isManual) {
+                    _manualUpdateCheckResult.value = "Check failed: ${e.localizedMessage ?: "Network error"}"
+                }
+            } finally {
+                if (isManual) {
+                    _isCheckingForUpdates.value = false
+                }
+            }
+        }
+    }
+
+    fun dismissAppUpdate(context: Context) {
+        val current = _availableAppUpdate.value
+        if (current != null) {
+            com.example.util.AppUpdateManager.dismissUpdate(context, current.latestVersionCode)
+        }
+        _availableAppUpdate.value = null
+    }
+
+    fun downloadAndInstallUpdate(context: Context, downloadUrl: String) {
+        com.example.util.AppUpdateManager.launchDownload(context, downloadUrl)
+    }
+
+    fun clearManualUpdateMessage() {
+        _manualUpdateCheckResult.value = null
     }
 
     fun logDistraction(type: String) {

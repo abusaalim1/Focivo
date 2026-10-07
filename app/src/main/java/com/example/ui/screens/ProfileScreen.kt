@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -160,6 +161,7 @@ fun ProfileScreen(
     onOpenShieldHub: () -> Unit = {},
     onOpenSundayRecap: () -> Unit = {},
     onOpenSupportLockZen: () -> Unit = {},
+    onCheckForUpdates: () -> Unit = {},
     onLogout: () -> Unit = {},
     onUpdateProfile: (newName: String, avatarBytes: ByteArray?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
@@ -945,6 +947,99 @@ fun ProfileScreen(
                         badges.drop(3).take(3).forEach { badge ->
                             BadgeGridItem(badge = badge, isDark = isDark, cardBg = cardBg, cardBorder = cardBorder, textPrimary = textPrimary, textSecondary = textSecondary, modifier = Modifier.weight(1f))
                         }
+                    }
+                }
+            }
+
+            // In-App Update Checker Card
+            item {
+                val currentVersionName = remember {
+                    try {
+                        val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                        pInfo.versionName ?: "1.0"
+                    } catch (_: Exception) {
+                        "1.0"
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth().testTag("check_for_updates_card"),
+                    shape = RoundedCornerShape(20.dp),
+                    onClick = { onCheckForUpdates() }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(RegainLimeContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SystemUpdate,
+                                    contentDescription = "Check for Updates",
+                                    tint = RegainLimeDeepText,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Check for Updates",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontFamily = PoppinsFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textPrimary,
+                                            fontSize = 15.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(RegainLimeContainer)
+                                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "v$currentVersionName",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontFamily = PoppinsFontFamily,
+                                                color = RegainLimeDeepText,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 9.sp
+                                            )
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Tap to check for new features & fixes",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        color = textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = textSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             }

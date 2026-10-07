@@ -41,6 +41,7 @@ import com.example.ui.components.FocusShieldHubSheet
 import com.example.ui.components.AiStudyWarningDialog
 import com.example.ui.components.AiStudyBlockedDialog
 import com.example.ui.components.AiStudyResolvedDialog
+import com.example.ui.components.AppUpdateDialog
 import com.example.ui.screens.AutoStudyScheduleScreen
 import com.example.ui.components.NavTab
 import com.example.ui.components.NotificationAlarmPermissionSheet
@@ -232,6 +233,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
 
     // Local Auth & Questionnaire states
     val currentUser by viewModel.currentUser.collectAsState()
+    val availableAppUpdate by viewModel.availableAppUpdate.collectAsState()
+    val manualUpdateCheckResult by viewModel.manualUpdateCheckResult.collectAsState()
     val isAuthChecking by viewModel.isAuthChecking.collectAsState()
     val isAuthLoading by viewModel.isAuthLoading.collectAsState()
     val isProfileLoading by viewModel.isProfileLoading.collectAsState()
@@ -284,10 +287,11 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
         android.util.Log.d("MainActivity", "Notification permission request result: $isGranted")
     }
 
-    // Startup Notification Permission Check & Sunday Recap Check
+    // Startup Notification Permission Check, Sunday Recap Check, & In-App Update Check
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             viewModel.checkWeeklyReview(context)
+            viewModel.checkForAppUpdates(context, isManual = false)
             if (!hasCheckedNotificationPermissionOnStartup) {
                 hasCheckedNotificationPermissionOnStartup = true
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -300,6 +304,13 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     }
                 }
             }
+        }
+    }
+
+    LaunchedEffect(manualUpdateCheckResult) {
+        if (!manualUpdateCheckResult.isNullOrBlank()) {
+            android.widget.Toast.makeText(context, manualUpdateCheckResult, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.clearManualUpdateMessage()
         }
     }
 
@@ -531,6 +542,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onOpenShieldHub = { viewModel.openShieldHub() },
                                         onOpenSundayRecap = { viewModel.openLatestSundayRecap() },
                                         onOpenSupportLockZen = { viewModel.openSupportLockZenSheet() },
+                                        onCheckForUpdates = { viewModel.checkForAppUpdates(context, isManual = true) },
                                         onLogout = { showSignOutConfirmationDialog = true },
                                         onUpdateProfile = { name, avatarBytes ->
                                             viewModel.updateProfileNameAndAvatar(name, avatarBytes)
@@ -733,6 +745,21 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                             }
                         }
                     )
+                }
+
+                // In-App Update Overlay Dialog
+                availableAppUpdate?.let { updateInfo ->
+                    if (updateInfo.isUpdateAvailable) {
+                        AppUpdateDialog(
+                            updateInfo = updateInfo,
+                            onDownloadClick = { downloadUrl ->
+                                viewModel.downloadAndInstallUpdate(context, downloadUrl)
+                            },
+                            onDismiss = {
+                                viewModel.dismissAppUpdate(context)
+                            }
+                        )
+                    }
                 }
             }
         }
