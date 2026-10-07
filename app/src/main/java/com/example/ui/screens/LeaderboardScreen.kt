@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -67,10 +70,70 @@ import com.example.ui.theme.isAppInDarkTheme
 import java.util.Calendar
 
 @Composable
+fun LeaderboardAvatar(
+    avatarUrl: String?,
+    displayName: String,
+    modifier: Modifier = Modifier,
+    isCurrentUser: Boolean = false,
+    textSizeSp: Int = 15
+) {
+    val bitmap = remember(avatarUrl) {
+        if (!avatarUrl.isNullOrBlank() && !avatarUrl.startsWith("http://") && !avatarUrl.startsWith("https://")) {
+            try {
+                val clean = if (avatarUrl.contains(",")) avatarUrl.substringAfter(",") else avatarUrl
+                val bytes = android.util.Base64.decode(clean, android.util.Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            } catch (_: Exception) {
+                null
+            }
+        } else null
+    }
+
+    val initials = remember(displayName) {
+        val trimmed = displayName.trim()
+        val parts = trimmed.split(" ").filter { it.isNotBlank() }
+        if (parts.size >= 2) {
+            "${parts[0].first().uppercase()}${parts[1].first().uppercase()}"
+        } else if (trimmed.isNotEmpty()) {
+            trimmed.take(1).uppercase()
+        } else {
+            "U"
+        }
+    }
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = displayName,
+            modifier = modifier.fillMaxSize().clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+    } else if (!avatarUrl.isNullOrBlank()) {
+        AsyncImage(
+            model = avatarUrl,
+            contentDescription = displayName,
+            modifier = modifier.fillMaxSize().clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Text(
+            text = initials,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.Bold,
+                color = if (isCurrentUser) Color(0xFF0D1B05) else Color.White,
+                fontSize = textSizeSp.sp
+            )
+        )
+    }
+}
+
+@Composable
 fun LeaderboardScreen(
     users: List<LeaderboardUser>,
     hallOfFame: List<HallOfFameItem> = emptyList(),
     currentUserName: String,
+    currentUserPhotoUrl: String? = null,
     currentUserPoints: Int,
     currentUserStreak: Int,
     sessions: List<FocusSessionEntity> = emptyList(),
@@ -132,6 +195,7 @@ fun LeaderboardScreen(
 
     val currentEntry = remember(
         currentUserName,
+        currentUserPhotoUrl,
         currentUserPoints,
         currentUserStreak,
         myTodayStudySeconds,
@@ -153,7 +217,7 @@ fun LeaderboardScreen(
             currentWeekStart = currentMonday,
             streak = maxOf(remoteMe?.streak ?: 1, currentUserStreak.coerceAtLeast(1)),
             subjectTag = remoteMe?.subjectTag ?: "Active Focus",
-            avatarUrl = remoteMe?.avatarUrl,
+            avatarUrl = currentUserPhotoUrl ?: remoteMe?.avatarUrl,
             isCurrentUser = true
         )
     }
@@ -552,24 +616,12 @@ private fun PodiumColumn(
                 .border(2.dp, if (isDark) Color(0xFF1B221B) else Color.White, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            if (!user.avatarUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = user.avatarUrl,
-                    contentDescription = user.displayName,
-                    modifier = Modifier.fillMaxSize().clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Text(
-                    text = user.displayName.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        fontSize = if (rank == 1) 18.sp else 15.sp
-                    )
-                )
-            }
+            LeaderboardAvatar(
+                avatarUrl = user.avatarUrl,
+                displayName = user.displayName,
+                isCurrentUser = user.isCurrentUser,
+                textSizeSp = if (rank == 1) 18 else 15
+            )
         }
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -800,24 +852,12 @@ private fun LeaderboardUserRow(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (!user.avatarUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = user.avatarUrl,
-                            contentDescription = user.displayName,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Text(
-                            text = user.displayName.take(1).uppercase(),
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isCurrentUser) Color(0xFF0D1B05) else nameTextColor,
-                                fontSize = 15.sp
-                            )
-                        )
-                    }
+                    LeaderboardAvatar(
+                        avatarUrl = user.avatarUrl,
+                        displayName = user.displayName,
+                        isCurrentUser = isCurrentUser,
+                        textSizeSp = 14
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))

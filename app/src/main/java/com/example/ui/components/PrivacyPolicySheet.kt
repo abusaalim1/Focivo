@@ -397,23 +397,6 @@ fun PrivacyPolicySheet(
                     // Section 10
                     PolicySection(
                         number = "10",
-                        title = "Donations",
-                        textPrimary = textPrimary,
-                        textSecondary = textSecondary,
-                        accentColor = limeAccent
-                    ) {
-                        Text(
-                            text = "Focivo includes an optional donation feature allowing users to voluntarily support the app's development via UPI or PayPal. This is entirely optional, is not tied to unlocking any feature, and we do not store or process your payment information — payments are handled directly through UPI or PayPal's own secure systems, not by us.",
-                            color = textSecondary,
-                            fontSize = 13.sp,
-                            lineHeight = 19.sp,
-                            fontFamily = PoppinsFontFamily
-                        )
-                    }
-
-                    // Section 11
-                    PolicySection(
-                        number = "11",
                         title = "Children's Privacy",
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
@@ -428,9 +411,9 @@ fun PrivacyPolicySheet(
                         )
                     }
 
-                    // Section 12
+                    // Section 11
                     PolicySection(
-                        number = "12",
+                        number = "11",
                         title = "Changes to This Policy",
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
@@ -445,9 +428,9 @@ fun PrivacyPolicySheet(
                         )
                     }
 
-                    // Section 13
+                    // Section 12
                     PolicySection(
-                        number = "13",
+                        number = "12",
                         title = "Contact Us",
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,

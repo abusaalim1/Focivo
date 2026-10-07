@@ -133,10 +133,11 @@ class BlockedAppLockActivity : ComponentActivity() {
     }
 
     private fun exitToHomeScreen() {
+        isCurrentlyShowing = false
         try {
             val homeIntent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_HOME)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             startActivity(homeIntent)
         } catch (_: Exception) {}

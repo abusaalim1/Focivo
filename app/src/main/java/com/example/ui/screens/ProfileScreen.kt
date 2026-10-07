@@ -448,17 +448,7 @@ fun ProfileScreen(
                                                 )
                                             )
                                         }
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = persona,
-                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                fontFamily = PoppinsFontFamily,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = RegainLimeDeepText
-                                            )
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Spacer(modifier = Modifier.height(3.dp))
                                         Text(
                                             text = "$sessionCount Completed Sessions · $hoursFocused Logged",
                                             style = MaterialTheme.typography.labelSmall.copy(
@@ -904,89 +894,6 @@ fun ProfileScreen(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "Ringtones · Active: $alarmRingtone",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = PoppinsFontFamily,
-                                        color = textSecondary,
-                                        fontSize = 11.sp
-                                    )
-                                )
-                            }
-                        }
-
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = textSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-
-            // Support LockZen Card
-            item {
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    onClick = { onOpenSupportLockZen() }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Favorite,
-                                    contentDescription = "Support Focivo",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(14.dp))
-
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = "Support Focivo",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontFamily = PoppinsFontFamily,
-                                            fontWeight = FontWeight.Bold,
-                                            color = textPrimary,
-                                            fontSize = 15.sp
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(CircleShape)
-                                            .background(RegainLimeContainer)
-                                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = "VOLUNTARY",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontFamily = PoppinsFontFamily,
-                                                color = RegainLimeDeepText,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 9.sp
-                                            )
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "Keep Focivo free & independent",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         color = textSecondary,

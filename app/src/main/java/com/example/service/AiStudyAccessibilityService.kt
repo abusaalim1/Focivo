@@ -81,6 +81,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
         reason: String,
         isGeminiIntercept: Boolean = true
     ) {
+        if (com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing) return
+
         try {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             audioManager?.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE))

@@ -166,6 +166,13 @@ fun MascotVideoPlayer(
                 }
             }
         },
+        onRelease = { view ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                try {
+                    (view.drawable as? AnimatedImageDrawable)?.stop()
+                } catch (_: Exception) {}
+            }
+        },
         modifier = modifier
     )
 }

@@ -214,29 +214,31 @@ class FocusShieldService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val endTime = prefs.getLong(PREF_KEY_SHIELD_END_TIME, 0L)
-        val isScheduleActive = ScheduledBlockScheduler.isScheduleCurrentlyActive(this)
-        if (endTime > System.currentTimeMillis() || isScheduleActive) {
-            val remaining = if (isScheduleActive) {
-                ScheduledBlockScheduler.getSecondsUntilNextStateChange(this)
-            } else {
-                ((endTime - System.currentTimeMillis()) / 1000L).toInt()
+        try {
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val endTime = prefs.getLong(PREF_KEY_SHIELD_END_TIME, 0L)
+            val isScheduleActive = ScheduledBlockScheduler.isScheduleCurrentlyActive(this)
+            if (endTime > System.currentTimeMillis() || isScheduleActive) {
+                val remaining = if (isScheduleActive) {
+                    ScheduledBlockScheduler.getSecondsUntilNextStateChange(this)
+                } else {
+                    ((endTime - System.currentTimeMillis()) / 1000L).toInt()
+                }
+                val isPunishment = prefs.getBoolean(PREF_KEY_IS_PUNISHMENT, false)
+                val punishedPkg = prefs.getString(PREF_KEY_PUNISHED_PACKAGE, null)
+                val restartIntent = Intent(applicationContext, FocusShieldService::class.java).apply {
+                    action = ACTION_START_SHIELD
+                    putExtra(EXTRA_DURATION_SECONDS, remaining)
+                    putExtra(EXTRA_IS_PUNISHMENT, isPunishment)
+                    putExtra(EXTRA_BLOCKED_LIST, if (isPunishment) punishedPkg else prefs.getString(PREF_KEY_BLOCKED_LIST, ""))
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(restartIntent)
+                } else {
+                    startService(restartIntent)
+                }
             }
-            val isPunishment = prefs.getBoolean(PREF_KEY_IS_PUNISHMENT, false)
-            val punishedPkg = prefs.getString(PREF_KEY_PUNISHED_PACKAGE, null)
-            val restartIntent = Intent(applicationContext, FocusShieldService::class.java).apply {
-                action = ACTION_START_SHIELD
-                putExtra(EXTRA_DURATION_SECONDS, remaining)
-                putExtra(EXTRA_IS_PUNISHMENT, isPunishment)
-                putExtra(EXTRA_BLOCKED_LIST, if (isPunishment) punishedPkg else prefs.getString(PREF_KEY_BLOCKED_LIST, ""))
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(restartIntent)
-            } else {
-                startService(restartIntent)
-            }
-        }
+        } catch (_: Exception) {}
     }
 
     private fun safeStartForeground(notificationId: Int, notification: Notification) {
@@ -397,17 +399,13 @@ class FocusShieldService : Service() {
         }
         edit.apply()
 
-        try {
-            wakeLock?.acquire(totalSeconds * 1000L + 5000L)
-        } catch (_: Exception) {}
-
         monitorJob = serviceScope.launch {
             var secondsLeft = totalSeconds
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
             var lastInterceptTime = 0L
 
             while (isActive) {
-                delay(1000L)
+                delay(1200L)
 
                 val isScheduled = ScheduledBlockScheduler.isScheduleCurrentlyActive(this@FocusShieldService)
                 if (isScheduled) {
@@ -434,8 +432,8 @@ class FocusShieldService : Service() {
                     continue
                 }
 
-                // Check foreground app (reduced delay to 800ms for immediate reaction)
-                if (usageStatsManager != null && System.currentTimeMillis() - lastInterceptTime > 800L) {
+                // Check foreground app
+                if (usageStatsManager != null && !com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing && System.currentTimeMillis() - lastInterceptTime > 1500L) {
                     // NEVER block if phone call is active or ringing!
                     if (isPhoneCallInProgress()) {
                         continue
@@ -554,7 +552,7 @@ class FocusShieldService : Service() {
         reason: String? = null
     ) {
         val now = System.currentTimeMillis()
-        if (com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing && blockedPackage == lastInterceptPkg && (now - lastInterceptTimestamp) < 1500L) {
+        if (com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing || (blockedPackage == lastInterceptPkg && (now - lastInterceptTimestamp) < 2500L)) {
             return
         }
         lastInterceptPkg = blockedPackage

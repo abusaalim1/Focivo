@@ -2685,82 +2685,32 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun checkAndTriggerSessionDonationPrompt(lastSession: FocusSessionEntity) {
-        viewModelScope.launch {
-            val prefs = userPreferences.value ?: repository.userPreferences.firstOrNull() ?: UserPreferencesEntity()
-            if (prefs.neverShowDonationPrompt) {
-                // User opted out via "Don't show again" -> never prompt again
-                return@launch
-            }
-            val now = System.currentTimeMillis()
-
-            // 1. Cooldown check: 7 days default; 14 days if user dismissed prompt >= 2 times
-            val requiredCooldownMs = if (prefs.donationPromptDismissedCount >= 2) {
-                14 * 24 * 60 * 60 * 1000L // 14 days cooldown for dismissed >= 2
-            } else {
-                7 * 24 * 60 * 60 * 1000L // 7 days cooldown
-            }
-
-            if (prefs.lastDonationPromptShownAt > 0L) {
-                val timeSinceLastShown = now - prefs.lastDonationPromptShownAt
-                if (timeSinceLastShown < requiredCooldownMs) {
-                    // Cooldown active -> skip prompt
-                    return@launch
-                }
-            }
-
-            // 2. Probability check (~10% chance / 1 in 10 eligible times)
-            val passesProbabilityCheck = kotlin.random.Random.nextFloat() < 0.10f
-            if (!passesProbabilityCheck) {
-                // Failed probability check -> skip prompt
-                return@launch
-            }
-
-            // 3. Show prompt & update last_donation_prompt_shown_at immediately
-            _lastCompletedSessionForPrompt.value = lastSession
-            _showSessionDonationPrompt.value = true
-            sessionDonationRotationIndex = (sessionDonationRotationIndex + 1) % 6
-
-            val updatedPrefs = prefs.copy(lastDonationPromptShownAt = now)
-            repository.savePreferences(updatedPrefs)
-        }
+        // Automatic donation prompts permanently disabled
+        _showSessionDonationPrompt.value = false
+        _lastCompletedSessionForPrompt.value = null
     }
 
     fun dismissSessionDonationPrompt() {
         _showSessionDonationPrompt.value = false
         _lastCompletedSessionForPrompt.value = null
-
-        // Explicit dismissal ("Maybe later") -> increment donationPromptDismissedCount
-        viewModelScope.launch {
-            val prefs = userPreferences.value ?: repository.userPreferences.firstOrNull() ?: UserPreferencesEntity()
-            val updatedPrefs = prefs.copy(donationPromptDismissedCount = prefs.donationPromptDismissedCount + 1)
-            repository.savePreferences(updatedPrefs)
-        }
     }
 
     fun setNeverShowDonationPrompt(neverShow: Boolean = true) {
         _showSessionDonationPrompt.value = false
         _showMilestoneDonationPrompt.value = false
         _lastCompletedSessionForPrompt.value = null
-
-        viewModelScope.launch {
-            val prefs = userPreferences.value ?: repository.userPreferences.firstOrNull() ?: UserPreferencesEntity()
-            val updatedPrefs = prefs.copy(neverShowDonationPrompt = neverShow)
-            repository.savePreferences(updatedPrefs)
-        }
     }
 
     fun openSupportFromSessionPrompt() {
         _showSessionDonationPrompt.value = false
         _lastCompletedSessionForPrompt.value = null
-        _isSupportLockZenSheetOpen.value = true
-        // User chose to donate -> do not increment dismissed count
     }
 
-    fun getSessionDonationRotationIndex(): Int = sessionDonationRotationIndex
+    fun getSessionDonationRotationIndex(): Int = 0
 
     // Support LockZen / Donation Functions
     fun openSupportLockZenSheet() {
-        _isSupportLockZenSheetOpen.value = true
+        _isSupportLockZenSheetOpen.value = false
     }
 
     fun closeSupportLockZenSheet() {
@@ -2768,24 +2718,12 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun triggerMilestoneDonationCheck(completedSessionCount: Int) {
-        viewModelScope.launch {
-            val prefs = userPreferences.value ?: repository.userPreferences.firstOrNull() ?: UserPreferencesEntity()
-            if (prefs.neverShowDonationPrompt) return@launch
-            if (completedSessionCount < 5) return@launch // Don't prompt new users (<5 sessions)
-            val now = System.currentTimeMillis()
-            val sevenDaysMs = 7 * 24 * 60 * 60 * 1000L
-            if (now - prefs.lastDonationPromptTimestamp >= sevenDaysMs) {
-                _showMilestoneDonationPrompt.value = true
-            }
-        }
+        // Milestone donation checks permanently disabled
+        _showMilestoneDonationPrompt.value = false
     }
 
     fun dismissMilestoneDonationPrompt() {
         _showMilestoneDonationPrompt.value = false
-        viewModelScope.launch {
-            val prefs = userPreferences.value ?: repository.userPreferences.firstOrNull() ?: UserPreferencesEntity()
-            repository.savePreferences(prefs.copy(lastDonationPromptTimestamp = System.currentTimeMillis()))
-        }
     }
 
     fun logDistraction(type: String) {

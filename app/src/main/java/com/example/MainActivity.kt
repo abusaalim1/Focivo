@@ -504,6 +504,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         users = leaderboardUsers,
                                         hallOfFame = hallOfFame,
                                         currentUserName = userPreferences?.currentUserName ?: "You",
+                                        currentUserPhotoUrl = userPreferences?.currentUserPhotoUrl,
                                         currentUserPoints = userPreferences?.focusPoints ?: 0,
                                         currentUserStreak = userPreferences?.currentStreak ?: 1,
                                         sessions = sessions,
@@ -702,44 +703,6 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                         onToggleSchedule = { id, en -> viewModel.toggleScheduledBlock(id, en) },
                         onDeleteSchedule = { viewModel.deleteScheduledBlock(it) },
                         onBack = { isAutoScheduleOpen = false }
-                    )
-                }
-
-                // Global Support LockZen Sheet
-                if (isSupportLockZenSheetOpen) {
-                    SupportLockZenSheet(
-                        sheetState = supportLockZenSheetState,
-                        onDismiss = { viewModel.closeSupportLockZenSheet() }
-                    )
-                }
-
-                // Milestone Soft Prompt Dialog
-                if (showMilestoneDonationPrompt) {
-                    SupportLockZenMilestoneDialog(
-                        onSupportClick = {
-                            viewModel.dismissMilestoneDonationPrompt()
-                            viewModel.openSupportLockZenSheet()
-                        },
-                        onDismiss = { viewModel.dismissMilestoneDonationPrompt() },
-                        onNeverShowAgain = { viewModel.setNeverShowDonationPrompt(true) }
-                    )
-                }
-
-                // Automatic Post-Session Donation Sheet
-                if (showSessionDonationPrompt && lastCompletedSessionForPrompt != null) {
-                    val totalFocusMins = remember(sessions) {
-                        sessions.sumOf { it.durationSeconds }.toLong() / 60
-                    }
-                    val streak = userPreferences?.currentStreak ?: 1
-
-                    SessionDonationPromptSheet(
-                        session = lastCompletedSessionForPrompt!!,
-                        rotationIndex = viewModel.getSessionDonationRotationIndex(),
-                        currentStreak = streak,
-                        totalFocusMinutes = totalFocusMins,
-                        onSupportClick = { viewModel.openSupportFromSessionPrompt() },
-                        onDismiss = { viewModel.dismissSessionDonationPrompt() },
-                        onNeverShowAgain = { viewModel.setNeverShowDonationPrompt(true) }
                     )
                 }
 
