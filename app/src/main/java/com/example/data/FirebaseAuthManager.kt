@@ -206,7 +206,7 @@ class FirebaseAuthManager private constructor(private val context: Context) {
         return true
     }
 
-    suspend fun signInAnonymously(): Result<AuthUserData> {
+    suspend fun signInAsGuestLocal(): Result<AuthUserData> {
         _isAuthLoading.value = true
         _authError.value = null
 

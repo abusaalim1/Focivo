@@ -27,6 +27,8 @@ object ScheduledBlockScheduler {
     private const val TAG = "ScheduledBlockScheduler"
     private const val PREFS_NAME = "focusly_local_data"
     private const val KEY_SCHEDULES_JSON = "custom_scheduled_blocks_json"
+    private const val KEY_MANUAL_STOPPED_SCHEDULE_ID = "manually_stopped_schedule_id"
+    private const val KEY_MANUAL_STOPPED_UNTIL_MS = "manually_stopped_until_ms"
     private const val ALARM_REQUEST_CODE = 2001
 
     private val json = Json {
@@ -210,9 +212,9 @@ object ScheduledBlockScheduler {
 
     /**
      * Checks whether a specific schedule is actively blocking at the given time.
-     * Honors active days, start/end time window, and break window if configured.
+     * Honors active days, start/end time window, break window, and manual stop for current block window.
      */
-    fun isScheduleActiveAt(schedule: SupabaseScheduledBlockDto, calendar: Calendar): Boolean {
+    fun isScheduleActiveAt(schedule: SupabaseScheduledBlockDto, calendar: Calendar, checkManualStop: Boolean = true): Boolean {
         if (!schedule.is_enabled) return false
 
         val dayStr = when (calendar.get(Calendar.DAY_OF_WEEK)) {
@@ -266,10 +268,23 @@ object ScheduledBlockScheduler {
         return true
     }
 
+    fun isScheduleActiveNow(context: Context, schedule: SupabaseScheduledBlockDto): Boolean {
+        val now = Calendar.getInstance()
+        if (!isScheduleActiveAt(schedule, now)) return false
+
+        // Check if user manually stopped this specific block
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val stoppedId = prefs.getString(KEY_MANUAL_STOPPED_SCHEDULE_ID, null)
+        val stoppedUntil = prefs.getLong(KEY_MANUAL_STOPPED_UNTIL_MS, 0L)
+        if (stoppedId == schedule.id && System.currentTimeMillis() < stoppedUntil) {
+            return false
+        }
+        return true
+    }
+
     fun isAnyScheduleCurrentlyActive(context: Context): Boolean {
         val schedules = getLocalSchedules(context)
-        val now = Calendar.getInstance()
-        return schedules.any { isScheduleActiveAt(it, now) }
+        return schedules.any { isScheduleActiveNow(context, it) }
     }
 
     fun isScheduleCurrentlyActive(context: Context): Boolean {
@@ -277,12 +292,46 @@ object ScheduledBlockScheduler {
     }
 
     /**
+     * Allows user to stop or pause the currently active scheduled study block.
+     * Cancels any active notification timer and terminates the FocusShieldService foreground service immediately.
+     */
+    fun snoozeOrStopCurrentScheduleBlock(context: Context) {
+        val activeSchedule = getActiveStudySchedule(context)
+        val now = Calendar.getInstance()
+        val nextTransition = getNextTransitionMillis(context) ?: (System.currentTimeMillis() + 3600_000L)
+
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString(KEY_MANUAL_STOPPED_SCHEDULE_ID, activeSchedule?.id ?: "all")
+            .putLong(KEY_MANUAL_STOPPED_UNTIL_MS, nextTransition)
+            .apply()
+
+        Log.i(TAG, "[ManualStop] Manually stopped current schedule block until ${java.util.Date(nextTransition)}")
+
+        // Immediately stop FocusShieldService
+        val stopIntent = Intent(context, FocusShieldService::class.java).apply {
+            action = FocusShieldService.ACTION_STOP_SHIELD
+        }
+        try {
+            context.startService(stopIntent)
+            context.stopService(stopIntent)
+        } catch (_: Exception) {}
+
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            nm?.cancel(7001)
+            nm?.cancel(7002)
+        } catch (_: Exception) {}
+
+        evaluateAndReschedule(context)
+    }
+
+    /**
      * Returns the currently active schedule if its label/mode represents a study window, null otherwise.
      */
     fun getActiveStudySchedule(context: Context): SupabaseScheduledBlockDto? {
         val schedules = getLocalSchedules(context).filter { it.is_enabled }
-        val now = Calendar.getInstance()
-        return schedules.firstOrNull { isScheduleActiveAt(it, now) }
+        return schedules.firstOrNull { isScheduleActiveNow(context, it) }
     }
 
     /**
@@ -612,18 +661,26 @@ object ScheduledBlockScheduler {
             val isPunishment = FocusShieldService.isPunishmentLock.value
             if (isShieldRunning && !isPunishment) {
                 // Check if user is running a manual focus timer
-                val prefs = context.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
-                val isManualTimerRunning = prefs.getBoolean("is_timer_running", false)
+                val localPrefs = context.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
+                val timerPrefs = context.getSharedPreferences("focusly_timer_state", Context.MODE_PRIVATE)
+                val isManualTimerRunning = localPrefs.getBoolean("is_manual_timer_running", false) ||
+                    timerPrefs.getBoolean("is_timer_running", false)
+
                 if (!isManualTimerRunning) {
                     val stopIntent = Intent(context, FocusShieldService::class.java).apply {
                         action = FocusShieldService.ACTION_STOP_SHIELD
                     }
                     try {
                         context.startService(stopIntent)
-                        Log.d(TAG, "Stopped FocusShieldService (schedule window ended/break)")
+                        context.stopService(stopIntent)
+                        Log.d(TAG, "Stopped FocusShieldService (schedule window ended/break/manual stop)")
                     } catch (e: Exception) {
                         Log.e(TAG, "Error stopping FocusShieldService: ${e.message}")
                     }
+                    try {
+                        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                        nm?.cancel(7001)
+                    } catch (_: Exception) {}
                 }
             }
         }

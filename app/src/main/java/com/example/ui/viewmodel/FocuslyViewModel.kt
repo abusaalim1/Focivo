@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -1178,7 +1179,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _isAuthLoading.value = true
             _authError.value = null
-            val result = authManager.signInAnonymously()
+            val result = authManager.signInAsGuestLocal()
             result.onSuccess { authData ->
                 val guestUser = UserAccountEntity(
                     id = Math.abs(authData.uid.hashCode().toLong()).let { if (it == 0L) System.currentTimeMillis() else it },
@@ -2101,34 +2102,42 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             com.example.widget.FocivoWidgetHelper.updateAllWidgets(app)
         } catch (_: Exception) {}
 
-        // Deactivate protections started for this session UNLESS an Auto Study Schedule is actively running
-        val isScheduleActive = ScheduledBlockScheduler.isScheduleCurrentlyActive(app)
+        // Deactivate protections and stop Focus Shield notification service
+        val wasAutoScheduled = isAutoScheduledSession
+        isAutoScheduledSession = false
 
-        if (!isScheduleActive) {
-            if (didSessionAutoEnableAppBlocker) {
-                didSessionAutoEnableAppBlocker = false
-                val currentPrefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
-                viewModelScope.launch {
-                    repository.savePreferences(currentPrefs.copy(isAppBlockerEnabled = false))
-                }
-            }
-
-            val serviceIntent = Intent(app, FocusShieldService::class.java).apply {
-                action = FocusShieldService.ACTION_STOP_SHIELD
-            }
-            try {
-                app.startService(serviceIntent)
-            } catch (_: Exception) {}
-
-            if (didSessionAutoEnableAiGuard) {
-                didSessionAutoEnableAiGuard = false
-                com.example.util.AiStudyGuardManager.setAiGuardEnabled(app, false)
-            }
-            com.example.util.AiStudyGuardManager.resetSessionCounters()
-            com.example.util.AiStudyGuardManager.updateGuardStatusNotification(app)
-        } else {
-            Log.d(TAG, "Auto Study Schedule is active — maintaining shield and AI Guard")
+        if (wasAutoScheduled) {
+            ScheduledBlockScheduler.snoozeOrStopCurrentScheduleBlock(app)
         }
+
+        if (didSessionAutoEnableAppBlocker) {
+            didSessionAutoEnableAppBlocker = false
+            val currentPrefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
+            viewModelScope.launch {
+                repository.savePreferences(currentPrefs.copy(isAppBlockerEnabled = false))
+            }
+        }
+
+        val serviceIntent = Intent(app, FocusShieldService::class.java).apply {
+            action = FocusShieldService.ACTION_STOP_SHIELD
+        }
+        try {
+            app.startService(serviceIntent)
+            app.stopService(serviceIntent)
+        } catch (_: Exception) {}
+
+        try {
+            val nm = app.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            nm?.cancel(7001)
+            nm?.cancel(7002)
+        } catch (_: Exception) {}
+
+        if (didSessionAutoEnableAiGuard) {
+            didSessionAutoEnableAiGuard = false
+            com.example.util.AiStudyGuardManager.setAiGuardEnabled(app, false)
+        }
+        com.example.util.AiStudyGuardManager.resetSessionCounters()
+        com.example.util.AiStudyGuardManager.updateGuardStatusNotification(app)
         _sessionProtectionNote.value = null
     }
 
@@ -2719,7 +2728,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
 
     // Support LockZen / Donation Functions
     fun openSupportLockZenSheet() {
-        _isSupportLockZenSheetOpen.value = false
+        _isSupportLockZenSheetOpen.value = true
     }
 
     fun closeSupportLockZenSheet() {
@@ -2780,6 +2789,12 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
 
     fun clearManualUpdateMessage() {
         _manualUpdateCheckResult.value = null
+    }
+
+    fun deleteFocusSession(sessionId: Long) {
+        viewModelScope.launch {
+            repository.deleteSession(sessionId)
+        }
     }
 
     fun logDistraction(type: String) {
@@ -2921,6 +2936,9 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     fun toggleScheduledBlock(scheduleId: String, isEnabled: Boolean) {
         viewModelScope.launch {
             Log.d(TAG, "[UserAction] User clicked toggle scheduled block id=$scheduleId to isEnabled=$isEnabled")
+            if (!isEnabled) {
+                com.example.service.ScheduledBlockScheduler.snoozeOrStopCurrentScheduleBlock(getApplication())
+            }
             com.example.service.ScheduledBlockScheduler.toggleSchedule(getApplication(), scheduleId, isEnabled, triggerSource = "USER_TAP_TOGGLE")
             _scheduledBlocks.value = com.example.service.ScheduledBlockScheduler.getLocalSchedules(getApplication())
             updateScheduleStatusSummary()
@@ -2930,6 +2948,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     fun deleteScheduledBlock(scheduleId: String) {
         viewModelScope.launch {
             Log.d(TAG, "[UserAction] User clicked delete scheduled block id=$scheduleId")
+            com.example.service.ScheduledBlockScheduler.snoozeOrStopCurrentScheduleBlock(getApplication())
             com.example.service.ScheduledBlockScheduler.deleteScheduleLocalAndRemote(getApplication(), scheduleId, triggerSource = "USER_TAP_DELETE")
             _scheduledBlocks.value = com.example.service.ScheduledBlockScheduler.getLocalSchedules(getApplication())
             updateScheduleStatusSummary()

@@ -255,20 +255,32 @@ fun AiStudyBlockedDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(Color(0xFF33161A))
-                        .border(1.dp, accentRed.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                        .padding(12.dp),
+                        .border(1.dp, accentRed.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "🔒 Block Active: 180 Minutes (3 Hours)\nFocus shield will intercept any attempt to open this app.",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFFFCA5A5),
-                        textAlign = TextAlign.Center,
-                        lineHeight = 17.sp
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "🔒 Block Active: 180 Minutes (3 Hours)",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFCA5A5),
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "Focus Shield will intercept any attempt to open this app.",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = Color(0xFFFECDD3),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 16.sp
+                        )
+                    }
                 }
             }
         },

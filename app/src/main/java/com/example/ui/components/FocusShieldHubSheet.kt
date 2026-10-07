@@ -767,7 +767,7 @@ fun FocusShieldHubSheet(
             item {
                 LiquidGlassCard(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(22.dp),
                     accentBorder = isAiGuardEnabled
                 ) {
                     Column(
@@ -780,43 +780,69 @@ fun FocusShieldHubSheet(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = "AI Study Guard",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 15.sp,
-                                            color = textPrimary
-                                        )
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(accentLime.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Shield,
+                                        contentDescription = null,
+                                        tint = accentLime,
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(if (hasAccessibilityPermission) Color(0x354CAF50) else Color(0x35E53935))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         Text(
-                                            text = if (hasAccessibilityPermission) "ACTIVE" else "PERMISSION NEEDED",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 9.sp,
+                                            text = "AI Study Guard",
+                                            style = MaterialTheme.typography.titleMedium.copy(
                                                 fontWeight = FontWeight.Bold,
-                                                color = if (hasAccessibilityPermission) accentGreen else accentCoral
+                                                fontSize = 15.sp,
+                                                color = textPrimary
                                             )
                                         )
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(if (hasAccessibilityPermission) Color(0x354CAF50) else Color(0x35E53935))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = if (hasAccessibilityPermission) "ACTIVE" else "PERMISSION NEEDED",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (hasAccessibilityPermission) accentGreen else accentCoral
+                                                )
+                                            )
+                                        }
                                     }
-                                }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "Two-Stage Academic Focus Warning & 3-Hour Lock",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = accentLime,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "ChatGPT & Claude Academic Sentinel",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = accentLime,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
                                     )
-                                )
+                                }
                             }
+
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             Switch(
                                 checked = isAiGuardEnabled,
@@ -837,27 +863,111 @@ fun FocusShieldHubSheet(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Stage 1 (Warning): High-priority alert & in-app dialog with 3-minute grace window when non-study casual chat is detected.\n\nStage 2 (Block): 3-hour lockout applied only if non-study usage continues.\n\nStage 3 (Resolved): Instant positive confirmation when you return to study focus.",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = textSecondary,
-                                fontSize = 11.sp,
-                                lineHeight = 16.sp
-                            )
-                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Clean Structured 3-Stage Workflow
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Stage 1
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0x30F59E0B))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "Stage 1",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFF59E0B)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Warning Alert with 3-minute grace window",
+                                    fontSize = 11.sp,
+                                    color = textPrimary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+
+                            // Stage 2
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0x30EF4444))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "Stage 2",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFEF4444)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "3-Hour Lockout if casual chatter continues",
+                                    fontSize = 11.sp,
+                                    color = textPrimary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+
+                            // Stage 3
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0x3010B981))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "Stage 3",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF10B981)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Instant Resolution upon returning to study",
+                                    fontSize = 11.sp,
+                                    color = textPrimary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
 
                         if (!hasAccessibilityPermission) {
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(14.dp))
                                     .background(accentLime)
                                     .clickable {
                                         showAiAccessibilityOptInDialog = true
                                     }
-                                    .padding(vertical = 10.dp),
+                                    .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -1562,33 +1672,44 @@ fun FocusShieldHubSheet(
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = "YouTube AI Content Filter",
-                                            style = MaterialTheme.typography.titleSmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 15.sp,
-                                                color = textPrimary
-                                            )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "YouTube AI Content Filter",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                            color = textPrimary
                                         )
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                    )
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
                                         Surface(
-                                            color = accentCyan.copy(alpha = 0.2f),
+                                            color = if (hasAccessibilityPermission && isYouTubeFilterEnabled) Color(0x354CAF50) else if (!hasAccessibilityPermission && isYouTubeFilterEnabled) Color(0x35E53935) else accentCyan.copy(alpha = 0.2f),
                                             shape = RoundedCornerShape(6.dp)
                                         ) {
                                             Text(
-                                                text = "AI ACCESSIBILITY",
+                                                text = if (!hasAccessibilityPermission && isYouTubeFilterEnabled) "PERMISSION NEEDED" else if (isYouTubeFilterEnabled) "ACTIVE" else "AI ACCESSIBILITY",
                                                 style = MaterialTheme.typography.labelSmall.copy(
-                                                    color = accentCyan,
+                                                    color = if (!hasAccessibilityPermission && isYouTubeFilterEnabled) accentCoral else if (isYouTubeFilterEnabled) accentGreen else accentCyan,
                                                     fontSize = 8.5.sp,
                                                     fontWeight = FontWeight.Bold
                                                 ),
-                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             )
                                         }
+                                        Text(
+                                            text = "Educational Whitelist",
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                color = accentCyan,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        )
                                     }
-                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = "Only allows educational lectures & coding tutorials. Automatically blocks songs, movies, gaming & entertainment vlogs.",
                                         style = MaterialTheme.typography.bodySmall.copy(

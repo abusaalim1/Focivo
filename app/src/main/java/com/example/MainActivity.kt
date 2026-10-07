@@ -43,6 +43,7 @@ import com.example.ui.components.AiStudyBlockedDialog
 import com.example.ui.components.AiStudyResolvedDialog
 import com.example.ui.components.AppUpdateDialog
 import com.example.ui.screens.AutoStudyScheduleScreen
+import com.example.ui.screens.FocusSessionLogScreen
 import com.example.ui.components.NavTab
 import com.example.ui.components.NotificationAlarmPermissionSheet
 import com.example.ui.components.SignOutConfirmationDialog
@@ -325,6 +326,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     var isSettingsOpen by remember { mutableStateOf(false) }
     var isAlarmHubOpen by remember { mutableStateOf(false) }
     var isAutoScheduleOpen by remember { mutableStateOf(false) }
+    var isSessionLogOpen by remember { mutableStateOf(false) }
     var showTaskBottomSheet by remember { mutableStateOf(false) }
 
     val taskSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -527,7 +529,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         sessions = sessions,
                                         reflections = reflections,
                                         userPreferences = userPreferences,
-                                        onSaveReflection = { viewModel.saveWeeklyReflection(it) }
+                                        onSaveReflection = { viewModel.saveWeeklyReflection(it) },
+                                        onOpenSessionHistory = { isSessionLogOpen = true }
                                     )
                                 }
                                 NavTab.PROFILE.name -> {
@@ -542,6 +545,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onOpenShieldHub = { viewModel.openShieldHub() },
                                         onOpenSundayRecap = { viewModel.openLatestSundayRecap() },
                                         onOpenSupportLockZen = { viewModel.openSupportLockZenSheet() },
+                                        onOpenSessionHistory = { isSessionLogOpen = true },
                                         onCheckForUpdates = { viewModel.checkForAppUpdates(context, isManual = true) },
                                         onLogout = { showSignOutConfirmationDialog = true },
                                         onUpdateProfile = { name, avatarBytes ->
@@ -718,6 +722,24 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     )
                 }
 
+                // Full-screen Past Focus Sessions Log Screen (Firestore Cloud Storage)
+                if (isSessionLogOpen) {
+                    androidx.activity.compose.BackHandler {
+                        isSessionLogOpen = false
+                    }
+                    FocusSessionLogScreen(
+                        sessions = sessions,
+                        onBack = { isSessionLogOpen = false },
+                        onStartNewSession = {
+                            isSessionLogOpen = false
+                            selectedTab = NavTab.FOCUS
+                        },
+                        onDeleteSession = { sessionId ->
+                            viewModel.deleteFocusSession(sessionId)
+                        }
+                    )
+                }
+
                 // Post-Login / Post-Onboarding Alarm & Notification Permission Sheet
                 if (showNotificationPermissionPrompt && !PermissionUtils.hasNotificationPermission(context)) {
                     NotificationAlarmPermissionSheet(
@@ -744,6 +766,14 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                 android.widget.Toast.makeText(context, "Study progress synced & signed out", android.widget.Toast.LENGTH_SHORT).show()
                             }
                         }
+                    )
+                }
+
+                // Voluntary Support / Donation Sheet
+                if (isSupportLockZenSheetOpen) {
+                    SupportLockZenSheet(
+                        sheetState = supportLockZenSheetState,
+                        onDismiss = { viewModel.closeSupportLockZenSheet() }
                     )
                 }
 

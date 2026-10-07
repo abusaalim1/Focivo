@@ -101,7 +101,7 @@ fun SupportLockZenSheet(
     }
 
     fun launchUpiPayment() {
-        val upiUri = "upi://pay?pa=7002395406@fam&pn=Focivo&am=$effectiveAmount&cu=INR"
+        val upiUri = "upi://pay?pa=aabu.x@fam&pn=Focivo&am=$effectiveAmount&cu=INR"
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(upiUri))
         try {
             val chooser = Intent.createChooser(intent, "Pay via UPI App")
@@ -109,8 +109,15 @@ fun SupportLockZenSheet(
             lastPaymentMethod = "UPI"
             showPaymentConfirmDialog = true
         } catch (_: Exception) {
-            Toast.makeText(context, "No UPI app found. Please use UPI ID: 7002395406@fam", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "No UPI app found. Please use UPI ID: aabu.x@fam", Toast.LENGTH_LONG).show()
         }
+    }
+
+    fun copyUpiId() {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("UPI ID", "aabu.x@fam")
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(context, "UPI ID copied: aabu.x@fam", Toast.LENGTH_SHORT).show()
     }
 
     ModalBottomSheet(
@@ -182,7 +189,15 @@ fun SupportLockZenSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Grateful Mascot
+            RegainMascotView(
+                size = 90.dp,
+                pose = MascotPose.GRATEFUL
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Human developer message card
             GlassCard(
@@ -339,14 +354,23 @@ fun SupportLockZenSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = "Direct UPI ID: 7002395406@fam · Contact: focivo.app@gmail.com",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontFamily = PoppinsFontFamily,
-                    color = textSecondary,
-                    fontSize = 10.sp
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { copyUpiId() }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "Direct UPI ID: aabu.x@fam (Tap to copy) · Contact: focivo.app@gmail.com",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = PoppinsFontFamily,
+                        color = textSecondary,
+                        fontSize = 10.5.sp
+                    )
                 )
-            )
+            }
         }
     }
 
@@ -415,6 +439,12 @@ fun SupportLockZenSheet(
             onDismissRequest = {
                 showThankYouDialog = false
                 onDismiss()
+            },
+            icon = {
+                RegainMascotView(
+                    size = 90.dp,
+                    pose = MascotPose.GRATEFUL
+                )
             },
             title = {
                 Text(

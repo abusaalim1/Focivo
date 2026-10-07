@@ -638,15 +638,24 @@ class FocusShieldService : Service() {
                 wakeLock?.release()
             }
         } catch (_: Exception) {}
-        stopForeground(STOP_FOREGROUND_REMOVE)
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        } catch (_: Exception) {}
+
+        try {
+            val manager = getSystemService(NotificationManager::class.java)
+            manager?.cancel(NOTIFICATION_ID)
+        } catch (_: Exception) {}
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val endTime = prefs.getLong(PREF_KEY_SHIELD_END_TIME, 0L)
-        if (endTime <= System.currentTimeMillis()) {
-            stopShield()
-        }
+        stopShield()
     }
 }

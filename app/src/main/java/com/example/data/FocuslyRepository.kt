@@ -669,7 +669,36 @@ class FocuslyRepository(private val context: Context) {
                 }
             }
         }
+
+        // Firestore Cloud Database Storage
+        scope.launch {
+            try {
+                val firebaseUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: uid ?: ""
+                if (firebaseUid.isNotBlank()) {
+                    FirestoreSessionRepository.getInstance().saveSession(newSession, firebaseUid)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error saving session to Firestore: ${e.message}")
+            }
+        }
         return id
+    }
+
+    suspend fun deleteSession(sessionId: Long) {
+        val updatedList = _allSessions.value.filterNot { it.id == sessionId }
+        _allSessions.value = updatedList
+        saveSessionsToLocal(updatedList)
+
+        scope.launch {
+            try {
+                val firebaseUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                if (firebaseUid.isNotBlank()) {
+                    FirestoreSessionRepository.getInstance().deleteSession(sessionId, firebaseUid)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error deleting session in Firestore: ${e.message}")
+            }
+        }
     }
 
     suspend fun insertReflection(reflection: ReflectionEntity): Long {
