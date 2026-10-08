@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -26,6 +29,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,23 +38,31 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SheetState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
@@ -89,6 +101,11 @@ fun SupportLockZenSheet(
     var showThankYouDialog by remember { mutableStateOf(false) }
     var lastPaymentMethod by remember { mutableStateOf("UPI") }
 
+    val coroutineScope = rememberCoroutineScope()
+    var isWaitingPayment by remember { mutableStateOf(false) }
+    var paymentWaitRemaining by remember { mutableStateOf(30) }
+    var paymentWaitJob by remember { mutableStateOf<Job?>(null) }
+
     val bgSurface = if (isDark) Color(0xFF1D221C) else Color(0xFFFFFFFF)
     val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
     val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
@@ -100,6 +117,12 @@ fun SupportLockZenSheet(
         selectedAmount
     }
 
+    val handleDismiss: () -> Unit = {
+        paymentWaitJob?.cancel()
+        isWaitingPayment = false
+        onDismiss()
+    }
+
     fun launchUpiPayment() {
         val upiUri = "upi://pay?pa=aabu.x@fam&pn=Focivo&am=$effectiveAmount&cu=INR"
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(upiUri))
@@ -107,7 +130,19 @@ fun SupportLockZenSheet(
             val chooser = Intent.createChooser(intent, "Pay via UPI App")
             context.startActivity(chooser)
             lastPaymentMethod = "UPI"
-            showPaymentConfirmDialog = true
+            // Wait 30 seconds for payment completion before displaying confirmation dialog
+            isWaitingPayment = true
+            paymentWaitRemaining = 30
+            paymentWaitJob?.cancel()
+            paymentWaitJob = coroutineScope.launch {
+                for (sec in 30 downTo 1) {
+                    paymentWaitRemaining = sec
+                    delay(1000L)
+                }
+                paymentWaitRemaining = 0
+                isWaitingPayment = false
+                showPaymentConfirmDialog = true
+            }
         } catch (_: Exception) {
             Toast.makeText(context, "No UPI app found. Please use UPI ID: aabu.x@fam", Toast.LENGTH_LONG).show()
         }
@@ -121,7 +156,7 @@ fun SupportLockZenSheet(
     }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = handleDismiss,
         sheetState = sheetState,
         containerColor = bgSurface,
         scrimColor = Color.Black.copy(alpha = 0.5f)
@@ -178,7 +213,7 @@ fun SupportLockZenSheet(
                 }
 
                 IconButton(
-                    onClick = onDismiss,
+                    onClick = handleDismiss,
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
@@ -191,10 +226,14 @@ fun SupportLockZenSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Grateful Mascot
-            RegainMascotView(
-                size = 90.dp,
-                pose = MascotPose.GRATEFUL
+            // Donation Mascot (Image 2: IMG_20260910_141543.png)
+            Image(
+                painter = painterResource(id = R.drawable.mascot_donation_intro),
+                contentDescription = "Support Focivo Mascot",
+                modifier = Modifier
+                    .height(110.dp)
+                    .wrapContentWidth(),
+                contentScale = ContentScale.Fit
             )
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -334,21 +373,65 @@ fun SupportLockZenSheet(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // UPI Button
-            GlassButton(
-                text = "Pay ₹$effectiveAmount via UPI (GPay/PhonePe)",
-                onClick = { launchUpiPayment() },
-                isPrimary = true,
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.QrCode,
-                        contentDescription = null,
-                        tint = NearBlack,
-                        modifier = Modifier.size(18.dp)
-                    )
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (isWaitingPayment) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isDark) Color(0xFF232B22) else Color(0xFFEDF7E7),
+                    border = BorderStroke(1.dp, RegainLimePrimary.copy(alpha = 0.6f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = RegainLimeDeepText
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Complete payment in your UPI app",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = PoppinsFontFamily,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = textPrimary,
+                                    fontSize = 13.5.sp
+                                )
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Confirmation options will appear in ${paymentWaitRemaining}s...",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontFamily = PoppinsFontFamily,
+                                color = textSecondary,
+                                fontSize = 11.5.sp
+                            )
+                        )
+                    }
+                }
+            } else {
+                // UPI Button
+                GlassButton(
+                    text = "Pay ₹$effectiveAmount via UPI (GPay/PhonePe)",
+                    onClick = { launchUpiPayment() },
+                    isPrimary = true,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.QrCode,
+                            contentDescription = null,
+                            tint = NearBlack,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -422,7 +505,7 @@ fun SupportLockZenSheet(
                     }
                 ) {
                     Text(
-                        text = "Not Yet",
+                        text = "Cancel",
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontFamily = PoppinsFontFamily,
                             color = textSecondary
@@ -441,9 +524,14 @@ fun SupportLockZenSheet(
                 onDismiss()
             },
             icon = {
-                RegainMascotView(
-                    size = 90.dp,
-                    pose = MascotPose.GRATEFUL
+                // Thank You Mascot (Image 3: IMG_20260910_141528.png)
+                Image(
+                    painter = painterResource(id = R.drawable.mascot_donation_thankyou),
+                    contentDescription = "Thank You Mascot",
+                    modifier = Modifier
+                        .height(110.dp)
+                        .padding(bottom = 4.dp),
+                    contentScale = ContentScale.Fit
                 )
             },
             title = {

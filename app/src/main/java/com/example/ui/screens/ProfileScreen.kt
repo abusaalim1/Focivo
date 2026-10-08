@@ -590,6 +590,92 @@ fun ProfileScreen(
                 }
             }
 
+            // Support Focivo / Donation Option (Positioned prominently near the top)
+            item {
+                Spacer(modifier = Modifier.height(10.dp))
+                GlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("profile_support_focivo_card"),
+                    shape = RoundedCornerShape(20.dp),
+                    onClick = onOpenSupportLockZen
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(RegainLimeContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Favorite,
+                                    contentDescription = "Support Focivo",
+                                    tint = RegainLimeDeepText,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Support Focivo",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontFamily = PoppinsFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textPrimary,
+                                            fontSize = 15.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(RegainLimeContainer)
+                                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "UPI DONATE",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontFamily = PoppinsFontFamily,
+                                                color = RegainLimeDeepText,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 9.sp
+                                            )
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Voluntary contribution · Keep Focivo free & growing",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        color = textSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = textSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
             // Focus Shield Shortcut Card
             item {
                 GlassCard(
@@ -1112,92 +1198,6 @@ fun ProfileScreen(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "Tap to check for new features & fixes",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = PoppinsFontFamily,
-                                        color = textSecondary,
-                                        fontSize = 11.sp
-                                    )
-                                )
-                            }
-                        }
-
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = textSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-
-            // Support Focivo / Donation Option
-            item {
-                Spacer(modifier = Modifier.height(10.dp))
-                GlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("profile_support_focivo_card"),
-                    shape = RoundedCornerShape(20.dp),
-                    onClick = onOpenSupportLockZen
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Favorite,
-                                    contentDescription = "Support Focivo",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(14.dp))
-
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = "Support Focivo",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontFamily = PoppinsFontFamily,
-                                            fontWeight = FontWeight.Bold,
-                                            color = textPrimary,
-                                            fontSize = 15.sp
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(CircleShape)
-                                            .background(RegainLimeContainer)
-                                            .padding(horizontal = 7.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = "UPI DONATE",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontFamily = PoppinsFontFamily,
-                                                color = RegainLimeDeepText,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 9.sp
-                                            )
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "Voluntary contribution · Keep Focivo free & growing",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         color = textSecondary,
