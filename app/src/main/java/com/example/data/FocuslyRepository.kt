@@ -847,7 +847,7 @@ class FocuslyRepository(private val context: Context) {
                             display_name = displayName,
                             study_seconds = effectiveStudySeconds,
                             weekly_study_seconds = weeklyStudySeconds,
-                            current_week_start = FirebaseSyncManager.LeaderboardDateUtils.getCurrentWeekMonday(),
+                            current_week_start = LeaderboardDateUtils.getCurrentWeekMonday(),
                             streak = preferences.currentStreak.coerceAtLeast(1),
                             subject_tag = preferences.primaryStudyGoal.ifBlank { "Study" },
                             avatar_url = avatar
@@ -1710,7 +1710,7 @@ class FocuslyRepository(private val context: Context) {
                     display_name = displayName,
                     study_seconds = ((_allSessions.value.sumOf { it.durationSeconds })).toLong().coerceAtLeast(1L),
                     weekly_study_seconds = weeklyStudySecondsSync,
-                    current_week_start = FirebaseSyncManager.LeaderboardDateUtils.getCurrentWeekMonday(),
+                    current_week_start = LeaderboardDateUtils.getCurrentWeekMonday(),
                     streak = prefs.currentStreak.coerceAtLeast(1),
                     subject_tag = prefs.primaryStudyGoal.ifBlank { "Study" },
                     avatar_url = avatar
