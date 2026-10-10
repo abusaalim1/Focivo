@@ -46,7 +46,9 @@ data class HallOfFameItem(
 )
 
 object LeaderboardDateUtils {
-    private val isoFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    // SimpleDateFormat is not thread-safe; create a fresh instance per call
+    // (this object is used from concurrent Dispatchers.IO coroutines).
+    private fun isoFormat() = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 
     /**
      * Returns Monday of the current week in ISO-8601 format: YYYY-MM-DD
@@ -57,7 +59,7 @@ object LeaderboardDateUtils {
         // Convert DAY_OF_WEEK (Sunday=1, Monday=2, ..., Saturday=7) to days since Monday
         val daysToSubtract = (dayOfWeek - Calendar.MONDAY + 7) % 7
         cal.add(Calendar.DAY_OF_MONTH, -daysToSubtract)
-        return isoFormat.format(cal.time)
+        return isoFormat().format(cal.time)
     }
 
     /**
@@ -68,7 +70,7 @@ object LeaderboardDateUtils {
         val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
         val daysToSubtract = (dayOfWeek - Calendar.MONDAY + 7) % 7
         cal.add(Calendar.DAY_OF_MONTH, -daysToSubtract - 7)
-        return isoFormat.format(cal.time)
+        return isoFormat().format(cal.time)
     }
 
     /**
@@ -76,13 +78,13 @@ object LeaderboardDateUtils {
      */
     fun formatWeekRange(startIso: String, endIso: String): String {
         return try {
-            val startDate = isoFormat.parse(startIso) ?: return "Week of $startIso"
+            val startDate = isoFormat().parse(startIso) ?: return "Week of $startIso"
             val cal = Calendar.getInstance().apply { time = startDate }
             val monthStr = SimpleDateFormat("MMM", Locale.US).format(cal.time)
             val startDay = cal.get(Calendar.DAY_OF_MONTH)
 
             val endDay = if (endIso.isNotBlank()) {
-                val endDate = isoFormat.parse(endIso)
+                val endDate = isoFormat().parse(endIso)
                 if (endDate != null) {
                     val calEnd = Calendar.getInstance().apply { time = endDate }
                     calEnd.get(Calendar.DAY_OF_MONTH)
@@ -284,14 +286,9 @@ class FirebaseSyncManager(private val context: Context) {
     }
 
     fun syncUserProfile(userId: String, displayName: String, studySeconds: Int, streak: Int) {
-        recordUserStudyProgress(
-            userId = userId,
-            displayName = displayName,
-            studySeconds = studySeconds.toLong(),
-            weeklyStudySeconds = 0L,
-            streak = streak,
-            subjectTag = "Deep Work"
-        )
+        // NOTE: intentionally does NOT touch the leaderboard here. Previously this
+        // hardcoded weeklyStudySeconds = 0L, wiping the user's weekly counter.
+        _syncStatus.value = "Profile Synced"
     }
 
     fun syncSession(session: FocusSessionEntity, totalPoints: Int, streak: Int) {
