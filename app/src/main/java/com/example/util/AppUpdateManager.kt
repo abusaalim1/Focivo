@@ -154,22 +154,25 @@ object AppUpdateManager {
                 .get()
                 .build()
 
-            val response = httpClient.newCall(request).execute()
-            if (response.isSuccessful) {
-                val body = response.body?.string()
-                if (!body.isNullOrBlank() && body.startsWith("[")) {
-                    val array = org.json.JSONArray(body)
-                    if (array.length() > 0) {
-                        val obj = array.getJSONObject(0)
-                        return AppUpdateDto(
-                            id = obj.optString("id"),
-                            versionCode = obj.optInt("version_code", 1),
-                            versionName = obj.optString("version_name", "1.0.0"),
-                            releaseNotes = obj.optString("release_notes", ""),
-                            downloadUrl = obj.optString("download_url", ""),
-                            isForceUpdate = obj.optBoolean("is_force_update", false),
-                            publishedAt = obj.optString("published_at", "")
-                        )
+            // use{} closes the response (and recycles the pooled connection)
+            // on every path, including non-2xx responses.
+            httpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    if (!body.isNullOrBlank() && body.startsWith("[")) {
+                        val array = org.json.JSONArray(body)
+                        if (array.length() > 0) {
+                            val obj = array.getJSONObject(0)
+                            return AppUpdateDto(
+                                id = obj.optString("id"),
+                                versionCode = obj.optInt("version_code", 1),
+                                versionName = obj.optString("version_name", "1.0.0"),
+                                releaseNotes = obj.optString("release_notes", ""),
+                                downloadUrl = obj.optString("download_url", ""),
+                                isForceUpdate = obj.optBoolean("is_force_update", false),
+                                publishedAt = obj.optString("published_at", "")
+                            )
+                        }
                     }
                 }
             }
