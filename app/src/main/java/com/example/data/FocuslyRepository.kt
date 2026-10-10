@@ -21,6 +21,14 @@ import org.json.JSONObject
 
 class FocuslyRepository(private val context: Context) {
 
+    /** Logs failed Supabase writes at ERROR level with the entity id.
+     * Previously these Results were discarded, so transient failures were silently lost. */
+    private fun logSupabaseResult(res: Result<*>, op: String, entityId: String) {
+        if (res.isFailure) {
+            Log.e(TAG, "Supabase $op failed for id=$entityId: ${res.exceptionOrNull()?.message}")
+        }
+    }
+
     companion object {
         private const val TAG = "FocuslyRepository"
         @Volatile
@@ -34,6 +42,8 @@ class FocuslyRepository(private val context: Context) {
     }
 
     private val scope = CoroutineScope(Dispatchers.IO)
+    // Guards read-modify-write on _appDailyLimits (lost minutes / double-spent bypass)
+    private val limitsMutex = kotlinx.coroutines.sync.Mutex()
 
     // In-memory state flows backed by local SharedPreferences
     private val _allTasks = MutableStateFlow<List<TaskEntity>>(emptyList())
@@ -64,7 +74,12 @@ class FocuslyRepository(private val context: Context) {
     }
 
     init {
-        loadAllLocalData()
+        // Load off the calling thread: loadAllLocalData() does disk IO and getInstance()
+        // is typically called on the main thread (ANR risk as data grows).
+        // StateFlow.value sets are thread-safe; collectors receive data when ready.
+        scope.launch {
+            loadAllLocalData()
+        }
     }
 
     private fun loadAllLocalData() {
@@ -501,23 +516,24 @@ class FocuslyRepository(private val context: Context) {
         if (!uid.isNullOrBlank()) {
             scope.launch {
                 try {
-                    val dto = SupabaseUserDto(
-                        id = uid,
-                        email = user.email,
-                        full_name = user.fullName,
-                        primary_goal = user.primaryGoal,
-                        focus_style = user.focusStyle,
-                        daily_target_hours = user.dailyTargetHours,
-                        peak_productivity_time = user.peakProductivityTime,
-                        primary_distraction = user.primaryDistraction,
-                        sound_preference = user.soundPreference,
-                        student_age = user.studentAge,
-                        student_class = user.studentClass,
-                        student_stream = user.studentStream,
-                        study_schedule = user.studySchedule,
-                        mobile_break_time = user.mobileBreakTime
+                    // Targeted update: only these columns are written. (Previously a
+                    // partial-DTO upsert wiped avatar_url / survey columns with nulls.)
+                    val columns = mapOf(
+                        "email" to user.email,
+                        "full_name" to user.fullName,
+                        "primary_goal" to user.primaryGoal,
+                        "focus_style" to user.focusStyle,
+                        "daily_target_hours" to user.dailyTargetHours,
+                        "peak_productivity_time" to user.peakProductivityTime,
+                        "primary_distraction" to user.primaryDistraction,
+                        "sound_preference" to user.soundPreference,
+                        "student_age" to user.studentAge,
+                        "student_class" to user.studentClass,
+                        "student_stream" to user.studentStream,
+                        "study_schedule" to user.studySchedule,
+                        "mobile_break_time" to user.mobileBreakTime
                     )
-                    SupabaseService.getInstance().upsertUserProfile(dto)
+                    SupabaseService.getInstance().updateUserProfileColumns(uid, columns)
                 } catch (e: Exception) {
                     Log.w(TAG, "Error updating Supabase user profile: ${e.message}")
                 }
@@ -549,7 +565,7 @@ class FocuslyRepository(private val context: Context) {
                         notes = newTask.notes,
                         date = newTask.date
                     )
-                    SupabaseService.getInstance().upsertTask(dto)
+                    logSupabaseResult(SupabaseService.getInstance().upsertTask(dto), "upsertTask", dto.id)
                 } catch (e: Exception) {
                     Log.w(TAG, "Error inserting task to Supabase: ${e.message}")
                 }
@@ -580,7 +596,7 @@ class FocuslyRepository(private val context: Context) {
                         notes = task.notes,
                         date = task.date
                     )
-                    SupabaseService.getInstance().upsertTask(dto)
+                    logSupabaseResult(SupabaseService.getInstance().upsertTask(dto), "upsertTask", dto.id)
                 } catch (e: Exception) {
                     Log.w(TAG, "Error updating task to Supabase: ${e.message}")
                 }
@@ -629,7 +645,7 @@ class FocuslyRepository(private val context: Context) {
                         notes = task.notes,
                         date = task.date
                     )
-                    SupabaseService.getInstance().upsertTask(dto)
+                    logSupabaseResult(SupabaseService.getInstance().upsertTask(dto), "upsertTask", dto.id)
                 } catch (e: Exception) {
                     Log.w(TAG, "Error setting task completion on Supabase: ${e.message}")
                 }
@@ -663,7 +679,7 @@ class FocuslyRepository(private val context: Context) {
                         hour_of_day = newSession.hourOfDay,
                         notes = newSession.notes
                     )
-                    SupabaseService.getInstance().upsertFocusSession(dto)
+                    logSupabaseResult(SupabaseService.getInstance().upsertFocusSession(dto), "upsertFocusSession", dto.id)
                 } catch (e: Exception) {
                     Log.w(TAG, "Error recording session on Supabase: ${e.message}")
                 }
@@ -698,6 +714,14 @@ class FocuslyRepository(private val context: Context) {
             } catch (e: Exception) {
                 Log.w(TAG, "Error deleting session in Firestore: ${e.message}")
             }
+            // Also delete from Supabase, otherwise the row resurrects on next sync.
+            try {
+                val sessionUuid = java.util.UUID.nameUUIDFromBytes("session_$sessionId".toByteArray()).toString()
+                val res = SupabaseService.getInstance().deleteFocusSession(sessionUuid)
+                if (res.isFailure) Log.w(TAG, "Supabase deleteSession failed: ${res.exceptionOrNull()?.message}")
+            } catch (e: Exception) {
+                Log.w(TAG, "Error deleting session in Supabase: ${e.message}")
+            }
         }
     }
 
@@ -722,7 +746,7 @@ class FocuslyRepository(private val context: Context) {
                         completion_rate = newReflection.completionRate,
                         reflection_text = newReflection.reflectionText
                     )
-                    SupabaseService.getInstance().upsertReflection(dto)
+                    logSupabaseResult(SupabaseService.getInstance().upsertReflection(dto), "upsertReflection", dto.id)
                 } catch (e: Exception) {
                     Log.w(TAG, "Error inserting reflection on Supabase: ${e.message}")
                 }
@@ -783,7 +807,7 @@ class FocuslyRepository(private val context: Context) {
                         never_show_donation_prompt = preferences.neverShowDonationPrompt,
                         last_viewed_sunday_recap_week = preferences.lastViewedSundayRecapWeek
                     )
-                    SupabaseService.getInstance().upsertUserPreferences(dto)
+                    logSupabaseResult(SupabaseService.getInstance().upsertUserPreferences(dto), "upsertUserPreferences", dto.user_id)
 
                     // Also sync to public.study_leaderboard with real accumulated session study duration
                     val emailPart = preferences.currentUserEmail?.substringBefore("@")
@@ -799,12 +823,31 @@ class FocuslyRepository(private val context: Context) {
 
                     val totalActualStudySeconds = _allSessions.value.sumOf { it.durationSeconds }.toLong()
                     val effectiveStudySeconds = totalActualStudySeconds
+                    // Weekly total: only sessions completed since Monday 00:00 local time.
+                    // (Previously the LIFETIME total was written into weekly_study_seconds,
+                    // corrupting weekly rankings and Hall of Fame.)
+                    val weekStartMs = run {
+                        val cal = java.util.Calendar.getInstance()
+                        val dayOfWeek = cal.get(java.util.Calendar.DAY_OF_WEEK)
+                        val daysToSubtract = (dayOfWeek - java.util.Calendar.MONDAY + 7) % 7
+                        cal.add(java.util.Calendar.DAY_OF_MONTH, -daysToSubtract)
+                        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                        cal.set(java.util.Calendar.MINUTE, 0)
+                        cal.set(java.util.Calendar.SECOND, 0)
+                        cal.set(java.util.Calendar.MILLISECOND, 0)
+                        cal.timeInMillis
+                    }
+                    val weeklyStudySeconds = _allSessions.value
+                        .filter { it.completedAt >= weekStartMs }
+                        .sumOf { it.durationSeconds }.toLong()
 
                     SupabaseService.getInstance().upsertLeaderboard(
                         SupabaseStudyLeaderboardDto(
                             user_id = resolvedUid,
                             display_name = displayName,
                             study_seconds = effectiveStudySeconds,
+                            weekly_study_seconds = weeklyStudySeconds,
+                            current_week_start = FirebaseSyncManager.LeaderboardDateUtils.getCurrentWeekMonday(),
                             streak = preferences.currentStreak.coerceAtLeast(1),
                             subject_tag = preferences.primaryStudyGoal.ifBlank { "Study" },
                             avatar_url = avatar
@@ -819,7 +862,7 @@ class FocuslyRepository(private val context: Context) {
                         userId = resolvedUid,
                         displayName = displayName,
                         studySeconds = effectiveStudySeconds,
-                        weeklyStudySeconds = effectiveStudySeconds,
+                        weeklyStudySeconds = weeklyStudySeconds,
                         streak = preferences.currentStreak.coerceAtLeast(1),
                         subjectTag = preferences.primaryStudyGoal.ifBlank { "Study" },
                         avatarUrl = avatar
@@ -922,7 +965,7 @@ class FocuslyRepository(private val context: Context) {
                         notes = task.notes,
                         date = task.date
                     )
-                    SupabaseService.getInstance().upsertTask(dto)
+                    logSupabaseResult(SupabaseService.getInstance().upsertTask(dto), "upsertTask", dto.id)
                 }
                 val mergedTasks = mappedRemoteTasks + localOnlyTasks
                 _allTasks.value = mergedTasks
@@ -969,7 +1012,7 @@ class FocuslyRepository(private val context: Context) {
                         hour_of_day = session.hourOfDay,
                         notes = session.notes
                     )
-                    SupabaseService.getInstance().upsertFocusSession(dto)
+                    logSupabaseResult(SupabaseService.getInstance().upsertFocusSession(dto), "upsertFocusSession", dto.id)
                 }
                 val mergedSessions = (mappedRemoteSessions + localOnlySessions).sortedByDescending { it.completedAt }
                 _allSessions.value = mergedSessions
@@ -1003,7 +1046,7 @@ class FocuslyRepository(private val context: Context) {
                             completion_rate = ref.completionRate,
                             reflection_text = ref.reflectionText
                         )
-                        SupabaseService.getInstance().upsertReflection(dto)
+                        logSupabaseResult(SupabaseService.getInstance().upsertReflection(dto), "upsertReflection", dto.id)
                     }
                     val mergedReflections = mappedReflections + localOnly
                     _allReflections.value = mergedReflections
@@ -1020,7 +1063,7 @@ class FocuslyRepository(private val context: Context) {
                             completion_rate = reflection.completionRate,
                             reflection_text = reflection.reflectionText
                         )
-                        SupabaseService.getInstance().upsertReflection(dto)
+                        logSupabaseResult(SupabaseService.getInstance().upsertReflection(dto), "upsertReflection", dto.id)
                     }
                 }
 
@@ -1175,7 +1218,7 @@ class FocuslyRepository(private val context: Context) {
                             never_show_donation_prompt = prefs.neverShowDonationPrompt,
                             last_viewed_sunday_recap_week = prefs.lastViewedSundayRecapWeek
                         )
-                        SupabaseService.getInstance().upsertUserPreferences(dto)
+                        logSupabaseResult(SupabaseService.getInstance().upsertUserPreferences(dto), "upsertUserPreferences", dto.user_id)
                     }
                 }
 
@@ -1245,7 +1288,7 @@ class FocuslyRepository(private val context: Context) {
                                 is_enabled = local.isEnabled,
                                 vibrate = local.vibrate
                             )
-                            SupabaseService.getInstance().upsertAlarm(dto)
+                            logSupabaseResult(SupabaseService.getInstance().upsertAlarm(dto), "upsertAlarm", dto.id)
                         }
                     }
                 } catch (e: Exception) {
@@ -1401,6 +1444,7 @@ class FocuslyRepository(private val context: Context) {
     }
 
     suspend fun saveAppDailyLimit(limit: AppDailyLimitEntity) {
+        limitsMutex.withLock {
         val checked = limit.checkAndResetDailyUsage()
         val currentList = _appDailyLimits.value.toMutableList()
         val existingIndex = currentList.indexOfFirst { it.appPackage == checked.appPackage || it.id == checked.id }
@@ -1429,9 +1473,10 @@ class FocuslyRepository(private val context: Context) {
                 last_reset_date = checked.lastResetDate.ifBlank { checked.getTodayDateString() },
                 is_enabled = checked.isEnabled
             )
-            SupabaseService.getInstance().upsertAppDailyLimit(dto)
+            logSupabaseResult(SupabaseService.getInstance().upsertAppDailyLimit(dto), "upsertAppDailyLimit", dto.id)
         }
-    }
+    
+    }}
 
     suspend fun deleteAppDailyLimit(id: String) {
         val currentList = _appDailyLimits.value.filter { it.id != id }
@@ -1441,6 +1486,7 @@ class FocuslyRepository(private val context: Context) {
     }
 
     suspend fun useEmergencyAccess(appPackage: String, durationMinutes: Int = 15) {
+        limitsMutex.withLock {
         val currentList = _appDailyLimits.value.toMutableList()
         val index = currentList.indexOfFirst { it.appPackage == appPackage }
         if (index >= 0) {
@@ -1470,13 +1516,14 @@ class FocuslyRepository(private val context: Context) {
                         last_reset_date = updated.lastResetDate,
                         is_enabled = updated.isEnabled
                     )
-                    SupabaseService.getInstance().upsertAppDailyLimit(dto)
+                    logSupabaseResult(SupabaseService.getInstance().upsertAppDailyLimit(dto), "upsertAppDailyLimit", dto.id)
                 }
             }
         }
-    }
+    
+    }}
 
-    suspend fun updateAppUsageMinutes(appPackage: String, additionalMinutes: Int = 1): AppDailyLimitEntity? {
+    suspend fun updateAppUsageMinutes(appPackage: String, additionalMinutes: Int = 1): AppDailyLimitEntity? {limitsMutex.withLock {
         val currentList = _appDailyLimits.value.toMutableList()
         val index = currentList.indexOfFirst { it.appPackage == appPackage }
         if (index >= 0) {
@@ -1504,12 +1551,13 @@ class FocuslyRepository(private val context: Context) {
                     last_reset_date = updated.lastResetDate,
                     is_enabled = updated.isEnabled
                 )
-                SupabaseService.getInstance().upsertAppDailyLimit(dto)
+                logSupabaseResult(SupabaseService.getInstance().upsertAppDailyLimit(dto), "upsertAppDailyLimit", dto.id)
             }
             return updated
         }
         return null
-    }
+    
+    }}
 
     suspend fun syncAppDailyLimitsFromSupabase(userId: String) {
         if (userId.isBlank()) return
@@ -1640,13 +1688,29 @@ class FocuslyRepository(private val context: Context) {
                 motivation_style = prefs.motivationStyle,
                 has_completed_intake_survey = prefs.hasCompletedIntakeSurvey || prefs.hasCompletedOnboarding
             )
-            SupabaseService.getInstance().upsertUserProfile(userDto)
+            logSupabaseResult(SupabaseService.getInstance().upsertUserProfile(userDto), "upsertUserProfile", userDto.id)
 
+            val weekStartMsSync = run {
+                val cal = java.util.Calendar.getInstance()
+                val dayOfWeek = cal.get(java.util.Calendar.DAY_OF_WEEK)
+                val daysToSubtract = (dayOfWeek - java.util.Calendar.MONDAY + 7) % 7
+                cal.add(java.util.Calendar.DAY_OF_MONTH, -daysToSubtract)
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                cal.set(java.util.Calendar.MINUTE, 0)
+                cal.set(java.util.Calendar.SECOND, 0)
+                cal.set(java.util.Calendar.MILLISECOND, 0)
+                cal.timeInMillis
+            }
+            val weeklyStudySecondsSync = _allSessions.value
+                .filter { it.completedAt >= weekStartMsSync }
+                .sumOf { it.durationSeconds }.toLong()
             val lbRes = SupabaseService.getInstance().upsertLeaderboard(
                 SupabaseStudyLeaderboardDto(
                     user_id = resolvedUid,
                     display_name = displayName,
                     study_seconds = ((_allSessions.value.sumOf { it.durationSeconds })).toLong().coerceAtLeast(1L),
+                    weekly_study_seconds = weeklyStudySecondsSync,
+                    current_week_start = FirebaseSyncManager.LeaderboardDateUtils.getCurrentWeekMonday(),
                     streak = prefs.currentStreak.coerceAtLeast(1),
                     subject_tag = prefs.primaryStudyGoal.ifBlank { "Study" },
                     avatar_url = avatar
@@ -1667,7 +1731,7 @@ class FocuslyRepository(private val context: Context) {
                 } else {
                     sched
                 }
-                SupabaseService.getInstance().upsertScheduledBlock(toPush)
+                logSupabaseResult(SupabaseService.getInstance().upsertScheduledBlock(toPush), "upsertScheduledBlock", toPush.id)
             }
             Log.i(TAG, "[PreLogoutSync] Synced ${localSchedules.size} scheduled blocks to Supabase.")
         } catch (e: Exception) {
@@ -1690,7 +1754,7 @@ class FocuslyRepository(private val context: Context) {
                     is_enabled = alarm.isEnabled,
                     vibrate = alarm.vibrate
                 )
-                SupabaseService.getInstance().upsertAlarm(dto)
+                logSupabaseResult(SupabaseService.getInstance().upsertAlarm(dto), "upsertAlarm", dto.id)
             }
             Log.i(TAG, "[PreLogoutSync] Synced ${localAlarms.size} alarms to Supabase.")
         } catch (e: Exception) {
@@ -1716,7 +1780,7 @@ class FocuslyRepository(private val context: Context) {
                     hour_of_day = sess.hourOfDay,
                     notes = sess.notes
                 )
-                SupabaseService.getInstance().upsertFocusSession(dto)
+                logSupabaseResult(SupabaseService.getInstance().upsertFocusSession(dto), "upsertFocusSession", dto.id)
             }
             Log.i(TAG, "[PreLogoutSync] Synced ${sessions.size} sessions to Supabase.")
         } catch (e: Exception) {
@@ -1741,7 +1805,7 @@ class FocuslyRepository(private val context: Context) {
                     notes = task.notes,
                     date = task.date
                 )
-                SupabaseService.getInstance().upsertTask(dto)
+                logSupabaseResult(SupabaseService.getInstance().upsertTask(dto), "upsertTask", dto.id)
             }
             Log.i(TAG, "[PreLogoutSync] Synced ${tasks.size} tasks to Supabase.")
         } catch (e: Exception) {
@@ -1763,7 +1827,7 @@ class FocuslyRepository(private val context: Context) {
                     completion_rate = ref.completionRate,
                     reflection_text = ref.reflectionText
                 )
-                SupabaseService.getInstance().upsertReflection(dto)
+                logSupabaseResult(SupabaseService.getInstance().upsertReflection(dto), "upsertReflection", dto.id)
             }
         } catch (e: Exception) {
             Log.w(TAG, "[PreLogoutSync] Error syncing reflections: ${e.message}")
@@ -1787,7 +1851,7 @@ class FocuslyRepository(private val context: Context) {
                     last_reset_date = limit.lastResetDate,
                     is_enabled = limit.isEnabled
                 )
-                SupabaseService.getInstance().upsertAppDailyLimit(dto)
+                logSupabaseResult(SupabaseService.getInstance().upsertAppDailyLimit(dto), "upsertAppDailyLimit", dto.id)
             }
         } catch (e: Exception) {
             Log.w(TAG, "[PreLogoutSync] Error syncing app daily limits: ${e.message}")
