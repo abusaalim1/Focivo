@@ -153,8 +153,10 @@ object YouTubeVideoClassifier {
         val fullCombined = "$cleanTitle $cleanChannel $cleanMeta"
 
         // 0. Zero Tolerance Check: 18+ / Adult / NSFW / Sensual Content
+        // Word-boundary matching so legit titles ("Illustration basics",
+        // "Middlesex University Lecture") are not false-blocked.
         for (adultKey in ADULT_AND_NSFW_KEYWORDS) {
-            if (fullCombined.contains(adultKey)) {
+            if (Regex("""(?<!\w)${Regex.escape(adultKey)}(?!\w)""").containsMatchIn(fullCombined)) {
                 return VideoVerdict(
                     isEducational = false,
                     confidence = 1.0f,
