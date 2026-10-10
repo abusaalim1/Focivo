@@ -20,6 +20,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.Calendar
 
 object AppDailyLimitsManager {
@@ -28,6 +30,13 @@ object AppDailyLimitsManager {
 
     private var monitorJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO)
+
+    /**
+     * Serializes all daily-limit repo writes shared between the monitor
+     * coroutine and checkAndEnforceLimit, so concurrent full-entity saves
+     * cannot clobber reminder flags or minutes-used updates.
+     */
+    private val repoSaveMutex = Mutex()
 
     fun init(context: Context) {
         createNotificationChannel(context)
@@ -88,7 +97,7 @@ object AppDailyLimitsManager {
 
             if (realMinutes != resetLimit.minutesUsedToday) {
                 val updated = resetLimit.copy(minutesUsedToday = realMinutes)
-                repo.saveAppDailyLimit(updated)
+                repoSaveMutex.withLock { repo.saveAppDailyLimit(updated) }
             }
         }
     }
@@ -332,7 +341,9 @@ object AppDailyLimitsManager {
     }
 
     private suspend fun repoSave(context: Context, limit: AppDailyLimitEntity) {
-        FocuslyRepository.getInstance(context).saveAppDailyLimit(limit)
+        repoSaveMutex.withLock {
+            FocuslyRepository.getInstance(context).saveAppDailyLimit(limit)
+        }
     }
 
     private fun sendNotification(context: Context, notificationId: Int, title: String, message: String) {
