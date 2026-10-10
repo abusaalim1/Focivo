@@ -1,0 +1,298 @@
+name: Build and Publish Release APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Temurin Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Verify Java environment
+        run: |
+          echo "Checking Java version..."
+          java -version
+          echo "JAVA_HOME: $JAVA_HOME"
+
+          if [ -z "$JAVA_HOME" ]; then
+            echo "Error: JAVA_HOME is not set."
+            exit 1
+          fi
+
+          JAVA_MAJOR_VERSION=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
+          if [ -z "$JAVA_MAJOR_VERSION" ]; then
+            echo "Error: Unable to detect Java major version."
+            exit 1
+          fi
+
+          echo "Detected active Java major version: $JAVA_MAJOR_VERSION"
+          if [ "$JAVA_MAJOR_VERSION" -lt 21 ]; then
+            echo "Error: Java major version must be 21 or higher for AGP 9.1.1. Found: $JAVA_MAJOR_VERSION"
+            exit 1
+          fi
+          echo "Java environment verified successfully."
+
+      - name: Set up Android SDK & Accept All Licenses
+        run: |
+          echo "Taking ownership of Android SDK directory..."
+          sudo chown -R $USER:$USER "$ANDROID_HOME" 2>/dev/null || true
+          sudo chmod -R u+rwX "$ANDROID_HOME" 2>/dev/null || true
+
+          echo "Configuring Android SDK licenses..."
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf "24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479edd01e217609cb32e753ac077a977\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          printf "601085b94cd77f0b54ff86406957099ebe79c4d6\n" > "$ANDROID_HOME/licenses/android-googletv-license"
+          printf "33b6a2b64607f11b759f320ef9dff4ae5c47d97a\n" > "$ANDROID_HOME/licenses/google-gdk-license"
+          printf "859f317696f67ef3d7f30a50a5560e7834b43903\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
+          printf "ceff83576aac4f7f37cb98fe189e9fb3c49d3b81\n" > "$ANDROID_HOME/licenses/android-googlexr-license"
+          printf "e9acab5b5fbb560a72cfaecce8946896ff6aab9d\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
+
+          echo "Accepting any interactive licenses..."
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+
+          echo "Installing Android 36 SDK Platform components..."
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" \
+            "platforms;android-36.1" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" || true
+
+          echo "Writing local.properties..."
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Ensure environment configuration
+        run: |
+          if [ ! -f .env ] && [ -f .env.example ]; then
+            echo "Creating .env from .env.example..."
+            cp .env.example .env
+          elif [ ! -f .env ]; then
+            touch .env
+          fi
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Restore Release Keystore from Base64 Secret
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "Error: KEYSTORE_BASE64 secret is not set or empty. Cannot build signed release APK."
+            exit 1
+          fi
+          echo "Restoring release keystore to ./my-upload-key.jks"
+          echo "$KEYSTORE_BASE64" | base64 --decode > ./my-upload-key.jks
+          if [ ! -f ./my-upload-key.jks ] || [ ! -s ./my-upload-key.jks ]; then
+            echo "Error: Failed to restore keystore file or restored file is empty."
+            exit 1
+          fi
+          echo "Keystore successfully restored."
+
+      - name: Build Release APK
+        env:
+          KEYSTORE_PATH: "./my-upload-key.jks"
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3584m -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false"
+        run: |
+          echo "Starting Gradle release build..."
+          gradle :app:assembleRelease --stacktrace --no-configuration-cache 2>&1 | tee gradle-build.log
+
+      - name: Capture build failure details
+        if: failure()
+        run: |
+          if [ -f gradle-build.log ]; then
+            echo "## ❌ Gradle Build Error Details" >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 120 gradle-build.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload build log on failure
+        if: failure()
+        run: |
+          echo "Uploading gradle build log artifact..."
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-release-build-log
+          path: gradle-build.log
+          if-no-files-found: ignore
+
+      - name: Verify release APK
+        run: |
+          EXPECTED_APK="app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$EXPECTED_APK" ]; then
+            echo "Error: Expected Release APK missing at $EXPECTED_APK"
+            echo "Searching only inside app/build/outputs/apk:"
+            if [ -d "app/build/outputs/apk" ]; then
+              find app/build/outputs/apk -maxdepth 3 -type f -name "*.apk" || true
+            else
+              echo "Directory app/build/outputs/apk not found."
+            fi
+            exit 1
+          fi
+
+          if [ ! -s "$EXPECTED_APK" ]; then
+            echo "Error: Release APK file $EXPECTED_APK is empty."
+            exit 1
+          fi
+
+          case "$EXPECTED_APK" in
+            *.apk) ;;
+            *)
+              echo "Error: File $EXPECTED_APK does not have .apk extension."
+              exit 1
+              ;;
+          esac
+
+          echo "Release APK verified successfully: $EXPECTED_APK"
+
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Prepare APK release asset
+        id: prepare_asset
+        run: |
+          TEMP_ASSET_DIR="${{ runner.temp }}/release-asset"
+          mkdir -p "$TEMP_ASSET_DIR"
+
+          RAW_REPO_NAME="${{ github.event.repository.name }}"
+          if [ -z "$RAW_REPO_NAME" ]; then
+            RAW_REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          fi
+
+          # Sanitize repository name: lowercase, convert non-alphanumerics to single hyphens, trim edges
+          CLEAN_REPO_NAME=$(echo "$RAW_REPO_NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-+|-+$//g')
+          if [ -z "$CLEAN_REPO_NAME" ]; then
+            CLEAN_REPO_NAME="android-app"
+          fi
+
+          RUN_NUM="${{ github.run_number }}"
+          RELEASE_ASSET_NAME="${CLEAN_REPO_NAME}-release-build-${RUN_NUM}.apk"
+          TARGET_ASSET_PATH="${TEMP_ASSET_DIR}/${RELEASE_ASSET_NAME}"
+
+          cp app/build/outputs/apk/release/app-release.apk "$TARGET_ASSET_PATH"
+
+          if [ ! -s "$TARGET_ASSET_PATH" ]; then
+            echo "Error: Release asset could not be prepared at $TARGET_ASSET_PATH"
+            exit 1
+          fi
+
+          echo "Prepared release asset: $TARGET_ASSET_PATH ($RELEASE_ASSET_NAME)"
+          echo "asset_path=${TARGET_ASSET_PATH}" >> "$GITHUB_OUTPUT"
+          echo "asset_name=${RELEASE_ASSET_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish APK to GitHub Releases
+        id: publish_release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Checking GitHub CLI availability..."
+          gh --version
+
+          ASSET_PATH="${{ steps.prepare_asset.outputs.asset_path }}"
+          ASSET_NAME="${{ steps.prepare_asset.outputs.asset_name }}"
+
+          if [ ! -f "$ASSET_PATH" ] || [ ! -s "$ASSET_PATH" ]; then
+            echo "Error: Prepared release asset $ASSET_PATH is missing or empty."
+            exit 1
+          fi
+
+          case "$ASSET_PATH" in
+            *.apk) ;;
+            *)
+              echo "Error: Asset file $ASSET_PATH does not have an .apk extension."
+              exit 1
+              ;;
+          esac
+
+          RELEASE_TAG="release-apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
+          RELEASE_TITLE="Release APK Build #${{ github.run_number }}"
+
+          NOTES=$(cat << 'EOF'
+          ### Release APK Automated Build
+
+          - **Build Type**: Automatically generated release APK (Signed)
+          - **Built by**: GitHub Actions
+          - **Run Number**: ${{ github.run_number }}
+          - **Run Attempt**: ${{ github.run_attempt }}
+          - **Source Commit**: ${{ github.sha }}
+
+          > **Notice**: This APK is signed with your production release key. Please test thoroughly before distributing to end-users.
+          EOF
+          )
+
+          echo "Publishing release: tag=$RELEASE_TAG, title=$RELEASE_TITLE"
+          gh release create "$RELEASE_TAG" "$ASSET_PATH" \
+            --title "$RELEASE_TITLE" \
+            --notes "$NOTES" \
+            --target "${{ github.sha }}" \
+            --latest
+
+      - name: Report APK download result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "=== APK Release & Download Summary ==="
+          RELEASE_OUTCOME="${{ steps.publish_release.outcome }}"
+
+          if [ "$RELEASE_OUTCOME" = "success" ]; then
+            RELEASE_TAG="release-apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
+            RELEASE_TITLE="Release APK Build #${{ github.run_number }}"
+            ASSET_NAME="${{ steps.prepare_asset.outputs.asset_name }}"
+
+            echo "GitHub Release published successfully."
+            gh release view "$RELEASE_TAG" || true
+
+            RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${RELEASE_TAG}"
+            echo "Release Tag: $RELEASE_TAG"
+            echo "Release Title: $RELEASE_TITLE"
+            echo "Release URL: $RELEASE_URL"
+            echo "APK Asset Filename: $ASSET_NAME"
+
+            {
+              echo "## :rocket: Release APK Build and Release Succeeded"
+              echo ""
+              echo "- **Release Tag**: \`$RELEASE_TAG\`"
+              echo "- **Release Title**: $RELEASE_TITLE"
+              echo "- **APK Asset Filename**: \`$ASSET_NAME\`"
+              echo "- **Release URL**: [View Release]($RELEASE_URL)"
+              echo ""
+              echo ":arrow_down: **Download**: The signed release APK can be downloaded directly from the **Assets** section of the [GitHub Release page]($RELEASE_URL) on your mobile device or computer."
+              echo ""
+              echo "> **Backup**: The standard GitHub Actions artifact (\`app-release-apk\`) is also preserved and available in the workflow run summary."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning ::GitHub Release publishing failed or was skipped, but release APK build succeeded."
+            echo "The release APK artifact 'app-release-apk' was successfully uploaded and remains available in this GitHub Actions run."
+
+            {
+              echo "## :warning: Release APK Build Succeeded (Release Publishing Failed)"
+              echo ""
+              echo "The signed release APK was built and verified successfully, but creating the GitHub Release encountered an issue."
+              echo ""
+              echo ":package: **Download Backup**: The complete release APK artifact named **\`app-release-apk\`** is available under the **Artifacts** section of this GitHub Actions workflow run."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
