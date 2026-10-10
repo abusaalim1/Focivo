@@ -214,6 +214,13 @@ class FocusShieldService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
+        // Android 12+ throws ForegroundServiceStartNotAllowedException for background
+        // FGS starts; the old code swallowed it and the shield silently failed to
+        // restart after a task swipe. Only attempt the restart below Android 12.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Log.i("FocusShieldService", "onTaskRemoved: skipping FGS restart on Android 12+ (background start not allowed)")
+            return
+        }
         try {
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val endTime = prefs.getLong(PREF_KEY_SHIELD_END_TIME, 0L)
