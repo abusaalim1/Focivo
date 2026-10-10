@@ -29,6 +29,28 @@ A free study-focus app built for students — Pomodoro timer, app blocker, sched
 
 ---
 
+<div align="center">
+
+## 💚 Support Focivo
+
+**Focivo is free forever for students.** If it helped your focus, a small donation keeps development going.
+
+**UPI ID:** `aabu.x@fam`
+
+<a href="upi://pay?pa=aabu.x@fam&pn=Focivo&tn=Support%20Focivo&cu=INR">
+<img src="https://focivoapp.vercel.app/upi-qr.png" width="200" alt="UPI QR Code — scan to donate"/>
+</a>
+
+<br/>
+
+📱 **On mobile?** [Tap here to open your UPI app directly](upi://pay?pa=aabu.x@fam&pn=Focivo&tn=Support%20Focivo&cu=INR)
+<br/>
+💻 **On desktop?** Scan the QR code above with any UPI app (GPay / PhonePe / Paytm)
+
+</div>
+
+---
+
 ## ✨ Overview 🌿
 
 Focivo is an Android-first focus companion for students who want to study deeper, not just longer. It combines proven focus techniques with playful motivation — a growing mascot, streaks, and friendly competition — so staying focused actually feels rewarding.
@@ -109,18 +131,6 @@ Schedule study sessions and set alarms that respect your rhythm. Plan once, focu
 | 🏪 Orion Store | *Coming soon* |
 
 > **Note:** Focivo is distributed outside the Play Store. The APK is signed with our official release key — always download from the links above.
-
----
-
-## 💚 Support Focivo
-
-Focivo is **free forever for students**. If it helped your focus, a small donation keeps development going.
-
-**UPI:** `aabu.x@fam`
-
-<a href="upi://pay?pa=aabu.x@fam&pn=Focivo&tn=Support%20Focivo&cu=INR">
-<img src="https://img.shields.io/badge/Donate_via_UPI-aabu.x@fam-84cc16?style=for-the-badge" alt="Donate via UPI"/>
-</a>
 
 ---
 
