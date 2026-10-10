@@ -33,6 +33,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 data class ActiveAiWarning(
     val logId: String,
@@ -81,7 +82,14 @@ object AiStudyGuardManager {
     }
 
     private val scope = CoroutineScope(Dispatchers.IO)
+    @Volatile
     private var graceObservationJob: Job? = null
+
+    /**
+     * Guards the warning/block/resolve state transitions so concurrent triggers
+     * (accessibility thread, UI thread, IO grace coroutine) cannot double-fire.
+     */
+    private val resolveLock = Any()
 
     private val _activeWarning = MutableStateFlow<ActiveAiWarning?>(null)
     val activeWarning: StateFlow<ActiveAiWarning?> = _activeWarning.asStateFlow()
@@ -192,7 +200,7 @@ object AiStudyGuardManager {
         return if (diff > 0) diff.toInt() else 0
     }
 
-    private val nonStudyMessageCounts = mutableMapOf<String, Int>()
+    private val nonStudyMessageCounts = ConcurrentHashMap<String, Int>()
     private var nonStudyFirstDetectedMs = 0L
     private var currentMonitoredPackage: String? = null
 
@@ -301,7 +309,9 @@ object AiStudyGuardManager {
             graceExpiresAtMillis = graceExpiresAtMillis
         )
 
-        _activeWarning.value = warning
+        synchronized(resolveLock) {
+            _activeWarning.value = warning
+        }
 
         // Show High-Priority Heads-up Notification
         showWarningNotification(context, warning)
@@ -335,21 +345,23 @@ object AiStudyGuardManager {
         recordLog(context, logDto)
 
         // Start grace window observation
-        graceObservationJob?.cancel()
-        graceObservationJob = scope.launch {
-            val checkInterval = 2000L
-            while (true) {
-                delay(checkInterval)
-                val cur = _activeWarning.value ?: break
-                if (System.currentTimeMillis() >= cur.graceExpiresAtMillis) {
-                    // Grace window expired without further violations!
-                    // User corrected course -> STAGE 3: RESOLVED
-                    Log.i(TAG, "Grace window elapsed without repeat violation for ${cur.appName}. Resolving warning.")
-                    triggerStage3Resolved(context, cur, "User adhered to study focus throughout grace period.")
-                    break
+        synchronized(resolveLock) {
+            graceObservationJob?.cancel()
+            graceObservationJob = scope.launch {
+                val checkInterval = 2000L
+                while (true) {
+                    delay(checkInterval)
+                    val cur = _activeWarning.value ?: break
+                    if (System.currentTimeMillis() >= cur.graceExpiresAtMillis) {
+                        // Grace window expired without further violations!
+                        // User corrected course -> STAGE 3: RESOLVED
+                        Log.i(TAG, "Grace window elapsed without repeat violation for ${cur.appName}. Resolving warning.")
+                        triggerStage3Resolved(context, cur, "User adhered to study focus throughout grace period.")
+                        break
+                    }
                 }
-            }
-        }
+        } // end scope.launch
+        } // end synchronized(resolveLock) — grace job replace
     }
 
     /**
@@ -363,8 +375,11 @@ object AiStudyGuardManager {
         warning: ActiveAiWarning,
         repeatReason: String
     ) {
-        graceObservationJob?.cancel()
-        _activeWarning.value = null
+        synchronized(resolveLock) {
+            graceObservationJob?.cancel()
+            graceObservationJob = null
+            _activeWarning.value = null
+        }
 
         val lockDurationMinutes = 180
         val lockDurationSeconds = lockDurationMinutes * 60
@@ -456,10 +471,26 @@ object AiStudyGuardManager {
         warning: ActiveAiWarning,
         resolutionNote: String = "Returned to study in time"
     ) {
-        graceObservationJob?.cancel()
-        _activeWarning.value = null
-        nonStudyFirstDetectedMs = 0L
-        currentMonitoredPackage = null
+        // Atomic claim: only the first caller resolves a given warning, so the
+        // grace-expiry coroutine and a manual/UI resolve cannot double-fire
+        // (duplicate notifications and duplicate Supabase log upserts).
+        val claimed = synchronized(resolveLock) {
+            val cur = _activeWarning.value
+            if (cur == null || cur.logId != warning.logId) {
+                false
+            } else {
+                graceObservationJob?.cancel()
+                graceObservationJob = null
+                _activeWarning.value = null
+                nonStudyFirstDetectedMs = 0L
+                currentMonitoredPackage = null
+                true
+            }
+        }
+        if (!claimed) {
+            Log.d(TAG, "[AiGuard] Resolve skipped — warning ${warning.logId} already handled.")
+            return
+        }
 
         val resolvedState = ActiveAiResolved(
             logId = warning.logId,
