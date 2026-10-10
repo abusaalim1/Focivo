@@ -107,9 +107,19 @@
         </service>
 
         <receiver
-            android:name=".service.ScheduledBlockReceiver"
+            android:name=".service.ScheduledBlockReceiver$BootReceiver"
             android:enabled="true"
             android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".service.ScheduledBlockReceiver"
+            android:enabled="true"
+            android:exported="false">
             <intent-filter>
                 <action android:name="com.example.action.SCHEDULE_TRANSITION" />
                 <action android:name="com.example.action.SCHEDULE_BLOCK_START" />
@@ -117,7 +127,6 @@
                 <action android:name="com.example.action.FOCUS_ALARM_RING" />
                 <action android:name="com.example.action.DISMISS_ALARM" />
                 <action android:name="com.example.action.SNOOZE_ALARM" />
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 
