@@ -15,6 +15,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class SupabaseService {
+    // Shared OkHttpClient: constructing one per call leaked threads/pools.
+    private val sharedOkHttpClient = okhttp3.OkHttpClient()
+
 
     companion object {
         private const val TAG = "SupabaseService"
@@ -149,27 +152,10 @@ class SupabaseService {
                 }
             }
 
-            // 4. Check for direct tokens in query or fragment (#access_token=...&refresh_token=...)
-            val accessToken = uri.getQueryParameter("access_token") ?: fragmentParams["access_token"]
-            val refreshToken = uri.getQueryParameter("refresh_token") ?: fragmentParams["refresh_token"]
-            if (!accessToken.isNullOrBlank() && !refreshToken.isNullOrBlank()) {
-                val expiresIn = (uri.getQueryParameter("expires_in") ?: fragmentParams["expires_in"])?.toLongOrNull() ?: 3600L
-                val tokenType = uri.getQueryParameter("token_type") ?: fragmentParams["token_type"] ?: "bearer"
-                val userSession = io.github.jan.supabase.auth.user.UserSession(
-                    accessToken = accessToken,
-                    refreshToken = refreshToken,
-                    expiresIn = expiresIn,
-                    tokenType = tokenType,
-                    user = null
-                )
-                client.auth.importSession(userSession)
-                val user = client.auth.retrieveUserForCurrentSession()
-                val ctx = SupabaseManager.getApplicationContext()
-                if (ctx != null) {
-                    AndroidPreferenceSessionManager(ctx).saveSession(client.auth.currentSessionOrNull() ?: userSession)
-                }
-                return@withContext Result.success(user.id)
-            }
+            // NOTE: direct raw-token import from custom-scheme deep links was removed.
+            // Accepting #access_token/#refresh_token here let any installed app log the
+            // victim into an attacker's account (login CSRF). Only the PKCE code-exchange
+            // branch above is used (bound to the locally stored code_verifier).
 
             // 5. Fallback: check if session is already initialized
             val user = client.auth.currentUserOrNull()
@@ -333,7 +319,7 @@ class SupabaseService {
                 .get()
                 .build()
 
-            val response = okhttp3.OkHttpClient().newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             val body = response.body?.string().orEmpty()
             if (response.isSuccessful && body.isNotBlank()) {
                 val jsonArray = org.json.JSONArray(body)
@@ -406,8 +392,7 @@ class SupabaseService {
                 .post(requestBody)
                 .build()
 
-            val okHttpClient = okhttp3.OkHttpClient()
-            val response = okHttpClient.newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             val code = response.code
             if (code in 200..299) {
                 Log.i(TAG, "[TaskSync] REST POST succeeded for task_id=${taskDto.id}")
@@ -418,6 +403,20 @@ class SupabaseService {
             }
         } catch (e: Exception) {
             Log.e(TAG, "[TaskSync] Error saving task: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /** Deletes a focus session row. Mirrors deleteTask; session rows use the
+     * deterministic UUID derived as nameUUIDFromBytes("session_<localId>"). */
+    suspend fun deleteFocusSession(sessionUuid: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            client.from("focus_sessions").delete {
+                filter { eq("id", sessionUuid) }
+            }
+            Result.success(true)
+        } catch (e: Exception) {
+            Log.w(TAG, "deleteFocusSession error: ${e.message}")
             Result.failure(e)
         }
     }
@@ -441,7 +440,7 @@ class SupabaseService {
                     .addHeader("Authorization", "Bearer $token")
                     .delete()
                     .build()
-                val response = okhttp3.OkHttpClient().newCall(request).execute()
+                val response = sharedOkHttpClient.newCall(request).execute()
                 if (response.isSuccessful) Result.success(true) else Result.failure(Exception("HTTP ${response.code}"))
             } catch (ex: Exception) {
                 Result.failure(ex)
@@ -472,7 +471,7 @@ class SupabaseService {
                 .get()
                 .build()
 
-            val response = okhttp3.OkHttpClient().newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             val body = response.body?.string().orEmpty()
             if (response.isSuccessful && body.isNotBlank()) {
                 val jsonArray = org.json.JSONArray(body)
@@ -567,8 +566,7 @@ class SupabaseService {
                 .post(requestBody)
                 .build()
 
-            val okHttpClient = okhttp3.OkHttpClient()
-            val response = okHttpClient.newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             val code = response.code
             if (code in 200..299) {
                 Log.i(TAG, "[FocusSessionSync] REST POST succeeded for session_id=${sessionDto.id}")
@@ -606,7 +604,7 @@ class SupabaseService {
                 .get()
                 .build()
 
-            val response = okhttp3.OkHttpClient().newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             val body = response.body?.string().orEmpty()
             if (response.isSuccessful && body.isNotBlank()) {
                 val jsonArray = org.json.JSONArray(body)
@@ -673,8 +671,7 @@ class SupabaseService {
                 .post(requestBody)
                 .build()
 
-            val okHttpClient = okhttp3.OkHttpClient()
-            val response = okHttpClient.newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             val code = response.code
             if (code in 200..299) {
                 Log.i(TAG, "[ReflectionSync] REST POST succeeded for reflection_id=${reflectionDto.id}")
@@ -712,7 +709,7 @@ class SupabaseService {
                 .get()
                 .build()
 
-            val response = okhttp3.OkHttpClient().newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             val body = response.body?.string().orEmpty()
             if (response.isSuccessful && body.isNotBlank()) {
                 val jsonArray = org.json.JSONArray(body)
@@ -839,8 +836,7 @@ class SupabaseService {
                 .post(requestBody)
                 .build()
 
-            val okHttpClient = okhttp3.OkHttpClient()
-            val response = okHttpClient.newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             val responseBody = response.body?.string().orEmpty()
             val code = response.code
 
@@ -860,7 +856,7 @@ class SupabaseService {
                     .patch(requestBody)
                     .build()
 
-                val patchResponse = okHttpClient.newCall(patchRequest).execute()
+                val patchResponse = sharedOkHttpClient.newCall(patchRequest).execute()
                 val patchBody = patchResponse.body?.string().orEmpty()
                 val patchCode = patchResponse.code
                 Log.i(TAG, "[UserPreferencesSync] AFTER WRITE (PATCH): REST PATCH code=$patchCode, body=$patchBody")
@@ -905,8 +901,7 @@ class SupabaseService {
                 .get()
                 .build()
 
-            val okHttpClient = okhttp3.OkHttpClient()
-            val response = okHttpClient.newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             val body = response.body?.string().orEmpty()
             if (response.isSuccessful && body.isNotBlank()) {
                 val jsonArray = org.json.JSONArray(body)
@@ -997,8 +992,7 @@ class SupabaseService {
                 .patch(requestBody)
                 .build()
 
-            val okHttpClient = okhttp3.OkHttpClient()
-            val response = okHttpClient.newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             val responseBody = response.body?.string().orEmpty()
             val code = response.code
             Log.d(TAG, "[SurveyPersistence] REST PATCH response code=$code body=$responseBody")
@@ -1007,21 +1001,10 @@ class SupabaseService {
                 Log.i(TAG, "[SurveyPersistence] Successfully updated has_completed_intake_survey=$isCompleted for user $userId")
                 Result.success(true)
             } else {
-                Log.w(TAG, "[SurveyPersistence] PATCH failed with code $code: $responseBody. Attempting upsert fallback...")
-                val userDto = SupabaseUserDto(
-                    id = userId,
-                    full_name = name,
-                    has_completed_intake_survey = isCompleted,
-                    student_class_level = studentClassLevel,
-                    is_board_exam_year = isBoardExamYear,
-                    primary_study_goal = primaryStudyGoal,
-                    biggest_distraction_app = biggestDistractionApp,
-                    preferred_study_time_window = preferredStudyTimeWindow,
-                    daily_screen_time_goal_minutes = dailyScreenTimeGoalMinutes,
-                    motivation_style = motivationStyle
-                )
-                upsertUserProfile(userDto)
-                Result.success(true)
+                // NOTE: the old upsert fallback was removed — a partial-DTO upsert here
+                // overwrote email/avatar_url/daily_target_hours/etc. with nulls/defaults.
+                Log.e(TAG, "[SurveyPersistence] PATCH failed with code $code: $responseBody. Not falling back to upsert (would wipe profile columns).")
+                Result.failure(Exception("Survey update failed (HTTP $code)"))
             }
         } catch (e: Exception) {
             Log.e(TAG, "[SurveyPersistence] Error updating survey completed flag: ${e.message}", e)
@@ -1038,7 +1021,6 @@ class SupabaseService {
         Log.i(TAG, "[AvatarPersistence] BEFORE UPDATE: Executing UPSERT public.users & public.study_leaderboard SET avatar_url = '${avatarUrl.take(60)}...' WHERE id = '$userId'")
         try {
             val token = getAuthToken() ?: SupabaseManager.SUPABASE_KEY
-            val okHttpClient = okhttp3.OkHttpClient()
             val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
 
             // 1. Try SDK update first
@@ -1065,7 +1047,7 @@ class SupabaseService {
                 .post(userUpsertJson.toString().toRequestBody(mediaType))
                 .build()
 
-            val usersResponse = okHttpClient.newCall(usersRequest).execute()
+            val usersResponse = sharedOkHttpClient.newCall(usersRequest).execute()
             val usersBody = usersResponse.body?.string().orEmpty()
             val usersCode = usersResponse.code
             Log.i(TAG, "[AvatarPersistence] AFTER UPSERT (users): REST POST code=$usersCode, body=$usersBody")
@@ -1085,7 +1067,7 @@ class SupabaseService {
                 .post(lbUpsertJson.toString().toRequestBody(mediaType))
                 .build()
 
-            val lbResponse = okHttpClient.newCall(lbRequest).execute()
+            val lbResponse = sharedOkHttpClient.newCall(lbRequest).execute()
             val lbBody = lbResponse.body?.string().orEmpty()
             Log.i(TAG, "[AvatarPersistence] AFTER UPSERT (study_leaderboard): REST POST code=${lbResponse.code}, body=$lbBody")
 
@@ -1096,6 +1078,38 @@ class SupabaseService {
             Result.failure(e)
         }
     }
+
+    /**
+     * Targeted column update (not an upsert). Only the given columns are written;
+     * every other column keeps its server value. Use this instead of upsertUserProfile
+     * for partial updates — the PostgREST upsert serializes ALL DTO fields (including
+     * nulls/defaults) and would wipe unrelated columns like avatar_url.
+     */
+    suspend fun updateUserProfileColumns(userId: String, columns: Map<String, Any?>): Result<Boolean> =
+        withContext(Dispatchers.IO) {
+            if (userId.isBlank()) return@withContext Result.failure(IllegalArgumentException("user id is blank"))
+            if (columns.isEmpty()) return@withContext Result.success(true)
+            try {
+                val json = kotlinx.serialization.json.buildJsonObject {
+                    for ((k, v) in columns) {
+                        when (v) {
+                            null -> put(k, kotlinx.serialization.json.JsonNull)
+                            is String -> put(k, v)
+                            is Number -> put(k, v)
+                            is Boolean -> put(k, v)
+                            else -> put(k, v.toString())
+                        }
+                    }
+                }
+                client.from("users").update(json) {
+                    filter { eq("id", userId) }
+                }
+                Result.success(true)
+            } catch (e: Exception) {
+                Log.w(TAG, "updateUserProfileColumns failed: ${e.message}")
+                Result.failure(e)
+            }
+        }
 
     suspend fun upsertUserProfile(userDto: SupabaseUserDto): Result<Boolean> = withContext(Dispatchers.IO) {
         val userId = userDto.id
@@ -1147,7 +1161,7 @@ class SupabaseService {
                 .post(json.toString().toRequestBody(mediaType))
                 .build()
 
-            val response = okhttp3.OkHttpClient().newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             if (response.isSuccessful) {
                 Log.i(TAG, "upsertUserProfile REST succeeded for $userId")
                 Result.success(true)
@@ -1200,6 +1214,7 @@ class SupabaseService {
         try {
             client.from("study_leaderboard").upsert(leaderboardDto)
             Log.i(TAG, "[LeaderboardSync] SDK upsert succeeded for user_id=$userId")
+            return@withContext Result.success(true)
         } catch (e: Exception) {
             Log.w(TAG, "[LeaderboardSync] SDK upsert failed: ${e.message}. Attempting REST POST fallback...")
         }
@@ -1213,6 +1228,8 @@ class SupabaseService {
                 put("user_id", leaderboardDto.user_id)
                 put("display_name", leaderboardDto.display_name)
                 put("study_seconds", leaderboardDto.study_seconds)
+                put("weekly_study_seconds", leaderboardDto.weekly_study_seconds)
+                leaderboardDto.current_week_start?.let { put("current_week_start", it) }
                 put("streak", leaderboardDto.streak)
                 put("subject_tag", leaderboardDto.subject_tag)
                 leaderboardDto.avatar_url?.takeIf { it.isNotBlank() }?.let { put("avatar_url", it) }
@@ -1228,8 +1245,7 @@ class SupabaseService {
                 .post(requestBody)
                 .build()
 
-            val okHttpClient = okhttp3.OkHttpClient()
-            val response = okHttpClient.newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             val responseBody = response.body?.string().orEmpty()
             val code = response.code
 
@@ -1504,8 +1520,7 @@ class SupabaseService {
                 .post(requestBody)
                 .build()
 
-            val okHttpClient = okhttp3.OkHttpClient()
-            val response = okHttpClient.newCall(request).execute()
+            val response = sharedOkHttpClient.newCall(request).execute()
             val responseBody = response.body?.string().orEmpty()
             Log.i(TAG, "[AvatarUpload] AFTER UPLOAD: Storage response code=${response.code}, body=$responseBody")
             if (response.isSuccessful || response.code == 200 || response.code == 201) {
