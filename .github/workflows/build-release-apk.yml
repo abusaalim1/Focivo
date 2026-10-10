@@ -106,12 +106,13 @@ jobs:
 
       - name: Build Release APK
         env:
-          KEYSTORE_PATH: "./my-upload-key.jks"
+          KEYSTORE_PATH: "${{ github.workspace }}/my-upload-key.jks"
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3584m -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false"
         run: |
           echo "Starting Gradle release build..."
+          set -o pipefail
           gradle :app:assembleRelease --stacktrace --no-configuration-cache 2>&1 | tee gradle-build.log
 
       - name: Capture build failure details
