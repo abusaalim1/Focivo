@@ -631,10 +631,11 @@ object WeeklyRecapImageGenerator {
                 cacheDir.mkdirs()
             }
             val imageFile = File(cacheDir, fileName)
-            val fos = FileOutputStream(imageFile)
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
-            fos.flush()
-            fos.close()
+            // use{} guarantees the stream is closed even if compress() throws.
+            FileOutputStream(imageFile).use { fos ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
+                fos.flush()
+            }
 
             val authority = "${context.packageName}.fileprovider"
             FileProvider.getUriForFile(context, authority, imageFile)
