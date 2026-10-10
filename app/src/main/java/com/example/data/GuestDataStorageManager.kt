@@ -54,6 +54,14 @@ class GuestDataStorageManager private constructor(private val context: Context) 
         }
     }
 
+    /**
+     * Serializes all file access: concurrent writers previously shared one
+     * "$fileName.tmp" path and interleaved load-modify-save sequences,
+     * corrupting guest data. (synchronized is reentrant, so nested
+     * load/save calls from appendGuestSession are safe.)
+     */
+    private val fileLock = Any()
+
     private val guestDir: File by lazy {
         val dir = File(context.filesDir, GUEST_DIR_NAME)
         if (!dir.exists()) {
@@ -67,7 +75,8 @@ class GuestDataStorageManager private constructor(private val context: Context) 
      * Atomically writes JSON string to disk using FileOutputStream with file descriptor synchronization.
      */
     private fun writeJsonStringToFile(fileName: String, jsonString: String): Boolean {
-        return try {
+        synchronized(fileLock) {
+            return try {
             if (!guestDir.exists()) {
                 guestDir.mkdirs()
             }
@@ -102,13 +111,15 @@ class GuestDataStorageManager private constructor(private val context: Context) 
             Log.e(TAG, "Failed to write $fileName to guest_data directory using FileOutputStream", e)
             false
         }
+        }
     }
 
     /**
      * Reads raw JSON string from disk using FileInputStream.
      */
     private fun readJsonStringFromFile(fileName: String): String? {
-        return try {
+        synchronized(fileLock) {
+            return try {
             val file = File(guestDir, fileName)
             if (!file.exists() || !file.canRead()) {
                 return null
@@ -119,6 +130,7 @@ class GuestDataStorageManager private constructor(private val context: Context) 
         } catch (e: Exception) {
             Log.e(TAG, "Failed to read $fileName from guest_data directory using FileInputStream", e)
             null
+        }
         }
     }
 
@@ -194,11 +206,14 @@ class GuestDataStorageManager private constructor(private val context: Context) 
      * Appends a new completed focus session directly to guest_data storage.
      */
     fun appendGuestSession(session: FocusSessionEntity): Boolean {
-        val existing = loadGuestSessions().toMutableList()
-        // Deduplicate by ID or completedAt
-        existing.removeAll { it.id == session.id || (it.completedAt > 0 && it.completedAt == session.completedAt) }
-        existing.add(0, session)
-        return saveGuestSessions(existing)
+        // Atomic load-modify-save: prevents lost updates when two threads append at once.
+        synchronized(fileLock) {
+            val existing = loadGuestSessions().toMutableList()
+            // Deduplicate by ID or completedAt
+            existing.removeAll { it.id == session.id || (it.completedAt > 0 && it.completedAt == session.completedAt) }
+            existing.add(0, session)
+            return saveGuestSessions(existing)
+        }
     }
 
     // =========================================================================
