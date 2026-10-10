@@ -247,7 +247,7 @@ fun WeeklyProductivityChart(
 
     var selectedDayOfWeek by remember { mutableIntStateOf(initialSelectedDay) }
     val selectedDayModel = remember(summary, selectedDayOfWeek) {
-        summary.dailyList.find { it.dayOfWeek == selectedDayOfWeek } ?: summary.dailyList.first()
+        summary.dailyList.find { it.dayOfWeek == selectedDayOfWeek } ?: summary.dailyList.firstOrNull()
     }
 
     // Determine max scale for chart Y-Axis (at least targetDailyGoalHours + 1h, or highest day rounded up)
@@ -602,6 +602,8 @@ fun WeeklyProductivityChart(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Interactive Day Inspector Tooltip Card
+            // Guarded: hidden when the weekly list is empty (selectedDayModel == null)
+            if (selectedDayModel != null) {
             Surface(
                 color = if (isDark) Color(0xFF1B221A) else Color(0xFFF2F7EE),
                 shape = RoundedCornerShape(16.dp),
@@ -724,6 +726,7 @@ fun WeeklyProductivityChart(
                     }
                 }
             }
+            } // end null-guard for selectedDayModel
 
             Spacer(modifier = Modifier.height(14.dp))
 
