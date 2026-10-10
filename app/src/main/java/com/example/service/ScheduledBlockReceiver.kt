@@ -17,6 +17,68 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
         const val ACTION_SCHEDULE_TRANSITION = "com.example.action.SCHEDULE_TRANSITION"
         const val ACTION_SCHEDULE_START = "com.example.action.SCHEDULE_BLOCK_START"
         const val ACTION_SCHEDULE_END = "com.example.action.SCHEDULE_BLOCK_END"
+
+        /**
+         * Restores alarms and study-block schedules after boot or app update.
+         * Called by the exported [BootReceiver]; kept here so the logic is shared.
+         */
+        fun handleBootCompleted(context: Context, pendingResult: BroadcastReceiver.PendingResult) {
+            Log.d(TAG, "[BootCompleted] Device boot completed. Re-registering system alarms and study blocks...")
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val dummyLabels = setOf("Morning Deep Focus", "Midday Reset", "Day Review")
+                    val localAlarms = AlarmScheduler.getLocalAlarms(context).filterNot { it.label in dummyLabels }
+                    if (localAlarms.isNotEmpty()) {
+                        AlarmScheduler.rescheduleAllEnabled(context, localAlarms)
+                        Log.d(TAG, "[BootCompleted] Re-registered ${localAlarms.size} local cached alarms")
+                    }
+
+                    val uid = SupabaseService.getInstance().getCurrentUserId()
+                    if (!uid.isNullOrBlank()) {
+                        val alarmsDto = SupabaseService.getInstance().fetchAlarms(uid).filterNot { it.label in dummyLabels }
+                        if (alarmsDto.isNotEmpty()) {
+                            val alarmItems = alarmsDto.map { dto ->
+                                AlarmItem(
+                                    id = dto.id,
+                                    label = dto.label,
+                                    hour = dto.hour,
+                                    minute = dto.minute,
+                                    isEnabled = dto.is_enabled,
+                                    ringtone = dto.ringtone,
+                                    vibrate = dto.vibrate,
+                                    daysActive = dto.days_active
+                                )
+                            }
+                            AlarmScheduler.saveLocalAlarms(context, alarmItems)
+                            AlarmScheduler.rescheduleAllEnabled(context, alarmItems)
+                        }
+                    }
+
+                    ScheduledBlockScheduler.evaluateAndReschedule(context)
+                } catch (e: Exception) {
+                    Log.e(TAG, "[BootCompleted] Error restoring alarms/schedules on boot: ${e.message}")
+                } finally {
+                    pendingResult.finish()
+                }
+            }
+        }
+    }
+
+    /**
+     * Exported receiver for system broadcasts only (boot / package replaced).
+     * Declared in the manifest with android:exported="true".
+     */
+    class BootReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent?) {
+            val action = intent?.action
+            Log.d(TAG, "BootReceiver onReceive action: $action")
+            if (action == Intent.ACTION_BOOT_COMPLETED ||
+                action == Intent.ACTION_MY_PACKAGE_REPLACED ||
+                action == "android.intent.action.QUICKBOOT_POWERON"
+            ) {
+                handleBootCompleted(context, goAsync())
+            }
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
@@ -24,47 +86,6 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
         Log.d(TAG, "onReceive action: $action")
 
         when (action) {
-            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED, "android.intent.action.QUICKBOOT_POWERON" -> {
-                Log.d(TAG, "[BootCompleted] Device boot completed. Re-registering system alarms and study blocks...")
-                val pendingResult = goAsync()
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        val dummyLabels = setOf("Morning Deep Focus", "Midday Reset", "Day Review")
-                        val localAlarms = AlarmScheduler.getLocalAlarms(context).filterNot { it.label in dummyLabels }
-                        if (localAlarms.isNotEmpty()) {
-                            AlarmScheduler.rescheduleAllEnabled(context, localAlarms)
-                            Log.d(TAG, "[BootCompleted] Re-registered ${localAlarms.size} local cached alarms")
-                        }
-
-                        val uid = SupabaseService.getInstance().getCurrentUserId()
-                        if (!uid.isNullOrBlank()) {
-                            val alarmsDto = SupabaseService.getInstance().fetchAlarms(uid).filterNot { it.label in dummyLabels }
-                            if (alarmsDto.isNotEmpty()) {
-                                val alarmItems = alarmsDto.map { dto ->
-                                    AlarmItem(
-                                        id = dto.id,
-                                        label = dto.label,
-                                        hour = dto.hour,
-                                        minute = dto.minute,
-                                        isEnabled = dto.is_enabled,
-                                        ringtone = dto.ringtone,
-                                        vibrate = dto.vibrate,
-                                        daysActive = dto.days_active
-                                    )
-                                }
-                                AlarmScheduler.saveLocalAlarms(context, alarmItems)
-                                AlarmScheduler.rescheduleAllEnabled(context, alarmItems)
-                            }
-                        }
-
-                        ScheduledBlockScheduler.evaluateAndReschedule(context)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "[BootCompleted] Error restoring alarms/schedules on boot: ${e.message}")
-                    } finally {
-                        pendingResult.finish()
-                    }
-                }
-            }
             AlarmScheduler.ACTION_ALARM_TRIGGER -> {
                 val alarmId = intent.getStringExtra(AlarmScheduler.EXTRA_ALARM_ID) ?: ""
                 val label = intent.getStringExtra(AlarmScheduler.EXTRA_ALARM_LABEL) ?: "Focus Alarm"
