@@ -19,6 +19,7 @@ object StudyNotificationBlockerManager {
     private const val KEY_SAVED_NOTIFICATION_VOLUME = "key_saved_notification_volume"
     private const val KEY_SAVED_RINGER_MODE = "key_saved_ringer_mode"
 
+    @Volatile
     private var isCurrentlyMuted = false
 
     fun isBlockNotificationsDuringStudyEnabled(context: Context): Boolean {
@@ -55,6 +56,9 @@ object StudyNotificationBlockerManager {
      */
     fun activateStudyNotificationBlock(context: Context) {
         if (!isBlockNotificationsDuringStudyEnabled(context)) return
+        // Idempotent: a second overlapping activation must not overwrite the
+        // saved volume with 0, or the user's real volume is lost forever.
+        if (isCurrentlyMuted) return
         try {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
@@ -120,6 +124,15 @@ object StudyNotificationBlockerManager {
                         am.setStreamVolume(AudioManager.STREAM_NOTIFICATION, savedVol, 0)
                     } catch (e: Exception) {
                         Log.w(TAG, "Could not restore notification stream volume: ${e.message}")
+                    }
+                }
+                // Restore the ringer mode that was saved on activation
+                val savedRinger = prefs.getInt(KEY_SAVED_RINGER_MODE, -1)
+                if (savedRinger >= 0) {
+                    try {
+                        am.ringerMode = savedRinger
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not restore ringer mode: ${e.message}")
                     }
                 }
             }
