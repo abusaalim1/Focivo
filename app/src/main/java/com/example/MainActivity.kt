@@ -77,13 +77,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // ViewModel is created eagerly here (not inside composition) so that
+        // intent handling runs exactly once per intent. Calling the handlers
+        // inside setContent{} re-fired them on every recomposition
+        // (e.g. every timer tick), re-launching network calls and widget IPC.
+        val viewModel: FocuslyViewModel =
+            androidx.lifecycle.ViewModelProvider(this)[FocuslyViewModel::class.java]
+        activeViewModel = viewModel
+        handleActivityIntent(intent, viewModel)
         setContent {
-            val viewModel: FocuslyViewModel = viewModel()
-            activeViewModel = viewModel
-            handleShieldIntent(intent, viewModel)
-            handleAuthIntent(intent, viewModel)
-            handleSundayRecapIntent(intent, viewModel)
-            handleWidgetIntent(intent, viewModel)
             FocuslyApp(viewModel = viewModel)
         }
     }
@@ -110,12 +112,14 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        activeViewModel?.let {
-            handleShieldIntent(intent, it)
-            handleAuthIntent(intent, it)
-            handleSundayRecapIntent(intent, it)
-            handleWidgetIntent(intent, it)
-        }
+        activeViewModel?.let { handleActivityIntent(intent, it) }
+    }
+
+    private fun handleActivityIntent(intent: Intent?, viewModel: FocuslyViewModel) {
+        handleShieldIntent(intent, viewModel)
+        handleAuthIntent(intent, viewModel)
+        handleSundayRecapIntent(intent, viewModel)
+        handleWidgetIntent(intent, viewModel)
     }
 
     private fun handleWidgetIntent(intent: Intent?, viewModel: FocuslyViewModel) {
