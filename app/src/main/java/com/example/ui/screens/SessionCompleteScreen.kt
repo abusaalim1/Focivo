@@ -607,9 +607,9 @@ private suspend fun captureShareCardBitmap(
             view.doOnLayout {
                 try {
                     val bmp = it.drawToBitmap()
-                    if (!cont.isCompleted) cont.resume(bmp)
+                    if (!cont.isCompleted) cont.resume(bmp) {}
                 } catch (e: Exception) {
-                    if (!cont.isCompleted) cont.resume(null)
+                    if (!cont.isCompleted) cont.resume(null) {}
                 } finally {
                     cleanup()
                 }
@@ -617,7 +617,7 @@ private suspend fun captureShareCardBitmap(
             manager.addView(view, params)
         } catch (e: Exception) {
             cleanup()
-            if (!cont.isCompleted) cont.resume(null)
+            if (!cont.isCompleted) cont.resume(null) {}
         }
     }
 }
