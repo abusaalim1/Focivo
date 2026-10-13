@@ -6,10 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.PixelFormat
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.view.View
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -67,6 +70,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.drawToBitmap
+import androidx.core.view.doOnLayout
 import com.example.data.model.FocusSessionEntity
 import com.example.ui.components.GlassButton
 import com.example.ui.components.MascotPose
@@ -80,6 +84,7 @@ import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.math.cos
 import kotlin.math.sin
@@ -258,8 +263,14 @@ fun SessionCompleteScreen(
 
             Spacer(modifier = Modifier.height(36.dp))
 
-            // v1.3.0: Share your focus session (minimal share card)
-            ShareSessionCard(minutesSpent = minutesSpent)
+            // v1.3.0: Share your focus session (share card). v1.3.1: rotating quote line,
+            // honest distractions copy, working Download + image share.
+            val sessionQuote = com.example.util.FocusQuotes.forSession(session.id)
+            ShareSessionCard(
+                minutesSpent = minutesSpent,
+                distractionsCount = session.distractionsCount,
+                quote = sessionQuote
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -275,23 +286,46 @@ fun SessionCompleteScreen(
 
 /**
  * v1.3.0 — compact share row on the session-complete screen.
- * "You focused for Xm without distractions!" with WhatsApp / More / Download actions.
+ * v1.3.1 — honest distractions copy (never claims "without distractions" when there
+ * were some), rotating quote line, working Download, and image-attached sharing.
  */
 @Composable
-private fun ShareSessionCard(minutesSpent: Int) {
+private fun ShareSessionCard(minutesSpent: Int, distractionsCount: Int, quote: String) {
     val context = LocalContext.current
     val isDark = isAppInDarkTheme()
     val scope = rememberCoroutineScope()
 
-    val shareText = "I focused for $minutesSpent minutes without distractions with Focivo! Stay focused, stay sharp."
+    val headerText = if (distractionsCount == 0) {
+        "\uD83C\uDF89 You focused for ${minutesSpent}m without distractions!"
+    } else {
+        val dWord = if (distractionsCount == 1) "distraction" else "distractions"
+        "\uD83C\uDF89 You focused for ${minutesSpent}m with only $distractionsCount $dWord!"
+    }
+    val shareText = if (distractionsCount == 0) {
+        "I focused for $minutesSpent minutes without distractions with Focivo! Stay focused, stay sharp."
+    } else {
+        "I focused for $minutesSpent minutes with Focivo (only $distractionsCount distractions)! Stay focused, stay sharp."
+    }
 
     val storagePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            scope.launch { saveShareCard(context, minutesSpent) }
+            scope.launch { saveShareCard(context, minutesSpent, distractionsCount, quote) }
         } else {
             Toast.makeText(context, "Storage permission is needed to save the image.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Shares the card image (saved to gallery first) + text; falls back to text-only.
+    fun shareWithImage(toWhatsApp: Boolean) {
+        scope.launch {
+            val imageUri = saveShareCardImage(context, minutesSpent, distractionsCount, quote)
+            if (imageUri != null) {
+                shareImageAndText(context, imageUri, shareText, toWhatsApp)
+            } else {
+                if (toWhatsApp) shareToWhatsApp(context, shareText) else shareGeneric(context, shareText)
+            }
         }
     }
 
@@ -300,7 +334,7 @@ private fun ShareSessionCard(minutesSpent: Int) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Text(
-            text = "\uD83C\uDF89 You focused for ${minutesSpent}m without distractions!",
+            text = headerText,
             style = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
@@ -308,6 +342,18 @@ private fun ShareSessionCard(minutesSpent: Int) {
             ),
             textAlign = TextAlign.Center
         )
+
+        if (quote.isNotBlank()) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "\u201C$quote\u201D",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontSize = 12.sp,
+                    color = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+                ),
+                textAlign = TextAlign.Center
+            )
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -319,13 +365,13 @@ private fun ShareSessionCard(minutesSpent: Int) {
                 label = "WhatsApp",
                 icon = Icons.Default.Chat,
                 tint = Color(0xFF25D366),
-                onClick = { shareToWhatsApp(context, shareText) }
+                onClick = { shareWithImage(toWhatsApp = true) }
             )
             ShareActionButton(
                 label = "More",
                 icon = Icons.Default.Share,
                 tint = if (isDark) Color(0xFFF0F4ED) else NearBlack,
-                onClick = { shareGeneric(context, shareText) }
+                onClick = { shareWithImage(toWhatsApp = false) }
             )
             ShareActionButton(
                 label = "Download",
@@ -337,7 +383,7 @@ private fun ShareSessionCard(minutesSpent: Int) {
                     ) {
                         storagePermissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     } else {
-                        scope.launch { saveShareCard(context, minutesSpent) }
+                        scope.launch { saveShareCard(context, minutesSpent, distractionsCount, quote) }
                     }
                 }
             )
@@ -386,52 +432,102 @@ private fun ShareActionButton(
 /**
  * The card rendered into the downloaded PNG. Self-contained colors so it
  * renders correctly in an offscreen ComposeView without an Activity theme.
+ * v1.3.1 — Regain-level aesthetic: lime card, big Focus Time, rotating quote
+ * box, honest distractions line, brand footer.
  */
 @Composable
-private fun ShareCardContent(minutes: Int) {
+private fun ShareCardContent(minutes: Int, distractionsCount: Int, quote: String) {
+    val lime = Color(0xFF8CE000)
+    val ink = Color(0xFF121511)
+    val cardBg = Color(0xFF1D221C)
+    val softText = Color(0xFFA0A89E)
+    val brightText = Color(0xFFF0F4ED)
+
+    val focusLine = if (distractionsCount == 0) {
+        "without distractions!"
+    } else {
+        val dWord = if (distractionsCount == 1) "distraction" else "distractions"
+        "with only $distractionsCount $dWord"
+    }
+
     Box(
         modifier = Modifier
-            .background(Color(0xFF121511))
+            .background(ink)
             .padding(48.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .clip(RoundedCornerShape(32.dp))
-                .background(Color(0xFF1D221C))
-                .border(2.dp, Color(0xFF8CE000), RoundedCornerShape(32.dp))
-                .padding(horizontal = 56.dp, vertical = 48.dp)
+                .clip(RoundedCornerShape(36.dp))
+                .background(lime)
+                .padding(horizontal = 8.dp, vertical = 8.dp)
         ) {
-            Text(
-                text = "\uD83C\uDF89",
-                fontSize = 64.sp
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "You focused for",
-                color = Color(0xFFA0A89E),
-                fontSize = 28.sp
-            )
-            Text(
-                text = "${minutes}m",
-                color = Color(0xFF8CE000),
-                fontSize = 96.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = BalooBrandFontFamily
-            )
-            Text(
-                text = "without distractions!",
-                color = Color(0xFFF0F4ED),
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Focivo — Stay focused, stay sharp.",
-                color = Color(0xFFA0A89E),
-                fontSize = 22.sp
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(30.dp))
+                    .background(cardBg)
+                    .border(2.dp, lime.copy(alpha = 0.6f), RoundedCornerShape(30.dp))
+                    .padding(horizontal = 56.dp, vertical = 48.dp)
+            ) {
+                Text(
+                    text = "\uD83C\uDF89",
+                    fontSize = 64.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Yay! You focused for",
+                    color = softText,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "${minutes}m",
+                    color = lime,
+                    fontSize = 110.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = BalooBrandFontFamily
+                )
+                Text(
+                    text = "Focus Time",
+                    color = brightText,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 2.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = focusLine,
+                    color = brightText,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                if (quote.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(28.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF2A3129))
+                            .border(1.dp, lime.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+                            .padding(horizontal = 28.dp, vertical = 20.dp)
+                    ) {
+                        Text(
+                            text = "\u201C$quote\u201D",
+                            color = brightText,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(28.dp))
+                Text(
+                    text = "Focivo \u2014 Stay focused, stay sharp.",
+                    color = softText,
+                    fontSize = 20.sp
+                )
+            }
         }
     }
 }
@@ -465,24 +561,80 @@ private fun shareGeneric(context: Context, text: String) {
     }
 }
 
-private fun captureShareCardBitmap(context: Context, minutes: Int): Bitmap? {
-    return try {
-        val composeView = ComposeView(context)
-        composeView.setContent { ShareCardContent(minutes = minutes) }
-        val widthSpec = View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY)
-        val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-        composeView.measure(widthSpec, heightSpec)
-        composeView.layout(0, 0, composeView.measuredWidth, composeView.measuredHeight)
-        composeView.drawToBitmap()
-    } catch (e: Exception) {
-        null
+/**
+ * v1.3.1 — renders the card by briefly attaching a ComposeView to the WindowManager
+ * (TYPE_APPLICATION_OVERLAY), awaiting one layout pass, then drawing it to a bitmap.
+ *
+ * Why: the old approach measured a DETACHED ComposeView, which defers composition
+ * until onAttachedToWindow — so nothing ever composed and drawToBitmap() threw on a
+ * 0-height bitmap (every Download tap ended at the failure toast).
+ *
+ * Must be called from a coroutine (suspends on Main until the frame is drawn).
+ * Returns null when the overlay permission is missing or anything fails.
+ */
+private suspend fun captureShareCardBitmap(
+    context: Context,
+    minutes: Int,
+    distractionsCount: Int,
+    quote: String
+): Bitmap? = withContext(Dispatchers.Main) {
+    suspendCancellableCoroutine { cont ->
+        var composeView: ComposeView? = null
+        var wm: WindowManager? = null
+        fun cleanup() {
+            try {
+                composeView?.let { v -> wm?.removeView(v) }
+            } catch (_: Exception) {
+            }
+        }
+        cont.invokeOnCancellation { cleanup() }
+        try {
+            wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            composeView = ComposeView(context).apply {
+                setContent { ShareCardContent(minutes, distractionsCount, quote) }
+            }
+            val params = WindowManager.LayoutParams(
+                1080,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT
+            )
+            val view = composeView!!
+            val manager = wm!!
+            view.doOnLayout {
+                try {
+                    val bmp = it.drawToBitmap()
+                    if (!cont.isCompleted) cont.resume(bmp) {}
+                } catch (e: Exception) {
+                    if (!cont.isCompleted) cont.resume(null) {}
+                } finally {
+                    cleanup()
+                }
+            }
+            manager.addView(view, params)
+        } catch (e: Exception) {
+            cleanup()
+            if (!cont.isCompleted) cont.resume(null) {}
+        }
     }
 }
 
-private suspend fun saveShareCard(context: Context, minutes: Int) {
-    val ok = withContext(Dispatchers.IO) {
+/**
+ * Renders the card and saves the PNG to the gallery.
+ * @return the MediaStore Uri of the saved image, or null on failure.
+ */
+private suspend fun saveShareCardImage(
+    context: Context,
+    minutes: Int,
+    distractionsCount: Int,
+    quote: String
+): Uri? {
+    val bitmap = captureShareCardBitmap(context, minutes, distractionsCount, quote) ?: return null
+    return withContext(Dispatchers.IO) {
         try {
-            val bitmap = captureShareCardBitmap(context, minutes) ?: return@withContext false
             val filename = "Focivo-Focus-${System.currentTimeMillis()}.png"
             val values = ContentValues().apply {
                 put(MediaStore.Images.Media.DISPLAY_NAME, filename)
@@ -493,24 +645,59 @@ private suspend fun saveShareCard(context: Context, minutes: Int) {
                 }
             }
             val resolver = context.contentResolver
-            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return@withContext false
+            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: return@withContext null
+            var ok = false
             resolver.openOutputStream(uri)?.use { out ->
-                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) return@withContext false
-            } ?: return@withContext false
+                ok = bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+            if (!ok) {
+                runCatching { resolver.delete(uri, null, null) }
+                return@withContext null
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val done = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
                 resolver.update(uri, done, null, null)
             }
-            true
+            if (!bitmap.isRecycled) bitmap.recycle()
+            uri
         } catch (e: Exception) {
-            false
+            null
         }
     }
+}
+
+private suspend fun saveShareCard(
+    context: Context,
+    minutes: Int,
+    distractionsCount: Int,
+    quote: String
+) {
+    val uri = saveShareCardImage(context, minutes, distractionsCount, quote)
     withContext(Dispatchers.Main) {
         Toast.makeText(
             context,
-            if (ok) "Image saved to gallery." else "Could not save the image. Please try again.",
+            if (uri != null) "Image saved to gallery." else "Could not save the image. Please try again.",
             Toast.LENGTH_SHORT
         ).show()
+    }
+}
+
+/** Shares the card image together with the share text (WhatsApp direct, or system chooser). */
+private fun shareImageAndText(context: Context, imageUri: Uri, text: String, toWhatsApp: Boolean) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(Intent.EXTRA_STREAM, imageUri)
+        putExtra(Intent.EXTRA_TEXT, text)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        if (toWhatsApp) setPackage("com.whatsapp")
+    }
+    val launch = if (toWhatsApp) intent else Intent.createChooser(intent, "Share your focus session")
+    if (context !is Activity) launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        context.startActivity(launch)
+    } catch (e: Exception) {
+        // WhatsApp missing / no app handles image share — fall back to text-only.
+        if (toWhatsApp) shareToWhatsApp(context, text) else shareGeneric(context, text)
     }
 }

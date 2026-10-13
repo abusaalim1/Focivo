@@ -260,7 +260,12 @@ object StudyGuardKnowledge {
     /**
      * AI-chat entry point. Handles the sticky verdict internally:
      * low-signal follow-ups (< 25 chars, no phrase hits) inherit the last
-     * confident verdict for this package instead of being re-evaluated.
+     * confident verdict for this package instead of being re-evaluated —
+     * EXCEPT a cached STUDY verdict is never inherited (v1.3.1: inheriting
+     * STUDY laundered short casual follow-ups like "acha"/"sahi hai" into
+     * study verdicts, hiding real non-study chat). Only NON_STUDY stickies
+     * are inherited; everything else is re-scored (UNCERTAIN still goes to
+     * the Gemini tie-breaker in the service).
      * Confident verdicts refresh the sticky cache.
      */
     fun scoreChatMessage(message: String, pkg: String): Verdict {
@@ -268,7 +273,7 @@ object StudyGuardKnowledge {
         if (norm.isEmpty()) return Verdict.UNCERTAIN
         val now = System.currentTimeMillis()
         val cached = stickyVerdicts[pkg]
-        if (cached != null && cached.first != Verdict.UNCERTAIN &&
+        if (cached != null && cached.first == Verdict.NON_STUDY &&
             now - cached.second <= STICKY_TTL_MS
         ) {
             val padded = " $norm "

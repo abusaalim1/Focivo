@@ -84,7 +84,8 @@ fun AuroraTimer(
     isBreak: Boolean = false,
     subjectTitle: String = "Deep Study",
     modifier: Modifier = Modifier,
-    dialSize: Dp = 290.dp,
+    dialSize: Dp = 320.dp,
+    mascotPose: MascotPose = MascotPose.IDLE,
     onTogglePlay: () -> Unit = {},
     onReset: () -> Unit = {},
     onTagClick: (() -> Unit)? = null,
@@ -370,7 +371,18 @@ fun AuroraTimer(
                 color = textSecondary
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // v1.3.1: Focivo mascot inside the timer, pose follows the timer state
+            // (ready → studying-with-book, focusing → study video, break → resting).
+            RegainMascotView(
+                size = 84.dp,
+                pose = mascotPose,
+                animate = true,
+                modifier = Modifier.testTag("aurora_timer_mascot")
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             // iOS-Style Glass Action Buttons (Play/Pause, Reset)
             Row(

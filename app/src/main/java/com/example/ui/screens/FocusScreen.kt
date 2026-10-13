@@ -91,6 +91,7 @@ import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.ui.components.DeepFocusToggleCard
 import com.example.ui.components.DeepFocusActiveBanner
+import com.example.ui.components.DeepFocusSettingsSheet
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -136,8 +137,11 @@ fun FocusScreen(
     var showDistractionModal by remember { mutableStateOf(false) }
     var showSoundSelector by remember { mutableStateOf(false) }
     var showStudyTypeDialog by remember { mutableStateOf(false) }
+    // v1.3.1: Deep Focus Settings sheet (Regain parity).
+    var showDeepFocusSettings by remember { mutableStateOf(false) }
     var currentTag by remember { mutableStateOf(currentTaskTitle.ifBlank { "Deep Study" }) }
-    var timerStyle by remember { mutableStateOf("classic") }
+    // v1.3.1: Aurora is the flagship timer — default to it.
+    var timerStyle by remember { mutableStateOf("aurora") }
 
     val context = LocalContext.current
     LaunchedEffect(Unit) {
@@ -396,13 +400,21 @@ fun FocusScreen(
                 // 1. Timer Component (Aurora Timer or Regain Study Dial)
                 item {
                     Spacer(modifier = Modifier.height(2.dp))
+                    val isBreakMode = currentMode.contains("break", ignoreCase = true)
+                    // v1.3.1: mascot pose follows the timer state (ready / focusing / break).
+                    val timerMascotPose = when {
+                        isBreakMode -> MascotPose.BREAK
+                        isRunning -> MascotPose.STUDYING
+                        else -> MascotPose.STUDY_POSE
+                    }
                     if (timerStyle == "aurora") {
                         AuroraTimer(
                             totalSeconds = targetSeconds,
                             remainingSeconds = remainingSeconds,
                             isRunning = isRunning,
-                            isBreak = currentMode.contains("break", ignoreCase = true),
+                            isBreak = isBreakMode,
                             subjectTitle = currentTag,
+                            mascotPose = timerMascotPose,
                             onTogglePlay = {
                                 if (isRunning) {
                                     onPauseTimer()
@@ -431,7 +443,7 @@ fun FocusScreen(
                                 onSkipBreak()
                             },
                             onMascotClick = {},
-                            mascotPose = if (isRunning) MascotPose.STUDYING else MascotPose.STUDY_POSE
+                            mascotPose = timerMascotPose
                         )
                     }
                 }
@@ -661,6 +673,59 @@ fun FocusScreen(
                             isSessionActive = false,
                             modifier = Modifier.padding(top = 8.dp)
                         )
+                    }
+
+                    item {
+                        // v1.3.1: Deep focus settings entry (Regain parity — all free).
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(cardBg)
+                                .border(1.dp, cardBorder, RoundedCornerShape(18.dp))
+                                .clickable { showDeepFocusSettings = true }
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                .testTag("deep_focus_settings_entry")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Shield,
+                                    contentDescription = null,
+                                    tint = RegainLimeDeepText,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Deep focus settings",
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontFamily = PoppinsFontFamily,
+                                            color = textPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                    )
+                                    Text(
+                                        text = "Strict mode · notifications · uninstall & home-screen protection",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontFamily = PoppinsFontFamily,
+                                            color = textSecondary,
+                                            fontSize = 11.sp
+                                        )
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.ArrowForward,
+                                    contentDescription = "Open deep focus settings",
+                                    tint = textSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                     }
 
                     item {
@@ -906,6 +971,13 @@ fun FocusScreen(
                     onConfirmPreStudyBlock(selectedPackages, dontShowAgain)
                 },
                 onDismiss = { onDismissPreStudyBlock() }
+            )
+        }
+
+        // v1.3.1: Deep Focus Settings sheet (Regain parity).
+        if (showDeepFocusSettings) {
+            DeepFocusSettingsSheet(
+                onDismiss = { showDeepFocusSettings = false }
             )
         }
     }

@@ -15,6 +15,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.example.MainActivity
 import com.example.util.AiStudyGuardManager
+import com.example.util.DeepFocusManager
 import com.example.util.EssentialAppsGuard
 import com.example.util.GeminiContentClassifier
 import com.example.util.OnDeviceStudyClassifier
@@ -57,6 +58,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
         private var lastLivenessWriteMs: Long = 0L
         // v1.3.0: multi-window protection scan throttle
         private var lastMultiWindowScanMs: Long = 0L
+        // v1.3.1: deep-focus home-screen block throttle
+        private var lastHomeScreenInterceptMs: Long = 0L
+        private var lastHomeInterceptedPkg: String? = null
     }
 
     override fun onServiceConnected() {
@@ -222,8 +226,43 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 return
             }
 
-            // 2. Essential apps, system launchers, folders, emergency, dialer, camera, gallery are PERMANENTLY protected
-            if (EssentialAppsGuard.isEssentialApp(applicationContext, pkg)) {
+            // 1b. v1.3.1: Deep-focus "Block phone home screen" (Regain parity, opt-in).
+            // Scoped to active deep-focus sessions only. Best-effort: the OS Home key
+            // itself can't be intercepted, but landing on the launcher re-shows the
+            // focus overlay. Placed BEFORE the essential-apps early return because
+            // launchers are permanently protected everywhere else.
+            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+                DeepFocusManager.isDeepFocusSessionActive(applicationContext) &&
+                StrictModeManager.isBlockHomeScreenEnabled(applicationContext) &&
+                EssentialAppsGuard.isLauncherPackage(applicationContext, pkg)
+            ) {
+                val nowHome = System.currentTimeMillis()
+                if (nowHome - lastHomeScreenInterceptMs > 3000L || lastHomeInterceptedPkg != pkg) {
+                    lastHomeScreenInterceptMs = nowHome
+                    lastHomeInterceptedPkg = pkg
+                    Log.w(TAG, "[Deep Focus] Home screen blocked during deep-focus session.")
+                    val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+                        context = applicationContext,
+                        packageName = pkg,
+                        appName = "Home Screen",
+                        durationSec = FocusShieldService.getRemainingSeconds(applicationContext),
+                        reason = "Deep Focus is on — the home screen stays blocked until your session ends. Get back in there!",
+                        isPunishment = false
+                    )
+                    try {
+                        applicationContext.startActivity(intent)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to start home-screen block overlay: ${e.message}")
+                    }
+                }
+                return
+            }
+
+            // 2. Essential apps, system launchers, folders, emergency, dialer, camera, gallery are PERMANENTLY protected.
+            // v1.3.1: YouTube is essential-PROTECTED from blocking but must stay MONITORED by the AI Study
+            // Guard (Shorts lock + video content filter below). Never early-return for it here.
+            val isMonitoredYouTube = pkg == "com.google.android.youtube" || pkg.contains("youtube", ignoreCase = true)
+            if (!isMonitoredYouTube && EssentialAppsGuard.isEssentialApp(applicationContext, pkg)) {
                 return
             }
 
@@ -477,8 +516,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 return
             }
 
-            // 9. AI Study Guard on AI chat apps (ChatGPT, Claude, Copilot, Perplexity)
+            // 9. AI Study Guard on AI chat apps (ChatGPT, Claude, Copilot, Perplexity, Meta AI, Grok, DeepSeek)
             // Strictly active ONLY when a study timer is running or within scheduled study hours!
+            // v1.3.1: added Meta AI, Grok (X), DeepSeek — previously unmonitored by design (S3).
             val isAiApp = pkg == "com.openai.chatgpt" ||
                     pkg == "com.anthropic.claude" ||
                     pkg == "com.google.android.apps.bard" ||
@@ -487,7 +527,12 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     pkg.contains("openai", ignoreCase = true) ||
                     pkg.contains("anthropic", ignoreCase = true) ||
                     pkg.contains("perplexity", ignoreCase = true) ||
-                    pkg.contains("copilot", ignoreCase = true)
+                    pkg.contains("copilot", ignoreCase = true) ||
+                    pkg.contains("meta.ai", ignoreCase = true) ||
+                    pkg.contains("metaai", ignoreCase = true) ||
+                    pkg.contains("deepseek", ignoreCase = true) ||
+                    pkg == "com.x.ai" ||
+                    pkg.contains("grok", ignoreCase = true)
 
             // v1.1.9 diagnostic: guard master switch off (throttled).
             if (isAiApp && !AiStudyGuardManager.isAiGuardEnabled(applicationContext)) {
@@ -1148,10 +1193,21 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         val parts = desc.split(" by ")
                         if (parts.size >= 2) {
                             foundTitle = parts[0].trim()
-                            val afterBy = parts[1].trim()
-                            val channelParts = afterBy.split(Regex("""[\-–•,\d]"""))
-                            if (channelParts.isNotEmpty()) {
-                                foundChannel = channelParts[0].trim()
+                            // v1.3.1: only use the description-derived channel when we don't
+                            // already have one from a channel_name/author node (more reliable).
+                            // Never split the channel segment on digits — channels like
+                            // "3Blue1Brown" or "TED-Ed" must survive intact. Strip trailing
+                            // view-count / age metadata with targeted patterns instead.
+                            if (foundChannel.isNullOrBlank()) {
+                                val afterBy = parts[1].trim()
+                                val metaCut = afterBy.split(Regex("""\s*[•|]\s*""")).firstOrNull()?.trim() ?: afterBy
+                                val channelOnly = metaCut
+                                    .replace(Regex("""\s+\d[\d.,]*[KMB]?\s+views?$""", RegexOption.IGNORE_CASE), "")
+                                    .replace(Regex("""\s+\d+\s+(seconds?|minutes?|hours?|days?|weeks?|months?|years?)\s+ago$""", RegexOption.IGNORE_CASE), "")
+                                    .trim()
+                                if (channelOnly.isNotBlank()) {
+                                    foundChannel = channelOnly
+                                }
                             }
                             foundMeta = desc
                         } else {

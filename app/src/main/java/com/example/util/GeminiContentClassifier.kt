@@ -495,13 +495,16 @@ object GeminiContentClassifier {
         }
 
         if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY" || apiKey == "<redacted>") {
-            Log.d(TAG, "Gemini API key unavailable; keeping on-device verdict for chat message.")
+            Log.w(TAG, "Gemini API key unavailable; failing CLOSED for chat message (review required).")
+            // v1.3.1: fail closed — an uncertain message with no AI verifier must NOT
+            // silently pass. The guard's staged flow (warning first, resolvable) handles it.
+            // Deliberately NOT cached: a later successful call must re-evaluate.
             val fallback = ContentVerdict(
-                isStudyAllowed = true,
+                isStudyAllowed = false,
                 isAdult = false,
-                category = "UNKNOWN",
-                reason = "On-device undecided, no AI key",
-                confidence = 0.5f
+                category = "REVIEW_REQUIRED",
+                reason = "AI verification unavailable (no API key) — treated as non-study until verified",
+                confidence = 0.0f
             )
             return@withContext fallback
         }
@@ -590,8 +593,16 @@ object GeminiContentClassifier {
             Log.w(TAG, "Gemini chat classification exception: ${e.message}")
         }
 
-        val fallback = ContentVerdict(true, false, "UNKNOWN", "AI unavailable", 0.5f)
-        classificationCache.put(cacheKey, fallback)
+        // v1.3.1: fail closed on AI errors — an uncertain message must NOT silently pass
+        // when the verifier is down. Deliberately NOT cached: transient errors must not
+        // poison the cache; the next attempt re-evaluates normally.
+        val fallback = ContentVerdict(
+            isStudyAllowed = false,
+            isAdult = false,
+            category = "REVIEW_REQUIRED",
+            reason = "AI verification failed — treated as non-study until verified",
+            confidence = 0.0f
+        )
         return@withContext fallback
     }
 

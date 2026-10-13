@@ -276,6 +276,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     var hasCheckedNotificationPermissionOnStartup by rememberSaveable(currentUser?.id) { mutableStateOf(false) }
     var showNotificationPermissionPrompt by rememberSaveable(currentUser?.id) { mutableStateOf(false) }
     var showSignOutConfirmationDialog by rememberSaveable { mutableStateOf(false) }
+    // v1.3.1: strict-mode end-early confirmation (Regain parity — "you cannot end your session early").
+    var showStrictEndConfirmDialog by remember { mutableStateOf(false) }
 
     // Real-time network connectivity observation
     LaunchedEffect(Unit) {
@@ -539,7 +541,15 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onStartTimer = { viewModel.requestStudySessionStart() },
                                         onPauseTimer = { viewModel.pauseTimer() },
                                         onResumeTimer = { viewModel.resumeTimer() },
-                                        onFinishEarly = { viewModel.finishSessionEarly() },
+                                        onFinishEarly = {
+                                            // v1.3.1: strict mode — ending early is blocked behind
+                                            // an explicit confirmation (the session is discarded).
+                                            if (com.example.util.StrictModeManager.isStrictModeEnabled(context)) {
+                                                showStrictEndConfirmDialog = true
+                                            } else {
+                                                viewModel.finishSessionEarly()
+                                            }
+                                        },
                                         onAddFiveMinutes = { viewModel.addFiveMinutes() },
                                         onSkipBreak = { viewModel.skipBreak() },
                                         onSelectMode = { mode, mins -> viewModel.setMode(mode, mins) },
@@ -830,6 +840,17 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                 isSettingsOpen = false
                                 android.widget.Toast.makeText(context, "Study progress synced & signed out", android.widget.Toast.LENGTH_SHORT).show()
                             }
+                        }
+                    )
+                }
+
+                // v1.3.1: strict-mode end-early confirmation (Regain parity).
+                if (showStrictEndConfirmDialog) {
+                    com.example.ui.components.StrictEndSessionDialog(
+                        onDismiss = { showStrictEndConfirmDialog = false },
+                        onConfirmEnd = {
+                            showStrictEndConfirmDialog = false
+                            viewModel.finishSessionEarly()
                         }
                     )
                 }

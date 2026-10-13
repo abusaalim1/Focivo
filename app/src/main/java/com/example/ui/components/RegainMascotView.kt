@@ -57,7 +57,8 @@ enum class MascotPose {
     GUARD_WARNING,
     GUARD,
     STUDY_POSE,
-    CELEBRATE_NEW
+    CELEBRATE_NEW,
+    BREAK
 }
 
 /**
@@ -107,6 +108,7 @@ fun RegainMascotView(
         MascotPose.GUARD -> R.drawable.mascot_guard
         MascotPose.STUDY_POSE -> R.drawable.mascot_study
         MascotPose.CELEBRATE_NEW -> R.drawable.mascot_celebrate_transparent
+        MascotPose.BREAK -> R.drawable.mascot_break
         MascotPose.IDLE -> R.drawable.mascot_base
     }
 
