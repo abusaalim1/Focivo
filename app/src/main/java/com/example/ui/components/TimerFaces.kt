@@ -89,7 +89,9 @@ data class TimerFaceParams(
     val onTogglePlay: () -> Unit,
     val onReset: () -> Unit,
     val onTagClick: (() -> Unit)?,
-    val onTimeClick: (() -> Unit)? = null
+    val onTimeClick: (() -> Unit)? = null,
+    val mascotContent: @Composable (() -> Unit)? = null,
+    val onMascotClick: (() -> Unit)? = null
 )
 
 fun formatFaceTime(remainingSeconds: Int): String {
@@ -128,7 +130,9 @@ fun TimerFaceHost(
             onTogglePlay = params.onTogglePlay,
             onReset = params.onReset,
             onTagClick = params.onTagClick,
-            onTimeClick = params.onTimeClick
+            onTimeClick = params.onTimeClick,
+            mascotContent = params.mascotContent,
+            onMascotClick = params.onMascotClick
         )
     }
 }

@@ -452,14 +452,14 @@ fun FocusScreen(
                                 // sessions keep the existing no-edit rule.
                                 onTimeClick = if (!isRunning) {
                                     { showCustomizeTimer = true }
-                                } else null
+                                } else null,
+                                // v1.1: dressed buddy on the default theme (tap
+                                // opens the Mascot screen); themed mascots stay.
+                                mascotContent = if (isDefaultTheme) {
+                                    { BuddyMascot(modifier = Modifier.width(108.dp)) }
+                                } else null,
+                                onMascotClick = if (isDefaultTheme) onOpenMascot else null
                             ),
-                            // v1.1: dressed buddy on the default theme (tap
-                            // opens the Mascot screen); themed mascots stay.
-                            mascotContent = if (isDefaultTheme) {
-                                { BuddyMascot(modifier = Modifier.width(108.dp)) }
-                            } else null,
-                            onMascotClick = if (isDefaultTheme) onOpenMascot else null,
                             modifier = Modifier.testTag("aurora_timer_component")
                         )
                     }
@@ -622,11 +622,7 @@ fun FocusScreen(
                 blockedPackages = userPreferences?.blockedAppsList
                     ?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet(),
                 onRemoveApp = onRemoveBlockedApp,
-                onSaveBlockedApps = onSaveBlockedApps,
-                onOpenShieldHub = {
-                    showBlockedAppsList = false
-                    onOpenShieldHub()
-                }
+                onSaveBlockedApps = onSaveBlockedApps
             )
         }
 

@@ -50,6 +50,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.security.MessageDigest
+import com.example.util.phaseModeLabel
+import com.example.util.phaseMinutes
 
 class FocuslyViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
