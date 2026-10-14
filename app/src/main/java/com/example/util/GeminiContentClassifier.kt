@@ -24,8 +24,9 @@ import java.util.concurrent.TimeUnit
 object GeminiContentClassifier {
 
     private const val TAG = "GeminiClassifier"
-    private const val MODEL_NAME = "gemini-2.5-flash"
-    private const val GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/$MODEL_NAME:generateContent"
+    private const val MODEL_NAME = "gemini-flash-latest"
+    private const val FALLBACK_MODEL_NAME = "gemini-3.8-flash"
+    private const val SECOND_FALLBACK_MODEL_NAME = "gemini-3.5-flash"
 
     data class ContentVerdict(
         val isStudyAllowed: Boolean,
@@ -50,10 +51,30 @@ object GeminiContentClassifier {
 
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(6, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
-            .writeTimeout(6, TimeUnit.SECONDS)
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .writeTimeout(8, TimeUnit.SECONDS)
             .build()
+    }
+
+    private fun executeGeminiPost(requestJson: JSONObject, apiKey: String): String? {
+        val requestBody = requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+        val models = listOf(MODEL_NAME, FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME)
+        for (m in models) {
+            try {
+                val url = "https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent?key=$apiKey"
+                val request = Request.Builder().url(url).post(requestBody).build()
+                val response = okHttpClient.newCall(request).execute()
+                val body = response.body?.string()
+                if (response.isSuccessful && !body.isNullOrBlank()) {
+                    return body
+                }
+                Log.w(TAG, "Gemini ($m) HTTP ${response.code}")
+            } catch (e: Exception) {
+                Log.w(TAG, "Gemini ($m) call failed: ${e.message}")
+            }
+        }
+        return null
     }
 
     // Known pure entertainment / social media packages that are strictly distractions during study
@@ -307,16 +328,9 @@ object GeminiContentClassifier {
                 })
             }
 
-            val requestBody = requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-            val request = Request.Builder()
-                .url("$GEMINI_ENDPOINT?key=$apiKey")
-                .post(requestBody)
-                .build()
+            val responseBody = executeGeminiPost(requestJson, apiKey)
 
-            val response = okHttpClient.newCall(request).execute()
-            val responseBody = response.body?.string()
-
-            if (response.isSuccessful && !responseBody.isNullOrBlank()) {
+            if (!responseBody.isNullOrBlank()) {
                 val respJson = JSONObject(responseBody)
                 val candidates = respJson.optJSONArray("candidates")
                 val firstCandidate = candidates?.optJSONObject(0)
@@ -345,7 +359,7 @@ object GeminiContentClassifier {
                     return@withContext verdict
                 }
             } else {
-                Log.w(TAG, "Gemini API screen call failed HTTP ${response.code}: $responseBody")
+                Log.w(TAG, "Gemini API screen call failed on all models")
             }
         } catch (e: Exception) {
             Log.w(TAG, "Gemini API screen evaluation exception: ${e.message}")
@@ -426,16 +440,9 @@ object GeminiContentClassifier {
                 })
             }
 
-            val requestBody = requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-            val request = Request.Builder()
-                .url("$GEMINI_ENDPOINT?key=$apiKey")
-                .post(requestBody)
-                .build()
+            val responseBody = executeGeminiPost(requestJson, apiKey)
 
-            val response = okHttpClient.newCall(request).execute()
-            val responseBody = response.body?.string()
-
-            if (response.isSuccessful && !responseBody.isNullOrBlank()) {
+            if (!responseBody.isNullOrBlank()) {
                 val respJson = JSONObject(responseBody)
                 val candidates = respJson.optJSONArray("candidates")
                 val firstCandidate = candidates?.optJSONObject(0)
@@ -462,7 +469,7 @@ object GeminiContentClassifier {
                     return@withContext geminiVerdict
                 }
             } else {
-                Log.w(TAG, "Gemini API call failed with HTTP ${response.code}: $responseBody")
+                Log.w(TAG, "Gemini API call failed on all models")
             }
         } catch (e: Exception) {
             Log.w(TAG, "Gemini API classification exception: ${e.message}")
@@ -553,16 +560,9 @@ object GeminiContentClassifier {
                 })
             }
 
-            val requestBody = requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-            val request = Request.Builder()
-                .url("$GEMINI_ENDPOINT?key=$apiKey")
-                .post(requestBody)
-                .build()
+            val responseBody = executeGeminiPost(requestJson, apiKey)
 
-            val response = okHttpClient.newCall(request).execute()
-            val responseBody = response.body?.string()
-
-            if (response.isSuccessful && !responseBody.isNullOrBlank()) {
+            if (!responseBody.isNullOrBlank()) {
                 val respJson = JSONObject(responseBody)
                 val textPart = respJson.optJSONArray("candidates")
                     ?.optJSONObject(0)?.optJSONObject("content")
@@ -587,22 +587,22 @@ object GeminiContentClassifier {
                     return@withContext verdict
                 }
             } else {
-                Log.w(TAG, "Gemini chat call failed HTTP ${response.code}")
+                Log.w(TAG, "Gemini chat call failed on all models")
             }
         } catch (e: Exception) {
             Log.w(TAG, "Gemini chat classification exception: ${e.message}")
         }
 
-        // v1.3.1: fail closed on AI errors — an uncertain message must NOT silently pass
-        // when the verifier is down. Deliberately NOT cached: transient errors must not
-        // poison the cache; the next attempt re-evaluates normally.
+        // Offline / fallback: evaluate using on-device intelligence
+        val onDevice = OnDeviceStudyClassifier.evaluateContent(message)
         val fallback = ContentVerdict(
-            isStudyAllowed = false,
-            isAdult = false,
-            category = "REVIEW_REQUIRED",
-            reason = "AI verification failed — treated as non-study until verified",
-            confidence = 0.0f
+            isStudyAllowed = !onDevice.isCasual,
+            isAdult = onDevice.reason.contains("18+") || onDevice.reason.contains("Adult"),
+            category = if (onDevice.isCasual) "NON_STUDY_CHAT" else "ACADEMIC_STUDY",
+            reason = onDevice.reason,
+            confidence = onDevice.confidence
         )
+        classificationCache.put(cacheKey, fallback)
         return@withContext fallback
     }
 

@@ -116,7 +116,7 @@ object AiStudyGuardManager {
         val hasPerm = isAccessibilityPermissionGranted(context)
         if (!hasPerm) return false
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(KEY_AI_GUARD_ENABLED, false)
+        return prefs.getBoolean(KEY_AI_GUARD_ENABLED, true)
     }
 
     fun setAiGuardEnabled(context: Context, enabled: Boolean) {

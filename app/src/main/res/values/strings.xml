@@ -11,4 +11,5 @@
     <string name="widget_shield_description">Quickly arm Focus Shield, toggle Deep Focus, and monitor blocked apps.</string>
     <string name="widget_zen_title">AI Study Coach &amp; Zen Break</string>
     <string name="widget_zen_description">Get AI coaching advice, check your XP level, and take instant 5-minute Zen breathing breaks.</string>
+    <string name="device_admin_description">Prevents accidental or impulsive uninstallation of Focivo while a strict focus session is actively running.</string>
 </resources>

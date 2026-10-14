@@ -369,7 +369,9 @@ class FocusShieldService : Service() {
 
     private fun isPermittedEducationalApp(pkg: String): Boolean {
         val lower = pkg.lowercase()
-        return lower == "com.openai.chatgpt" ||
+        return lower == "com.google.android.youtube" ||
+               lower == "com.google.android.apps.youtube.music" ||
+               lower == "com.openai.chatgpt" ||
                lower == "com.anthropic.claude" ||
                lower.contains("duolingo") ||
                lower.contains("khanacademy") ||

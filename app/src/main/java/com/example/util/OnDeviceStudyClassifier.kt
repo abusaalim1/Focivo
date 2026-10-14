@@ -270,17 +270,18 @@ object OnDeviceStudyClassifier {
         // Word-boundary matching: avoids false hits like "this"/"which" (contain "hi") or
         // "however" (contains "how").
         val shortChatRegex = Regex(
-            """\b(hi|hello|hey|kaise|kya|sun|batao|bata|haal|scene|who|how)\b""",
+            """\b(hi|hello|hey|sup|kaise|kya|sun|batao|bata|haal|hal|scene|who|how|bore|bored|mood|joke|chutkula|shayari|movie|song|crush|date|flirt|girlfriend|boyfriend|love|pyaar|dost|bro|yaar|kuch|aur|mai|tum|weather|ipl|game)\b""",
             RegexOption.IGNORE_CASE
         )
-        val isShortConversational = trimmed.length < 80 && (
+        val isShortConversational = trimmed.length < 120 && (
             shortChatRegex.containsMatchIn(trimmed) ||
-            lower.contains("tell me") || lower.contains("write ") || lower.contains("can you")
+            lower.contains("tell me") || lower.contains("write ") || lower.contains("can you") ||
+            lower.contains("kya kar") || lower.contains("kaise ho") || lower.contains("baat karo")
         )
         if (isShortConversational) {
             return ClassificationResult(
                 isCasual = true,
-                confidence = 0.80f,
+                confidence = 0.95f,
                 reason = "Non-academic casual query: '${trimmed.take(40)}'"
             )
         }

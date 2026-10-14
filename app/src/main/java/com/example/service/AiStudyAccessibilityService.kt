@@ -176,6 +176,16 @@ class AiStudyAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun pauseMediaPlayback() {
+        try {
+            val audioManager = applicationContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            audioManager?.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE))
+            audioManager?.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE))
+            audioManager?.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_STOP))
+            audioManager?.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_STOP))
+        } catch (_: Throwable) {}
+    }
+
     /**
      * Immediately pauses active media/audio, then triggers the BlockedAppLockActivity overlay
      * showing the mascot, lock icon, and time remaining without redirecting to Focivo main app.
@@ -339,7 +349,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             }
 
             // 5. Strictly block active scheduled blocked apps or active Focus Shield blocked apps immediately on launch
-            if (isWindowStateChanged && isStudyPeriod) {
+            if (isWindowStateChanged && isStudyPeriod && !isMonitoredYouTube) {
                 val blockedList = FocusShieldService.getActiveBlockedPackages(applicationContext)
                 if (blockedList.any { blocked -> pkg.equals(blocked, ignoreCase = true) || pkg.startsWith(blocked, ignoreCase = true) }) {
                     if (!com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing || (nowTime - lastGeneralAppInterceptTimeMs > 1000L) || lastGeneralInterceptedPkg != pkg) {
@@ -394,25 +404,6 @@ class AiStudyAccessibilityService : AccessibilityService() {
             if (isYouTube) {
                 if (!isStudyPeriod) return
 
-                // If YouTube is explicitly in the user's blocked list during active study, block the entire app!
-                val blockedList = FocusShieldService.getActiveBlockedPackages(applicationContext)
-                val isYouTubeBlocked = blockedList.any { it.contains("youtube", ignoreCase = true) }
-                if (isYouTubeBlocked && isWindowStateChanged) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
-                        lastYouTubeAiInterceptTimeMs = now
-                        Log.w(TAG, "[Focus Shield] YouTube is blocked during active study! Intercepting...")
-                        forceStopMediaAndDismissToFocivo(
-                            context = applicationContext,
-                            blockedPackage = pkg,
-                            appName = "YouTube",
-                            reason = "YouTube is blocked during your active focus session.",
-                            isGeminiIntercept = false
-                        )
-                    }
-                    return
-                }
-
                 // If Shorts Lock is on, check active screen
                 val isShortsLockOn = ShortsLockManager.isShortsLockEnabled(applicationContext)
                 val isYouTubeAiFilterOn = YouTubeStudyGuardManager.isFilterEnabled(applicationContext)
@@ -424,15 +415,15 @@ class AiStudyAccessibilityService : AccessibilityService() {
                             // 7A. Shorts Lock (Blocks Shorts viewer & shelf)
                             if (isShortsLockOn && isYouTubeShortsScreen(rootNode)) {
                                 val now = System.currentTimeMillis()
-                                if (now - lastShortsInterceptTimeMs > 1500L) {
+                                if (now - lastShortsInterceptTimeMs > 2000L) {
                                     lastShortsInterceptTimeMs = now
                                     Log.w(TAG, "[Shorts Lock] YouTube Shorts detected on screen! Intercepting...")
-                                    forceStopMediaAndDismissToFocivo(
+                                    pauseMediaPlayback()
+                                    AiStudyGuardManager.onNonStudyDetected(
                                         context = applicationContext,
-                                        blockedPackage = "com.google.android.youtube.shorts",
-                                        appName = "YouTube Shorts",
-                                        reason = "YouTube Shorts are locked during active study sessions.",
-                                        isGeminiIntercept = true
+                                        packageName = "com.google.android.youtube",
+                                        messageText = "YouTube Shorts",
+                                        reason = "YouTube Shorts are locked during active study sessions."
                                     )
                                 }
                                 return
@@ -1022,19 +1013,19 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 val now = System.currentTimeMillis()
                 if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
                     lastYouTubeAiInterceptTimeMs = now
-                    Log.w(TAG, "[StudyGuardKnowledge] Blocking non-study video: '$title' ($channel)")
+                    Log.w(TAG, "[StudyGuardKnowledge] Non-study video: '$title' ($channel)")
                     YouTubeStudyGuardManager.recordBlockedVideo(
                         context = applicationContext,
                         title = title,
                         channel = channel,
                         reason = "Non-study content detected: \"$title\""
                     )
-                    forceStopMediaAndDismissToFocivo(
+                    pauseMediaPlayback()
+                    AiStudyGuardManager.onNonStudyDetected(
                         context = applicationContext,
-                        blockedPackage = "com.google.android.youtube.entertainment",
-                        appName = "YouTube AI Guard",
-                        reason = "🔒 Non-Study Entertainment Blocked:\n\"$title\"\n\nOnly educational lectures, exam prep, school/college subjects & coding tutorials are allowed!",
-                        isGeminiIntercept = true
+                        packageName = "com.google.android.youtube",
+                        messageText = title,
+                        reason = "Non-study content detected on YouTube: \"$title\""
                     )
                 }
                 return true
@@ -1066,14 +1057,12 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     channel = channel,
                     reason = quickVerdict.reason
                 )
-                val blockLabel = if (quickVerdict.isAdult) "🔞 Inappropriate / 18+ Content" else "🔒 Non-Study Entertainment Blocked"
-                val reasonMsg = "$blockLabel:\n\"$title\"\n\nCategory: ${quickVerdict.category}\nReason: ${quickVerdict.reason}\n\nOnly educational lectures, exam prep, school/college subjects & coding tutorials are allowed!"
-                forceStopMediaAndDismissToFocivo(
+                pauseMediaPlayback()
+                AiStudyGuardManager.onNonStudyDetected(
                     context = applicationContext,
-                    blockedPackage = "com.google.android.youtube.entertainment",
-                    appName = "YouTube AI Guard",
-                    reason = reasonMsg,
-                    isGeminiIntercept = true
+                    packageName = "com.google.android.youtube",
+                    messageText = title,
+                    reason = quickVerdict.reason
                 )
             }
             return true
@@ -1103,14 +1092,12 @@ class AiStudyAccessibilityService : AccessibilityService() {
                             channel = channel,
                             reason = geminiVerdict.reason
                         )
-                        val blockLabel = if (geminiVerdict.isAdult) "🔞 Inappropriate / 18+ Content" else "🔒 Non-Study Entertainment Blocked"
-                        val reasonMsg = "$blockLabel:\n\"$title\"\n\nCategory: ${geminiVerdict.category}\nReason: ${geminiVerdict.reason}\n\nOnly educational lectures, exam prep, school/college subjects & coding tutorials are allowed!"
-                        forceStopMediaAndDismissToFocivo(
+                        pauseMediaPlayback()
+                        AiStudyGuardManager.onNonStudyDetected(
                             context = applicationContext,
-                            blockedPackage = "com.google.android.youtube.entertainment",
-                            appName = "YouTube AI Guard",
-                            reason = reasonMsg,
-                            isGeminiIntercept = true
+                            packageName = "com.google.android.youtube",
+                            messageText = title,
+                            reason = geminiVerdict.reason
                         )
                     }
                 } else {

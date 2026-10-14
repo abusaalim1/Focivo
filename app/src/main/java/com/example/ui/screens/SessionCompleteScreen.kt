@@ -45,14 +45,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import com.example.ui.components.SessionNotificationDigestSheet
+import com.example.util.SessionNotificationDigestManager
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,6 +103,13 @@ fun SessionCompleteScreen(
 ) {
     val isDark = isAppInDarkTheme()
     val minutesSpent = session.durationSeconds / 60
+
+    val suppressedNotifs by SessionNotificationDigestManager.digestList.collectAsState()
+    var showDigestSheet by remember { mutableStateOf(false) }
+
+    if (showDigestSheet) {
+        SessionNotificationDigestSheet(onDismiss = { showDigestSheet = false })
+    }
 
     // Particle / Light Orbit Animation
     val infiniteTransition = rememberInfiniteTransition(label = "particles")
@@ -261,7 +275,36 @@ fun SessionCompleteScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(36.dp))
+            if (suppressedNotifs.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (isDark) Color(0xFF1D221C) else Color(0xFFF2F6ED))
+                        .border(1.dp, if (isDark) Color(0x358CE000) else Color(0xFFDCE6D2), RoundedCornerShape(20.dp))
+                        .clickable { showDigestSheet = true }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.NotificationsOff,
+                        contentDescription = null,
+                        tint = if (isDark) RegainLimePrimary else RegainLimeDeepText,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "${suppressedNotifs.size} ${if (suppressedNotifs.size == 1) "notification" else "notifications"} held during session (tap to view)",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) RegainLimePrimary else RegainLimeDeepText,
+                            fontSize = 12.sp
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
 
             // v1.3.0: Share your focus session (share card). v1.3.1: rotating quote line,
             // honest distractions copy, working Download + image share.

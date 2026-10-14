@@ -41,6 +41,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import android.content.Context
+import android.content.Intent
+import androidx.compose.material3.MaterialTheme
+import com.example.service.FocivoDeviceAdminReceiver
+import com.example.util.SessionNotificationDigestManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -80,12 +85,80 @@ fun DeepFocusSettingsSheet(
         mutableStateOf(StudyNotificationBlockerManager.isBlockNotificationsDuringStudyEnabled(context))
     }
 
-    val isDark = isAppInDarkTheme()
+    val isDarkMode = isAppInDarkTheme()
+    val isDark = isDarkMode
     val sheetBackground = if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)
     val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
     val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
     val rowBg = if (isDark) Color(0xFF1D221C) else Color.White
     val rowBorder = if (isDark) Color(0x228CE000) else Color(0xFFDCE6D2)
+
+    var showDeviceAdminPrompt by remember { mutableStateOf(false) }
+    var showDigestSheet by remember { mutableStateOf(false) }
+    val digestList by SessionNotificationDigestManager.digestList.collectAsState()
+
+    if (showDigestSheet) {
+        SessionNotificationDigestSheet(onDismiss = { showDigestSheet = false })
+    }
+
+    if (showDeviceAdminPrompt) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDeviceAdminPrompt = false },
+            title = {
+                Text(
+                    text = "Activate Uninstall Protection?",
+                    fontFamily = BalooBrandFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp,
+                    color = textPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "Strict Mode is on! You can optionally activate Device Admin to ensure Focivo cannot be uninstalled or bypassed while a strict study session is running.",
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 13.sp,
+                    color = textSecondary
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        showDeviceAdminPrompt = false
+                        try {
+                            val intent = Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                                putExtra(
+                                    android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                                    FocivoDeviceAdminReceiver.getComponentName(context)
+                                )
+                                putExtra(
+                                    android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                                    "Prevents accidental uninstallation while a strict focus session is in progress."
+                                )
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            android.util.Log.e("DeepFocus", "Could not launch device admin request: ${e.message}")
+                        }
+                    }
+                ) {
+                    Text(
+                        text = "Enable Admin",
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) RegainLimePrimary else RegainLimeDeepText
+                    )
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = { showDeviceAdminPrompt = false }
+                ) {
+                    Text("Skip", color = textSecondary)
+                }
+            },
+            containerColor = rowBg
+        )
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -133,12 +206,36 @@ fun DeepFocusSettingsSheet(
                         title = "Strict mode",
                         subtitle = "You cannot end your session early without confirming. Ending early discards the session.",
                         checked = isStrictModeEnabled,
-                        onCheckedChange = { StrictModeManager.setStrictModeEnabled(context, it) },
+                        onCheckedChange = { enabled ->
+                            StrictModeManager.setStrictModeEnabled(context, enabled)
+                            if (enabled) {
+                                val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? android.app.admin.DevicePolicyManager
+                                val adminComponent = FocivoDeviceAdminReceiver.getComponentName(context)
+                                val isAdminActive = dpm?.isAdminActive(adminComponent) == true
+                                if (!isAdminActive) {
+                                    showDeviceAdminPrompt = true
+                                }
+                            }
+                        },
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
                         rowBg = rowBg,
                         rowBorder = rowBorder,
                         testTag = "deep_focus_strict_toggle"
+                    )
+                }
+                item {
+                    SettingsActionRow(
+                        icon = Icons.Default.NotificationsOff,
+                        title = "Suppressed notifications digest",
+                        subtitle = if (digestList.isEmpty()) "No notifications held yet in this session" else "${digestList.size} notifications held during focus sessions",
+                        onClick = { showDigestSheet = true },
+                        textPrimary = textPrimary,
+                        textSecondary = textSecondary,
+                        rowBg = rowBg,
+                        rowBorder = rowBorder,
+                        badgeCount = digestList.size,
+                        testTag = "deep_focus_digest_row"
                     )
                 }
                 item {
@@ -270,3 +367,85 @@ private fun SettingsToggleRow(
         )
     }
 }
+
+@Composable
+private fun SettingsActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    textPrimary: Color,
+    textSecondary: Color,
+    rowBg: Color,
+    rowBorder: Color,
+    badgeCount: Int = 0,
+    testTag: String
+) {
+    val isDark = isAppInDarkTheme()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(rowBg)
+            .border(1.dp, rowBorder, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 13.dp)
+            .testTag(testTag),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(
+                    if (badgeCount > 0) RegainLimePrimary.copy(alpha = 0.18f)
+                    else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (badgeCount > 0) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = textPrimary
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                fontFamily = PoppinsFontFamily,
+                fontSize = 11.5.sp,
+                color = textSecondary,
+                lineHeight = 15.sp
+            )
+        }
+        if (badgeCount > 0) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(RegainLimePrimary)
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    text = badgeCount.toString(),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black,
+                        fontSize = 11.sp
+                    )
+                )
+            }
+        }
+    }
+}
+

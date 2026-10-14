@@ -226,15 +226,21 @@ object YouTubeVideoClassifier {
             )
         }
 
-        // Case B: Explicit Vlog or Song Title Pattern
-        if (cleanTitle.contains("vlog") || cleanTitle.contains("song") || cleanTitle.contains("official video") || cleanTitle.contains("gameplay")) {
+        // Case B: Explicit Vlog, Gaming, or Entertainment Title Pattern
+        if (cleanTitle.contains("vlog") || cleanTitle.contains("song") || cleanTitle.contains("official video") ||
+            cleanTitle.contains("gameplay") || cleanTitle.contains("gaming") || cleanTitle.contains("game") ||
+            cleanTitle.contains("gta") || cleanTitle.contains("minecraft") || cleanTitle.contains("bgmi") ||
+            cleanTitle.contains("pubg") || cleanTitle.contains("roblox") || cleanTitle.contains("prank") ||
+            cleanTitle.contains("roast") || cleanTitle.contains("comedy") || cleanTitle.contains("funny") ||
+            cleanTitle.contains("trailer") || cleanTitle.contains("movie") || cleanTitle.contains("highlights")
+        ) {
             // Even if academic keyword is falsely present, e.g. "Funny College Life Vlog"
             if (!cleanTitle.contains("lecture") && !cleanTitle.contains("chapter") && !cleanTitle.contains("tutorial") && !cleanTitle.contains("ncert")) {
                 return VideoVerdict(
                     isEducational = false,
-                    confidence = 0.90f,
-                    category = "Entertainment Vlog / Music",
-                    reason = "Vlog, music, or gameplay detected"
+                    confidence = 0.95f,
+                    category = "Entertainment / Gaming / Vlog",
+                    reason = "Non-study entertainment or gaming detected"
                 )
             }
         }

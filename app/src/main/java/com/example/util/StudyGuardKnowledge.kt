@@ -138,7 +138,9 @@ object StudyGuardKnowledge {
         "movie explained in hindi", "full episode", "latest episode",
         "tv serial", "daily soap", "dance deewane", "indian idol",
         "splitsvilla", "roadies", "film gossip", "actor interview",
-        "cricket highlights"
+        "cricket highlights", "vlogs", "gamer", "games", "gaming video", "stream",
+        "live stream", "kaise ho", "kya chal rha", "kya chal raha", "aur batao", "aur bata",
+        "kya kar rahe ho", "kya kr rhe ho", "kuch sunao", "timepass", "chitchat", "roast me"
     )
 
     // ------------------------------------------------------------------
@@ -194,7 +196,7 @@ object StudyGuardKnowledge {
             if (padded.contains(" $p ")) score += if (p.contains(' ')) 2.0 else 1.0
         }
         for (p in BLOCK) {
-            if (padded.contains(" $p ")) score -= if (p.contains(' ')) 2.5 else 1.5
+            if (padded.contains(" $p ")) score -= if (p.contains(' ')) 3.0 else 2.0
         }
         var strongOverride = CLASS_CHAPTER_RE.containsMatchIn(padded)
         if (!strongOverride) {

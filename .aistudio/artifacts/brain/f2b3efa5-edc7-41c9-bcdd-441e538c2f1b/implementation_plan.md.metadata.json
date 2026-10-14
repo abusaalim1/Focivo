@@ -1,6 +1,0 @@
-{
-  "summary":  "AI Study Guard with Gemini 3.5 Flash backend, 1-warning-then-3h-lock enforcement on non-study activity in YouTube/AI-chat/browsers, and strict whitelist exclusion for essential system & payment apps (Phone, Contacts, Camera, Gallery, Settings, PhonePe, Paytm, PayPal, FamPay).",
-  "updatedAt":  "2026-10-11T15:05:46.217387671Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}
