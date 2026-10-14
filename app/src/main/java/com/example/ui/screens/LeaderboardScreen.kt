@@ -60,10 +60,14 @@ import com.example.data.HallOfFameItem
 import com.example.data.LeaderboardDateUtils
 import com.example.data.LeaderboardUser
 import com.example.data.model.FocusSessionEntity
-import com.example.ui.components.AuroraBackground
+import com.example.R
+import com.example.ui.components.FeatureIcon
+import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainGoldStar
+import com.example.ui.theme.LocalAppAccent
+import com.example.ui.theme.themedCardBackground
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
@@ -141,7 +145,8 @@ fun LeaderboardScreen(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
-    val cardBg = if (isDark) Color(0xFF1B221B) else Color(0xFFFFFFFF)
+    val appAccent = LocalAppAccent.current // v1.4.0-round2 theme accent
+    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
     val cardBorder = if (isDark) Color(0x358CE000) else Color(0xFFDCE6D2)
     val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
     val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
@@ -242,9 +247,7 @@ fun LeaderboardScreen(
     Box(
         modifier = modifier.fillMaxSize()
     ) {
-        AuroraBackground(
-            modifier = Modifier.fillMaxSize()
-        )
+        // Round-3: theme backdrop is drawn once at the MainActivity shell root.
 
         Column(
             modifier = Modifier
@@ -302,32 +305,11 @@ fun LeaderboardScreen(
                     }
 
                     // Global rank pill
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(cardBg)
-                            .border(1.dp, cardBorder, CircleShape)
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.EmojiEvents,
-                                contentDescription = null,
-                                tint = RegainGoldStar,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Global",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    color = textPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
-                            )
-                        }
-                    }
+                                        FeatureIcon(
+                        drawableRes = R.drawable.ic3d_trophy,
+                        contentDescription = "Leaderboard",
+                        size = 52.dp
+                    )
                 }
             }
 
@@ -342,12 +324,12 @@ fun LeaderboardScreen(
                 listOf("Today", "This Week", "All Time", "Hall of Fame").forEach { filter ->
                     val isSelected = selectedFilter == filter
                     val pillBg = if (isSelected) {
-                        RegainLimePrimary
+                        appAccent
                     } else {
                         if (isDark) Color(0xFF1D241C) else Color(0xFFEFF5EA)
                     }
                     val pillBorder = if (isSelected) {
-                        RegainLimePrimary
+                        appAccent
                     } else {
                         if (isDark) Color(0x358CE000) else Color(0xFFD6E2CB)
                     }
@@ -406,7 +388,7 @@ fun LeaderboardScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 96.dp),
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = BottomNavClearance),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Podium Section (Top 3)
@@ -909,7 +891,7 @@ private fun HallOfFameSection(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 96.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = BottomNavClearance),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Banner card
@@ -984,11 +966,10 @@ private fun HallOfFameSection(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.MilitaryTech,
-                            contentDescription = null,
-                            tint = if (isDark) Color(0x80FFA000) else Color(0xFFE0A800),
-                            modifier = Modifier.size(56.dp)
+                        FeatureIcon(
+                            drawableRes = R.drawable.ic3d_trophy,
+                            contentDescription = "No Past Champions Yet",
+                            size = 84.dp
                         )
                         Text(
                             text = "No Past Champions Yet",
@@ -1044,7 +1025,7 @@ private fun HallOfFameCard(
     textPrimary: Color,
     textSecondary: Color
 ) {
-    val cardBg = if (isDark) Color(0xFF1B221B) else Color(0xFFFFFFFF)
+    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
     val cardBorder = if (isDark) Color(0x40FFD54F) else Color(0xFFFFE082)
     val weekLabel = remember(item.weekStart, item.weekEnd) {
         LeaderboardDateUtils.formatWeekRange(item.weekStart, item.weekEnd)

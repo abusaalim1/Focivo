@@ -41,10 +41,10 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.FocusSessionEntity
 import com.example.data.model.ReflectionEntity
 import com.example.data.model.UserPreferencesEntity
-import com.example.ui.components.AuroraBackground
 import com.example.ui.components.GlassCard
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.WeeklyProductivityChart
+import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -52,6 +52,7 @@ import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.themedCardBackground
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import java.text.SimpleDateFormat
@@ -68,7 +69,7 @@ fun InsightsScreen(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
-    val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
+    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
     val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
@@ -169,14 +170,14 @@ fun InsightsScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        AuroraBackground(modifier = Modifier.fillMaxSize())
+        // Round-3: theme backdrop is drawn once at the MainActivity shell root.
 
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
                 .testTag("insights_screen"),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = BottomNavClearance),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Minimalist Header

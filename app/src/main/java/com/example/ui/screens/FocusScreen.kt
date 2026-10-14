@@ -75,13 +75,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.UserPreferencesEntity
-import com.example.ui.components.AuroraBackground
 import com.example.ui.components.DistractionDialog
 import com.example.ui.components.MascotPose
 import com.example.ui.components.PreStudyAppBlockSheet
 import com.example.ui.components.RegainMascotView
 import com.example.ui.components.RegainStudyDial
+import com.example.ui.components.resolveThemeBackdropRes
 import com.example.R
+import com.example.ui.theme.LocalAppAccent
+import com.example.ui.theme.themedCardBackground
+import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -132,7 +135,9 @@ fun FocusScreen(
 ) {
     val isDark = isAppInDarkTheme()
     val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
-    val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
+    // v1.4.0-round2: interactive accents follow the full-screen theme.
+    val appAccent = LocalAppAccent.current
+    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
     val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
@@ -162,9 +167,8 @@ fun FocusScreen(
             .fillMaxSize()
             .testTag("focus_screen")
     ) {
-        AuroraBackground(
-            modifier = Modifier.fillMaxSize()
-        )
+        // Round-3: the full-bleed theme backdrop is drawn once at the
+        // MainActivity shell root; nothing per-screen here.
 
         Column(
             modifier = Modifier
@@ -269,7 +273,7 @@ fun FocusScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = if (isRunning) 24.dp else 96.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = if (isRunning) 24.dp else BottomNavClearance),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
@@ -366,7 +370,7 @@ fun FocusScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(18.dp))
-                                        .background(if (timerStyle == "aurora") RegainLimePrimary else Color.Transparent)
+                                        .background(if (timerStyle == "aurora") appAccent else Color.Transparent)
                                         .clickable { timerStyle = "aurora" }
                                         .padding(horizontal = 14.dp, vertical = 6.dp)
                                         .testTag("timer_style_aurora_btn")
@@ -413,11 +417,14 @@ fun FocusScreen(
                     }
                     if (timerStyle == "aurora") {
                         // v1.4.0: themed backdrop ambience behind the timer dial.
+                        // Round-3: backdrop resolved at runtime so new themes work too.
                         Box(
                             modifier = Modifier.fillMaxWidth(),
                             contentAlignment = Alignment.Center
                         ) {
-                            val backdropRes = selectedTheme.backdropRes
+                            val backdropRes = remember(selectedTheme.id) {
+                                resolveThemeBackdropRes(context, selectedTheme)
+                            }
                             if (backdropRes != null) {
                                 Image(
                                     painter = painterResource(id = backdropRes),
@@ -492,7 +499,7 @@ fun FocusScreen(
                                         )
                                         .border(
                                             1.dp,
-                                            if (isSelected) RegainLimePrimary else cardBorder,
+                                            if (isSelected) appAccent else cardBorder,
                                             RoundedCornerShape(16.dp)
                                         )
                                         .clickable {
@@ -575,11 +582,11 @@ fun FocusScreen(
                                 .shadow(
                                     elevation = 6.dp,
                                     shape = CircleShape,
-                                    ambientColor = RegainLimePrimary.copy(alpha = 0.3f),
-                                    spotColor = RegainLimePrimary.copy(alpha = 0.4f)
+                                    ambientColor = appAccent.copy(alpha = 0.3f),
+                                    spotColor = appAccent.copy(alpha = 0.4f)
                                 )
                                 .clip(CircleShape)
-                                .background(RegainLimePrimary)
+                                .background(appAccent)
                                 .clickable {
                                     if (isRunning) {
                                         onPauseTimer()
@@ -910,7 +917,7 @@ fun FocusScreen(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(if (isChosen) RegainLimeContainer else cardBg)
-                                        .border(1.dp, if (isChosen) RegainLimePrimary else cardBorder, RoundedCornerShape(12.dp))
+                                        .border(1.dp, if (isChosen) appAccent else cardBorder, RoundedCornerShape(12.dp))
                                         .clickable {
                                             selectedSubject = subject
                                             customSubjectInput = ""
@@ -972,7 +979,7 @@ fun FocusScreen(
                             onSelectMode(finalSubject, mins)
                             showStudyTypeDialog = false
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = RegainLimePrimary, contentColor = NearBlack)
+                        colors = ButtonDefaults.buttonColors(containerColor = appAccent, contentColor = NearBlack)
                     ) {
                         Text("Apply Timer & Subject", fontWeight = FontWeight.Bold)
                     }

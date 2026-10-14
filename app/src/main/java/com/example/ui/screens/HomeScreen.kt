@@ -64,7 +64,8 @@ import com.example.R
 import com.example.data.model.FocusSessionEntity
 import com.example.data.model.TaskEntity
 import com.example.data.model.UserPreferencesEntity
-import com.example.ui.components.AuroraBackground
+import com.example.ui.components.FeatureIcon
+import com.example.ui.components.PremiumButton
 import com.example.ui.components.LinearButton
 import com.example.ui.components.LinearButtonVariant
 import com.example.ui.components.LinearGlowCard
@@ -80,6 +81,8 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
+import com.example.ui.theme.LocalAppAccent
+import com.example.ui.theme.themedCardBackground
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
@@ -106,9 +109,10 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
+    val appAccent = LocalAppAccent.current // v1.4.0-round2 theme accent
 
     // Semantic colors for Light/Dark mode - Apple-inspired minimal glass aesthetic
-    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
+    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
     val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
     val textPrimary = if (isDark) Color(0xFFF2F2F7) else Color(0xFF1C1C1E)
     val textSecondary = if (isDark) Color(0xFF8E8E93) else Color(0xFF6C6C70)
@@ -283,7 +287,7 @@ fun HomeScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        AuroraBackground(modifier = Modifier.fillMaxSize())
+        // Round-3: theme backdrop is drawn once at the MainActivity shell root.
 
         // Top Atmospheric Header Backdrop Image Layer
         Box(
@@ -384,35 +388,19 @@ fun HomeScreen(
                             IconButton(
                                 onClick = onOpenAutoSchedule,
                                 modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(headerButtonBg)
-                                    .border(1.dp, headerButtonBorder, CircleShape)
+                                    .size(40.dp)
                                     .testTag("home_auto_schedule_button")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Schedule,
-                                    contentDescription = "Auto Schedule",
-                                    tint = if (isDark) RegainLimeDeepText else Color(0xFF2E6800),
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                FeatureIcon(drawableRes = R.drawable.ic3d_calendar, contentDescription = "Auto Schedule", size = 40.dp)
                             }
 
                             IconButton(
                                 onClick = onOpenAlarmStudio,
                                 modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(headerButtonBg)
-                                    .border(1.dp, headerButtonBorder, CircleShape)
+                                    .size(40.dp)
                                     .testTag("home_alarm_button")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Alarm,
-                                    contentDescription = "Alarms",
-                                    tint = if (isDark) textPrimary else Color(0xFF151916),
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                FeatureIcon(drawableRes = R.drawable.ic3d_alarm, contentDescription = "Alarms", size = 40.dp)
                             }
                         }
                     }
@@ -723,20 +711,11 @@ fun HomeScreen(
                                 .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Schedule,
-                                    contentDescription = "Auto Schedule",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                            FeatureIcon(
+                                drawableRes = R.drawable.ic3d_calendar,
+                                contentDescription = "Auto Schedule",
+                                size = 40.dp
+                            )
 
                             Spacer(modifier = Modifier.width(10.dp))
 
@@ -783,20 +762,11 @@ fun HomeScreen(
                                 .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isShieldActive) RegainLimeContainer else (if (isDark) Color(0x30FFFFFF) else Color(0xFFF0F4EC))),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Security,
-                                    contentDescription = "Focus Shield",
-                                    tint = if (isShieldActive) RegainLimeDeepText else textSecondary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                            FeatureIcon(
+                                drawableRes = R.drawable.ic3d_shield,
+                                contentDescription = "Focus Shield",
+                                size = 40.dp
+                            )
 
                             Spacer(modifier = Modifier.width(10.dp))
 
@@ -859,20 +829,11 @@ fun HomeScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(CircleShape)
-                                        .background(RegainLimeContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Bolt,
-                                        contentDescription = null,
-                                        tint = RegainLimeDeepText,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
+                                FeatureIcon(
+                                    drawableRes = R.drawable.ic3d_bolt,
+                                    contentDescription = "Quick Focus",
+                                    size = 38.dp
+                                )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "QUICK FOCUS",
@@ -1035,23 +996,11 @@ fun HomeScreen(
                                 )
                             )
                             Spacer(modifier = Modifier.height(14.dp))
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(RegainLimePrimary)
-                                    .clickable { onOpenTaskCreate() }
-                                    .padding(horizontal = 18.dp, vertical = 10.dp)
-                            ) {
-                                Text(
-                                    text = "+ Add Priority",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontFamily = PoppinsFontFamily,
-                                        color = NearBlack,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp
-                                    )
-                                )
-                            }
+                            PremiumButton(
+                                text = "+ Add Priority",
+                                onClick = { onOpenTaskCreate() },
+                                compact = true
+                            )
                         }
                     }
                 }

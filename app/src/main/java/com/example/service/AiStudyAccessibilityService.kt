@@ -304,7 +304,10 @@ class AiStudyAccessibilityService : AccessibilityService() {
 
             val nowTime = System.currentTimeMillis()
 
-            // 3. Strict Mode: Guard uninstaller apps only during active study schedule / timer / shield
+            // 3. Strict Mode: Guard uninstaller apps only during active study schedule / timer / shield.
+            // v1.4.0-round2: com.android.settings is DELIBERATELY not matched here —
+            // the device-admin grant/revoke flow lives in Settings and must never
+            // be blocked or overlaid, otherwise the user gets trapped mid-permission.
             if (isWindowStateChanged && isStrictActive && isSettingsOrPackageInstallerApp(pkg)) {
                 if (nowTime - lastGeneralAppInterceptTimeMs > 2500L || lastGeneralInterceptedPkg != pkg) {
                     lastGeneralAppInterceptTimeMs = nowTime

@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.FocusSessionEntity
 import com.example.ui.components.AuroraBackground
+import com.example.ui.components.PremiumButton
 import com.example.ui.components.GlassCard
 import com.example.ui.components.MascotPose
 import com.example.ui.components.RegainMascotView
@@ -387,26 +388,11 @@ fun FocusSessionLogScreen(
 
                                 Spacer(modifier = Modifier.height(6.dp))
 
-                                Button(
+                                PremiumButton(
+                                    text = "Start Focus Session",
                                     onClick = onStartNewSession,
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = limeAccent,
-                                        contentColor = NearBlack
-                                    )
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Start Focus Session",
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = PoppinsFontFamily
-                                    )
-                                }
+                                    compact = true
+                                )
                             }
                         }
                     }

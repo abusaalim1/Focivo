@@ -79,6 +79,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.data.model.AppDailyLimitEntity
+import com.example.R
+import com.example.ui.components.FeatureIcon
 import com.example.ui.components.AddEditAppLimitSheet
 import com.example.ui.components.FocusShieldPermissions
 import com.example.ui.components.GlassCard
@@ -425,20 +427,11 @@ fun AppLimitsScreen(
                         )
                     }
 
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(RegainLimePrimary.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = RegainLimePrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    FeatureIcon(
+                        drawableRes = R.drawable.ic3d_timer,
+                        contentDescription = "App Limits",
+                        size = 48.dp
+                    )
                 }
             }
 

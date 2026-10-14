@@ -22,11 +22,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,6 +39,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +57,8 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.material3.MaterialTheme
 import com.example.service.FocivoDeviceAdminReceiver
+import com.example.data.FocuslyRepository
+import com.example.util.TimerTheme
 import com.example.util.TimerThemeManager
 import com.example.util.SessionNotificationDigestManager
 import androidx.compose.ui.platform.LocalContext
@@ -82,7 +88,9 @@ import com.example.util.StudyNotificationBlockerManager
 @Composable
 fun DeepFocusSettingsSheet(
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // v1.4.0-round2: test hook — screenshot tests open the picker directly
+    initialShowThemePicker: Boolean = false
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -103,13 +111,59 @@ fun DeepFocusSettingsSheet(
     val rowBorder = if (isDark) Color(0x228CE000) else Color(0xFFDCE6D2)
 
     var showDeviceAdminPrompt by remember { mutableStateOf(false) }
-    var showThemePicker by remember { mutableStateOf(false) }
+    var showThemePicker by remember { mutableStateOf(initialShowThemePicker) }
     val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
-    var showDigestSheet by remember { mutableStateOf(false) }
-    val digestList by SessionNotificationDigestManager.digestList.collectAsState()
+    // Round-4: Focus Points balance (real currency, 1 pt per focused minute)
+    // drives theme locks. Guests / fresh accounts see 0 -> only free themes.
+    val prefsFlow = remember(context) { FocuslyRepository.getInstance(context).userPreferences }
+    val prefs by prefsFlow.collectAsState(initial = null)
+    val focusPoints = prefs?.focusPoints ?: 0
+    var lockedDialogTheme by remember { mutableStateOf<TimerTheme?>(null) }
 
+    // Round-4: if the persisted theme is no longer affordable (rules changed),
+    // fall back to Aurora gracefully instead of rendering a locked theme.
+    LaunchedEffect(focusPoints, selectedTheme.id) {
+        TimerThemeManager.validateSelection(context, focusPoints)
+    }
+
+    var showDigestSheet by remember { mutableStateOf(false) }
     if (showDigestSheet) {
         SessionNotificationDigestSheet(onDismiss = { showDigestSheet = false })
+    }
+    val digestList by SessionNotificationDigestManager.digestList.collectAsState()
+
+    // Round-4: locked-theme explainer dialog.
+    lockedDialogTheme?.let { lockedTheme ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { lockedDialogTheme = null },
+            title = {
+                Text(
+                    text = "Locked theme",
+                    fontFamily = BalooBrandFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp,
+                    color = textPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "Collect ${(lockedTheme.unlockPoints - focusPoints).coerceAtLeast(1)} more Focus Points to unlock ${lockedTheme.name}. You earn 1 point per focused minute.",
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 13.sp,
+                    color = textSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { lockedDialogTheme = null }) {
+                    Text(
+                        text = "Got it",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = RegainLimePrimary
+                    )
+                }
+            }
+        )
     }
 
     if (showDeviceAdminPrompt) {
@@ -179,6 +233,7 @@ fun DeepFocusSettingsSheet(
         dragHandle = null
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            SheetDragHandle()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -214,6 +269,7 @@ fun DeepFocusSettingsSheet(
                 item {
                     SettingsToggleRow(
                         icon = Icons.Default.Lock,
+                        icon3dRes = com.example.R.drawable.ic3d_lock,
                         title = "Strict mode",
                         subtitle = "You cannot end your session early without confirming. Ending early discards the session.",
                         checked = isStrictModeEnabled,
@@ -238,8 +294,11 @@ fun DeepFocusSettingsSheet(
                 item {
                     SettingsActionRow(
                         icon = Icons.Default.Palette,
+                        // Final phase: the theme row shows the selected theme's
+                        // own backdrop art as its icon tile.
+                        icon3dRes = resolveThemeBackdropRes(context, selectedTheme),
                         title = "Timer theme",
-                        subtitle = selectedTheme.name + " — timer backdrop, mascot and glow",
+                        subtitle = selectedTheme.name + " — full-screen backdrop, mascot and glow",
                         onClick = { showThemePicker = !showThemePicker },
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
@@ -250,62 +309,170 @@ fun DeepFocusSettingsSheet(
                 }
                 if (showThemePicker) {
                     item {
+                        // Round-4: Focus Points header — the real earned balance
+                        // (1 pt per focused minute) that unlocks themes.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp)
+                                .padding(bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFFFD54F),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Your Focus Points: $focusPoints",
+                                fontFamily = PoppinsFontFamily,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                color = textPrimary
+                            )
+                        }
+                        // Round-3: visual theme cards — each theme shows its real
+                        // backdrop artwork so users SEE it is a full-screen theme.
+                        // Round-4: locked cards show a lock badge + price, and
+                        // tapping one explains how to earn it.
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             TimerThemeManager.THEMES.forEach { theme ->
                                 val isSelected = theme.id == selectedTheme.id
+                                val isLocked = !theme.isUnlocked(focusPoints)
+                                val cardBackdrop = remember(theme.id) {
+                                    resolveThemeBackdropRes(context, theme)
+                                }
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier.clickable {
-                                        TimerThemeManager.selectTheme(context, theme.id)
+                                        if (isLocked) {
+                                            lockedDialogTheme = theme
+                                        } else {
+                                            TimerThemeManager.trySelectTheme(context, theme.id, focusPoints)
+                                        }
                                     }
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(56.dp)
-                                            .clip(CircleShape)
+                                            .width(104.dp)
+                                            .height(138.dp)
+                                            .clip(RoundedCornerShape(16.dp))
                                             .border(
                                                 width = if (isSelected) 2.5.dp else 1.dp,
-                                                color = if (isSelected) RegainLimePrimary else rowBorder,
-                                                shape = CircleShape
-                                            ),
-                                        contentAlignment = Alignment.Center
+                                                color = if (isSelected) theme.accent else rowBorder,
+                                                shape = RoundedCornerShape(16.dp)
+                                            )
                                     ) {
-                                        if (theme.backdropRes != null) {
+                                        if (cardBackdrop != null) {
                                             Image(
-                                                painter = painterResource(id = theme.backdropRes),
+                                                painter = painterResource(id = cardBackdrop),
                                                 contentDescription = theme.name,
                                                 contentScale = ContentScale.Crop,
                                                 modifier = Modifier.fillMaxSize()
                                             )
                                         } else {
+                                            // Aurora (code-drawn) or an asset not packaged yet:
+                                            // accent-tinted gradient placeholder.
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxSize()
                                                     .background(
                                                         Brush.linearGradient(
                                                             colors = listOf(
-                                                                Color(0xFF8CE000),
-                                                                Color(0xFF00E5FF),
-                                                                Color(0xFF7C4DFF)
+                                                                theme.accent,
+                                                                Color(0xFF0E1512)
                                                             )
                                                         )
                                                     )
                                             )
                                         }
+                                        if (isLocked) {
+                                            // Dim the artwork so locked cards read as unavailable.
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(Color(0xAA0B0F0B))
+                                            )
+                                        }
+                                        if (isLocked) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopStart)
+                                                    .padding(6.dp)
+                                                    .size(24.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xCC1A221B)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Lock,
+                                                    contentDescription = "Locked",
+                                                    tint = Color(0xFFFFD54F),
+                                                    modifier = Modifier.size(13.dp)
+                                                )
+                                            }
+                                        }
+                                        // Name strip on a scrim so it reads on any artwork.
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .align(Alignment.BottomCenter)
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        listOf(
+                                                            Color.Transparent,
+                                                            Color(0xCC000000)
+                                                        )
+                                                    )
+                                                )
+                                                .padding(top = 16.dp, bottom = 8.dp),
+                                            contentAlignment = Alignment.BottomCenter
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text(
+                                                    text = theme.name,
+                                                    fontFamily = PoppinsFontFamily,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                                    fontSize = 11.sp,
+                                                    color = Color.White
+                                                )
+                                                if (isLocked) {
+                                                    Text(
+                                                        text = "${theme.unlockPoints} pts",
+                                                        fontFamily = PoppinsFontFamily,
+                                                        fontWeight = FontWeight.Medium,
+                                                        fontSize = 9.sp,
+                                                        color = Color(0xFFFFD54F)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        if (isSelected && !isLocked) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(6.dp)
+                                                    .size(22.dp)
+                                                    .clip(CircleShape)
+                                                    .background(theme.accent),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = "Selected",
+                                                    tint = Color(0xFF061505),
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
                                     }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = theme.name,
-                                        fontFamily = PoppinsFontFamily,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        fontSize = 10.sp,
-                                        color = if (isSelected) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary
-                                    )
                                 }
                             }
                         }
@@ -328,16 +495,24 @@ fun DeepFocusSettingsSheet(
                 item {
                     SettingsToggleRow(
                         icon = Icons.Default.NotificationsOff,
+                        icon3dRes = com.example.R.drawable.ic3d_bell,
                         title = "Block notifications",
-                        subtitle = "Silence notifications during focus sessions so pings don't pull you out.",
+                        subtitle = "Silence notifications during focus sessions so pings don't pull you out. Needs notification access + Do Not Disturb.",
                         checked = blockNotifications,
                         onCheckedChange = { enabled ->
-                            if (enabled && !StudyNotificationBlockerManager.hasDndPermission(context)) {
-                                // Ask for Do Not Disturb access first; keep the toggle off until granted.
+                            if (!enabled) {
+                                StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, false)
+                                blockNotifications = false
+                            } else if (!StudyNotificationBlockerManager.hasNotificationListenerAccess(context)) {
+                                // v1.4.0-round2: without listener access the suppressor
+                                // never runs — send the user to grant it first.
+                                StudyNotificationBlockerManager.openNotificationListenerSettings(context)
+                            } else if (!StudyNotificationBlockerManager.hasDndPermission(context)) {
+                                // Ask for Do Not Disturb access next; keep the toggle off until granted.
                                 StudyNotificationBlockerManager.openDndSettings(context)
                             } else {
-                                StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, enabled)
-                                blockNotifications = enabled
+                                StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, true)
+                                blockNotifications = true
                             }
                         },
                         textPrimary = textPrimary,
@@ -350,6 +525,7 @@ fun DeepFocusSettingsSheet(
                 item {
                     SettingsToggleRow(
                         icon = Icons.Default.Security,
+                        icon3dRes = com.example.R.drawable.ic3d_shield,
                         title = "Uninstall protection",
                         subtitle = "Focivo cannot be uninstalled while a focus session is running.",
                         checked = uninstallProtection,
@@ -364,6 +540,7 @@ fun DeepFocusSettingsSheet(
                 item {
                     SettingsToggleRow(
                         icon = Icons.Default.Home,
+                        icon3dRes = com.example.R.drawable.ic3d_home,
                         title = "Block phone home screen",
                         subtitle = "During deep focus, going to the home screen shows the focus overlay instead. Best-effort on some phones.",
                         checked = blockHomeScreen,
@@ -392,7 +569,10 @@ private fun SettingsToggleRow(
     textSecondary: Color,
     rowBg: Color,
     rowBorder: Color,
-    testTag: String
+    testTag: String,
+    // Final phase: 3D feature icon (drawable tile); falls back to the vector
+    // circle when null.
+    icon3dRes: Int? = null
 ) {
     val isDark = isAppInDarkTheme()
     Row(
@@ -401,29 +581,24 @@ private fun SettingsToggleRow(
             .clip(RoundedCornerShape(18.dp))
             .background(rowBg)
             .border(1.dp, rowBorder, RoundedCornerShape(18.dp))
+            .pressFeedback()
             .clickable { onCheckedChange(!checked) }
             .padding(horizontal = 14.dp, vertical = 13.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(
-                    if (checked) RegainLimePrimary.copy(alpha = 0.18f)
-                    else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (checked) (if (isDark) RegainLimePrimary else RegainLimeDeepText)
-                else textSecondary,
-                modifier = Modifier.size(20.dp)
-            )
-        }
+        // Final phase: 3D feature tile when a drawable is supplied, else the
+        // legacy vector circle.
+        FeatureIcon(
+            drawableRes = icon3dRes,
+            imageVector = if (icon3dRes == null) icon else null,
+            contentDescription = null,
+            size = 44.dp,
+            vectorCircleColor = if (checked) RegainLimePrimary.copy(alpha = 0.18f)
+            else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6),
+            vectorTint = if (checked) (if (isDark) RegainLimePrimary else RegainLimeDeepText)
+            else textSecondary
+        )
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -466,7 +641,10 @@ private fun SettingsActionRow(
     rowBg: Color,
     rowBorder: Color,
     badgeCount: Int = 0,
-    testTag: String
+    testTag: String,
+    // Final phase: 3D feature icon (drawable tile); falls back to the vector
+    // circle when null.
+    icon3dRes: Int? = null
 ) {
     val isDark = isAppInDarkTheme()
     Row(
@@ -475,28 +653,23 @@ private fun SettingsActionRow(
             .clip(RoundedCornerShape(18.dp))
             .background(rowBg)
             .border(1.dp, rowBorder, RoundedCornerShape(18.dp))
+            .pressFeedback()
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 13.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(
-                    if (badgeCount > 0) RegainLimePrimary.copy(alpha = 0.18f)
-                    else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (badgeCount > 0) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary,
-                modifier = Modifier.size(20.dp)
-            )
-        }
+        // Final phase: 3D feature tile when a drawable is supplied, else the
+        // legacy vector circle.
+        FeatureIcon(
+            drawableRes = icon3dRes,
+            imageVector = if (icon3dRes == null) icon else null,
+            contentDescription = null,
+            size = 44.dp,
+            vectorCircleColor = if (badgeCount > 0) RegainLimePrimary.copy(alpha = 0.18f)
+            else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6),
+            vectorTint = if (badgeCount > 0) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary
+        )
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(

@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- v1.4.0-round2: uninstall protection needs NO device policies.
+     The previous <force-lock /> declaration made Android/OEMs treat Focivo
+     as a screen-controlling admin (and told the user so on the activation
+     screen) even though the app never locks the screen. Device admin here
+     exists ONLY so onDisableRequested() can warn during strict sessions. -->
 <device-admin xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-policies>
-        <force-lock />
-    </uses-policies>
+    <uses-policies />
 </device-admin>

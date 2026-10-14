@@ -191,6 +191,69 @@ class SupabaseService {
         }
     }
 
+    /**
+     * v1.4.0-round2: password recovery. Sends the Supabase recovery email;
+     * the link redirects to focivo://auth-callback where [isRecoveryDeeplink]
+     * + [handleAuthDeeplink] pick it up, then [updatePassword] sets the new one.
+     */
+    suspend fun requestPasswordReset(email: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val cleanEmail = email.trim().lowercase()
+            if (!cleanEmail.contains("@")) {
+                return@withContext Result.failure(Exception("Please enter a valid email address."))
+            }
+            client.auth.resetPasswordForEmail(cleanEmail, redirectUrl = "focivo://auth-callback")
+            Log.i(TAG, "Password recovery email requested for $cleanEmail")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.w(TAG, "requestPasswordReset failed: ${e.message}")
+            val raw = e.message ?: ""
+            val friendly = when {
+                raw.contains("Unable to resolve host", ignoreCase = true) || raw.contains("ConnectException", ignoreCase = true) ->
+                    "Network error. Please check your internet connection."
+                else -> "Could not send the recovery email. Please try again."
+            }
+            Result.failure(Exception(friendly))
+        }
+    }
+
+    /** True when a focivo://auth-callback deep link carries a password-recovery token. */
+    fun isRecoveryDeeplink(uri: android.net.Uri): Boolean {
+        return try {
+            val typeParam = uri.getQueryParameter("type")
+            val frag = uri.fragment ?: ""
+            typeParam.equals("recovery", ignoreCase = true) ||
+                    frag.split("&").any { it.substringBefore("=").equals("type", ignoreCase = true) && it.substringAfter("=", "").equals("recovery", ignoreCase = true) }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Sets the new password for the user holding the recovery session. */
+    suspend fun updatePassword(newPassword: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            if (newPassword.length < 6) {
+                return@withContext Result.failure(Exception("Password must be at least 6 characters."))
+            }
+            client.auth.updateUser {
+                password = newPassword
+            }
+            Log.i(TAG, "Password updated via recovery flow")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.w(TAG, "updatePassword failed: ${e.message}")
+            val raw = e.message ?: ""
+            val friendly = when {
+                raw.contains("expired", ignoreCase = true) || raw.contains("invalid", ignoreCase = true) ->
+                    "This recovery link has expired. Please request a new one."
+                raw.contains("Unable to resolve host", ignoreCase = true) ->
+                    "Network error. Please check your internet connection."
+                else -> "Could not update the password. Please try again."
+            }
+            Result.failure(Exception(friendly))
+        }
+    }
+
     fun getCurrentUserId(): String? {
         return try {
             val uid = client.auth.currentUserOrNull()?.id

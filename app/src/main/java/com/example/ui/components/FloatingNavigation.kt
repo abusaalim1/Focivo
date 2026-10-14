@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AppleLinearFontFamily
+import com.example.ui.theme.LocalAppAccent
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PureWhite
@@ -84,7 +85,9 @@ fun FloatingNavigation(
 
     val barBg = if (isDark) Color(0xE61C1C1E) else Color(0xF8FFFFFF)
     val barBorder = if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
-    val activeBg = RegainLimePrimary
+    // v1.4.0-round2: active pill follows the full-screen theme accent
+    // (Aurora accent == RegainLimePrimary, so the default look is unchanged).
+    val activeBg = LocalAppAccent.current
     val activeContent = Color(0xFF061505)
     val inactiveContent = if (isDark) Color(0xFF8E8E93) else Color(0xFF6C6C70)
 

@@ -37,6 +37,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import com.example.ui.components.PrivacyPolicySheet
+import com.example.ui.components.PremiumButton
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -117,6 +118,13 @@ fun AuthScreen(
     onGoogleDirectSignIn: (name: String, email: String) -> Unit = { _, _ -> },
     onGuestSignIn: () -> Unit = {},
     onClearError: () -> Unit,
+    // v1.4.0-round2: forgot-password wiring
+    passwordResetState: com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState =
+        com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Idle,
+    pendingPasswordRecovery: Boolean = false,
+    onForgotPassword: (email: String) -> Unit = {},
+    onClearPasswordReset: () -> Unit = {},
+    onSetNewPassword: (password: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -132,6 +140,8 @@ fun AuthScreen(
     var localError by remember { mutableStateOf<String?>(null) }
     var hasAcceptedPrivacyPolicy by remember { mutableStateOf(false) }
     var showPrivacyPolicySheet by remember { mutableStateOf(false) }
+    // v1.4.0-round2
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
 
     val activeError = localError ?: errorMessage
 
@@ -756,6 +766,34 @@ fun AuthScreen(
                     )
                 }
 
+                // v1.4.0-round2: Forgot password (sign-in mode only)
+                AnimatedVisibility(
+                    visible = !isRegisterMode,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = { showForgotPasswordDialog = true },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                            modifier = Modifier.testTag("forgot_password_link")
+                        ) {
+                            Text(
+                                text = "Forgot password?",
+                                style = TextStyle(
+                                    fontFamily = PoppinsFontFamily,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDark) RegainLimeLight else RegainLimeDeepText
+                                )
+                            )
+                        }
+                    }
+                }
+
                 // Privacy Policy Consent Checkbox (Registration Mode Only)
                 AnimatedVisibility(
                     visible = isRegisterMode,
@@ -819,51 +857,14 @@ fun AuthScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Primary CTA Button (Solid Lime Green Fill with White Bold Text)
-            Button(
+            // Primary CTA Button (v1.4.0-round2 premium button system)
+            PremiumButton(
+                text = if (isLoading) "Please wait..." else if (isRegisterMode) "Create Account" else "Sign In",
                 onClick = { handleSubmit() },
                 enabled = !isLoading && (!isRegisterMode || hasAcceptedPrivacyPolicy),
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = RegainLimePrimary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    disabledContainerColor = RegainLimeContainer
-                ),
-                contentPadding = PaddingValues(0.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .shadow(
-                        elevation = 6.dp,
-                        shape = CircleShape,
-                        ambientColor = Color(0x3B8CE000),
-                        spotColor = Color(0x3B8CE000)
-                    )
-                    .testTag("btn_primary")
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.5.dp
-                        )
-                    } else {
-                        Text(
-                            text = if (isRegisterMode) "Create Account" else "Sign In",
-                            style = TextStyle(
-                                fontFamily = PoppinsFontFamily,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        )
-                    }
-                }
-            }
+                modifier = Modifier.fillMaxWidth(),
+                testTag = "btn_primary"
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -944,6 +945,28 @@ fun AuthScreen(
                     showGoogleAccountDialog = false
                     onGoogleSignIn(context)
                 }
+            )
+        }
+
+        // v1.4.0-round2: Forgot password dialog
+        if (showForgotPasswordDialog) {
+            ForgotPasswordDialog(
+                initialEmail = emailInput,
+                resetState = passwordResetState,
+                onDismiss = {
+                    showForgotPasswordDialog = false
+                    onClearPasswordReset()
+                },
+                onSend = { email -> onForgotPassword(email) }
+            )
+        }
+
+        // v1.4.0-round2: Set-new-password sheet after a recovery deep link
+        if (pendingPasswordRecovery) {
+            SetNewPasswordSheet(
+                resetState = passwordResetState,
+                onDismiss = { onClearPasswordReset() },
+                onSubmit = { newPassword -> onSetNewPassword(newPassword) }
             )
         }
     }
@@ -1146,6 +1169,208 @@ fun GoogleAccountSelectDialog(
                         style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 12.5.sp, color = RegainLimeDeepText, fontWeight = FontWeight.SemiBold)
                     )
                 }
+            }
+        }
+    )
+}
+
+/**
+ * v1.4.0-round2: Forgot-password dialog. Email entry -> Supabase recovery
+ * email -> idle/sending/sent/error states, all English.
+ */
+@Composable
+private fun ForgotPasswordDialog(
+    initialEmail: String,
+    resetState: com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState,
+    onDismiss: () -> Unit,
+    onSend: (email: String) -> Unit
+) {
+    var email by remember { mutableStateOf(initialEmail) }
+    val isDark = isAppInDarkTheme()
+    val textPrimary = if (isDark) PureWhite else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA9B3AB) else SecondaryTextLight
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Reset password",
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = textPrimary
+            )
+        },
+        text = {
+            Column {
+                when (resetState) {
+                    is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Sent -> {
+                        Text(
+                            text = "Recovery email sent. Check your inbox and tap the link, then set a new password here in the app.",
+                            fontFamily = PoppinsFontFamily,
+                            fontSize = 14.sp,
+                            color = textPrimary
+                        )
+                    }
+                    is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Error -> {
+                        Text(
+                            text = resetState.message,
+                            fontFamily = PoppinsFontFamily,
+                            fontSize = 14.sp,
+                            color = Color(0xFFEF4444)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    else -> {
+                        Text(
+                            text = "Enter your account email. We will send you a link to reset your password.",
+                            fontFamily = PoppinsFontFamily,
+                            fontSize = 14.sp,
+                            color = textSecondary
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
+                if (resetState !is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Sent) {
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        label = { Text("Email", fontFamily = PoppinsFontFamily) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = RegainLimePrimary,
+                            cursorColor = RegainLimePrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("forgot_password_email")
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            val sending = resetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Sending
+            val sent = resetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Sent
+            if (!sent) {
+                PremiumButton(
+                    text = if (sending) "Sending..." else "Send link",
+                    onClick = { onSend(email.trim()) },
+                    enabled = !sending && email.contains("@"),
+                    compact = true,
+                    modifier = Modifier.testTag("forgot_password_send")
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", fontFamily = PoppinsFontFamily, color = textSecondary)
+            }
+        }
+    )
+}
+
+/**
+ * v1.4.0-round2: shown after the user taps the recovery link in their email.
+ * Sets the new password against the recovery session.
+ */
+@Composable
+private fun SetNewPasswordSheet(
+    resetState: com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState,
+    onDismiss: () -> Unit,
+    onSubmit: (password: String) -> Unit
+) {
+    var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var localError by remember { mutableStateOf<String?>(null) }
+    val isDark = isAppInDarkTheme()
+    val textPrimary = if (isDark) PureWhite else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA9B3AB) else SecondaryTextLight
+    val updating = resetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Updating
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Set a new password",
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = textPrimary
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Choose a new password for your account (min. 6 characters).",
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 14.sp,
+                    color = textSecondary
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it; localError = null },
+                    label = { Text("New password", fontFamily = PoppinsFontFamily) },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = RegainLimePrimary,
+                        cursorColor = RegainLimePrimary
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("new_password_input")
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = confirm,
+                    onValueChange = { confirm = it; localError = null },
+                    label = { Text("Confirm password", fontFamily = PoppinsFontFamily) },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = RegainLimePrimary,
+                        cursorColor = RegainLimePrimary
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("new_password_confirm")
+                )
+                val stateError = (resetState as? com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Error)?.message
+                val showError = localError ?: stateError
+                if (showError != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = showError,
+                        fontFamily = PoppinsFontFamily,
+                        fontSize = 13.sp,
+                        color = Color(0xFFEF4444)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            PremiumButton(
+                text = if (updating) "Saving..." else "Save password",
+                onClick = {
+                    localError = when {
+                        password.length < 6 -> "Password must be at least 6 characters."
+                        password != confirm -> "Passwords do not match."
+                        else -> null
+                    }
+                    if (localError == null) onSubmit(password)
+                },
+                enabled = !updating,
+                compact = true,
+                modifier = Modifier.testTag("new_password_submit")
+            )
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", fontFamily = PoppinsFontFamily, color = textSecondary)
             }
         }
     )

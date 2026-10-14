@@ -10,6 +10,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -28,6 +30,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,6 +44,7 @@ import com.example.ui.components.AlarmRingingOverlay
 import com.example.ui.components.BlockShieldOverlay
 import com.example.ui.components.FloatingNavigation
 import com.example.ui.components.FocusShieldHubSheet
+import com.example.ui.components.ThemedScreenBackground
 import com.example.ui.components.AiStudyWarningDialog
 import com.example.ui.components.AiStudyBlockedDialog
 import com.example.ui.components.AiStudyResolvedDialog
@@ -402,7 +406,12 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 onGoogleSignIn = { ctx -> viewModel.signInWithGoogle(ctx) },
                 onGoogleDirectSignIn = { name, email -> viewModel.signInWithGoogleDirect(name, email) },
                 onGuestSignIn = { viewModel.signInAsGuest() },
-                onClearError = { viewModel.clearAuthError() }
+                onClearError = { viewModel.clearAuthError() },
+                passwordResetState = viewModel.passwordResetState.collectAsState().value,
+                pendingPasswordRecovery = viewModel.pendingPasswordRecovery.collectAsState().value,
+                onForgotPassword = { email -> viewModel.requestPasswordReset(email) },
+                onClearPasswordReset = { viewModel.clearPasswordReset() },
+                onSetNewPassword = { password -> viewModel.completePasswordRecovery(password) }
             )
         // v1.4.0: first-launch onboarding runs for guests too (same survey;
         // answers persist via the local repository / guest storage).
@@ -428,9 +437,18 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
             )
         } else {
             // Main OS Shell (Direct Open)
+            // v1.4.0-round2: full-screen theme accent for nav + main screens.
+            val appTheme by com.example.util.TimerThemeManager.selectedTheme.collectAsState()
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.example.ui.theme.LocalAppAccent provides appTheme.accent
+            ) {
             Box(modifier = Modifier.fillMaxSize()) {
+                // Round-3: one full-bleed theme backdrop behind the whole shell —
+                // every main screen, the top bar and the bottom-nav area.
+                ThemedScreenBackground(modifier = Modifier.fillMaxSize())
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
+                    containerColor = Color.Transparent,
                     bottomBar = {
                         if (!isSettingsOpen && !isTimerRunning) {
                             FloatingNavigation(
@@ -451,7 +469,13 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                         AnimatedContent(
                             targetState = if (isSettingsOpen) "SETTINGS" else selectedTab.name,
                             transitionSpec = {
-                                fadeIn(animationSpec = tween(240)) togetherWith fadeOut(animationSpec = tween(180))
+                                // Final phase: soft fade + gentle slide on tab switches
+                                (fadeIn(animationSpec = tween(260)) + slideInHorizontally(
+                                    animationSpec = tween(260)
+                                ) { it / 14 }) togetherWith
+                                (fadeOut(animationSpec = tween(200)) + slideOutHorizontally(
+                                    animationSpec = tween(200)
+                                ) { -it / 14 })
                             },
                             label = "tab_navigation"
                         ) { target ->
@@ -880,6 +904,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     }
                 }
             }
+            } // CompositionLocalProvider (v1.4.0-round2 theme accent)
         }
     }
 }

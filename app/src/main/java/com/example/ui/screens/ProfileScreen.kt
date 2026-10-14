@@ -43,6 +43,8 @@ import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import com.example.ui.components.WidgetsShowcaseSheet
+import com.example.ui.components.PremiumSecondaryButton
+import com.example.ui.components.FeatureIcon
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -53,6 +55,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -81,7 +84,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.FocusSessionEntity
 import com.example.data.model.UserPreferencesEntity
-import com.example.ui.components.AuroraBackground
 import com.example.ui.components.GlassCard
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.pressFeedback
@@ -91,6 +93,14 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.themedCardBackground
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import com.example.R
+import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import java.text.SimpleDateFormat
@@ -146,7 +156,12 @@ fun ProfileAvatarImage(
 data class CleanBadge(
     val title: String,
     val icon: ImageVector,
-    val isUnlocked: Boolean
+    val isUnlocked: Boolean,
+    // v1.4.0-round2: 3D icon + detail-dialog data (all from real stored data)
+    val iconRes: Int = 0,
+    val description: String = "",
+    val progressText: String = "",
+    val progressFraction: Float? = null
 )
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -166,17 +181,21 @@ fun ProfileScreen(
     onCheckForUpdates: () -> Unit = {},
     onLogout: () -> Unit = {},
     onUpdateProfile: (newName: String, avatarBytes: ByteArray?) -> Unit = { _, _ -> },
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // v1.4.0-round2: test hook — screenshot tests open a badge directly
+    initialSelectedBadgeTitle: String? = null
 ) {
     val context = LocalContext.current
     val isDark = isAppInDarkTheme()
     var showEditProfileDialog by remember { mutableStateOf(false) }
+    // v1.4.0-round2: achievement tapped -> detail dialog
+    var selectedBadge by remember { mutableStateOf<CleanBadge?>(null) }
     var showPrivacyPolicySheet by remember { mutableStateOf(false) }
     var showWidgetsSheet by remember { mutableStateOf(false) }
     val widgetSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Semantic colors for Dark / Light mode compatibility
-    val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
+    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
     val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
@@ -248,24 +267,70 @@ fun ProfileScreen(
         0.1f
     }
 
+    // v1.4.0-round2: achievements with real progress (no fake counters).
+    val bestSessionSeconds = remember(sessions) { sessions.maxOfOrNull { it.durationSeconds } ?: 0 }
+    val shieldAttempts = userPreferences?.shieldBlockedAttempts ?: 0
     val badges = listOf(
-        CleanBadge("First Flow", Icons.Default.Star, sessionCount >= 1),
-        CleanBadge("60m Deep", Icons.Default.HourglassTop, sessions.any { it.durationSeconds >= 3600 }),
-        CleanBadge("7 Days Flow", Icons.Default.DateRange, distinctDaysCount >= 7),
-        CleanBadge("25h Master", Icons.Default.MilitaryTech, totalSeconds >= 25 * 3600),
-        CleanBadge("Focus Shield", Icons.Default.Security, (userPreferences?.isAppBlockerEnabled == true) || ((userPreferences?.shieldBlockedAttempts ?: 0) > 0)),
-        CleanBadge("100 Blocks", Icons.Default.WorkspacePremium, sessionCount >= 100)
+        CleanBadge(
+            "First Flow", Icons.Default.Star, sessionCount >= 1,
+            iconRes = R.drawable.ach_first_flow,
+            description = "Complete your very first focus session.",
+            progressText = "${minOf(sessionCount, 1)}/1 session",
+            progressFraction = minOf(sessionCount, 1) / 1f
+        ),
+        CleanBadge(
+            "60m Deep", Icons.Default.HourglassTop, bestSessionSeconds >= 3600,
+            iconRes = R.drawable.ach_60m_deep,
+            description = "Finish a single session of 60 minutes or more.",
+            progressText = "${bestSessionSeconds / 60}/60 min best",
+            progressFraction = (bestSessionSeconds / 3600f).coerceIn(0f, 1f)
+        ),
+        CleanBadge(
+            "7 Days Flow", Icons.Default.DateRange, distinctDaysCount >= 7,
+            iconRes = R.drawable.ach_7days_flow,
+            description = "Focus on 7 different days.",
+            progressText = "${minOf(distinctDaysCount, 7)}/7 days",
+            progressFraction = minOf(distinctDaysCount, 7) / 7f
+        ),
+        CleanBadge(
+            "25h Master", Icons.Default.MilitaryTech, totalSeconds >= 25 * 3600,
+            iconRes = R.drawable.ach_25h_master,
+            description = "Accumulate 25 hours of total focus time.",
+            progressText = "${"%.1f".format(totalSeconds / 3600f)}/25 h",
+            progressFraction = (totalSeconds / (25 * 3600f)).coerceIn(0f, 1f)
+        ),
+        CleanBadge(
+            "Focus Shield", Icons.Default.Security,
+            (userPreferences?.isAppBlockerEnabled == true) || (shieldAttempts > 0),
+            iconRes = R.drawable.ach_focus_shield,
+            description = "Block your first distraction with Focus Shield.",
+            progressText = if (shieldAttempts > 0) "$shieldAttempts interceptions" else "No interceptions yet",
+            progressFraction = if (shieldAttempts > 0) 1f else 0f
+        ),
+        CleanBadge(
+            "100 Blocks", Icons.Default.WorkspacePremium, sessionCount >= 100,
+            iconRes = R.drawable.ach_100_blocks,
+            description = "Complete 100 focus sessions.",
+            progressText = "${minOf(sessionCount, 100)}/100 sessions",
+            progressFraction = minOf(sessionCount, 100) / 100f
+        )
     )
+    // v1.4.0-round2: test hook — open a badge directly for screenshots
+    LaunchedEffect(initialSelectedBadgeTitle) {
+        if (initialSelectedBadgeTitle != null && selectedBadge == null) {
+            selectedBadge = badges.firstOrNull { it.title == initialSelectedBadgeTitle }
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
-        AuroraBackground(modifier = Modifier.fillMaxSize())
+        // Round-3: theme backdrop is drawn once at the MainActivity shell root.
 
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
                 .testTag("profile_screen"),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = BottomNavClearance),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Header
@@ -300,21 +365,11 @@ fun ProfileScreen(
                         )
                     }
 
-                    IconButton(
+                                        IconButton(
                         onClick = onOpenSettings,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(cardBg)
-                            .border(1.dp, cardBorder, CircleShape)
-                            .testTag("settings_button")
+                        modifier = Modifier.size(46.dp).testTag("settings_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = textPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        FeatureIcon(drawableRes = R.drawable.ic3d_gear, contentDescription = "Settings", size = 46.dp)
                     }
                 }
             }
@@ -336,20 +391,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Favorite,
-                                    contentDescription = "Support Focivo",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_heart,
+                                contentDescription = "Support Focivo",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -692,20 +738,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Security,
-                                    contentDescription = "Focus Shield",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_shield,
+                                contentDescription = "Focus Shield",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -775,20 +812,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Widgets,
-                                    contentDescription = "Home Widgets",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_widgets,
+                                contentDescription = "Home Widgets",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -872,20 +900,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isTodaySunday) RegainLimeContainer else Color(0xFF232A25)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.DateRange,
-                                    contentDescription = "Sunday Recap",
-                                    tint = if (isTodaySunday) RegainLimeDeepText else Color(0xFFA0A89E),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_calendar,
+                                contentDescription = "Sunday Recap",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -957,20 +976,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Schedule,
-                                    contentDescription = "Session History",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_history,
+                                contentDescription = "Session History",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -1040,20 +1050,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Alarm,
-                                    contentDescription = null,
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_alarm,
+                                contentDescription = "Alarm Studio",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -1111,7 +1112,7 @@ fun ProfileScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         badges.take(3).forEach { badge ->
-                            BadgeGridItem(badge = badge, isDark = isDark, cardBg = cardBg, cardBorder = cardBorder, textPrimary = textPrimary, textSecondary = textSecondary, modifier = Modifier.weight(1f))
+                            BadgeGridItem(badge = badge, isDark = isDark, cardBg = cardBg, cardBorder = cardBorder, textPrimary = textPrimary, textSecondary = textSecondary, onClick = { selectedBadge = badge }, modifier = Modifier.weight(1f))
                         }
                     }
                     Row(
@@ -1119,7 +1120,7 @@ fun ProfileScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         badges.drop(3).take(3).forEach { badge ->
-                            BadgeGridItem(badge = badge, isDark = isDark, cardBg = cardBg, cardBorder = cardBorder, textPrimary = textPrimary, textSecondary = textSecondary, modifier = Modifier.weight(1f))
+                            BadgeGridItem(badge = badge, isDark = isDark, cardBg = cardBg, cardBorder = cardBorder, textPrimary = textPrimary, textSecondary = textSecondary, onClick = { selectedBadge = badge }, modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -1150,20 +1151,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.SystemUpdate,
-                                    contentDescription = "Check for Updates",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_download,
+                                contentDescription = "Check for Updates",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -1322,8 +1314,20 @@ fun ProfileScreen(
         }
     }
 
-    if (showEditProfileDialog) {
-        var editedName by remember { mutableStateOf(userName) }
+    // v1.4.0-round2: achievement detail dialog
+    selectedBadge?.let { badge ->
+        AchievementDetailDialog(
+            badge = badge,
+            isDark = isDark,
+            textPrimary = textPrimary,
+            textSecondary = textSecondary,
+            cardBg = cardBg,
+            cardBorder = cardBorder,
+            onDismiss = { selectedBadge = null }
+        )
+    }
+
+    if (showEditProfileDialog) {        var editedName by remember { mutableStateOf(userName) }
         var selectedPhotoUri by remember { mutableStateOf<android.net.Uri?>(null) }
         val photoPickerLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.PickVisualMedia()
@@ -1476,11 +1480,13 @@ private fun BadgeGridItem(
     cardBorder: Color,
     textPrimary: Color,
     textSecondary: Color,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     GlassCard(
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(18.dp),
+        onClick = onClick
     ) {
         Column(
             modifier = Modifier
@@ -1489,20 +1495,58 @@ private fun BadgeGridItem(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (badge.isUnlocked) RegainLimeContainer else (if (isDark) Color(0x20FFFFFF) else Color(0xFFF0F4EC))
-                    ),
+                modifier = Modifier.size(56.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = if (badge.isUnlocked) badge.icon else Icons.Default.Lock,
-                    contentDescription = badge.title,
-                    tint = if (badge.isUnlocked) RegainLimeDeepText else textSecondary,
-                    modifier = Modifier.size(18.dp)
-                )
+                if (badge.iconRes != 0) {
+                    // 3D icon tile (icons have solid corners -> clip rounded).
+                    // Locked: dimmed tile + small lock badge.
+                    Image(
+                        painter = painterResource(id = badge.iconRes),
+                        contentDescription = badge.title,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .alpha(if (badge.isUnlocked) 1f else 0.45f),
+                        contentScale = ContentScale.Crop
+                    )
+                    if (!badge.isUnlocked) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .offset(x = 4.dp, y = 4.dp)
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(if (isDark) Color(0xFF2A2A2E) else Color(0xFFE8EDE4))
+                                .border(1.dp, cardBorder, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "Locked",
+                                tint = textSecondary,
+                                modifier = Modifier.size(11.dp)
+                            )
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (badge.isUnlocked) RegainLimeContainer else (if (isDark) Color(0x20FFFFFF) else Color(0xFFF0F4EC))
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (badge.isUnlocked) badge.icon else Icons.Default.Lock,
+                            contentDescription = badge.title,
+                            tint = if (badge.isUnlocked) RegainLimeDeepText else textSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -1516,6 +1560,111 @@ private fun BadgeGridItem(
                     color = if (badge.isUnlocked) textPrimary else textSecondary
                 )
             )
+            if (badge.progressText.isNotBlank()) {
+                Text(
+                    text = badge.progressText,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = PoppinsFontFamily,
+                        fontSize = 10.sp,
+                        color = textSecondary
+                    )
+                )
+            }
         }
     }
+}
+
+/**
+ * v1.4.0-round2: achievement detail — big 3D icon, description, real
+ * progress bar, unlock state. All values come from stored session data.
+ */
+@Composable
+private fun AchievementDetailDialog(
+    badge: CleanBadge,
+    isDark: Boolean,
+    textPrimary: Color,
+    textSecondary: Color,
+    cardBg: Color,
+    cardBorder: Color,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = null,
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (badge.iconRes != 0) {
+                    Image(
+                        painter = painterResource(id = badge.iconRes),
+                        contentDescription = badge.title,
+                        modifier = Modifier
+                            .size(96.dp)
+                            .clip(RoundedCornerShape(26.dp))
+                            .alpha(if (badge.isUnlocked) 1f else 0.55f),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = badge.title,
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp,
+                    color = textPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = badge.description,
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 13.sp,
+                    color = textSecondary,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                badge.progressFraction?.let { fraction ->
+                    LinearProgressIndicator(
+                        progress = { fraction },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = RegainLimePrimary,
+                        trackColor = if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+                Text(
+                    text = badge.progressText,
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (badge.isUnlocked) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (badge.isUnlocked) "Unlocked" else "Locked",
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (badge.isUnlocked) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            if (badge.isUnlocked) RegainLimePrimary.copy(alpha = 0.16f)
+                            else (if (isDark) Color(0x20FFFFFF) else Color(0xFFF0F4EC))
+                        )
+                        .padding(horizontal = 12.dp, vertical = 5.dp)
+                )
+            }
+        },
+        confirmButton = {
+            PremiumSecondaryButton(
+                text = "Close",
+                onClick = onDismiss
+            )
+        }
+    )
 }

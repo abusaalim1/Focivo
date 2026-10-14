@@ -78,6 +78,58 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError.asStateFlow()
 
+    /** v1.4.0-round2: forgot-password flow states (English-only UI). */
+    sealed interface PasswordResetState {
+        data object Idle : PasswordResetState
+        data object Sending : PasswordResetState
+        data object Sent : PasswordResetState
+        data class Error(val message: String) : PasswordResetState
+        data object Updating : PasswordResetState
+        data object Updated : PasswordResetState
+    }
+
+    private val _passwordResetState = MutableStateFlow<PasswordResetState>(PasswordResetState.Idle)
+    val passwordResetState: StateFlow<PasswordResetState> = _passwordResetState.asStateFlow()
+
+    /** True while the app holds a recovery session waiting for a new password. */
+    private val _pendingPasswordRecovery = MutableStateFlow(false)
+    val pendingPasswordRecovery: StateFlow<Boolean> = _pendingPasswordRecovery.asStateFlow()
+
+    fun requestPasswordReset(email: String) {
+        viewModelScope.launch {
+            _passwordResetState.value = PasswordResetState.Sending
+            val result = authManager.requestPasswordReset(email)
+            _passwordResetState.value = result.fold(
+                onSuccess = { PasswordResetState.Sent },
+                onFailure = { PasswordResetState.Error(it.message ?: "Could not send the recovery email.") }
+            )
+        }
+    }
+
+    fun clearPasswordReset() {
+        _passwordResetState.value = PasswordResetState.Idle
+    }
+
+    /** Called from the "set new password" screen after a recovery deep link. */
+    fun completePasswordRecovery(newPassword: String) {
+        viewModelScope.launch {
+            _passwordResetState.value = PasswordResetState.Updating
+            val result = authManager.updatePassword(newPassword)
+            if (result.isSuccess) {
+                _passwordResetState.value = PasswordResetState.Updated
+                _pendingPasswordRecovery.value = false
+                val uid = SupabaseService.getInstance().getCurrentUserId()
+                if (!uid.isNullOrBlank()) {
+                    restoreUserAccount(uid)
+                }
+                _showQuestionnaire.value = false
+            } else {
+                _passwordResetState.value =
+                    PasswordResetState.Error(result.exceptionOrNull()?.message ?: "Could not update the password.")
+            }
+        }
+    }
+
     private val _isAuthLoading = MutableStateFlow(false)
     val isAuthLoading: StateFlow<Boolean> = _isAuthLoading.asStateFlow()
 
@@ -854,6 +906,20 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _isAuthLoading.value = true
             _authError.value = null
+            // v1.4.0-round2: password-recovery links land here too. Establish the
+            // recovery session, then ask the user for the new password in-app.
+            if (SupabaseService.getInstance().isRecoveryDeeplink(uri)) {
+                val result = SupabaseService.getInstance().handleAuthDeeplink(uri)
+                result.onSuccess {
+                    _pendingPasswordRecovery.value = true
+                    _passwordResetState.value = PasswordResetState.Idle
+                    _verificationMessage.value = null
+                }.onFailure { err ->
+                    _authError.value = err.message ?: "This recovery link has expired, please request a new one"
+                }
+                _isAuthLoading.value = false
+                return@launch
+            }
             _verificationMessage.value = "Verifying email confirmation link..."
             val result = SupabaseService.getInstance().handleAuthDeeplink(uri)
             result.onSuccess { uid ->

@@ -74,6 +74,11 @@ class FocusTimerService : Service() {
 
     override fun onDestroy() {
         tickerJob?.cancel()
+        // v1.4.0-round2: always release the notification blocker when the
+        // timer service dies (covers stop, completion, and process kill).
+        try {
+            com.example.util.StudyNotificationBlockerManager.deactivateStudyNotificationBlock(this)
+        } catch (_: Exception) { }
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -142,6 +147,12 @@ class FocusTimerService : Service() {
             return START_NOT_STICKY
         }
         startTicker(endTimeMs, targetSeconds, taskTitle, mode)
+        // v1.4.0-round2: arm the notification blocker for timer sessions too
+        // (previously only FocusShieldService armed it, so the Deep Focus
+        // "Block notifications" toggle did nothing during normal timers).
+        try {
+            com.example.util.StudyNotificationBlockerManager.activateStudyNotificationBlock(this)
+        } catch (_: Exception) { }
         return START_STICKY
     }
 

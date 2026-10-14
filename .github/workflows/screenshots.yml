@@ -1,0 +1,53 @@
+name: Round2 Screenshots
+
+# Owner-approved (round 3): runs the Robolectric/Roborazzi owner-review
+# screenshots on the round2/premium-ui-fixes branch and uploads the PNGs
+# as an artifact. The owner reviews these before approving any deploy.
+#
+# Trigger: push to THIS branch only. Nothing ever touches main.
+# Note: this repo has no gradle wrapper committed, so we provision Gradle
+# via gradle/actions/setup-gradle like the debug build workflow does.
+
+on:
+  push:
+    branches: [round2/premium-ui-fixes]
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Run screenshot tests (record mode)
+        run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.*" --stacktrace
+
+      - name: Locate generated PNGs
+        if: always()
+        run: |
+          echo "=== test screenshot dirs ==="
+          find app/src/test/screenshots -type f 2>/dev/null | head -30
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: round3-screenshots
+          path: |
+            app/src/test/screenshots/round2/
+            app/src/test/screenshots/round3/
+            app/src/test/screenshots/round4/
+          if-no-files-found: error
