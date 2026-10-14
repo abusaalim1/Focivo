@@ -289,7 +289,9 @@ fun LeaderboardScreen(
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.Bold,
-                            color = onBackdrop,
+                            // v1.1: title uses fixed light text — theme onBackdropContent
+                            // resolves dark against this screen's dark surface (contrast fix).
+                            color = textPrimary,
                             shadow = titleShadow,
                             fontSize = 24.sp
                         )
@@ -442,7 +444,8 @@ fun LeaderboardScreen(
                             text = "RANKINGS",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = onBackdrop.copy(alpha = 0.7f),
+                                // v1.1: fixed muted light text (contrast fix, see header title).
+                                color = textSecondary,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.4.sp,
                                 fontSize = 11.sp
@@ -616,7 +619,9 @@ private fun PodiumColumn(
             style = MaterialTheme.typography.labelMedium.copy(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = podiumOnBackdrop,
+                // v1.1: fixed light text — theme onBackdropContent resolves dark
+                // against this screen's dark surface (contrast fix).
+                color = textPrimary,
                 shadow = podiumShadow,
                 fontSize = 12.sp
             ),
@@ -628,7 +633,7 @@ private fun PodiumColumn(
             text = user.subjectTag,
             style = MaterialTheme.typography.labelSmall.copy(
                 fontFamily = PoppinsFontFamily,
-                color = podiumOnBackdrop.copy(alpha = 0.75f),
+                color = textSecondary,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium
             ),
