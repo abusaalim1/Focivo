@@ -214,6 +214,21 @@
                 android:resource="@xml/widget_zen_coach_info" />
         </receiver>
 
+        <!-- v1.1 Anti-Uninstall Shield (Device Admin) -->
+        <receiver
+            android:name=".receiver.FocivoDeviceAdminReceiver"
+            android:label="Focivo Anti-Uninstall Shield"
+            android:description="@string/device_admin_description"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_policy" />
+        </receiver>
+
         <service
             android:name=".service.AiStudyAccessibilityService"
             android:label="Focivo AI Study Guard"
