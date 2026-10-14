@@ -39,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +70,9 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainGoldStar
 import com.example.ui.theme.LocalAppAccent
 import com.example.ui.theme.themedCardBackground
+import com.example.ui.theme.backdropContentColor
+import com.example.ui.theme.backdropTitleShadow
+import com.example.util.TimerThemeManager
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
@@ -150,6 +155,11 @@ fun LeaderboardScreen(
     val cardBorder = if (isDark) Color(0x358CE000) else Color(0xFFDCE6D2)
     val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
     val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    // v1.4.2: header text sits directly on the full-bleed theme backdrop, so it
+    // follows the selected theme (not the app dark/light mode).
+    val theme by TimerThemeManager.selectedTheme.collectAsState()
+    val onBackdrop = theme.onBackdropContent
+    val titleShadow = backdropTitleShadow(onBackdrop)
 
     var selectedFilter by remember { mutableStateOf("This Week") }
 
@@ -268,7 +278,8 @@ fun LeaderboardScreen(
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.Bold,
-                            color = textPrimary,
+                            color = onBackdrop,
+                            shadow = titleShadow,
                             fontSize = 24.sp
                         )
                     )
@@ -276,7 +287,7 @@ fun LeaderboardScreen(
                         text = if (selectedFilter == "Hall of Fame") "Weekly champions enshrined in history" else "Study together & stay disciplined",
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontFamily = PoppinsFontFamily,
-                            color = textSecondary,
+                            color = onBackdrop.copy(alpha = 0.75f),
                             fontWeight = FontWeight.Medium,
                             fontSize = 12.sp
                         )
@@ -445,7 +456,7 @@ fun LeaderboardScreen(
                             text = "RANKINGS",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = textSecondary,
+                                color = onBackdrop.copy(alpha = 0.7f),
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.4.sp,
                                 fontSize = 11.sp
@@ -562,6 +573,11 @@ private fun PodiumColumn(
     val isDark = isAppInDarkTheme()
     val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
     val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    // v1.4.2: podium names sit on the theme backdrop — follow the theme.
+    val podiumTheme by TimerThemeManager.selectedTheme.collectAsState()
+    val podiumOnBackdrop = podiumTheme.onBackdropContent
+    val podiumShadow = backdropTitleShadow(podiumOnBackdrop)
+    val podiumTimeColor = if (podiumOnBackdrop.luminance() < 0.5f) RegainLimePrimary else Color(0xFF2E6300)
 
     // Celebratory badge for current week's leader while week is in progress
     val isLeadingThisWeek = selectedFilter == "This Week" && rank == 1 && displaySeconds > 0
@@ -614,7 +630,8 @@ private fun PodiumColumn(
             style = MaterialTheme.typography.labelMedium.copy(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = textPrimary,
+                color = podiumOnBackdrop,
+                shadow = podiumShadow,
                 fontSize = 12.sp
             ),
             maxLines = 1
@@ -625,7 +642,7 @@ private fun PodiumColumn(
             text = user.subjectTag,
             style = MaterialTheme.typography.labelSmall.copy(
                 fontFamily = PoppinsFontFamily,
-                color = textSecondary,
+                color = podiumOnBackdrop.copy(alpha = 0.75f),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium
             ),
@@ -637,7 +654,7 @@ private fun PodiumColumn(
             text = formatHoursMins(displaySeconds),
             style = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = PoppinsFontFamily,
-                color = if (isDark) RegainLimePrimary else Color(0xFF2E6300),
+                color = podiumTimeColor,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
             )

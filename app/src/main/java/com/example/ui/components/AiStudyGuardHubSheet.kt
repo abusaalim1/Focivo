@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.R
+import com.example.ui.components.FeatureIcon
 import com.example.ui.theme.BalooBrandFontFamily
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.RegainLimeDeepText
@@ -203,21 +204,11 @@ fun AiStudyGuardHubSheet(
                                         .clip(RoundedCornerShape(20.dp)),
                                     contentScale = ContentScale.Crop
                                 )
-                                Box(
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(CircleShape)
-                                        .background(accentLime)
-                                        .border(2.dp, Color.White, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Default.Shield,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
+                                FeatureIcon(
+                                    drawableRes = R.drawable.ic3d_shield,
+                                    contentDescription = null,
+                                    size = 30.dp
+                                )
                             }
                             Spacer(modifier = Modifier.width(14.dp))
                             Column(modifier = Modifier.weight(1f)) {

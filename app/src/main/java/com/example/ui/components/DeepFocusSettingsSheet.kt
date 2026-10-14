@@ -292,11 +292,16 @@ fun DeepFocusSettingsSheet(
                     )
                 }
                 item {
+                    // v1.4.2: the theme row shows the selected theme's own backdrop
+                    // art as its icon tile. Aurora is code-drawn (no asset), so it
+                    // gets a live aurora-gradient thumbnail instead of a glyph.
+                    val themeTileRes = resolveThemeBackdropRes(context, selectedTheme)
                     SettingsActionRow(
                         icon = Icons.Default.Palette,
-                        // Final phase: the theme row shows the selected theme's
-                        // own backdrop art as its icon tile.
-                        icon3dRes = resolveThemeBackdropRes(context, selectedTheme),
+                        icon3dRes = themeTileRes,
+                        iconCustom = if (themeTileRes == null) {
+                            { AuroraBackground(modifier = Modifier.fillMaxSize()) }
+                        } else null,
                         title = "Timer theme",
                         subtitle = selectedTheme.name + " — full-screen backdrop, mascot and glow",
                         onClick = { showThemePicker = !showThemePicker },
@@ -481,6 +486,7 @@ fun DeepFocusSettingsSheet(
                 item {
                     SettingsActionRow(
                         icon = Icons.Default.NotificationsOff,
+                        icon3dRes = com.example.R.drawable.ic3d_bell,
                         title = "Suppressed notifications digest",
                         subtitle = if (digestList.isEmpty()) "No notifications held yet in this session" else "${digestList.size} notifications held during focus sessions",
                         onClick = { showDigestSheet = true },
@@ -572,7 +578,9 @@ private fun SettingsToggleRow(
     testTag: String,
     // Final phase: 3D feature icon (drawable tile); falls back to the vector
     // circle when null.
-    icon3dRes: Int? = null
+    icon3dRes: Int? = null,
+    // v1.4.2: arbitrary composable art for the tile (e.g. aurora thumbnail).
+    iconCustom: (@Composable () -> Unit)? = null
 ) {
     val isDark = isAppInDarkTheme()
     Row(
@@ -591,9 +599,10 @@ private fun SettingsToggleRow(
         // legacy vector circle.
         FeatureIcon(
             drawableRes = icon3dRes,
-            imageVector = if (icon3dRes == null) icon else null,
+            imageVector = if (icon3dRes == null && iconCustom == null) icon else null,
             contentDescription = null,
             size = 44.dp,
+            customContent = iconCustom,
             vectorCircleColor = if (checked) RegainLimePrimary.copy(alpha = 0.18f)
             else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6),
             vectorTint = if (checked) (if (isDark) RegainLimePrimary else RegainLimeDeepText)
@@ -644,7 +653,9 @@ private fun SettingsActionRow(
     testTag: String,
     // Final phase: 3D feature icon (drawable tile); falls back to the vector
     // circle when null.
-    icon3dRes: Int? = null
+    icon3dRes: Int? = null,
+    // v1.4.2: arbitrary composable art for the tile (e.g. aurora thumbnail).
+    iconCustom: (@Composable () -> Unit)? = null
 ) {
     val isDark = isAppInDarkTheme()
     Row(
@@ -663,9 +674,10 @@ private fun SettingsActionRow(
         // legacy vector circle.
         FeatureIcon(
             drawableRes = icon3dRes,
-            imageVector = if (icon3dRes == null) icon else null,
+            imageVector = if (icon3dRes == null && iconCustom == null) icon else null,
             contentDescription = null,
             size = 44.dp,
+            customContent = iconCustom,
             vectorCircleColor = if (badgeCount > 0) RegainLimePrimary.copy(alpha = 0.18f)
             else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6),
             vectorTint = if (badgeCount > 0) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary

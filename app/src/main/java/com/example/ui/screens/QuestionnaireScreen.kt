@@ -57,6 +57,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.example.ui.theme.NearBlack
+import com.example.ui.theme.SecondaryTextLight
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -106,6 +108,9 @@ fun QuestionnaireScreen(
     ) -> Unit = { _, _, _, _, _, _, _, _ -> }
 ) {
     val isDark = isAppInDarkTheme()
+    // v1.4.2: explicit text colors (colorScheme.onSurface renders dark on dark surfaces)
+    val qPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val qSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
     var currentStep by remember { mutableIntStateOf(0) }
 
@@ -268,7 +273,7 @@ fun QuestionnaireScreen(
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = "Previous Question",
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = qPrimary,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -279,7 +284,7 @@ fun QuestionnaireScreen(
                         Text(
                             text = "STUDENT CALIBRATION",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = qSecondary,
                                 letterSpacing = 2.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 10.sp
@@ -299,7 +304,7 @@ fun QuestionnaireScreen(
                             Text(
                                 text = "Skip",
                                 style = MaterialTheme.typography.labelMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = qSecondary,
                                     fontWeight = FontWeight.Medium
                                 ),
                                 modifier = Modifier
@@ -413,7 +418,7 @@ fun QuestionnaireScreen(
                             Text(
                                 text = q.subtitle,
                                 style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = qSecondary,
                                     fontSize = 13.sp,
                                     lineHeight = 18.sp
                                 )
@@ -464,7 +469,7 @@ fun QuestionnaireScreen(
                                         Text(
                                             text = "Automatic timetable locking, emergency calls pass-through, and AI Academic Sentinel enabled.",
                                             style = MaterialTheme.typography.bodySmall.copy(
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                color = qSecondary,
                                                 fontSize = 11.sp
                                             )
                                         )
@@ -538,7 +543,7 @@ fun QuestionnaireScreen(
                                                 .clip(CircleShape)
                                                 .border(
                                                     width = if (isSelected) 2.dp else 1.5.dp,
-                                                    color = if (isSelected) RegainLimePrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                                    color = if (isSelected) RegainLimePrimary else qSecondary.copy(alpha = 0.3f),
                                                     shape = CircleShape
                                                 )
                                                 .background(if (isSelected) RegainLimePrimary else Color.Transparent),
@@ -589,7 +594,7 @@ fun QuestionnaireScreen(
                                             Text(
                                                 text = "• AI will automatically lock distracting apps during study hours.\n• Emergency phone calls will never be blocked.\n• Academic study tools allowed for clearing doubts.\n• Personalized focus warnings for board exam prep.",
                                                 style = MaterialTheme.typography.bodySmall.copy(
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    color = qSecondary,
                                                     fontSize = 11.sp,
                                                     lineHeight = 16.sp
                                                 )

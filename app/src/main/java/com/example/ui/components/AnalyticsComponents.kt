@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.LavenderSoft
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.isAppInDarkTheme
+import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.NearBlack
 
 @Composable
 fun MetricCard(
@@ -55,6 +57,8 @@ fun MetricCard(
     icon: ImageVector? = null
 ) {
     val isDark = isAppInDarkTheme()
+    // v1.4.2: explicit secondary text (colorScheme.onSurfaceVariant renders dark on dark cards)
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
     GlassCard(
         modifier = modifier,
@@ -73,7 +77,7 @@ fun MetricCard(
                 Text(
                     text = title.uppercase(),
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = textSecondary,
                         fontSize = 10.sp,
                         letterSpacing = 1.2.sp
                     )
@@ -103,7 +107,7 @@ fun MetricCard(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = textSecondary,
                         fontSize = 11.sp
                     )
                 )
@@ -119,6 +123,8 @@ fun WeeklyFocusChart(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
+    // v1.4.2: explicit secondary text (colorScheme.onSurfaceVariant renders dark on dark cards)
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
     LiquidGlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -138,7 +144,7 @@ fun WeeklyFocusChart(
                     Text(
                         text = "WEEKLY FOCUS",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = textSecondary,
                             letterSpacing = 1.4.sp
                         )
                     )
@@ -206,7 +212,7 @@ fun WeeklyFocusChart(
                                 text = label,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 9.sp,
-                                    color = if (isToday) RegainLimePrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    color = if (isToday) RegainLimePrimary else textSecondary.copy(alpha = 0.7f)
                                 )
                             )
                         } else {
@@ -251,7 +257,7 @@ fun WeeklyFocusChart(
                         Text(
                             text = day,
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = if (isToday) RegainLimePrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (isToday) RegainLimePrimary else textSecondary,
                                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
                                 fontSize = 11.sp
                             )
@@ -269,6 +275,8 @@ fun ProductivityHeatmap(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
+    // v1.4.2: explicit secondary text (colorScheme.onSurfaceVariant renders dark on dark cards)
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
     GlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -287,7 +295,7 @@ fun ProductivityHeatmap(
                 Text(
                     text = "PRODUCTIVITY HEATMAP",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = textSecondary,
                         letterSpacing = 1.4.sp
                     )
                 )
@@ -326,7 +334,7 @@ fun ProductivityHeatmap(
                         Text(
                             text = "Your strongest focus window",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = textSecondary,
                                 fontSize = 11.sp
                             )
                         )
@@ -374,7 +382,7 @@ fun ProductivityHeatmap(
                             Text(
                                 text = hours,
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = textSecondary,
                                     fontSize = 10.sp
                                 )
                             )
@@ -410,6 +418,8 @@ fun StreakCalendarCard(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
+    // v1.4.2: explicit secondary text (colorScheme.onSurfaceVariant renders dark on dark cards)
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
     GlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -446,7 +456,7 @@ fun StreakCalendarCard(
                 Text(
                     text = "Best: $bestStreak days",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = textSecondary,
                         fontSize = 11.sp
                     )
                 )
@@ -458,7 +468,7 @@ fun StreakCalendarCard(
             Text(
                 text = "Recent Daily Consistency",
                 style = MaterialTheme.typography.bodySmall.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = textSecondary,
                     fontSize = 11.sp
                 )
             )
@@ -495,6 +505,9 @@ fun WeeklyReflectionCard(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
+    // v1.4.2: explicit secondary text (colorScheme.onSurfaceVariant renders dark on dark cards)
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
     var reflectionText by remember { mutableStateOf(initialReflection) }
     var isSaved by remember { mutableStateOf(initialReflection.isNotBlank()) }
 
@@ -515,7 +528,7 @@ fun WeeklyReflectionCard(
                 Text(
                     text = "WEEKLY REFLECTION",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = textSecondary,
                         letterSpacing = 1.4.sp
                     )
                 )
@@ -541,7 +554,7 @@ fun WeeklyReflectionCard(
             Text(
                 text = "Your most productive day was $bestDay. You completed $completionRate% of your planned sessions.",
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = textSecondary,
                     fontSize = 13.sp
                 )
             )
@@ -551,7 +564,7 @@ fun WeeklyReflectionCard(
             Text(
                 text = "What helped you focus?",
                 style = MaterialTheme.typography.titleSmall.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = textPrimary,
                     fontWeight = FontWeight.Medium,
                     fontSize = 14.sp
                 )

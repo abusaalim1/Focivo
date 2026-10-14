@@ -38,7 +38,14 @@ data class TimerTheme(
      * usable when the user's lifetime balance reaches this threshold.
      * 0 = free forever.
      */
-    val unlockPoints: Int = 0
+    val unlockPoints: Int = 0,
+    /**
+     * v1.4.2: content color for text drawn directly on the full-bleed
+     * backdrop (screen titles, section labels, top-of-screen text).
+     * Dark scenes get light text; the light Aurora canvas keeps dark text.
+     * Card-internal text is unaffected (cards are light surfaces).
+     */
+    val onBackdropContent: Color = Color(0xFFF7F8F4)
 ) {
     fun isUnlocked(userPoints: Int): Boolean = userPoints >= unlockPoints
 }
@@ -57,7 +64,8 @@ object TimerThemeManager {
             arcColors = emptyList(), // unused — AuroraTimer uses its built-in palette
             glowColor = Color.Transparent,
             accent = Color(0xFF8CE000),
-            unlockPoints = 0
+            unlockPoints = 0,
+            onBackdropContent = Color(0xFF161A16) // light aurora canvas -> dark text
         ),
         TimerTheme(
             id = "forest",

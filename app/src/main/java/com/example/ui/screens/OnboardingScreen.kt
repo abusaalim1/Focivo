@@ -35,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.example.ui.theme.NearBlack
+import com.example.ui.theme.SecondaryTextLight
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
@@ -81,6 +83,9 @@ fun OnboardingScreen(
     onCompleteOnboarding: (dailyGoalMinutes: Int) -> Unit
 ) {
     val isDark = isAppInDarkTheme()
+    // v1.4.2: explicit text colors (colorScheme.onSurface renders dark on dark cards)
+    val tPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val tSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
     val context = LocalContext.current
     var currentStep by remember { mutableIntStateOf(0) }
     var selectedGoalHours by remember { mutableIntStateOf(4) }
@@ -190,14 +195,14 @@ fun OnboardingScreen(
                                         Text(
                                             text = "${hrs}h",
                                             style = MaterialTheme.typography.titleLarge.copy(
-                                                color = if (isSelected) RegainLimePrimary else MaterialTheme.colorScheme.onSurface,
+                                                color = if (isSelected) RegainLimePrimary else tPrimary,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         )
                                         Text(
                                             text = if (hrs == 4) "Balanced" else if (hrs == 6) "Deep" else if (hrs == 2) "Light" else "Intense",
                                             style = MaterialTheme.typography.labelSmall.copy(
-                                                color = if (isSelected) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                color = if (isSelected) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else tSecondary,
                                                 fontSize = 10.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                             )
@@ -246,7 +251,7 @@ fun OnboardingScreen(
                                                 text = label,
                                                 style = MaterialTheme.typography.titleMedium.copy(
                                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                    color = if (isSelected) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else MaterialTheme.colorScheme.onSurface,
+                                                    color = if (isSelected) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else tPrimary,
                                                     fontSize = 15.sp
                                                 )
                                             )
@@ -257,7 +262,7 @@ fun OnboardingScreen(
                                                 .clip(CircleShape)
                                                 .border(
                                                     2.dp,
-                                                    if (isSelected) RegainLimePrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                                    if (isSelected) RegainLimePrimary else tSecondary.copy(alpha = 0.4f),
                                                     CircleShape
                                                 )
                                                 .background(if (isSelected) RegainLimePrimary else Color.Transparent),
@@ -301,7 +306,7 @@ fun OnboardingScreen(
                         Text(
                             text = "Back",
                             style = MaterialTheme.typography.titleMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = tSecondary
                             )
                         )
                     }

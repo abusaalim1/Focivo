@@ -269,6 +269,10 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     private val _availableAppUpdate = MutableStateFlow<com.example.util.AppUpdateInfo?>(null)
     val availableAppUpdate: StateFlow<com.example.util.AppUpdateInfo?> = _availableAppUpdate.asStateFlow()
 
+    // v1.4.2: backend announcement notice (shown once per text change on Home)
+    private val _pendingAnnouncement = MutableStateFlow<String?>(null)
+    val pendingAnnouncement: StateFlow<String?> = _pendingAnnouncement.asStateFlow()
+
     private val _isCheckingForUpdates = MutableStateFlow(false)
     val isCheckingForUpdates: StateFlow<Boolean> = _isCheckingForUpdates.asStateFlow()
 
@@ -3155,6 +3159,36 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             com.example.util.AppUpdateManager.dismissUpdate(context, current.latestVersionCode)
         }
         _availableAppUpdate.value = null
+    }
+
+    /**
+     * v1.4.2: fetches the backend announcement and surfaces it once per text
+     * change. Any failure is silently skipped — never blocks the app.
+     */
+    fun checkForNotices(context: Context) {
+        viewModelScope.launch {
+            try {
+                val text = com.example.util.AppUpdateManager.fetchAnnouncement() ?: return@launch
+                val prefs = context.getSharedPreferences("focivo_notice_prefs", Context.MODE_PRIVATE)
+                val lastSeen = prefs.getString("last_seen_announcement", null)
+                if (text != lastSeen) {
+                    _pendingAnnouncement.value = text
+                }
+            } catch (_: Exception) {
+                // Silent skip: notices must never block the app.
+            }
+        }
+    }
+
+    fun dismissAnnouncement(context: Context) {
+        val text = _pendingAnnouncement.value
+        if (text != null) {
+            context.getSharedPreferences("focivo_notice_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putString("last_seen_announcement", text)
+                .apply()
+        }
+        _pendingAnnouncement.value = null
     }
 
     fun downloadAndInstallUpdate(context: Context, downloadUrl: String) {

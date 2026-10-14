@@ -97,8 +97,9 @@ fun AutoStudyScheduleScreen(
 
     val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
-    val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
-    val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
+    // v1.4.2: explicit text colors (colorScheme.onSurface renders dark on dark cards)
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
     var activeSheetSchedule by remember { mutableStateOf<SupabaseScheduledBlockDto?>(null) }
     var isSheetOpen by remember { mutableStateOf(false) }

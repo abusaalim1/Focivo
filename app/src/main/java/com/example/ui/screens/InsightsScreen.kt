@@ -28,6 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +55,9 @@ import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.themedCardBackground
+import com.example.ui.theme.backdropContentColor
+import com.example.ui.theme.backdropTitleShadow
+import com.example.util.TimerThemeManager
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import java.text.SimpleDateFormat
@@ -74,6 +79,11 @@ fun InsightsScreen(
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
     val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
     val accentLime = if (isDark) RegainLimePrimary else RegainLimeDeepText
+    // v1.4.2: header text sits directly on the full-bleed theme backdrop, so it
+    // follows the selected theme (not the app dark/light mode).
+    val theme by TimerThemeManager.selectedTheme.collectAsState()
+    val onBackdrop = theme.onBackdropContent
+    val titleShadow = backdropTitleShadow(onBackdrop)
 
     val totalSeconds = remember(sessions) { sessions.sumOf { it.durationSeconds } }
     val totalHours = remember(totalSeconds) {
@@ -187,7 +197,7 @@ fun InsightsScreen(
                         text = "WEEKLY METRICS",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontFamily = PoppinsFontFamily,
-                            color = textSecondary,
+                            color = onBackdrop.copy(alpha = 0.7f),
                             letterSpacing = 2.sp,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
@@ -199,7 +209,8 @@ fun InsightsScreen(
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.Bold,
-                            color = textPrimary,
+                            color = onBackdrop,
+                            shadow = titleShadow,
                             fontSize = 24.sp
                         )
                     )

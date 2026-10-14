@@ -43,6 +43,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,11 +57,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.UserPreferencesEntity
+import com.example.ui.components.FeatureIcon
+import com.example.R
+import com.example.BuildConfig
 import com.example.ui.components.GlassButton
 import com.example.ui.components.GlassCard
 import com.example.ui.components.SegmentedControl
+import com.example.ui.theme.backdropContentColor
+import com.example.ui.theme.backdropTitleShadow
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.SecondaryTextLight
+import com.example.util.TimerThemeManager
 import com.example.util.StudyNotificationBlockerManager
 import androidx.compose.material.icons.filled.NotificationsOff
 
@@ -94,6 +102,18 @@ fun SettingsScreen(
 ) {
     val isDark = isAppInDarkTheme()
     val context = LocalContext.current
+
+    // v1.4.2: explicit theme-derived text colors. Default (unspecified) text
+    // renders dark on this screen's dark cards, so every title/subtitle gets
+    // an explicit color from the proven isDark pattern (same convention as
+    // DeepFocusSettingsSheet) instead of relying on MaterialTheme defaults.
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    // v1.4.2: the screen sits on the full-bleed theme backdrop — the title
+    // follows the selected theme, not the app dark/light mode.
+    val theme by TimerThemeManager.selectedTheme.collectAsState()
+    val onBackdrop = theme.onBackdropContent
+    val titleShadow = backdropTitleShadow(onBackdrop)
 
     var notificationsEnabled by remember { mutableStateOf(userPreferences?.notificationsEnabled ?: true) }
     var hapticsEnabled by remember { mutableStateOf(userPreferences?.hapticsEnabled ?: true) }
@@ -149,7 +169,7 @@ fun SettingsScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface
+                        tint = textPrimary
                     )
                 }
 
@@ -159,7 +179,9 @@ fun SettingsScreen(
                     text = "Preferences",
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Medium,
-                        fontSize = 22.sp
+                        fontSize = 22.sp,
+                        color = onBackdrop,
+                        shadow = titleShadow
                     )
                 )
             }
@@ -187,7 +209,7 @@ fun SettingsScreen(
                         Text(
                             text = "APPEARANCE",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = textSecondary,
                                 letterSpacing = 1.2.sp
                             )
                         )
@@ -233,7 +255,7 @@ fun SettingsScreen(
                         Text(
                             text = "DAILY FOCUS TARGET",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = textSecondary,
                                 letterSpacing = 1.2.sp
                             )
                         )
@@ -263,7 +285,7 @@ fun SettingsScreen(
                                 Text(
                                     text = "${hrs}h / day",
                                     style = MaterialTheme.typography.labelLarge.copy(
-                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                        color = if (isSelected) Color.White else textPrimary,
                                         fontSize = 12.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     )
@@ -303,7 +325,8 @@ fun SettingsScreen(
                                 text = "Haptic Feedback",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    color = textPrimary
                                 )
                             )
                         }
@@ -337,7 +360,8 @@ fun SettingsScreen(
                                 text = "Local Session Chimes",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    color = textPrimary
                                 )
                             )
                         }
@@ -383,14 +407,15 @@ fun SettingsScreen(
                                         text = "Block Notifications in Study",
                                         style = MaterialTheme.typography.titleMedium.copy(
                                             fontSize = 15.sp,
-                                            fontWeight = FontWeight.SemiBold
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = textPrimary
                                         )
                                     )
                                     Text(
                                         text = "Mutes distracting app alerts & pings while timer is running",
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = textSecondary
                                         )
                                     )
                                 }
@@ -478,20 +503,11 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(RegainLimePrimary.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Alarm,
-                                contentDescription = null,
-                                tint = RegainLimePrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        FeatureIcon(
+                            drawableRes = R.drawable.ic3d_alarm,
+                            contentDescription = "Alarm Studio",
+                            size = 40.dp
+                        )
 
                         Spacer(modifier = Modifier.width(14.dp))
 
@@ -500,14 +516,15 @@ fun SettingsScreen(
                                 text = "Alarm Studio",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    color = textPrimary
                                 )
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "10 Ringtones · Active: $ringtoneName",
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = textSecondary,
                                     fontSize = 12.sp
                                 )
                             )
@@ -517,7 +534,7 @@ fun SettingsScreen(
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        tint = textSecondary.copy(alpha = 0.5f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -546,20 +563,11 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(RegainLimePrimary.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Security,
-                                contentDescription = null,
-                                tint = RegainLimePrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        FeatureIcon(
+                            drawableRes = R.drawable.ic3d_shield,
+                            contentDescription = "Focus Shield",
+                            size = 40.dp
+                        )
 
                         Spacer(modifier = Modifier.width(14.dp))
 
@@ -568,14 +576,15 @@ fun SettingsScreen(
                                 text = "Focus Shield & App Blocker",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    color = textPrimary
                                 )
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = if (isShieldEnabled) "Armed · Distractions Blocked During Study" else if (!hasShieldPerms) "Permissions Needed · Tap to setup shield" else "Configured · Tap to manage apps & timer",
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = textSecondary,
                                     fontSize = 12.sp
                                 )
                             )
@@ -585,7 +594,7 @@ fun SettingsScreen(
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        tint = textSecondary.copy(alpha = 0.5f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -608,20 +617,11 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(RegainLimePrimary.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Shield,
-                                contentDescription = null,
-                                tint = RegainLimePrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        FeatureIcon(
+                            drawableRes = R.drawable.ic3d_lock,
+                            contentDescription = "AI Study Guard",
+                            size = 40.dp
+                        )
 
                         Spacer(modifier = Modifier.width(14.dp))
 
@@ -630,14 +630,15 @@ fun SettingsScreen(
                                 text = "AI Study Guard",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    color = textPrimary
                                 )
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Filters, locks, warnings & history",
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = textSecondary,
                                     fontSize = 12.sp
                                 )
                             )
@@ -647,7 +648,7 @@ fun SettingsScreen(
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        tint = textSecondary.copy(alpha = 0.5f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -670,20 +671,11 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(RegainLimePrimary.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
-                                tint = RegainLimePrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        FeatureIcon(
+                            drawableRes = R.drawable.ic3d_book,
+                            contentDescription = "AI Study Guard Disclosure",
+                            size = 40.dp
+                        )
 
                         Spacer(modifier = Modifier.width(14.dp))
 
@@ -692,14 +684,15 @@ fun SettingsScreen(
                                 text = "AI Study Guard Disclosure",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    color = textPrimary
                                 )
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Read plain-language privacy & permission details",
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = textSecondary,
                                     fontSize = 12.sp
                                 )
                             )
@@ -709,7 +702,7 @@ fun SettingsScreen(
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        tint = textSecondary.copy(alpha = 0.5f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -731,7 +724,7 @@ fun SettingsScreen(
                     Text(
                         text = "DATA MANAGEMENT (OFFLINE-FIRST)",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = textSecondary,
                             letterSpacing = 1.2.sp
                         )
                     )
@@ -800,9 +793,9 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "ABOUT REGAIN",
+                            text = "ABOUT FOCIVO",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = textSecondary,
                                 letterSpacing = 1.2.sp
                             )
                         )
@@ -811,16 +804,17 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Focivo v1.0.0",
+                        text = "Focivo v${BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
+                            fontSize = 15.sp,
+                            color = textPrimary
                         )
                     )
                     Text(
                         text = "Crafted for students, deep workers, and thinkers. Real-time study protection, academic AI monitoring, and offline persistence.",
                         style = MaterialTheme.typography.bodySmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = textSecondary,
                             fontSize = 12.sp,
                             lineHeight = 18.sp
                         )
@@ -879,7 +873,7 @@ fun SettingsScreen(
                         Text(
                             text = manualUpdateMessage,
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = if (manualUpdateMessage.contains("available", ignoreCase = true)) RegainLimePrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (manualUpdateMessage.contains("available", ignoreCase = true)) RegainLimePrimary else textSecondary,
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -904,20 +898,11 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PrivacyTip,
-                                contentDescription = "Privacy Policy",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        FeatureIcon(
+                            drawableRes = R.drawable.ic3d_key,
+                            contentDescription = "Privacy Policy",
+                            size = 38.dp
+                        )
 
                         Spacer(modifier = Modifier.width(14.dp))
 
@@ -926,14 +911,15 @@ fun SettingsScreen(
                                 text = "Privacy Policy",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
+                                    fontSize = 15.sp,
+                                    color = textPrimary
                                 )
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Data practices, security & rights",
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = textSecondary,
                                     fontSize = 12.sp
                                 )
                             )
@@ -943,7 +929,7 @@ fun SettingsScreen(
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        tint = textSecondary.copy(alpha = 0.5f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
