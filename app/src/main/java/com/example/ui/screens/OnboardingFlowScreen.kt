@@ -1378,16 +1378,6 @@ fun OnboardingFlowScreen(
         permTick++
     }
 
-    fun requestPermission(spec: PermissionSpec) {
-        // v1.1 final: sensitive permissions (Accessibility, Device Admin) go
-        // through the trust explainer card first (already-built component).
-        if (spec.id == "accessibility" || spec.id == "device_admin") {
-            explainerFor = spec
-            return
-        }
-        firePermissionIntent(spec)
-    }
-
     fun firePermissionIntent(spec: PermissionSpec) {
         when (spec.id) {
             "notifications" -> {
@@ -1422,7 +1412,16 @@ fun OnboardingFlowScreen(
                 }
             }
         }
+    fun requestPermission(spec: PermissionSpec) {
+        // v1.1 final: sensitive permissions (Accessibility, Device Admin) go
+        // through the trust explainer card first (already-built component).
+        if (spec.id == "accessibility" || spec.id == "device_admin") {
+            explainerFor = spec
+            return
+        }
+        firePermissionIntent(spec)
     }
+
 
     // Refresh permission state on resume; auto-advance a permission step the
     // moment its permission becomes granted (including pre-granted ones).
