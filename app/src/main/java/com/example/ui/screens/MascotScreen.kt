@@ -352,17 +352,30 @@ fun MascotScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(contentAlignment = Alignment.TopEnd) {
-                        androidx.compose.foundation.Image(
-                            painter = painterResource(
-                                id = item.overlayFor(MascotPose.STANDING)?.resId
-                                    ?: R.drawable.mascot_base_standing
-                            ),
-                            contentDescription = item.name,
-                            contentScale = ContentScale.Fit,
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(84.dp)
-                        )
+                                .height(84.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Thumbnail: the item worn on the plain buddy (mini stack),
+                            // so users see exactly how the item looks on the mascot.
+                            androidx.compose.foundation.Image(
+                                painter = painterResource(id = R.drawable.mascot_base_standing),
+                                contentDescription = null,
+                                contentScale = ContentScale.FillBounds,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            val thumbOverlay = item.overlayFor(MascotPose.STANDING)
+                            if (thumbOverlay != null) {
+                                androidx.compose.foundation.Image(
+                                    painter = painterResource(id = thumbOverlay.resId),
+                                    contentDescription = item.name,
+                                    contentScale = ContentScale.FillBounds,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
                         if (isEquipped) {
                             Box(
                                 modifier = Modifier
