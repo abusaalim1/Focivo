@@ -183,15 +183,21 @@ object AiStudyGuardManager {
         }
     }
 
+    /**
+     * v1.4.3: the persistent guard notification shows ONLY while a study
+     * session is genuinely running (manual timer or active schedule). On
+     * plain app open / cold start it is cancelled — the owner reported it
+     * popping up on every app open. Also restyled: mascot icon, no emoji.
+     */
     fun updateGuardStatusNotification(context: Context) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
-        if (!isAiGuardEnabled(context)) {
+        if (!isAiGuardEnabled(context) || !isStudyPeriodActive(context)) {
             manager.cancel(NOTIFICATION_ID_GUARD_STATUS)
             return
         }
 
-        val title = "🛡️ AI Academic Sentinel Armed"
-        val text = "Smart Study Sentinel · AI Tutor & Academic Focus Protection"
+        val title = "AI Study Guard is watching"
+        val text = "Blocking distractions while you study"
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -203,10 +209,12 @@ object AiStudyGuardManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val largeIcon = BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large)
+        val largeIcon = try {
+            BitmapFactory.decodeResource(context.resources, R.drawable.mascot_study_happy)
+        } catch (_: Exception) { null }
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
             .setSmallIcon(R.drawable.ic_notification_small)
-            .setLargeIcon(largeIcon)
+            .setColor(0xFF8CE000.toInt())
             .setContentTitle(title)
             .setContentText(text)
             .setOngoing(true)
@@ -214,8 +222,18 @@ object AiStudyGuardManager {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setSound(null)
             .setContentIntent(pi)
+        if (largeIcon != null) builder.setLargeIcon(largeIcon)
 
-        manager.notify(NOTIFICATION_ID_GUARD_STATUS, builder.build())
+        try {
+            manager.notify(NOTIFICATION_ID_GUARD_STATUS, builder.build())
+        } catch (_: Exception) { }
+    }
+
+    fun cancelGuardStatusNotification(context: Context) {
+        try {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            manager?.cancel(NOTIFICATION_ID_GUARD_STATUS)
+        } catch (_: Exception) { }
     }
 
     fun isAppUnderPunishment(context: Context, packageName: String): Boolean {

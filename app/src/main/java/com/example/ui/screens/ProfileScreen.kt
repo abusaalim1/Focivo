@@ -168,6 +168,64 @@ data class CleanBadge(
     val progressFraction: Float? = null
 )
 
+/**
+ * v1.4.3: pure badge computation shared by ProfileScreen (display) and
+ * FocuslyViewModel (achievement-unlock notifications). Same inputs, same
+ * results — no drift.
+ */
+fun computeAchievementBadges(
+    sessionCount: Int,
+    distinctDaysCount: Int,
+    totalSeconds: Long,
+    bestSessionSeconds: Int,
+    shieldAttempts: Int,
+    isAppBlockerEnabled: Boolean
+): List<CleanBadge> = listOf(
+    CleanBadge(
+        "First Flow", Icons.Default.Star, sessionCount >= 1,
+        iconRes = R.drawable.ach_first_flow,
+        description = "Complete your very first focus session.",
+        progressText = "${minOf(sessionCount, 1)}/1 session",
+        progressFraction = minOf(sessionCount, 1) / 1f
+    ),
+    CleanBadge(
+        "60m Deep", Icons.Default.HourglassTop, bestSessionSeconds >= 3600,
+        iconRes = R.drawable.ach_60m_deep,
+        description = "Finish a single session of 60 minutes or more.",
+        progressText = "${bestSessionSeconds / 60}/60 min best",
+        progressFraction = (bestSessionSeconds / 3600f).coerceIn(0f, 1f)
+    ),
+    CleanBadge(
+        "7 Days Flow", Icons.Default.DateRange, distinctDaysCount >= 7,
+        iconRes = R.drawable.ach_7days_flow,
+        description = "Focus on 7 different days.",
+        progressText = "${minOf(distinctDaysCount, 7)}/7 days",
+        progressFraction = minOf(distinctDaysCount, 7) / 7f
+    ),
+    CleanBadge(
+        "25h Master", Icons.Default.MilitaryTech, totalSeconds >= 25 * 3600,
+        iconRes = R.drawable.ach_25h_master,
+        description = "Accumulate 25 hours of total focus time.",
+        progressText = "${"%.1f".format(totalSeconds / 3600f)}/25 h",
+        progressFraction = (totalSeconds / (25 * 3600f)).coerceIn(0f, 1f)
+    ),
+    CleanBadge(
+        "Focus Shield", Icons.Default.Security,
+        isAppBlockerEnabled || (shieldAttempts > 0),
+        iconRes = R.drawable.ach_focus_shield,
+        description = "Block your first distraction with Focus Shield.",
+        progressText = if (shieldAttempts > 0) "$shieldAttempts interceptions" else "No interceptions yet",
+        progressFraction = if (shieldAttempts > 0) 1f else 0f
+    ),
+    CleanBadge(
+        "100 Blocks", Icons.Default.WorkspacePremium, sessionCount >= 100,
+        iconRes = R.drawable.ach_100_blocks,
+        description = "Complete 100 focus sessions.",
+        progressText = "${minOf(sessionCount, 100)}/100 sessions",
+        progressFraction = minOf(sessionCount, 100) / 100f
+    )
+)
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
@@ -279,51 +337,17 @@ fun ProfileScreen(
     // v1.4.0-round2: achievements with real progress (no fake counters).
     val bestSessionSeconds = remember(sessions) { sessions.maxOfOrNull { it.durationSeconds } ?: 0 }
     val shieldAttempts = userPreferences?.shieldBlockedAttempts ?: 0
-    val badges = listOf(
-        CleanBadge(
-            "First Flow", Icons.Default.Star, sessionCount >= 1,
-            iconRes = R.drawable.ach_first_flow,
-            description = "Complete your very first focus session.",
-            progressText = "${minOf(sessionCount, 1)}/1 session",
-            progressFraction = minOf(sessionCount, 1) / 1f
-        ),
-        CleanBadge(
-            "60m Deep", Icons.Default.HourglassTop, bestSessionSeconds >= 3600,
-            iconRes = R.drawable.ach_60m_deep,
-            description = "Finish a single session of 60 minutes or more.",
-            progressText = "${bestSessionSeconds / 60}/60 min best",
-            progressFraction = (bestSessionSeconds / 3600f).coerceIn(0f, 1f)
-        ),
-        CleanBadge(
-            "7 Days Flow", Icons.Default.DateRange, distinctDaysCount >= 7,
-            iconRes = R.drawable.ach_7days_flow,
-            description = "Focus on 7 different days.",
-            progressText = "${minOf(distinctDaysCount, 7)}/7 days",
-            progressFraction = minOf(distinctDaysCount, 7) / 7f
-        ),
-        CleanBadge(
-            "25h Master", Icons.Default.MilitaryTech, totalSeconds >= 25 * 3600,
-            iconRes = R.drawable.ach_25h_master,
-            description = "Accumulate 25 hours of total focus time.",
-            progressText = "${"%.1f".format(totalSeconds / 3600f)}/25 h",
-            progressFraction = (totalSeconds / (25 * 3600f)).coerceIn(0f, 1f)
-        ),
-        CleanBadge(
-            "Focus Shield", Icons.Default.Security,
-            (userPreferences?.isAppBlockerEnabled == true) || (shieldAttempts > 0),
-            iconRes = R.drawable.ach_focus_shield,
-            description = "Block your first distraction with Focus Shield.",
-            progressText = if (shieldAttempts > 0) "$shieldAttempts interceptions" else "No interceptions yet",
-            progressFraction = if (shieldAttempts > 0) 1f else 0f
-        ),
-        CleanBadge(
-            "100 Blocks", Icons.Default.WorkspacePremium, sessionCount >= 100,
-            iconRes = R.drawable.ach_100_blocks,
-            description = "Complete 100 focus sessions.",
-            progressText = "${minOf(sessionCount, 100)}/100 sessions",
-            progressFraction = minOf(sessionCount, 100) / 100f
+    // v1.4.3: shared pure computation (also used for unlock notifications).
+    val badges = remember(sessionCount, distinctDaysCount, totalSeconds, bestSessionSeconds, shieldAttempts, userPreferences?.isAppBlockerEnabled) {
+        computeAchievementBadges(
+            sessionCount = sessionCount,
+            distinctDaysCount = distinctDaysCount,
+            totalSeconds = totalSeconds,
+            bestSessionSeconds = bestSessionSeconds,
+            shieldAttempts = shieldAttempts,
+            isAppBlockerEnabled = userPreferences?.isAppBlockerEnabled == true
         )
-    )
+    }
     // v1.4.0-round2: test hook — open a badge directly for screenshots
     LaunchedEffect(initialSelectedBadgeTitle) {
         if (initialSelectedBadgeTitle != null && selectedBadge == null) {

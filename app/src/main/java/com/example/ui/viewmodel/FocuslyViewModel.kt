@@ -2687,6 +2687,19 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                     streak = currentStreak
                 )
             }
+
+            // v1.4.3: post-session notifications (session complete / break over /
+            // achievements / theme unlocks / held digest). All guarded — never throws.
+            postSessionCompletionNotifications(
+                oldPoints = prefs.focusPoints,
+                newPoints = updatedPoints,
+                minutes = actualSeconds / 60,
+                pointsEarned = pointsEarned,
+                currentStreak = currentStreak,
+                totalSessions = totalSessions,
+                shieldAttempts = updatedPrefs.shieldBlockedAttempts,
+                isAppBlockerEnabled = updatedPrefs.isAppBlockerEnabled
+            )
         }
 
         _completedSessionSummary.value = session
@@ -2706,6 +2719,99 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 .apply()
             com.example.widget.FocivoWidgetHelper.updateAllWidgets(getApplication())
         } catch (_: Exception) {}
+    }
+
+    /**
+     * v1.4.3: all post-session notifications in one guarded place.
+     * - break-mode timers get "Break's over" instead of "Session complete"
+     * - achievements: diff the shared badge computation against the notified set
+     * - themes: notify when lifetime points first cross a theme's price
+     * - held digest: only when the guard actually held >= 1 notification
+     * Every branch is try/catch — a notification failure never breaks completion.
+     */
+    private fun postSessionCompletionNotifications(
+        oldPoints: Int,
+        newPoints: Int,
+        minutes: Int,
+        pointsEarned: Int,
+        currentStreak: Int,
+        totalSessions: List<FocusSessionEntity>,
+        shieldAttempts: Int,
+        isAppBlockerEnabled: Boolean
+    ) {
+        try {
+            val app = getApplication<Application>()
+            val isBreak = _currentMode.value.contains("break", ignoreCase = true)
+
+            if (isBreak) {
+                com.example.service.FocivoNotifications.postBreakOver(app)
+            } else {
+                com.example.service.FocivoNotifications.postSessionComplete(app, minutes, pointsEarned)
+
+                // Achievements: newly unlocked since last check.
+                // First run seeds already-unlocked badges silently (no spam for
+                // long-time users); afterwards only genuine new unlocks notify.
+                try {
+                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                    val distinctDays = totalSessions
+                        .filter { it.completedAt > 0 && it.durationSeconds > 0 }
+                        .map { sdf.format(java.util.Date(it.completedAt)) }.toSet().size
+                    val badges = com.example.ui.screens.computeAchievementBadges(
+                        sessionCount = totalSessions.count { it.durationSeconds > 0 },
+                        distinctDaysCount = distinctDays,
+                        totalSeconds = totalSessions.sumOf { it.durationSeconds }.toLong(),
+                        bestSessionSeconds = totalSessions.maxOfOrNull { it.durationSeconds } ?: 0,
+                        shieldAttempts = shieldAttempts,
+                        isAppBlockerEnabled = isAppBlockerEnabled
+                    )
+                    val N = com.example.service.FocivoNotifications
+                    if (!N.isAchievementSeeded(app)) {
+                        for (badge in badges) {
+                            if (badge.isUnlocked) N.seedAchievementNotified(app, badge.title)
+                        }
+                        N.markAchievementSeeded(app)
+                    } else {
+                        for (badge in badges) {
+                            if (badge.isUnlocked) N.postAchievementUnlocked(app, badge.title, badge.title)
+                        }
+                    }
+                } catch (_: Exception) { }
+
+                // Themes: first crossing of a price threshold (seeded silently
+                // on first run, same as achievements).
+                try {
+                    val N = com.example.service.FocivoNotifications
+                    if (!N.isThemeSeeded(app)) {
+                        for (theme in com.example.util.TimerThemeManager.THEMES) {
+                            if (theme.unlockPoints > 0 && newPoints >= theme.unlockPoints) {
+                                N.seedThemeNotified(app, theme.id)
+                            }
+                        }
+                        N.markThemeSeeded(app)
+                    } else {
+                        for (theme in com.example.util.TimerThemeManager.THEMES) {
+                            if (theme.unlockPoints > 0 && oldPoints < theme.unlockPoints && newPoints >= theme.unlockPoints) {
+                                N.postThemeUnlocked(app, theme.id, theme.name)
+                            }
+                        }
+                    }
+                } catch (_: Exception) { }
+            }
+
+            // Held-notifications digest: only when the guard actually held some.
+            try {
+                val held = com.example.util.SessionNotificationDigestManager.getDigestCount()
+                if (held > 0) {
+                    com.example.service.FocivoNotifications.postHeldDigest(app, held)
+                    com.example.util.SessionNotificationDigestManager.clearDigest(app)
+                }
+            } catch (_: Exception) { }
+
+            // Streak-saver state for the daily 19:00 check.
+            try {
+                com.example.service.FocivoNotifications.saveStreakState(app, currentStreak)
+            } catch (_: Exception) { }
+        } catch (_: Exception) { }
     }
 
     // App Blocker / Focus Shield Functions
@@ -3127,6 +3233,13 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 val updateInfo = com.example.util.AppUpdateManager.checkForUpdates(context, isManualCheck = isManual)
                 if (updateInfo != null && updateInfo.isUpdateAvailable && updateInfo.checkSucceeded) {
                     _availableAppUpdate.value = updateInfo
+                    // v1.4.3: one notification per version (deduped with the
+                    // overlay dismissal). Silent on any failure.
+                    try {
+                        com.example.service.FocivoNotifications.postUpdateAvailable(
+                            context, updateInfo.latestVersionName, updateInfo.latestVersionCode
+                        )
+                    } catch (_: Exception) { }
                     if (isManual) {
                         _manualUpdateCheckResult.value = "New version v${updateInfo.latestVersionName} is available!"
                     }
