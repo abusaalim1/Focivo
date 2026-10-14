@@ -90,7 +90,7 @@ class V11NewFeaturesScreenshotsTest {
             isRunning = false,
             isBreak = isBreak,
             subjectTitle = "Deep Work Session",
-            mascotPose = MascotPose.STUDYING,
+            mascotPose = MascotPose.STUDY,
             theme = theme,
             onTogglePlay = {},
             onReset = {},
