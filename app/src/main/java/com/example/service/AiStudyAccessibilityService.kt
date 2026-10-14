@@ -318,7 +318,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         packageName = pkg,
                         appName = "App Installer",
                         durationSec = FocusShieldService.getRemainingSeconds(applicationContext),
-                        reason = "🔒 Strict Mode Active: App Uninstallation is protected during your active study session.",
+                        reason = "Strict Mode Active: App Uninstallation is protected during your active study session.",
                         isPunishment = false
                     )
                     try {

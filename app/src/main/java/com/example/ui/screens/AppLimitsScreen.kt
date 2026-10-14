@@ -696,7 +696,7 @@ fun AppRankAndLimitCard(
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(
-                                    text = if (usedMins > 0) "⏱️ $formattedSpentToday today" else "0m today",
+                                    text = if (usedMins > 0) "$formattedSpentToday today" else "0m today",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         color = if (usedMins > 0) RegainLimePrimary else Color(0xFFA0A89E),
@@ -849,7 +849,7 @@ fun AppRankAndLimitCard(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = "🚨 ${limit.emergencyUsesRemainingToday}/${limit.emergencyUsesAllowed} Emergency Uses",
+                                text = "${limit.emergencyUsesRemainingToday}/${limit.emergencyUsesAllowed} Emergency Uses",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontFamily = PoppinsFontFamily,
                                     color = RegainLimePrimary,

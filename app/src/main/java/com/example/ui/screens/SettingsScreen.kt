@@ -467,7 +467,7 @@ fun SettingsScreen(
                                         } else {
                                             // Toggle test instant silence
                                             StudyNotificationBlockerManager.activateStudyNotificationBlock(context)
-                                            Toast.makeText(context, "🔕 Study Notifications Muted Now!", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Study Notifications Muted Now!", Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                 contentAlignment = Alignment.Center

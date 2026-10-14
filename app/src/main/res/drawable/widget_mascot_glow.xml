@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.4.3-widgets: soft lime radial glow behind widget center mascots.
+     Percentage radius works on all API levels (minSdk 24). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:type="radial"
+        android:gradientRadius="50%p"
+        android:startColor="#4D8FD400"
+        android:centerColor="#1A8FD400"
+        android:endColor="#008FD400" />
+</shape>

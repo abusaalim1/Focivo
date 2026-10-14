@@ -68,6 +68,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -75,6 +76,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.R
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimePrimary
 import com.example.util.AiStudyGuardManager
@@ -466,14 +468,14 @@ fun PreStudyAppBlockSheet(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val categories = listOf(
-                        InstalledAppsManager.CATEGORY_SOCIAL to "📱 Social Media",
-                        InstalledAppsManager.CATEGORY_GAMES to "🎮 Games",
-                        InstalledAppsManager.CATEGORY_ENTERTAINMENT to "🎬 Video & Entertainment",
-                        InstalledAppsManager.CATEGORY_MESSAGING to "💬 Messaging",
-                        InstalledAppsManager.CATEGORY_OTHER to "🌐 Other Apps"
+                        Triple(InstalledAppsManager.CATEGORY_SOCIAL, "Social Media", R.drawable.emoji3d_phone),
+                        Triple(InstalledAppsManager.CATEGORY_GAMES, "Games", R.drawable.emoji3d_game),
+                        Triple(InstalledAppsManager.CATEGORY_ENTERTAINMENT, "Video & Entertainment", R.drawable.emoji3d_clapper),
+                        Triple(InstalledAppsManager.CATEGORY_MESSAGING, "Messaging", R.drawable.emoji3d_chat),
+                        Triple(InstalledAppsManager.CATEGORY_OTHER, "Other Apps", R.drawable.emoji3d_globe)
                     )
 
-                    categories.forEach { (catKey, catTitle) ->
+                    categories.forEach { (catKey, catTitle, catIconRes) ->
                         val appsInCat = categorizedApps[catKey] ?: emptyList()
                         if (appsInCat.isNotEmpty()) {
                             val isExpanded = expandedCategories[catKey] ?: true
@@ -497,6 +499,12 @@ fun PreStudyAppBlockSheet(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Image(
+                                                painter = painterResource(id = catIconRes),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
                                             Text(
                                                 text = catTitle,
                                                 style = MaterialTheme.typography.titleSmall.copy(

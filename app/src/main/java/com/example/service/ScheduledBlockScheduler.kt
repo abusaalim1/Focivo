@@ -79,6 +79,7 @@ object ScheduledBlockScheduler {
             current.add(0, fixedSchedule)
         }
         saveLocalSchedules(context, current)
+        refreshReminderAlarms(context) // v1.4.3: 10-min reminder + streak-saver
 
         // Sync with Supabase
         if (fixedSchedule.user_id.isNotBlank() && fixedSchedule.user_id != "anonymous" && fixedSchedule.user_id != "local_user") {
@@ -103,6 +104,7 @@ object ScheduledBlockScheduler {
         Log.i(TAG, "[ScheduledBlockWrite] [$triggerSource] Deleting schedule id=$scheduleId")
         val current = getLocalSchedules(context).filterNot { it.id == scheduleId }
         saveLocalSchedules(context, current)
+        refreshReminderAlarms(context) // v1.4.3: 10-min reminder + streak-saver
 
         ioScope.launch {
             try {
@@ -129,6 +131,7 @@ object ScheduledBlockScheduler {
             val updated = oldItem.copy(is_enabled = isEnabled, user_id = finalUserId)
             current[index] = updated
             saveLocalSchedules(context, current)
+            refreshReminderAlarms(context) // v1.4.3: 10-min reminder + streak-saver
 
             Log.i(TAG, "[ScheduledBlockWrite] [$triggerSource] Toggled schedule id=$scheduleId from is_enabled=${oldItem.is_enabled} -> $isEnabled, user_id=$finalUserId")
 
@@ -196,6 +199,7 @@ object ScheduledBlockScheduler {
 
         val finalList = mergedMap.values.toList()
         saveLocalSchedules(context, finalList)
+        refreshReminderAlarms(context) // v1.4.3: 10-min reminder + streak-saver
         return finalList
     }
 
@@ -612,22 +616,22 @@ object ScheduledBlockScheduler {
                         } else {
                             "Break time is over. Focus Shield is active and apps are locked!"
                         }
-                        notifyScheduleEvent(context, "🔔 Break Ended - Study Resumed!", breakResumeMsg)
+                        notifyScheduleEvent(context, "Break Ended - Study Resumed!", breakResumeMsg)
                     } else {
                         val studyStartMsg = if (!subjectText.isNullOrBlank()) {
                             "Your study block for '$subjectText' has started. Focus Shield is active and apps are locked."
                         } else {
                             "Your study block has started. Focus Shield is active and apps are locked."
                         }
-                        notifyScheduleEvent(context, "📚 Study Schedule Started!", studyStartMsg)
+                        notifyScheduleEvent(context, "Study Schedule Started!", studyStartMsg)
                     }
                 }
                 "BREAK" -> {
-                    notifyScheduleEvent(context, "☕ Break Time Started!", "Take a break now! Your study break window is active.")
+                    notifyScheduleEvent(context, "Break Time Started!", "Take a break now! Your study break window is active.")
                 }
                 "FREE" -> {
                     if (prevState == "STUDY" || prevState == "BREAK") {
-                        notifyScheduleEvent(context, "🎉 Study Schedule Completed", "Your study window has ended. Great work!")
+                        notifyScheduleEvent(context, "Study Schedule Completed", "Your study window has ended. Great work!")
                     }
                 }
             }
@@ -684,6 +688,9 @@ object ScheduledBlockScheduler {
                 }
             }
         }
+
+        // v1.4.3: 10-minute heads-up + daily streak-saver alarms
+        refreshReminderAlarms(context)
 
         // Schedule the next transition alarm
         scheduleNextAlarm(context)
@@ -758,8 +765,68 @@ object ScheduledBlockScheduler {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        alarmManager.cancel(pi)
-        Log.d(TAG, "Cancelled scheduled block alarm")
+        try {
+            alarmManager.cancel(pi)
+        } catch (_: Exception) { }
+    }
+
+    /**
+     * v1.4.3: next upcoming study-block START (not end/break) across enabled
+     * schedules. Returns (startMillis, subject). Used for the 10-minute
+     * heads-up reminder.
+     */
+    fun getNextStudyStartMillis(context: Context): Pair<Long, String?>? {
+        return try {
+            val schedules = getLocalSchedules(context).filter { it.is_enabled }
+            if (schedules.isEmpty()) return null
+            val now = Calendar.getInstance()
+            val nowMillis = now.timeInMillis
+            val dayMap = mapOf(
+                "Mon" to Calendar.MONDAY, "Tue" to Calendar.TUESDAY,
+                "Wed" to Calendar.WEDNESDAY, "Thu" to Calendar.THURSDAY,
+                "Fri" to Calendar.FRIDAY, "Sat" to Calendar.SATURDAY,
+                "Sun" to Calendar.SUNDAY
+            )
+            var best: Pair<Long, String?>? = null
+            for (dayOffset in 0..7) {
+                val dayCal = (now.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, dayOffset) }
+                val calDayOfWeek = dayCal.get(Calendar.DAY_OF_WEEK)
+                for (schedule in schedules) {
+                    val activeDays = schedule.days_active.split(",").map { it.trim() }
+                    if (activeDays.none { dayMap[it] == calDayOfWeek }) continue
+                    val parts = schedule.start_time.split(":")
+                    if (parts.size < 2) continue
+                    val h = parts[0].toIntOrNull() ?: continue
+                    val m = parts[1].toIntOrNull() ?: continue
+                    val eventCal = (dayCal.clone() as Calendar).apply {
+                        set(Calendar.HOUR_OF_DAY, h)
+                        set(Calendar.MINUTE, m)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }
+                    val eventMillis = eventCal.timeInMillis
+                    if (eventMillis > nowMillis && (best == null || eventMillis < best!!.first)) {
+                        best = Pair(eventMillis, schedule.subject?.takeIf { it.isNotBlank() } ?: schedule.label.takeIf { it.isNotBlank() })
+                    }
+                }
+            }
+            best
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * v1.4.3: refresh the 10-minute study reminder + daily streak-saver alarm.
+     * Call after any schedule mutation and on evaluate/boot.
+     */
+    fun refreshReminderAlarms(context: Context) {
+        try {
+            FocivoNotifications.scheduleStudyReminder(context)
+        } catch (_: Exception) { }
+        try {
+            FocivoNotifications.scheduleStreakSaverDaily(context)
+        } catch (_: Exception) { }
     }
 
     fun formatDisplayTime(timeStr: String): String {

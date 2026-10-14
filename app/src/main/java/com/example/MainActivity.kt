@@ -69,6 +69,7 @@ import com.example.ui.screens.FocusScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.InsightsScreen
 import com.example.ui.screens.LeaderboardScreen
+import com.example.ui.screens.OnboardingFlowScreen
 import com.example.ui.screens.OnboardingScreen
 import com.example.ui.screens.OnboardingSurveyScreen
 import com.example.ui.screens.PlannerScreen
@@ -106,6 +107,15 @@ class MainActivity : ComponentActivity() {
         // the timer is already live in this process or no timer is persisted).
         activeViewModel?.restoreTimerStateIfNeeded()
         com.example.service.ScheduledBlockScheduler.evaluateAndReschedule(this)
+        // v1.5.0: the floating timer pill is only for out-of-app use — kill it on return.
+        com.example.service.FloatingTimerPillManager.hide(this)
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // v1.5.0: show the floating countdown pill when leaving the app mid-session.
+        // No-op unless a session is actively running and overlay permission is granted.
+        com.example.service.FloatingTimerPillManager.showIfSessionRunning(this)
     }
 
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
@@ -231,6 +241,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     var isAppLimitsOpen by remember { mutableStateOf(false) }
     val shouldNavigateToStudyTab by viewModel.shouldNavigateToStudyTab.collectAsState()
     var selectedTab by remember { mutableStateOf(NavTab.HOME) }
+    // v1.5.0: the onboarding group step can route the user to the leaderboard
+    // right after the new flow completes.
+    var pendingLeaderboardAfterOnboarding by remember { mutableStateOf(false) }
 
     LaunchedEffect(shouldNavigateToStudyTab) {
         if (shouldNavigateToStudyTab) {
@@ -420,9 +433,12 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
             )
         // v1.4.0: first-launch onboarding runs for guests too (same survey;
         // answers persist via the local repository / guest storage).
+        // v1.5.0: rebuilt flow — intro animation -> questions -> mascot showcase
+        // -> group step -> permissions (one per screen, last).
         } else if (showQuestionnaire || userPreferences?.hasCompletedIntakeSurvey == false || userPreferences?.hasCompletedOnboarding == false) {
-            OnboardingSurveyScreen(
-                initialUserName = currentUser?.fullName ?: userPreferences?.currentUserName ?: "Scholar",
+            OnboardingFlowScreen(
+                initialUserName = currentUser?.fullName ?: userPreferences?.currentUserName ?: "",
+                leaderboardUsers = leaderboardUsers,
                 onFinishSurvey = { name, studentClassLevel, isBoardExamYear, primaryStudyGoal, biggestDistractionApp, preferredStudyTimeWindow, dailyScreenTimeGoalMinutes, motivationStyle ->
                     viewModel.submitIntakeSurvey(
                         name = name,
@@ -435,12 +451,29 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                         motivationStyle = motivationStyle
                     )
                     viewModel.completeOnboarding()
-                    if (!PermissionUtils.hasNotificationPermission(context)) {
+                    // v1.5.0: notifications are offered inside the new flow; if the
+                    // user already decided there (Allow or Later), don't re-prompt
+                    // immediately after onboarding — the existing in-context
+                    // surfaces (Guard Hub / Shield Hub / pre-study sheets) handle
+                    // re-grant later.
+                    val obPrefs = context.getSharedPreferences(
+                        "focivo_onboarding_prefs", android.content.Context.MODE_PRIVATE
+                    )
+                    if (!PermissionUtils.hasNotificationPermission(context) &&
+                        !obPrefs.getBoolean("onboarding_notifications_decided", false)
+                    ) {
                         showNotificationPermissionPrompt = true
                     }
-                }
+                },
+                onJoinGroup = { pendingLeaderboardAfterOnboarding = true }
             )
         } else {
+            LaunchedEffect(pendingLeaderboardAfterOnboarding) {
+                if (pendingLeaderboardAfterOnboarding) {
+                    pendingLeaderboardAfterOnboarding = false
+                    selectedTab = NavTab.LEADERBOARD
+                }
+            }
             // Main OS Shell (Direct Open)
             // v1.4.0-round2: full-screen theme accent for nav + main screens.
             val appTheme by com.example.util.TimerThemeManager.selectedTheme.collectAsState()

@@ -79,6 +79,14 @@ class FocusTimerService : Service() {
         try {
             com.example.util.StudyNotificationBlockerManager.deactivateStudyNotificationBlock(this)
         } catch (_: Exception) { }
+        // v1.4.3: guard status notification lives only while a session runs.
+        try {
+            com.example.util.AiStudyGuardManager.cancelGuardStatusNotification(this)
+        } catch (_: Exception) { }
+        // v1.5.0: hide the floating timer pill when the timer service dies.
+        try {
+            FloatingTimerPillManager.hide(this)
+        } catch (_: Exception) { }
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -152,6 +160,10 @@ class FocusTimerService : Service() {
         // "Block notifications" toggle did nothing during normal timers).
         try {
             com.example.util.StudyNotificationBlockerManager.activateStudyNotificationBlock(this)
+        } catch (_: Exception) { }
+        // v1.4.3: guard status notification appears only while a session runs.
+        try {
+            com.example.util.AiStudyGuardManager.updateGuardStatusNotification(this)
         } catch (_: Exception) { }
         return START_STICKY
     }
@@ -253,10 +265,14 @@ class FocusTimerService : Service() {
                 .putBoolean(KEY_MANUAL_RUNNING, false)
                 .putLong(KEY_MANUAL_END, 0L)
                 .apply()
-            getSharedPreferences(PREFS_TIMER_STATE, Context.MODE_PRIVATE).edit()
-                .putBoolean(KEY_TIMER_RUNNING, false)
+            getSharedPreferences(PREFS_TIMER_STATE, Context.MODE_PRIVATE).edit()                .putBoolean(KEY_TIMER_RUNNING, false)
                 .apply()
         } catch (_: Exception) {}
+        // v1.5.0: the pill must disappear the moment the timer stops or completes.
+        // clearTimerPrefs() is the choke point on every stop/completion path.
+        try {
+            FloatingTimerPillManager.hide(this)
+        } catch (_: Exception) { }
     }
 
     private fun buildTimerNotification(remainingSec: Int, taskTitle: String): Notification {
@@ -269,7 +285,7 @@ class FocusTimerService : Service() {
         val pi = PendingIntent.getActivity(this, NOTIFICATION_ID, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_small)
-            .setContentTitle("⏱ Focus Session — $taskTitle")
+            .setContentTitle("Focus Session — $taskTitle")
             .setContentText("$timeText remaining — stay focused!")
             .setContentIntent(pi)
             .setOngoing(true)
@@ -294,13 +310,18 @@ class FocusTimerService : Service() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             val pi = PendingIntent.getActivity(this, NOTIFICATION_ID + 1, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            val largeIcon = try {
+                android.graphics.BitmapFactory.decodeResource(resources, R.drawable.mascot_study_happy)
+            } catch (_: Exception) { null }
             val notif = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification_small)
-                .setContentTitle("✅ Focus session complete")
-                .setContentText("\"$taskTitle\" finished while you were away — great discipline!")
+                .setColor(0xFF8CE000.toInt())
+                .setContentTitle("Session complete")
+                .setContentText("\"$taskTitle\" finished while you were away \u2014 great discipline!")
                 .setContentIntent(pi)
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .apply { if (largeIcon != null) setLargeIcon(largeIcon) }
                 .build()
             manager.notify(NOTIFICATION_ID + 1, notif)
         } catch (_: Exception) {}

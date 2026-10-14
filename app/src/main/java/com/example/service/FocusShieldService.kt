@@ -307,9 +307,9 @@ class FocusShieldService : Service() {
 
         val title = if (isPunishment) {
             val appTitle = punishedPkg?.let { friendlyAppName(this, it) } ?: "AI App"
-            "⚠️ 3-Hour Discipline Lock: $appTitle · $timeFormatted Left"
+            "3-Hour Discipline Lock: $appTitle · $timeFormatted Left"
         } else {
-            "🛡️ Focus Shield Active · $timeFormatted Left"
+            "Focus Shield Active · $timeFormatted Left"
         }
 
         val text = if (isPunishment) {
@@ -612,7 +612,7 @@ class FocusShieldService : Service() {
         val completeNotification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_small)
             .setLargeIcon(largeIcon)
-            .setContentTitle("🎉 Unbroken Focus Achieved!")
+            .setContentTitle("Unbroken Focus Achieved!")
             .setContentText("Focus Shield timer finished. Selected apps are now unlocked.")
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)

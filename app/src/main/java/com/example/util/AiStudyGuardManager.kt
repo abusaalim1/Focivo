@@ -183,15 +183,21 @@ object AiStudyGuardManager {
         }
     }
 
+    /**
+     * v1.4.3: the persistent guard notification shows ONLY while a study
+     * session is genuinely running (manual timer or active schedule). On
+     * plain app open / cold start it is cancelled — the owner reported it
+     * popping up on every app open. Also restyled: mascot icon, no emoji.
+     */
     fun updateGuardStatusNotification(context: Context) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
-        if (!isAiGuardEnabled(context)) {
+        if (!isAiGuardEnabled(context) || !isStudyPeriodActive(context)) {
             manager.cancel(NOTIFICATION_ID_GUARD_STATUS)
             return
         }
 
-        val title = "🛡️ AI Academic Sentinel Armed"
-        val text = "Smart Study Sentinel · AI Tutor & Academic Focus Protection"
+        val title = "AI Study Guard is watching"
+        val text = "Blocking distractions while you study"
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -203,10 +209,12 @@ object AiStudyGuardManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val largeIcon = BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large)
+        val largeIcon = try {
+            BitmapFactory.decodeResource(context.resources, R.drawable.mascot_study_happy)
+        } catch (_: Exception) { null }
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
             .setSmallIcon(R.drawable.ic_notification_small)
-            .setLargeIcon(largeIcon)
+            .setColor(0xFF8CE000.toInt())
             .setContentTitle(title)
             .setContentText(text)
             .setOngoing(true)
@@ -214,8 +222,18 @@ object AiStudyGuardManager {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setSound(null)
             .setContentIntent(pi)
+        if (largeIcon != null) builder.setLargeIcon(largeIcon)
 
-        manager.notify(NOTIFICATION_ID_GUARD_STATUS, builder.build())
+        try {
+            manager.notify(NOTIFICATION_ID_GUARD_STATUS, builder.build())
+        } catch (_: Exception) { }
+    }
+
+    fun cancelGuardStatusNotification(context: Context) {
+        try {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            manager?.cancel(NOTIFICATION_ID_GUARD_STATUS)
+        } catch (_: Exception) { }
     }
 
     fun isAppUnderPunishment(context: Context, packageName: String): Boolean {
@@ -374,7 +392,7 @@ object AiStudyGuardManager {
                 packageName = packageName,
                 appName = appName,
                 durationSec = GRACE_PERIOD_SECONDS,
-                reason = "⚠️ Study Warning: Non-study content detected in $appName.\n\nNon-study content mat dekho — padhai pe focus karo! 📚\n\nKeep your questions study & exam-related, warna $appName 3 ghante ke liye lock ho jayega.",
+                reason = "Study Warning: Non-study content detected in $appName.\n\nPlease avoid non-study content and stay focused on your studies!\n\nKeep your questions study & exam-related, or $appName will be locked for 3 hours.",
                 isPunishment = false,
                 guardVariant = com.example.ui.screens.BlockedAppLockActivity.GUARD_VARIANT_WARNING
             )
@@ -632,11 +650,11 @@ object AiStudyGuardManager {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
             .setSmallIcon(R.drawable.ic_notification_small)
             .setLargeIcon(largeIcon)
-            .setContentTitle("⚠️ Study Discipline Warning: ${warning.appName}")
+            .setContentTitle("Study Discipline Warning: ${warning.appName}")
             .setContentText("Casual/non-study activity detected. Return to studying within 3 min or this app locks for 3 hours!")
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("Non-study usage detected in ${warning.appName}.\n\nReason: ${warning.reason}\n\n⚠️ Continuing off-topic activity will trigger an immediate 3-HOUR LOCKOUT on ${warning.appName}. Return to your study goals now!")
+                    .bigText("Non-study usage detected in ${warning.appName}.\n\nReason: ${warning.reason}\n\nContinuing off-topic activity will trigger an immediate 3-HOUR LOCKOUT on ${warning.appName}. Return to your study goals now!")
             )
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
@@ -664,7 +682,7 @@ object AiStudyGuardManager {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
             .setSmallIcon(R.drawable.ic_notification_small)
             .setLargeIcon(largeIcon)
-            .setContentTitle("⛔ ${block.appName} Blocked for 3 Hours")
+            .setContentTitle("${block.appName} Blocked for 3 Hours")
             .setContentText("Study warning was ignored. ${block.appName} is now locked for 3 hours.")
             .setStyle(
                 NotificationCompat.BigTextStyle()
@@ -696,7 +714,7 @@ object AiStudyGuardManager {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
             .setSmallIcon(R.drawable.ic_notification_small)
             .setLargeIcon(largeIcon)
-            .setContentTitle("✅ Good — No Block Applied")
+            .setContentTitle("Good — No Block Applied")
             .setContentText("You corrected course in ${resolved.appName} in time. Keep up the great focus!")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pi)

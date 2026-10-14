@@ -17,6 +17,16 @@ class FocuslyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         installCrashReporter()
+
+        // v1.4.3: initialize the theme manager FIRST, before anything reads it.
+        // (Home greeting/dates read selectedTheme at frame one; late init made
+        // text colors render with the wrong/default theme on cold start.)
+        try {
+            com.example.util.TimerThemeManager.init(this)
+        } catch (e: Throwable) {
+            Log.e("FocuslyApplication", "Failed to initialize TimerThemeManager: ${e.message}", e)
+        }
+
         try {
             SupabaseManager.initialize(this)
         } catch (e: Throwable) {
@@ -75,6 +85,16 @@ class FocuslyApplication : Application() {
             ScheduledBlockScheduler.evaluateAndReschedule(this)
         } catch (e: Throwable) {
             Log.e("FocuslyApplication", "Failed to initialize ScheduledBlockScheduler: ${e.message}", e)
+        }
+
+        // v1.4.3: refresh the study-reminder + daily 19:00 streak-saver alarms
+        // on every process start (evaluateAndReschedule covers this too; belt
+        // and braces so the alarms exist even if evaluate throws early).
+        try {
+            com.example.service.FocivoNotifications.scheduleStudyReminder(this)
+            com.example.service.FocivoNotifications.scheduleStreakSaverDaily(this)
+        } catch (e: Throwable) {
+            Log.e("FocuslyApplication", "Failed to initialize reminder alarms: ${e.message}", e)
         }
     }
 

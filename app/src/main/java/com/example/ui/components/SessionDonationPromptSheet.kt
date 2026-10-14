@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,10 +32,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.model.FocusSessionEntity
 import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.MutedBorderLight
@@ -60,11 +64,11 @@ fun getSessionDonationCopy(
     val mins = maxOf(1, sessionMinutes)
 
     return when (rotationIndex % 6) {
-        0 -> "That's $mins minutes of real focus. 🌱 Focivo was built by one person who wanted a tool like this to exist — if it's helping you, a small bit of support keeps it growing."
+        0 -> "That's $mins minutes of real focus. Focivo was built by one person who wanted a tool like this to exist — if it's helping you, a small bit of support keeps it growing."
         1 -> "Session complete! You're building something real here. This app is a solo project — every bit of support helps keep it alive and improving for students like you."
         2 -> "$mins minutes closer to your goals. If Focivo's been part of that journey, consider leaving something behind to help it keep going — totally up to you."
         3 -> "Nice work today. Building this app has been a one-person mission — if it's earned a place in your routine, a little support means a lot."
-        4 -> "$mins minutes of deep focus logged! ✨ With $totalHours hours completed so far, you're making steady progress. Focivo is run independently by a solo dev — if you find value in it, any small contribution helps it stay ad-free."
+        4 -> "$mins minutes of deep focus logged! With $totalHours hours completed so far, you're making steady progress. Focivo is run independently by a solo dev — if you find value in it, any small contribution helps it stay ad-free."
         else -> "Another session done! $totalHours hours of focus completed so far. If Focivo is helping you stay on track, consider supporting its solo creator to keep updates coming."
     }
 }
@@ -119,17 +123,30 @@ fun SessionDonationPromptSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Title
-            Text(
-                text = "Keep Focivo Growing 🌱",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = AppleLinearFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    color = textPrimary,
-                    fontSize = 20.sp,
-                    letterSpacing = (-0.3).sp
+            // Title with 3D seedling icon
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.emoji3d_seedling),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(28.dp)
                 )
-            )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Keep Focivo Growing",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontFamily = AppleLinearFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = textPrimary,
+                        fontSize = 20.sp,
+                        letterSpacing = (-0.3).sp
+                    )
+                )
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -225,12 +242,20 @@ fun SessionDonationPromptSheet(
                     modifier = Modifier.weight(1f)
                 )
 
-                // Primary Action: Support Focivo
+                // Primary Action: Support Focivo with 3D heart icon
                 GlassButton(
-                    text = "Support Focivo 💚",
+                    text = "Support Focivo",
                     onClick = onSupportClick,
                     isPrimary = true,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    leadingIcon = {
+                        Image(
+                            painter = painterResource(id = R.drawable.emoji3d_heart),
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 )
             }
 

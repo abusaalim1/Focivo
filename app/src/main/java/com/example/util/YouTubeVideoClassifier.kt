@@ -160,7 +160,7 @@ object YouTubeVideoClassifier {
                 return VideoVerdict(
                     isEducational = false,
                     confidence = 1.0f,
-                    category = "🔞 Adult & 18+ Content Blocked",
+                    category = "Adult & 18+ Content Blocked",
                     reason = "Explicit adult or inappropriate content detected ($adultKey)"
                 )
             }
@@ -169,7 +169,7 @@ object YouTubeVideoClassifier {
             return VideoVerdict(
                 isEducational = false,
                 confidence = 1.0f,
-                category = "🔞 Adult & 18+ Content Blocked",
+                category = "Adult & 18+ Content Blocked",
                 reason = "Adult / 18+ restricted pattern detected"
             )
         }

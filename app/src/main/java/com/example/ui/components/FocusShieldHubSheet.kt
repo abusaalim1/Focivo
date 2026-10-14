@@ -451,9 +451,9 @@ fun FocusShieldHubSheet(
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = if (isShieldTimerRunning) {
-                                    "🔒 Strict Lock Active · Master switch locked until timer ends"
+                                    "Strict Lock Active · Master switch locked until timer ends"
                                 } else if (!isAllPermissionsGranted) {
-                                    "⚠️ Permissions Needed · Tap switch to grant permissions"
+                                    "Permissions Needed · Tap switch to grant permissions"
                                 } else if (isShieldEnabled) {
                                     "Armed · Distracting apps will be blocked during focus"
                                 } else {
@@ -1018,7 +1018,7 @@ fun FocusShieldHubSheet(
 
                         if (punishmentLogs.isEmpty()) {
                             Text(
-                                text = "🎯 No discipline violations recorded. Your AI study record is spotless!",
+                                text = "No discipline violations recorded. Your AI study record is spotless!",
                                 fontSize = 12.sp,
                                 color = accentGreen,
                                 modifier = Modifier.padding(vertical = 8.dp)
@@ -1027,9 +1027,9 @@ fun FocusShieldHubSheet(
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 punishmentLogs.take(10).forEach { log ->
                                     val (statusBg, statusFg, statusLabel) = when (log.status) {
-                                        "blocked" -> Triple(Color(0x35E53935), Color(0xFFEF4444), "⛔ BLOCKED (3h)")
-                                        "warned_resolved" -> Triple(Color(0x354CAF50), Color(0xFF10B981), "✅ RESOLVED")
-                                        else -> Triple(Color(0x35FFA000), Color(0xFFF59E0B), "⚠️ WARNED")
+                                        "blocked" -> Triple(Color(0x35E53935), Color(0xFFEF4444), "BLOCKED (3h)")
+                                        "warned_resolved" -> Triple(Color(0x354CAF50), Color(0xFF10B981), "RESOLVED")
+                                        else -> Triple(Color(0x35FFA000), Color(0xFFF59E0B), "WARNED")
                                     }
                                     val friendlyApp = when (log.app_package) {
                                         "com.openai.chatgpt" -> "ChatGPT"
@@ -1836,7 +1836,7 @@ fun FocusShieldHubSheet(
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(
-                                                    text = if (isEdu) "✅ UNLOCKED (Study Content)" else "🔒 LOCKED (Distraction)",
+                                                    text = if (isEdu) "UNLOCKED (Study Content)" else "LOCKED (Distraction)",
                                                     style = MaterialTheme.typography.titleSmall.copy(
                                                         color = badgeColor,
                                                         fontWeight = FontWeight.Bold,

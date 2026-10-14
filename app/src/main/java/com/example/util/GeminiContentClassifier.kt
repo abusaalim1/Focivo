@@ -172,7 +172,7 @@ object GeminiContentClassifier {
                 isDistraction = true,
                 isAdult = false,
                 category = "SOCIAL_MEDIA_ENTERTAINMENT",
-                reason = "🔒 $appLabel is locked during study sessions to protect your focus.",
+                reason = "$appLabel is locked during study sessions to protect your focus.",
                 confidence = 1.0f
             )
             screenCache.put(cacheKey, verdict)
@@ -187,7 +187,7 @@ object GeminiContentClassifier {
                 isDistraction = false,
                 isAdult = false,
                 category = "ACADEMIC_STUDY",
-                reason = "📚 Verified educational learning app ($appLabel).",
+                reason = "Verified educational learning app ($appLabel).",
                 confidence = 1.0f
             )
             screenCache.put(cacheKey, verdict)

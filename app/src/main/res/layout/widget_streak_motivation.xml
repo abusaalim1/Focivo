@@ -3,11 +3,11 @@
     android:id="@+id/widget_streak_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_card_bg_streak"
+    android:background="@drawable/widget_v2_card"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="18dp">
 
-    <!-- Top Row: Mascot + Streak Flame -->
+    <!-- Header: 3D flame tile + streak count -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -16,15 +16,18 @@
 
         <ImageView
             android:id="@+id/widget_streak_mascot"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:contentDescription="Streak Mascot"
-            android:src="@drawable/mascot_celebration" />
+            android:layout_width="54dp"
+            android:layout_height="54dp"
+            android:background="@drawable/widget_v2_icon_tile"
+            android:contentDescription="Streak Flame"
+            android:padding="9dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic3d_flame" />
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="12dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
@@ -32,18 +35,18 @@
                 android:id="@+id/widget_streak_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/poppins_bold"
-                android:letterSpacing="-0.01"
-                android:text="🔥 1 DAY STREAK"
-                android:textColor="@color/focivo_orange"
-                android:textSize="13sp" />
+                android:fontFamily="@font/poppins_semibold"
+                android:text="12 day streak"
+                android:textColor="@color/focivo_text_primary"
+                android:textSize="17sp" />
 
             <TextView
                 android:id="@+id/widget_streak_level"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
                 android:fontFamily="@font/poppins_medium"
-                android:text="Level 1 Student · Focus Daily"
+                android:text="Level 3 Student"
                 android:textColor="@color/focivo_text_muted"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -52,46 +55,84 @@
             android:id="@+id/widget_streak_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/widget_pill_badge_orange"
-            android:fontFamily="@font/poppins_bold"
-            android:letterSpacing="0.04"
-            android:paddingStart="10dp"
-            android:paddingTop="3.5dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="3.5dp"
+            android:background="@drawable/widget_v2_pill"
+            android:fontFamily="@font/poppins_semibold"
+            android:letterSpacing="0.06"
+            android:paddingStart="12dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="5dp"
             android:text="ON FIRE"
-            android:textColor="@color/focivo_orange"
-            android:textSize="9.5sp" />
+            android:textColor="@color/focivo_lime_primary"
+            android:textSize="10sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
     </LinearLayout>
 
-    <!-- Center: Motivational Student Quote in Frosted Card -->
+    <!-- Center: motivational quote + happy mascot -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="10dp"
         android:layout_weight="1"
-        android:background="@drawable/widget_glass_inner_card"
+        android:background="@drawable/widget_v2_inner"
         android:gravity="center_vertical"
-        android:orientation="vertical"
-        android:paddingStart="12dp"
-        android:paddingTop="6dp"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingTop="8dp"
         android:paddingEnd="12dp"
-        android:paddingBottom="6dp">
+        android:paddingBottom="8dp">
 
-        <TextView
-            android:id="@+id/widget_streak_quote"
-            android:layout_width="match_parent"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:fontFamily="@font/poppins_medium"
-            android:maxLines="2"
-            android:text="&quot;Every page studied today is a step towards your dream ✨&quot;"
-            android:textColor="@color/focivo_text_secondary"
-            android:textSize="11sp" />
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/poppins_semibold"
+                android:letterSpacing="0.09"
+                android:text="TODAY'S SPARK"
+                android:textColor="@color/focivo_lime_primary"
+                android:textSize="9sp" />
+
+            <TextView
+                android:id="@+id/widget_streak_quote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:ellipsize="end"
+                android:fontFamily="@font/poppins_medium"
+                android:maxLines="2"
+                android:text="Every page studied today is a step towards your dream."
+                android:textColor="@color/focivo_text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:layout_marginStart="6dp">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:src="@drawable/widget_mascot_glow" />
+
+            <ImageView
+                android:layout_width="88dp"
+                android:layout_height="88dp"
+                android:layout_gravity="center"
+                android:contentDescription="Focivo study mascot"
+                android:src="@drawable/mascot_study_happy" />
+        </FrameLayout>
     </LinearLayout>
 
-    <!-- Bottom: Today Study Goal Progress -->
+    <!-- Bottom: goal progress -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -108,7 +149,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:fontFamily="@font/poppins_medium"
-                android:text="Today's Study Goal"
+                android:text="Today's study goal"
                 android:textColor="@color/focivo_text_muted"
                 android:textSize="11sp" />
 
@@ -116,8 +157,8 @@
                 android:id="@+id/widget_streak_goal_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/poppins_bold"
-                android:text="0 / 90m"
+                android:fontFamily="@font/poppins_semibold"
+                android:text="120 / 360 min"
                 android:textColor="@color/focivo_text_primary"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -126,10 +167,10 @@
             android:id="@+id/widget_streak_progress_bar"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="9dp"
-            android:layout_marginTop="5dp"
+            android:layout_height="10dp"
+            android:layout_marginTop="7dp"
             android:max="100"
             android:progress="35"
-            android:progressDrawable="@drawable/widget_progress_drawable" />
+            android:progressDrawable="@drawable/widget_v2_progress" />
     </LinearLayout>
 </LinearLayout>

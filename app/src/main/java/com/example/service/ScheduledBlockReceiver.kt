@@ -17,6 +17,14 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
         const val ACTION_SCHEDULE_TRANSITION = "com.example.action.SCHEDULE_TRANSITION"
         const val ACTION_SCHEDULE_START = "com.example.action.SCHEDULE_BLOCK_START"
         const val ACTION_SCHEDULE_END = "com.example.action.SCHEDULE_BLOCK_END"
+        /**
+         * v1.4.3: fires 10 minutes before a scheduled study block starts.
+         * Extra [EXTRA_REMINDER_SUBJECT] carries the block's subject (may be null).
+         */
+        const val ACTION_SCHEDULE_REMINDER = "com.example.action.SCHEDULE_REMINDER"
+        const val EXTRA_REMINDER_SUBJECT = "extra_reminder_subject"
+        /** v1.4.3: daily 19:00 streak-saver evaluation. */
+        const val ACTION_STREAK_SAVER_CHECK = "com.example.action.STREAK_SAVER_CHECK"
 
         /**
          * Restores alarms and study-block schedules after boot or app update.
@@ -139,6 +147,15 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
             ACTION_SCHEDULE_TRANSITION, ACTION_SCHEDULE_START, ACTION_SCHEDULE_END -> {
                 Log.d(TAG, "Evaluating and rescheduling all custom study blocks on: $action")
                 ScheduledBlockScheduler.evaluateAndReschedule(context)
+            }
+            ACTION_SCHEDULE_REMINDER -> {
+                val subject = intent.getStringExtra(EXTRA_REMINDER_SUBJECT)
+                Log.i(TAG, "Schedule reminder fired for subject=$subject")
+                FocivoNotifications.postScheduleReminder(context, subject)
+            }
+            ACTION_STREAK_SAVER_CHECK -> {
+                Log.i(TAG, "Streak-saver check fired")
+                FocivoNotifications.handleStreakSaverCheck(context)
             }
             else -> {
                 ScheduledBlockScheduler.evaluateAndReschedule(context)

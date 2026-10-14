@@ -284,7 +284,7 @@ object AppDailyLimitsManager {
             sendNotification(
                 context,
                 limit.id.hashCode() + 20,
-                "⚠️ 20 Mins Left: ${updatedLimit.appName}",
+                " 20 Mins Left: ${updatedLimit.appName}",
                 "Daily screen time limit approaching! Only $remainingMins minutes remaining today."
             )
             updatedLimit = updatedLimit.copy(reminder15MinSentToday = true)

@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -64,6 +65,8 @@ import com.example.data.LeaderboardUser
 import com.example.data.model.FocusSessionEntity
 import com.example.R
 import com.example.ui.components.FeatureIcon
+import com.example.ui.components.MascotPose
+import com.example.ui.components.RegainMascotView
 import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -673,13 +676,19 @@ private fun PodiumColumn(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "👑 Leader",
+                        text = "Leader",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontFamily = PoppinsFontFamily,
                             color = if (isDark) Color(0xFFFFD54F) else Color(0xFFB45309),
                             fontWeight = FontWeight.Bold,
                             fontSize = 9.sp
                         )
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Image(
+                        painter = painterResource(id = R.drawable.emoji3d_crown),
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp)
                     )
                 }
             }
@@ -983,10 +992,11 @@ private fun HallOfFameSection(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        FeatureIcon(
-                            drawableRes = R.drawable.ic3d_trophy,
-                            contentDescription = "No Past Champions Yet",
-                            size = 84.dp
+                        // v1.5.0: mascot in the empty state
+                        RegainMascotView(
+                            pose = MascotPose.EMPTY_STATE,
+                            size = 92.dp,
+                            animate = false
                         )
                         Text(
                             text = "No Past Champions Yet",

@@ -141,6 +141,8 @@
                 <action android:name="com.example.action.SCHEDULE_TRANSITION" />
                 <action android:name="com.example.action.SCHEDULE_BLOCK_START" />
                 <action android:name="com.example.action.SCHEDULE_BLOCK_END" />
+                <action android:name="com.example.action.SCHEDULE_REMINDER" />
+                <action android:name="com.example.action.STREAK_SAVER_CHECK" />
                 <action android:name="com.example.action.FOCUS_ALARM_RING" />
                 <action android:name="com.example.action.DISMISS_ALARM" />
                 <action android:name="com.example.action.SNOOZE_ALARM" />

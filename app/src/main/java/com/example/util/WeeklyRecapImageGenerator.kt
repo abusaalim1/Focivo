@@ -34,6 +34,44 @@ object WeeklyRecapImageGenerator {
     private const val CARD_WIDTH = 1080
     private const val CARD_HEIGHT = 1920
 
+    private data class MetricCard(
+        val iconRes: Int,
+        val label: String,
+        val value: String,
+        val color: Int
+    )
+
+    private val emojiBitmapCache = mutableMapOf<Int, Bitmap?>()
+
+    private fun emojiBitmap(context: Context, resId: Int): Bitmap? =
+        emojiBitmapCache.getOrPut(resId) {
+            try {
+                BitmapFactory.decodeResource(context.resources, resId)
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+    /**
+     * Draws a 3D emoji bitmap vertically centered on a text baseline.
+     * Returns the horizontal width consumed so callers can offset their text.
+     */
+    private fun drawEmojiIcon(
+        canvas: Canvas,
+        context: Context,
+        resId: Int,
+        left: Float,
+        baselineY: Float,
+        textSize: Float
+    ): Float {
+        val src = emojiBitmap(context, resId) ?: return 0f
+        val iconSize = textSize * 1.5f
+        val top = baselineY - textSize - (iconSize - textSize) / 2f
+        val dst = RectF(left, top, left + iconSize, top + iconSize)
+        canvas.drawBitmap(src, null, dst, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+        return iconSize
+    }
+
     /**
      * Generates a high-resolution, social-ready summary card Bitmap (1080x1920)
      * utilizing Poppins typography, the official Focivo celebration mascot,
@@ -156,7 +194,8 @@ object WeeklyRecapImageGenerator {
             typeface = fontBold
             letterSpacing = 0.08f
         }
-        canvas.drawText("⚡ FOCIVO RECAP", contentLeft + 24f, curY + 36f, badgeTextPaint)
+        val badgeIconW = drawEmojiIcon(canvas, context, R.drawable.emoji3d_bolt, contentLeft + 20f, curY + 36f, 23f)
+        canvas.drawText("FOCIVO RECAP", contentLeft + 20f + badgeIconW + 10f, curY + 36f, badgeTextPaint)
 
         // Date Range on Right
         val dateTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -278,9 +317,10 @@ object WeeklyRecapImageGenerator {
             typeface = fontMedium
             letterSpacing = 0.02f
         }
+        val heroIconW = drawEmojiIcon(canvas, context, R.drawable.emoji3d_flame, contentLeft + 28f, curY + 204f, 24f)
         canvas.drawText(
-            "🔥 ${recap.totalMinutesFocused} Minutes Focused Across ${recap.sessionCount} Sessions",
-            contentLeft + 32f,
+            "${recap.totalMinutesFocused} Minutes Focused Across ${recap.sessionCount} Sessions",
+            contentLeft + 28f + heroIconW + 8f,
             curY + 204f,
             heroSubPaint
         )
@@ -293,9 +333,9 @@ object WeeklyRecapImageGenerator {
         val metricCardHeight = 126f
 
         val metrics = listOf(
-            Triple("⚡ SESSIONS", "${recap.sessionCount} Done", 0xFF8CE000.toInt()),
-            Triple("🔥 STREAK", "${recap.currentStreak} Day${if (recap.currentStreak > 1) "s" else ""}", 0xFFFF9800.toInt()),
-            Triple("🏆 BEST DAY", recap.bestDayName, 0xFF38BDF8.toInt())
+            MetricCard(R.drawable.emoji3d_bolt, "SESSIONS", "${recap.sessionCount} Done", 0xFF8CE000.toInt()),
+            MetricCard(R.drawable.emoji3d_flame, "STREAK", "${recap.currentStreak} Day${if (recap.currentStreak > 1) "s" else ""}", 0xFFFF9800.toInt()),
+            MetricCard(R.drawable.emoji3d_trophy, "BEST DAY", recap.bestDayName, 0xFF38BDF8.toInt())
         )
 
         for (i in metrics.indices) {
@@ -316,19 +356,20 @@ object WeeklyRecapImageGenerator {
             canvas.drawRoundRect(mRect, 22f, 22f, mBorderPaint)
 
             val mLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = metrics[i].third
+                color = metrics[i].color
                 textSize = 20f
                 typeface = fontBold
                 letterSpacing = 0.04f
             }
-            canvas.drawText(metrics[i].first, mLeft + 18f, curY + 42f, mLabelPaint)
+            val mIconW = drawEmojiIcon(canvas, context, metrics[i].iconRes, mLeft + 18f, curY + 42f, 20f)
+            canvas.drawText(metrics[i].label, mLeft + 18f + mIconW + 8f, curY + 42f, mLabelPaint)
 
             val mValuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFFFFFFFF.toInt()
                 textSize = 25f
                 typeface = fontBold
             }
-            canvas.drawText(metrics[i].second, mLeft + 18f, curY + 88f, mValuePaint)
+            canvas.drawText(metrics[i].value, mLeft + 18f, curY + 88f, mValuePaint)
         }
 
         curY += metricCardHeight + 26f
@@ -352,13 +393,16 @@ object WeeklyRecapImageGenerator {
         }
         canvas.drawText("Daily Consistency", contentLeft + 26f, curY + 44f, chartTitlePaint)
 
-        val bestDayBadgeText = "🏆 Best: ${recap.bestDayName}"
+        val bestDayBadgeText = "Best: ${recap.bestDayName}"
         val chartSubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFA6EB38.toInt()
             textSize = 23f
             typeface = fontBold
             textAlign = Paint.Align.RIGHT
         }
+        val bestDayIconSize = 23f * 1.5f
+        val bestDayIconLeft = contentRight - 26f - chartSubPaint.measureText(bestDayBadgeText) - 10f - bestDayIconSize
+        drawEmojiIcon(canvas, context, R.drawable.emoji3d_trophy, bestDayIconLeft, curY + 44f, 23f)
         canvas.drawText(bestDayBadgeText, contentRight - 26f, curY + 44f, chartSubPaint)
 
         // 7 Daily Bars
@@ -661,7 +705,7 @@ object WeeklyRecapImageGenerator {
                         type = "image/png"
                         putExtra(Intent.EXTRA_STREAM, uri)
                         putExtra(Intent.EXTRA_SUBJECT, "My Weekly Study Recap - Focivo")
-                        putExtra(Intent.EXTRA_TEXT, "⚡ Check out my weekly study recap on Focivo! Focused for ${recap.totalHoursFormatted} hrs across ${recap.sessionCount} sessions. Join me on Focivo to level up your focus! #Focivo #StudyGram #DeepWork")
+                        putExtra(Intent.EXTRA_TEXT, "Check out my weekly study recap on Focivo! Focused for ${recap.totalHoursFormatted} hrs across ${recap.sessionCount} sessions. Join me on Focivo to level up your focus! #Focivo #StudyGram #DeepWork")
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     val chooser = Intent.createChooser(shareIntent, "Share Weekly Study Recap")
