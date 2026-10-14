@@ -21,6 +21,10 @@ import kotlinx.coroutines.flow.asStateFlow
  * items additionally require Scholar/Grandmaster level. Owned state is
  * DERIVED from points — only the EQUIPPED outfit is persisted (existing
  * SharedPreferences "focusly_local_data", keys below). No new backend.
+ *
+ * Item overlays are FITTED per-pose via diff-extraction onto the plain base.
+ * Each item has a per-pose overlay (standing/study/celebrate) with placement
+ * as fractions of the base image (widthFrac/cxFrac/cyFrac).
  */
 enum class MascotLevel(val displayName: String, val threshold: Int) {
     NOVICE("Novice", 0),
@@ -49,40 +53,35 @@ fun progressToNextLevel(points: Int): Pair<Float, Int?> {
     return (done.toFloat() / span) to (next.threshold - points)
 }
 
+enum class MascotPose(val displayName: String) {
+    STANDING("Standing"),
+    STUDY("Study"),
+    CELEBRATE("Celebrate")
+}
+
 enum class WardrobeCategory(val displayName: String) {
     CAPS("Caps"),
     TOPS("Tops"),
     BOTTOMS("Bottoms"),
-    BOOKS("Books"),
+    SHOES("Shoes"),
     EXTRAS("Extras")
 }
 
-/**
- * A wardrobe item. Overlay art is fitted to the mascot's main study pose
- * (mascot_study_transparent, 640x889); [widthFrac]/[cxFrac]/[cyFrac] place the
- * full-canvas overlay by its center as fractions of the base width/height.
- *
- * Celebrate-pose (share card) overrides: the celebrate Box is square and the
- * base renders at 640/889 of its width, so celebrate widths default to
- * [widthFrac] * 640/889. Per-item [celebrate*] overrides fine-tune placement;
- * [renderOnCelebrate]=false skips items that can't fit the pose (books and
- * bottoms on the arms-raised celebrate pose; glasses, which read as goggles
- * on the smaller celebrate face).
- */
+/** Per-pose overlay: drawable + placement as fractions of the base image. */
+data class PoseOverlay(
+    @DrawableRes val resId: Int,
+    val widthFrac: Float,
+    val cxFrac: Float,
+    val cyFrac: Float
+)
+
 data class WardrobeItem(
     val id: String,
     val name: String,
     val category: WardrobeCategory,
     val unlockPoints: Int,
     val requiredLevel: MascotLevel = MascotLevel.NOVICE,
-    @DrawableRes val overlayRes: Int,
-    val widthFrac: Float,
-    val cxFrac: Float,
-    val cyFrac: Float,
-    val celebrateWidthFrac: Float? = null,
-    val celebrateCxFrac: Float? = null,
-    val celebrateCyFrac: Float? = null,
-    val renderOnCelebrate: Boolean = true
+    val overlays: Map<MascotPose, PoseOverlay>
 ) {
     fun isUnlocked(focusPoints: Int): Boolean {
         if (focusPoints < unlockPoints) return false
@@ -100,90 +99,358 @@ data class WardrobeItem(
             else -> "Earn $unlockPoints Focus Points"
         }
     }
+
+    fun overlayFor(pose: MascotPose): PoseOverlay? = overlays[pose]
 }
 
 val WARDROBE_ITEMS: List<WardrobeItem> = listOf(
-    // Caps — sit on the head TOP (35-50% of mascot width), never over the eyes.
-    // Eyes measured at y≈0.455; cap bottoms rest on the hood dome (y≈0.19-0.23).
     WardrobeItem(
-        id = "cap_lime", name = "Lime Cap", category = WardrobeCategory.CAPS,
-        unlockPoints = 0, overlayRes = R.drawable.wardrobe_cap_lime,
-        widthFrac = 0.46f, cxFrac = 0.50f, cyFrac = 0.13f,
-        celebrateWidthFrac = 0.26f, celebrateCxFrac = 0.50f, celebrateCyFrac = 0.10f
+        id = "cap_lime", name = "Lime Cap",
+        category = WardrobeCategory.CAPS,
+        unlockPoints = 0, requiredLevel = MascotLevel.NOVICE,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_cap_lime_standing,
+                widthFrac = 0.3608f, cxFrac = 0.4260f, cyFrac = 0.3451f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_cap_lime_study,
+                widthFrac = 0.4094f, cxFrac = 0.4624f, cyFrac = 0.3236f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_cap_lime_celebrate,
+                widthFrac = 0.3396f, cxFrac = 0.4840f, cyFrac = 0.3454f
+            ),
+        )
     ),
     WardrobeItem(
-        id = "cap_scholar", name = "Scholar Mortarboard", category = WardrobeCategory.CAPS,
+        id = "cap_scholar", name = "Scholar Mortarboard",
+        category = WardrobeCategory.CAPS,
         unlockPoints = 1500, requiredLevel = MascotLevel.SCHOLAR,
-        overlayRes = R.drawable.wardrobe_cap_scholar,
-        widthFrac = 0.50f, cxFrac = 0.50f, cyFrac = 0.125f,
-        celebrateWidthFrac = 0.26f, celebrateCxFrac = 0.50f, celebrateCyFrac = 0.10f
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_cap_scholar_standing,
+                widthFrac = 0.3356f, cxFrac = 0.4609f, cyFrac = 0.3121f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_cap_scholar_study,
+                widthFrac = 0.3507f, cxFrac = 0.4693f, cyFrac = 0.3030f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_cap_scholar_celebrate,
+                widthFrac = 0.3436f, cxFrac = 0.4942f, cyFrac = 0.3171f
+            ),
+        )
     ),
-    // Tops — unchanged (verified to fit the torso).
     WardrobeItem(
-        id = "top_sweatshirt", name = "Cream Sweatshirt", category = WardrobeCategory.TOPS,
-        unlockPoints = 0, overlayRes = R.drawable.wardrobe_top_sweatshirt,
-        widthFrac = 0.70f, cxFrac = 0.50f, cyFrac = 0.70f,
-        celebrateWidthFrac = 0.50f, celebrateCxFrac = 0.50f, celebrateCyFrac = 0.60f
+        id = "top_sweatshirt", name = "Cream Sweatshirt",
+        category = WardrobeCategory.TOPS,
+        unlockPoints = 300, requiredLevel = MascotLevel.NOVICE,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_top_sweatshirt_standing,
+                widthFrac = 0.3661f, cxFrac = 0.5365f, cyFrac = 0.5304f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_top_sweatshirt_study,
+                widthFrac = 0.2775f, cxFrac = 0.5074f, cyFrac = 0.5796f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_top_sweatshirt_celebrate,
+                widthFrac = 0.2645f, cxFrac = 0.5249f, cyFrac = 0.6289f
+            ),
+        )
     ),
     WardrobeItem(
-        id = "top_cardigan", name = "Sage Cardigan", category = WardrobeCategory.TOPS,
+        id = "top_cardigan", name = "Sage Cardigan",
+        category = WardrobeCategory.TOPS,
         unlockPoints = 2500, requiredLevel = MascotLevel.SCHOLAR,
-        overlayRes = R.drawable.wardrobe_top_cardigan,
-        widthFrac = 0.70f, cxFrac = 0.50f, cyFrac = 0.70f,
-        celebrateWidthFrac = 0.50f, celebrateCxFrac = 0.50f, celebrateCyFrac = 0.60f
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_top_cardigan_standing,
+                widthFrac = 0.4371f, cxFrac = 0.4701f, cyFrac = 0.5770f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_top_cardigan_study,
+                widthFrac = 0.3671f, cxFrac = 0.4974f, cyFrac = 0.5924f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_top_cardigan_celebrate,
+                widthFrac = 0.4501f, cxFrac = 0.5199f, cyFrac = 0.5776f
+            ),
+        )
     ),
-    // Bottoms — refit to the lap at sane scale; excluded on celebrate pose.
     WardrobeItem(
-        id = "bottom_shorts", name = "Cloud Shorts", category = WardrobeCategory.BOTTOMS,
-        unlockPoints = 0, overlayRes = R.drawable.wardrobe_bottom_shorts,
-        widthFrac = 0.48f, cxFrac = 0.50f, cyFrac = 0.85f,
-        renderOnCelebrate = false
+        id = "top_tee_mint", name = "Mint Tee",
+        category = WardrobeCategory.TOPS,
+        unlockPoints = 800, requiredLevel = MascotLevel.NOVICE,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_top_tee_mint_standing,
+                widthFrac = 0.3420f, cxFrac = 0.4889f, cyFrac = 0.5820f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_top_tee_mint_study,
+                widthFrac = 0.3407f, cxFrac = 0.5101f, cyFrac = 0.5897f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_top_tee_mint_celebrate,
+                widthFrac = 0.3387f, cxFrac = 0.5129f, cyFrac = 0.5737f
+            ),
+        )
     ),
     WardrobeItem(
-        id = "bottom_trousers", name = "Sage Trousers", category = WardrobeCategory.BOTTOMS,
+        id = "top_hoodie", name = "Mint Hoodie",
+        category = WardrobeCategory.TOPS,
+        unlockPoints = 1200, requiredLevel = MascotLevel.NOVICE,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_top_hoodie_standing,
+                widthFrac = 0.4175f, cxFrac = 0.5065f, cyFrac = 0.5920f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_top_hoodie_study,
+                widthFrac = 0.3691f, cxFrac = 0.5063f, cyFrac = 0.5949f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_top_hoodie_celebrate,
+                widthFrac = 0.3894f, cxFrac = 0.5252f, cyFrac = 0.5796f
+            ),
+        )
+    ),
+    WardrobeItem(
+        id = "top_jacket_denim", name = "Denim Jacket",
+        category = WardrobeCategory.TOPS,
         unlockPoints = 2000, requiredLevel = MascotLevel.SCHOLAR,
-        overlayRes = R.drawable.wardrobe_bottom_trousers,
-        widthFrac = 0.52f, cxFrac = 0.50f, cyFrac = 0.84f,
-        renderOnCelebrate = false
-    ),
-    // Books — only on poses that hold a book; sized to the held book.
-    // Excluded on celebrate (arms raised, would cover the torso).
-    WardrobeItem(
-        id = "book_notebook", name = "Lime Notebook", category = WardrobeCategory.BOOKS,
-        unlockPoints = 500, overlayRes = R.drawable.wardrobe_book_notebook,
-        widthFrac = 0.55f, cxFrac = 0.50f, cyFrac = 0.66f,
-        renderOnCelebrate = false
-    ),
-    WardrobeItem(
-        id = "book_tome", name = "Forest Tome", category = WardrobeCategory.BOOKS,
-        unlockPoints = 4500, requiredLevel = MascotLevel.SCHOLAR,
-        overlayRes = R.drawable.wardrobe_book_tome,
-        widthFrac = 0.55f, cxFrac = 0.50f, cyFrac = 0.66f,
-        renderOnCelebrate = false
-    ),
-    // Extras — glasses aligned to measured eye centers (0.439/0.705, y 0.455);
-    // lens span of the asset (0.487) matched to the eye span (0.266).
-    // Glasses don't fit the smaller celebrate face -> study pose only.
-    WardrobeItem(
-        id = "extra_glasses", name = "Round Glasses", category = WardrobeCategory.EXTRAS,
-        unlockPoints = 800, overlayRes = R.drawable.wardrobe_extra_glasses,
-        widthFrac = 0.55f, cxFrac = 0.572f, cyFrac = 0.451f,
-        renderOnCelebrate = false
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_top_jacket_denim_standing,
+                widthFrac = 0.4049f, cxFrac = 0.4651f, cyFrac = 0.5798f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_top_jacket_denim_study,
+                widthFrac = 0.3778f, cxFrac = 0.4882f, cyFrac = 0.5966f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_top_jacket_denim_celebrate,
+                widthFrac = 0.4583f, cxFrac = 0.5184f, cyFrac = 0.5818f
+            ),
+        )
     ),
     WardrobeItem(
-        id = "extra_badge", name = "Star Badge", category = WardrobeCategory.EXTRAS,
+        id = "top_sweater", name = "Navy Sweater",
+        category = WardrobeCategory.TOPS,
+        unlockPoints = 4000, requiredLevel = MascotLevel.SCHOLAR,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_top_sweater_standing,
+                widthFrac = 0.4072f, cxFrac = 0.4456f, cyFrac = 0.6416f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_top_sweater_study,
+                widthFrac = 0.4097f, cxFrac = 0.4791f, cyFrac = 0.6485f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_top_sweater_celebrate,
+                widthFrac = 0.3136f, cxFrac = 0.4797f, cyFrac = 0.6468f
+            ),
+        )
+    ),
+    WardrobeItem(
+        id = "top_blazer", name = "Royal Blazer",
+        category = WardrobeCategory.TOPS,
+        unlockPoints = 6000, requiredLevel = MascotLevel.GRANDMASTER,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_top_blazer_standing,
+                widthFrac = 0.2478f, cxFrac = 0.4712f, cyFrac = 0.5214f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_top_blazer_study,
+                widthFrac = 0.2758f, cxFrac = 0.5278f, cyFrac = 0.5587f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_top_blazer_celebrate,
+                widthFrac = 0.2537f, cxFrac = 0.5035f, cyFrac = 0.5299f
+            ),
+        )
+    ),
+    WardrobeItem(
+        id = "bottom_shorts_navy", name = "Navy Shorts",
+        category = WardrobeCategory.BOTTOMS,
+        unlockPoints = 0, requiredLevel = MascotLevel.NOVICE,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_shorts_navy_standing,
+                widthFrac = 0.2807f, cxFrac = 0.4731f, cyFrac = 0.6855f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_shorts_navy_study,
+                widthFrac = 0.3516f, cxFrac = 0.4802f, cyFrac = 0.6933f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_shorts_navy_celebrate,
+                widthFrac = 0.2478f, cxFrac = 0.5065f, cyFrac = 0.6849f
+            ),
+        )
+    ),
+    WardrobeItem(
+        id = "bottom_shorts_beige", name = "Beige Shorts",
+        category = WardrobeCategory.BOTTOMS,
+        unlockPoints = 500, requiredLevel = MascotLevel.NOVICE,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_shorts_beige_standing,
+                widthFrac = 0.2558f, cxFrac = 0.4835f, cyFrac = 0.6806f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_shorts_beige_study,
+                widthFrac = 0.3673f, cxFrac = 0.4902f, cyFrac = 0.6767f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_shorts_beige_celebrate,
+                widthFrac = 0.2526f, cxFrac = 0.5006f, cyFrac = 0.6793f
+            ),
+        )
+    ),
+    WardrobeItem(
+        id = "bottom_shorts_dark", name = "Dark Shorts",
+        category = WardrobeCategory.BOTTOMS,
+        unlockPoints = 1000, requiredLevel = MascotLevel.NOVICE,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_shorts_dark_standing,
+                widthFrac = 0.2678f, cxFrac = 0.4734f, cyFrac = 0.6895f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_shorts_dark_study,
+                widthFrac = 0.3820f, cxFrac = 0.4921f, cyFrac = 0.6525f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_shorts_dark_celebrate,
+                widthFrac = 0.3097f, cxFrac = 0.5208f, cyFrac = 0.7101f
+            ),
+        )
+    ),
+    WardrobeItem(
+        id = "bottom_trousers_grey", name = "Grey Trousers",
+        category = WardrobeCategory.BOTTOMS,
+        unlockPoints = 1800, requiredLevel = MascotLevel.SCHOLAR,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_trousers_grey_standing,
+                widthFrac = 0.2593f, cxFrac = 0.4726f, cyFrac = 0.6865f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_trousers_grey_study,
+                widthFrac = 0.3797f, cxFrac = 0.4833f, cyFrac = 0.6772f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_trousers_grey_celebrate,
+                widthFrac = 0.3368f, cxFrac = 0.5206f, cyFrac = 0.7385f
+            ),
+        )
+    ),
+    WardrobeItem(
+        id = "bottom_trousers_charcoal", name = "Charcoal Trousers",
+        category = WardrobeCategory.BOTTOMS,
+        unlockPoints = 3000, requiredLevel = MascotLevel.SCHOLAR,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_trousers_charcoal_standing,
+                widthFrac = 0.3145f, cxFrac = 0.4853f, cyFrac = 0.7527f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_trousers_charcoal_study,
+                widthFrac = 0.3991f, cxFrac = 0.4740f, cyFrac = 0.6802f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_trousers_charcoal_celebrate,
+                widthFrac = 0.3136f, cxFrac = 0.4997f, cyFrac = 0.7750f
+            ),
+        )
+    ),
+    WardrobeItem(
+        id = "bottom_shorts_black", name = "Black Shorts",
+        category = WardrobeCategory.BOTTOMS,
+        unlockPoints = 3500, requiredLevel = MascotLevel.SCHOLAR,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_shorts_black_standing,
+                widthFrac = 0.3891f, cxFrac = 0.4626f, cyFrac = 0.6905f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_shorts_black_study,
+                widthFrac = 0.4072f, cxFrac = 0.4627f, cyFrac = 0.7147f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_bottom_shorts_black_celebrate,
+                widthFrac = 0.3989f, cxFrac = 0.4969f, cyFrac = 0.7271f
+            ),
+        )
+    ),
+    WardrobeItem(
+        id = "shoes_lime", name = "Lime Sneakers",
+        category = WardrobeCategory.SHOES,
+        unlockPoints = 700, requiredLevel = MascotLevel.NOVICE,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_shoes_sneakers_lime_standing,
+                widthFrac = 0.2885f, cxFrac = 0.4820f, cyFrac = 0.6951f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_shoes_sneakers_lime_celebrate,
+                widthFrac = 0.2729f, cxFrac = 0.4874f, cyFrac = 0.6931f
+            ),
+        )
+    ),
+    WardrobeItem(
+        id = "shoes_black", name = "Black Shoes",
+        category = WardrobeCategory.SHOES,
+        unlockPoints = 2500, requiredLevel = MascotLevel.SCHOLAR,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_shoes_black_standing,
+                widthFrac = 0.3009f, cxFrac = 0.4787f, cyFrac = 0.7181f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_shoes_black_celebrate,
+                widthFrac = 0.2656f, cxFrac = 0.4894f, cyFrac = 0.7035f
+            ),
+        )
+    ),
+    WardrobeItem(
+        id = "extra_glasses", name = "Round Glasses",
+        category = WardrobeCategory.EXTRAS,
+        unlockPoints = 800, requiredLevel = MascotLevel.NOVICE,
+        overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_extra_glasses_standing,
+                widthFrac = 0.3877f, cxFrac = 0.4532f, cyFrac = 0.3669f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_extra_glasses_study,
+                widthFrac = 0.4057f, cxFrac = 0.4584f, cyFrac = 0.3975f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_extra_glasses_celebrate,
+                widthFrac = 0.3976f, cxFrac = 0.4801f, cyFrac = 0.3637f
+            ),
+        )
+    ),
+    WardrobeItem(
+        id = "extra_badge", name = "Gold Star Badge",
+        category = WardrobeCategory.EXTRAS,
         unlockPoints = 7500, requiredLevel = MascotLevel.GRANDMASTER,
-        overlayRes = R.drawable.wardrobe_extra_badge,
-        widthFrac = 0.15f, cxFrac = 0.70f, cyFrac = 0.55f,
-        celebrateWidthFrac = 0.11f, celebrateCxFrac = 0.62f, celebrateCyFrac = 0.55f
-    )
+        overlays = mapOf(
+        )
+    ),
 )
-
-/** Paint order: bottom garments first, face/head details last. */
+/** Paint order: shoes first (feet), then bottoms, tops, extras, caps last. */
 val WARDROBE_LAYER_ORDER: List<WardrobeCategory> = listOf(
+    WardrobeCategory.SHOES,
     WardrobeCategory.BOTTOMS,
     WardrobeCategory.TOPS,
-    WardrobeCategory.BOOKS,
     WardrobeCategory.EXTRAS,
     WardrobeCategory.CAPS
 )
