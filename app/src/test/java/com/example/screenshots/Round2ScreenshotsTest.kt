@@ -76,7 +76,8 @@ class Round2ScreenshotsTest {
     private fun themed(content: @Composable () -> Unit) {
         val theme = TimerThemeManager.selectedTheme.value
         composeTestRule.setContent {
-            FocuslyTheme {
+            // Dark theme forced: matches the owner's device for review.
+            FocuslyTheme(darkTheme = true) {
                 CompositionLocalProvider(LocalAppAccent provides theme.accent) {
                     content()
                 }
