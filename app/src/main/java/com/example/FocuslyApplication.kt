@@ -27,6 +27,18 @@ class FocuslyApplication : Application() {
             Log.e("FocuslyApplication", "Failed to initialize TimerThemeManager: ${e.message}", e)
         }
 
+        // v1.1: timer faces + mascot wardrobe — same init pattern.
+        try {
+            com.example.util.TimerFaceManager.init(this)
+        } catch (e: Throwable) {
+            Log.e("FocuslyApplication", "Failed to initialize TimerFaceManager: ${e.message}", e)
+        }
+        try {
+            com.example.util.MascotWardrobe.init(this)
+        } catch (e: Throwable) {
+            Log.e("FocuslyApplication", "Failed to initialize MascotWardrobe: ${e.message}", e)
+        }
+
         try {
             SupabaseManager.initialize(this)
         } catch (e: Throwable) {
@@ -90,11 +102,20 @@ class FocuslyApplication : Application() {
         // v1.4.3: refresh the study-reminder + daily 19:00 streak-saver alarms
         // on every process start (evaluateAndReschedule covers this too; belt
         // and braces so the alarms exist even if evaluate throws early).
+        // v1.1: + Sunday recap, update check, comeback — all survival alarms
+        // re-armed idempotently here (and on boot).
         try {
-            com.example.service.FocivoNotifications.scheduleStudyReminder(this)
-            com.example.service.FocivoNotifications.scheduleStreakSaverDaily(this)
+            com.example.service.FocivoNotifications.scheduleAllSurvivalAlarms(this)
         } catch (e: Throwable) {
             Log.e("FocuslyApplication", "Failed to initialize reminder alarms: ${e.message}", e)
+        }
+
+        // v1.1: stamp every app open (drives the 3-day comeback check; also
+        // resets its once-per-absence dedupe flag).
+        try {
+            com.example.service.FocivoNotifications.stampAppOpen(this)
+        } catch (e: Throwable) {
+            Log.e("FocuslyApplication", "Failed to stamp app open: ${e.message}", e)
         }
     }
 

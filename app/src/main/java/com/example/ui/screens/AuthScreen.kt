@@ -95,7 +95,6 @@ import com.example.ui.components.GlassCard
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.MutedTextLight
 import com.example.ui.theme.NearBlack
-import com.example.ui.theme.BalooBrandFontFamily
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.PureWhite
 import com.example.ui.theme.RegainBgTop
@@ -231,7 +230,7 @@ fun AuthScreen(
                 Text(
                     text = "Focivo",
                     style = TextStyle(
-                        fontFamily = BalooBrandFontFamily,
+                        fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
                         color = if (isDark) RegainLimeLight else RegainLimeDeepText,

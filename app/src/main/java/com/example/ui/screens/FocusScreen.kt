@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,8 +41,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -49,7 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.model.UserPreferencesEntity
-import com.example.ui.components.AuroraTimer
+import com.example.ui.components.BlockedAppsListSheet
+import com.example.ui.components.BuddyMascot
 import com.example.ui.components.CustomizeTimerSheet
 import com.example.ui.components.DeepFocusActiveBanner
 import com.example.ui.components.DeepFocusSettingsSheet
@@ -57,6 +61,8 @@ import com.example.ui.components.DistractionDialog
 import com.example.ui.components.MascotPose
 import com.example.ui.components.PreStudyAppBlockSheet
 import com.example.ui.components.StudyHubSheet
+import com.example.ui.components.TimerFaceHost
+import com.example.ui.components.TimerFaceParams
 import com.example.ui.components.resolveThemeBackdropRes
 import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.MutedBorderLight
@@ -65,7 +71,11 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.backdropTitleShadow
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.ui.theme.themedCardBackground
+import com.example.util.PomodoroConfig
+import com.example.util.PomodoroState
+import com.example.util.TimerFaceManager
 import com.example.util.TimerThemeManager
+import com.example.util.phaseDisplayLabel
 
 /**
  * v1.5.0 — ONE-BUTTON HUB redesign.
@@ -111,6 +121,15 @@ fun FocusScreen(
     onUpdateTaskTitle: (String) -> Unit,
     onOpenShieldHub: () -> Unit = {},
     onOpenAiGuardHub: () -> Unit = {},
+    // v1.1: Mascot Buddy — opens the dedicated Mascot screen.
+    onOpenMascot: () -> Unit = {},
+    // v1.1: Pomodoro — live phase state (null when no pomodoro is active).
+    pomodoroState: PomodoroState? = null,
+    // v1.1: starts a pomodoro run through the normal session-start gate.
+    onStartPomodoro: (PomodoroConfig) -> Unit = {},
+    // v1.1: blocked-apps list (dedicated destination from the hub).
+    onRemoveBlockedApp: (String) -> Unit = {},
+    onSaveBlockedApps: (Set<String>) -> Unit = {},
     // v1.5.0: test hook — screenshot tests open the hub directly.
     initialShowHub: Boolean = false,
     modifier: Modifier = Modifier
@@ -123,6 +142,8 @@ fun FocusScreen(
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
 
     var showHub by remember { mutableStateOf(initialShowHub) }
+    var hubInitialSection by remember { mutableStateOf<String?>(null) }
+    var showBlockedAppsList by remember { mutableStateOf(false) }
     var showDistractionModal by remember { mutableStateOf(false) }
     var showDeepFocusSettings by remember { mutableStateOf(false) }
     var showCustomizeTimer by remember { mutableStateOf(false) }
@@ -231,7 +252,7 @@ fun FocusScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = if (isRunning) 24.dp else BottomNavClearance),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = BottomNavClearance),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
@@ -312,6 +333,9 @@ fun FocusScreen(
 
                 // 1. Timer presentation — Aurora is the single flagship timer
                 // (the old Aurora/Classic toggle was a scattered control).
+                // v1.1: TimerFaceHost renders the selected timer face; the
+                // dressed buddy (Mascot system) shows on the default theme,
+                // themed mascots keep their pose on other themes.
                 item {
                     Spacer(modifier = Modifier.height(6.dp))
                     val isBreakMode = currentMode.contains("break", ignoreCase = true)
@@ -320,8 +344,71 @@ fun FocusScreen(
                         isRunning -> MascotPose.STUDYING
                         else -> selectedTheme.mascotPose
                     }
+                    val isDefaultTheme = selectedTheme.id == "aurora"
+                    val selectedFace by TimerFaceManager.selectedFace.collectAsState()
+                    val density = LocalDensity.current
+                    val swipeThresholdPx = remember(density) {
+                        with(density) { 100.dp.toPx() }
+                    }
+
+                    // v1.1: pomodoro phase pill (focus / short / long break).
+                    if (pomodoroState != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isBreakMode) Color(0xFF69F0AE).copy(alpha = 0.16f)
+                                    else hubAccent.copy(alpha = 0.14f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isBreakMode) Color(0xFF69F0AE).copy(alpha = 0.5f)
+                                    else hubAccent.copy(alpha = 0.45f),
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                                .testTag("pomodoro_phase_pill")
+                        ) {
+                            Text(
+                                text = pomodoroState.phaseDisplayLabel(),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = PoppinsFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.5.sp,
+                                    fontSize = 11.sp,
+                                    color = if (isBreakMode) Color(0xFF69F0AE)
+                                    else selectedTheme.onBackdropContent
+                                )
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+
                     Box(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // v1.1: swipe up on the timer region opens the
+                            // hub's Themes section. Tap vs drag are distinct:
+                            // detectVerticalDragGestures only fires after
+                            // touch slop, so taps (mascot, digits, buttons)
+                            // and LazyColumn scrolling are unaffected.
+                            .pointerInput(Unit) {
+                                var totalDrag = 0f
+                                detectVerticalDragGestures(
+                                    onDragStart = { totalDrag = 0f },
+                                    onVerticalDrag = { _, dragAmount ->
+                                        totalDrag += dragAmount
+                                    },
+                                    onDragEnd = {
+                                        if (totalDrag < -swipeThresholdPx) {
+                                            hubInitialSection = "themes"
+                                            showHub = true
+                                        }
+                                        totalDrag = 0f
+                                    },
+                                    onDragCancel = { totalDrag = 0f }
+                                )
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         val backdropRes = remember(selectedTheme.id) {
@@ -336,28 +423,43 @@ fun FocusScreen(
                                 alpha = 0.35f
                             )
                         }
-                        AuroraTimer(
-                            totalSeconds = targetSeconds,
-                            remainingSeconds = remainingSeconds,
-                            isRunning = isRunning,
-                            isBreak = isBreakMode,
-                            subjectTitle = currentTag,
-                            mascotPose = timerMascotPose,
-                            theme = selectedTheme,
-                            onTogglePlay = {
-                                if (isRunning) {
-                                    onPauseTimer()
-                                } else if (remainingSeconds < targetSeconds) {
-                                    onResumeTimer()
-                                } else {
-                                    onStartTimer()
-                                }
-                            },
-                            onReset = onFinishEarly,
-                            // Tapping the tag opens Customize Timer directly.
-                            onTagClick = {
-                                if (!isRunning) showCustomizeTimer = true
-                            },
+                        TimerFaceHost(
+                            faceId = selectedFace.id,
+                            params = TimerFaceParams(
+                                totalSeconds = targetSeconds,
+                                remainingSeconds = remainingSeconds,
+                                isRunning = isRunning,
+                                isBreak = isBreakMode,
+                                subjectTitle = currentTag,
+                                mascotPose = timerMascotPose,
+                                theme = selectedTheme,
+                                onTogglePlay = {
+                                    if (isRunning) {
+                                        onPauseTimer()
+                                    } else if (remainingSeconds < targetSeconds) {
+                                        onResumeTimer()
+                                    } else {
+                                        onStartTimer()
+                                    }
+                                },
+                                onReset = onFinishEarly,
+                                // Tapping the tag opens Customize Timer directly.
+                                onTagClick = {
+                                    if (!isRunning) showCustomizeTimer = true
+                                },
+                                // v1.1: tap-time-to-modify — digits open the
+                                // duration editor when idle/paused; running
+                                // sessions keep the existing no-edit rule.
+                                onTimeClick = if (!isRunning) {
+                                    { showCustomizeTimer = true }
+                                } else null
+                            ),
+                            // v1.1: dressed buddy on the default theme (tap
+                            // opens the Mascot screen); themed mascots stay.
+                            mascotContent = if (isDefaultTheme) {
+                                { BuddyMascot(modifier = Modifier.width(108.dp)) }
+                            } else null,
+                            onMascotClick = if (isDefaultTheme) onOpenMascot else null,
                             modifier = Modifier.testTag("aurora_timer_component")
                         )
                     }
@@ -452,7 +554,12 @@ fun FocusScreen(
         // from here; the hub dismisses itself before opening the next sheet.
         if (showHub) {
             StudyHubSheet(
-                onDismiss = { showHub = false },
+                onDismiss = {
+                    showHub = false
+                    hubInitialSection = null
+                },
+                // v1.1: swipe-up on the timer opens the hub straight into Themes.
+                initialExpandedSection = hubInitialSection,
                 isRunning = isRunning,
                 ambientSound = ambientSound,
                 onSelectAmbientSound = onSelectAmbientSound,
@@ -463,9 +570,11 @@ fun FocusScreen(
                 blockedAppsCount = userPreferences?.blockedAppsList
                     ?.split(",")?.count { it.isNotBlank() } ?: 0,
                 isShieldActive = isShieldActive,
+                // v1.1: the hub's Blocked Apps row opens the DEDICATED
+                // blocked-apps list (not the Shield page).
                 onOpenBlockedApps = {
                     showHub = false
-                    onOpenShieldHub()
+                    showBlockedAppsList = true
                 },
                 onOpenUltraFocus = {
                     showHub = false
@@ -489,6 +598,7 @@ fun FocusScreen(
         }
 
         // v1.5.0: replaces the old "Study Focus & Custom Timer" dialog.
+        // v1.1: + Timer Style picker, + Pomodoro showcase (onStartPomodoro).
         if (showCustomizeTimer) {
             CustomizeTimerSheet(
                 onDismiss = { showCustomizeTimer = false },
@@ -500,6 +610,22 @@ fun FocusScreen(
                 onUpdateSubject = { subject ->
                     currentTag = subject
                     onUpdateTaskTitle(subject)
+                },
+                onStartPomodoro = onStartPomodoro
+            )
+        }
+
+        // v1.1: dedicated blocked-apps list (hub row destination).
+        if (showBlockedAppsList) {
+            BlockedAppsListSheet(
+                onDismiss = { showBlockedAppsList = false },
+                blockedPackages = userPreferences?.blockedAppsList
+                    ?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet(),
+                onRemoveApp = onRemoveBlockedApp,
+                onSaveBlockedApps = onSaveBlockedApps,
+                onOpenShieldHub = {
+                    showBlockedAppsList = false
+                    onOpenShieldHub()
                 }
             )
         }

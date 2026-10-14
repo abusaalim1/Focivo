@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -60,26 +61,47 @@ fun CivoChatBubble(
     modifier: Modifier = Modifier,
     subtext: String? = null,
     avatarSize: Dp = 54.dp,
-    typingSpeedMs: Long = 35L,
+    // v1.1: readable-pace floor — the shared fix for "text types too fast".
+    // Call sites pass 20/30/35ms; the component enforces a minimum of 45ms
+    // per character everywhere so the bubble is always readable. Reduced-motion
+    // (animator duration scale = 0) shows the full text immediately.
+    typingSpeedMs: Long = 45L,
     onTypingFinished: (() -> Unit)? = null
 ) {
     val darkTheme = isAppInDarkTheme()
+    val context = LocalContext.current
 
     var displayedText by remember(text) { mutableStateOf("") }
     var isTypingFinished by remember(text) { mutableStateOf(false) }
+
+    val animationsReduced = remember {
+        try {
+            android.provider.Settings.Global.getFloat(
+                context.contentResolver,
+                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f
+            ) == 0f
+        } catch (_: Exception) {
+            false
+        }
+    }
+    val effectiveSpeedMs = typingSpeedMs.coerceAtLeast(45L)
 
     // Typewriter animation coroutine
     LaunchedEffect(text) {
         displayedText = ""
         isTypingFinished = false
-        if (text.isEmpty()) {
+        if (text.isEmpty() || animationsReduced) {
+            // Accessibility-safe: full text immediately, never rely on the
+            // animation for the primary content.
+            displayedText = text
             isTypingFinished = true
             onTypingFinished?.invoke()
             return@LaunchedEffect
         }
         for (i in 1..text.length) {
             displayedText = text.substring(0, i)
-            delay(typingSpeedMs)
+            delay(effectiveSpeedMs)
         }
         isTypingFinished = true
         onTypingFinished?.invoke()

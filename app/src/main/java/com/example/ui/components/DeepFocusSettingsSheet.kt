@@ -66,7 +66,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.BalooBrandFontFamily
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeDeepText
@@ -147,7 +146,7 @@ fun DeepFocusSettingsSheet(
             title = {
                 Text(
                     text = "Activate Uninstall Protection?",
-                    fontFamily = BalooBrandFontFamily,
+                    fontFamily = PoppinsFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 19.sp,
                     color = textPrimary
@@ -218,7 +217,7 @@ fun DeepFocusSettingsSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Deep focus settings",
-                        fontFamily = BalooBrandFontFamily,
+                        fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,
                         color = textPrimary
@@ -565,7 +564,7 @@ fun LockedThemeDialog(
         title = {
             Text(
                 text = "Locked theme",
-                fontFamily = BalooBrandFontFamily,
+                fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 19.sp,
                 color = textPrimary

@@ -72,13 +72,13 @@ import com.example.ui.components.LinearButton
 import com.example.ui.components.LinearButtonVariant
 import com.example.ui.components.LinearGlowCard
 import com.example.ui.components.PriorityItemRow
+import com.example.ui.components.BuddyMascot
 import com.example.ui.components.RegainMascotView
 import com.example.ui.components.MascotPose
 import com.example.ui.components.SegmentedProgressBar
 import com.example.ui.components.appleCard
 import com.example.ui.components.pressFeedback
 import com.example.ui.theme.AppleLinearFontFamily
-import com.example.ui.theme.BalooBrandFontFamily
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -274,7 +274,7 @@ fun HomeScreen(
                             Text(
                                 text = displayGreeting,
                                 style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontFamily = BalooBrandFontFamily,
+                                    fontFamily = PoppinsFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     color = headerTitleColor,
                                     shadow = titleShadow,
@@ -413,11 +413,12 @@ fun HomeScreen(
                                     )
                                 }
                             }
-                            RegainMascotView(
-                                pose = theme.mascotPose,
-                                size = 96.dp,
-                                animate = true,
-                                modifier = Modifier.testTag("home_hero_mascot")
+                            // v1.1: Home hero shows the dressed buddy (Mascot system)
+                            // consistently; themed mascots stay on the timer.
+                            BuddyMascot(
+                                modifier = Modifier
+                                    .width(96.dp)
+                                    .testTag("home_hero_mascot")
                             )
                         }
 

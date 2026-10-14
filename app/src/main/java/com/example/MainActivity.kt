@@ -206,6 +206,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val targetSeconds by viewModel.targetSeconds.collectAsState()
     val isTimerRunning by viewModel.isTimerRunning.collectAsState()
     val currentMode by viewModel.currentMode.collectAsState()
+    // v1.1: Pomodoro phase state for the Study timer.
+    val pomodoroState by viewModel.pomodoroState.collectAsState()
     val currentTaskTitle by viewModel.currentTaskTitle.collectAsState()
     val distractionsCount by viewModel.distractionsCount.collectAsState()
     val ambientSound by viewModel.ambientSound.collectAsState()
@@ -378,6 +380,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
         }
     }
     var isSettingsOpen by remember { mutableStateOf(false) }
+    // v1.1: Mascot Buddy dedicated screen.
+    var isMascotOpen by remember { mutableStateOf(false) }
     var isAlarmHubOpen by remember { mutableStateOf(false) }
     var isAutoScheduleOpen by remember { mutableStateOf(false) }
     var isSessionLogOpen by remember { mutableStateOf(false) }
@@ -488,7 +492,14 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     modifier = Modifier.fillMaxSize(),
                     containerColor = Color.Transparent,
                     bottomBar = {
-                        if (!isSettingsOpen && !isTimerRunning) {
+                        // v1.1 FIX: the bottom nav must stay visible AND usable
+                        // while a session runs (classic, pomodoro, shield) so
+                        // users can move between tabs mid-session. It was
+                        // previously hidden on isTimerRunning — that was the
+                        // "nav vanishes during session" bug. Splash/Auth/
+                        // onboarding never reach this Scaffold (early
+                        // branches above), so their no-nav behavior is intact.
+                        if (!isSettingsOpen && !isMascotOpen) {
                             FloatingNavigation(
                                 selectedTab = selectedTab,
                                 onTabSelected = { tab ->
@@ -505,7 +516,11 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                             .statusBarsPadding()
                     ) {
                         AnimatedContent(
-                            targetState = if (isSettingsOpen) "SETTINGS" else selectedTab.name,
+                            targetState = when {
+                                isSettingsOpen -> "SETTINGS"
+                                isMascotOpen -> "MASCOT"
+                                else -> selectedTab.name
+                            },
                             transitionSpec = {
                                 // Final phase: soft fade + gentle slide on tab switches
                                 (fadeIn(animationSpec = tween(260)) + slideInHorizontally(
@@ -541,6 +556,13 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onLogout = {
                                             showSignOutConfirmationDialog = true
                                         }
+                                    )
+                                }
+                                // v1.1: Mascot Buddy dedicated screen.
+                                "MASCOT" -> {
+                                    com.example.ui.screens.MascotScreen(
+                                        focusPoints = userPreferences?.focusPoints ?: 0,
+                                        onBack = { isMascotOpen = false }
                                     )
                                 }
                                 NavTab.HOME.name -> {
@@ -621,7 +643,15 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onLogDistraction = { type -> viewModel.logDistraction(type) },
                                         onUpdateTaskTitle = { viewModel.setCurrentTaskTitle(it) },
                                         onOpenShieldHub = { viewModel.openShieldHub() },
-                                        onOpenAiGuardHub = { viewModel.openAiGuardHub() }
+                                        onOpenAiGuardHub = { viewModel.openAiGuardHub() },
+                                        // v1.1: Mascot Buddy screen.
+                                        onOpenMascot = { isMascotOpen = true },
+                                        // v1.1: Pomodoro engine.
+                                        pomodoroState = pomodoroState,
+                                        onStartPomodoro = { config -> viewModel.requestPomodoroStart(config) },
+                                        // v1.1: dedicated blocked-apps list.
+                                        onRemoveBlockedApp = { pkg -> viewModel.removeBlockedApp(pkg) },
+                                        onSaveBlockedApps = { pkgs -> viewModel.updateBlockedAppsList(pkgs) }
                                     )
                                 }
                                 NavTab.LEADERBOARD.name -> {
@@ -658,6 +688,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onOpenSundayRecap = { viewModel.openLatestSundayRecap() },
                                         onOpenSupportLockZen = { viewModel.openSupportLockZenSheet() },
                                         onOpenSessionHistory = { isSessionLogOpen = true },
+                                        onOpenMascot = { isMascotOpen = true },
                                         onCheckForUpdates = { viewModel.checkForAppUpdates(context, isManual = true) },
                                         onLogout = { showSignOutConfirmationDialog = true },
                                         onUpdateProfile = { name, avatarBytes ->

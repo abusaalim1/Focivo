@@ -600,7 +600,7 @@ fun WeeklyReflectionCard(
                 horizontalArrangement = Arrangement.End
             ) {
                 GlassButton(
-                    text = if (isSaved) "Saved ✓" else "Save Reflection",
+                    text = if (isSaved) "Saved" else "Save Reflection",
                     onClick = {
                         onSaveReflection(reflectionText)
                         isSaved = true

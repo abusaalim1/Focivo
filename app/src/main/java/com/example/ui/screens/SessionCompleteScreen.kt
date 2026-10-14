@@ -84,8 +84,8 @@ import com.example.ui.components.GlassButton
 import com.example.ui.components.MascotPose
 import com.example.ui.components.RegainMascotView
 import com.example.ui.theme.LavenderSoft
-import com.example.ui.theme.BalooBrandFontFamily
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
@@ -201,7 +201,7 @@ fun SessionCompleteScreen(
             Text(
                 text = "Well done.",
                 style = MaterialTheme.typography.displayMedium.copy(
-                    fontFamily = BalooBrandFontFamily,
+                    fontFamily = PoppinsFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 36.sp,
                     color = if (isDark) Color(0xFFF0F4ED) else NearBlack
@@ -531,7 +531,7 @@ private fun ShareCardContent(minutes: Int, distractionsCount: Int, quote: String
                     color = lime,
                     fontSize = 110.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = BalooBrandFontFamily
+                    fontFamily = PoppinsFontFamily
                 )
                 Text(
                     text = "Focus Time",

@@ -92,7 +92,11 @@ import kotlinx.coroutines.isActive
 fun PreStudyAppBlockSheet(
     currentBlockedList: String = "",
     onConfirmAndStart: (selectedPackages: Set<String>, dontShowAgain: Boolean) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    // v1.1: add-mode — reuse the picker as the "add apps" flow from the
+    // dedicated Blocked Apps list. Single save button, no permission gate
+    // (editing the list needs no permissions; they are checked at session start).
+    addMode: Boolean = false
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -233,7 +237,8 @@ fun PreStudyAppBlockSheet(
                             )
                         )
                         Text(
-                            text = "Distracting apps will be locked until timer ends",
+                            text = if (addMode) "Choose apps to add to your block list"
+                            else "Distracting apps will be locked until timer ends",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
                                 color = Color(0xFFA0A89E),
@@ -596,6 +601,33 @@ fun PreStudyAppBlockSheet(
             }
 
             // Action Buttons: "Block" (this session only) vs "Save & Block" (save permanently for auto-block)
+            // v1.1 addMode: single "Save blocked apps" button (no session start).
+            if (addMode) {
+                Button(
+                    onClick = {
+                        val chosen = selectedPackages.filter { it.value }.keys.toSet()
+                        onConfirmAndStart(chosen, true)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RegainLimePrimary,
+                        contentColor = Color(0xFF021207)
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .testTag("save_blocked_apps_button")
+                ) {
+                    Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Save blocked apps ($totalSelectedCount)",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+            } else {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -646,6 +678,7 @@ fun PreStudyAppBlockSheet(
                     )
                 }
             }
+            } // end else (session-mode buttons)
 
             Spacer(modifier = Modifier.height(6.dp))
 
@@ -672,7 +705,7 @@ fun PreStudyAppBlockSheet(
 
 /**
  * Button showing permission status:
- * - If Granted: Crisp green pill badge "✓ Active"
+ * - If Granted: Crisp green pill badge "Active"
  * - If Not Granted: Orange actionable button "Enable"
  */
 @Composable

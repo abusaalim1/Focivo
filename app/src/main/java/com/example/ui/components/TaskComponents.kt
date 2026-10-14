@@ -622,7 +622,7 @@ fun TaskBottomSheet(
                         .padding(horizontal = 14.dp, vertical = 14.dp)
                 ) {
                     Text(
-                        text = if (isTopPriority) "★ Priority of Day" else "☆ Add to Daily Top 3",
+                        text = if (isTopPriority) "Priority of Day" else "Add to Daily Top 3",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontFamily = PoppinsFontFamily,
                             color = NearBlack,
