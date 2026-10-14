@@ -1,0 +1,38 @@
+name: Round2 Screenshots
+
+# Manual only. Runs the Robolectric/Roborazzi owner-review screenshots on
+# the round2/premium-ui-fixes branch and uploads the PNGs as an artifact.
+# The owner reviews these before approving any deploy.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout round2 branch
+        uses: actions/checkout@v4
+        with:
+          ref: round2/premium-ui-fixes
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run round2 screenshot tests
+        run: ./gradlew :app:testDebugUnitTest --tests "com.example.screenshots.*"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: round2-screenshots
+          path: app/src/test/screenshots/round2/
+          if-no-files-found: error
