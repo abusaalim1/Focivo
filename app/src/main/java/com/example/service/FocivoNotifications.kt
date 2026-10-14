@@ -490,7 +490,7 @@ object FocivoNotifications {
             val sessions = try {
                 com.example.data.FocuslyRepository.getInstance(context).let { repo ->
                     kotlinx.coroutines.runBlocking {
-                        kotlinx.coroutines.flow.first(repo.allSessions)
+                        repo.allSessions.first()
                     }
                 }
             } catch (_: Exception) { emptyList<com.example.data.model.FocusSessionEntity>() }
@@ -512,7 +512,9 @@ object FocivoNotifications {
     /** Receiver-side: daily update check — notifies once per new version. */
     fun handleUpdateCheck(context: Context) {
         try {
-            val info = com.example.util.AppUpdateManager.checkForUpdates(context, isManualCheck = false)
+            val info = kotlinx.coroutines.runBlocking {
+                com.example.util.AppUpdateManager.checkForUpdates(context, isManualCheck = false)
+            }
             if (info != null && info.isUpdateAvailable && info.checkSucceeded) {
                 // postUpdateAvailable dedupes per version internally.
                 postUpdateAvailable(context, info.latestVersionName, info.latestVersionCode)
