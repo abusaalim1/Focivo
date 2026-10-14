@@ -402,7 +402,12 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 onGoogleSignIn = { ctx -> viewModel.signInWithGoogle(ctx) },
                 onGoogleDirectSignIn = { name, email -> viewModel.signInWithGoogleDirect(name, email) },
                 onGuestSignIn = { viewModel.signInAsGuest() },
-                onClearError = { viewModel.clearAuthError() }
+                onClearError = { viewModel.clearAuthError() },
+                passwordResetState = viewModel.passwordResetState.collectAsState().value,
+                pendingPasswordRecovery = viewModel.pendingPasswordRecovery.collectAsState().value,
+                onForgotPassword = { email -> viewModel.requestPasswordReset(email) },
+                onClearPasswordReset = { viewModel.clearPasswordReset() },
+                onSetNewPassword = { password -> viewModel.completePasswordRecovery(password) }
             )
         // v1.4.0: first-launch onboarding runs for guests too (same survey;
         // answers persist via the local repository / guest storage).

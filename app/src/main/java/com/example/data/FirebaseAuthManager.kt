@@ -202,6 +202,16 @@ class FirebaseAuthManager private constructor(private val context: Context) {
         return Result.success(Unit)
     }
 
+    /** v1.4.0-round2: forgot-password entry point (backed by Supabase Auth). */
+    suspend fun requestPasswordReset(email: String): Result<Unit> {
+        return SupabaseService.getInstance().requestPasswordReset(email)
+    }
+
+    /** v1.4.0-round2: sets the new password after a recovery deep link. */
+    suspend fun updatePassword(newPassword: String): Result<Unit> {
+        return SupabaseService.getInstance().updatePassword(newPassword)
+    }
+
     suspend fun reloadAndCheckEmailVerification(): Boolean {
         return true
     }
