@@ -69,7 +69,7 @@
             android:ellipsize="end" />
     </LinearLayout>
 
-    <!-- Center: blocked apps stat -->
+    <!-- Center: blocked apps stat + guard mascot -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -78,30 +78,56 @@
         android:layout_weight="1"
         android:background="@drawable/widget_v2_inner"
         android:gravity="center_vertical"
-        android:orientation="vertical"
+        android:orientation="horizontal"
         android:paddingStart="14dp"
         android:paddingTop="8dp"
-        android:paddingEnd="14dp"
+        android:paddingEnd="12dp"
         android:paddingBottom="8dp">
 
-        <TextView
-            android:id="@+id/widget_shield_blocked_count"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:fontFamily="@font/poppins_semibold"
-            android:text="8 apps blocked"
-            android:textColor="@color/focivo_text_primary"
-            android:textSize="17sp" />
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/widget_shield_subtext"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:fontFamily="@font/poppins_medium"
-            android:text="Shorts and reels auto-intercept active"
-            android:textColor="@color/focivo_text_muted"
-            android:textSize="11sp" />
+            <TextView
+                android:id="@+id/widget_shield_blocked_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/poppins_semibold"
+                android:text="8 apps blocked"
+                android:textColor="@color/focivo_text_primary"
+                android:textSize="17sp" />
+
+            <TextView
+                android:id="@+id/widget_shield_subtext"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:fontFamily="@font/poppins_medium"
+                android:text="Shorts and reels auto-intercept active"
+                android:textColor="@color/focivo_text_muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:layout_marginStart="6dp">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:src="@drawable/widget_mascot_glow" />
+
+            <ImageView
+                android:layout_width="88dp"
+                android:layout_height="88dp"
+                android:layout_gravity="center"
+                android:contentDescription="Focus guard mascot"
+                android:src="@drawable/mascot_guard" />
+        </FrameLayout>
     </LinearLayout>
 
     <!-- Bottom actions -->
