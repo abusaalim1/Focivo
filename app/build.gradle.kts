@@ -18,8 +18,8 @@ android {
     applicationId = "com.aistudio.focusly.kqpzxr"
     minSdk = 24
     targetSdk = 36
-    versionCode = 19
-    versionName = "1.5.0"
+    versionCode = 20
+    versionName = "1.5.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -115,6 +115,9 @@ dependencies {
   implementation(libs.androidx.core.ktx)
   // implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)
+  implementation(libs.androidx.lifecycle.runtime.android)
+  implementation(libs.androidx.lifecycle.viewmodel.android)
+  implementation(libs.androidx.savedstate)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(libs.androidx.navigation.compose)

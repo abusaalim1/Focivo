@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import com.example.MainActivity
 import com.example.ui.components.FloatingTimerPill
+import com.example.ui.overlay.OverlayLifecycleHost
 import com.example.ui.theme.FocuslyTheme
 
 /**
@@ -49,6 +50,7 @@ object FloatingTimerPillManager {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var pillView: ComposeView? = null
+    private var pillHost: OverlayLifecycleHost? = null
     private var windowManager: WindowManager? = null
 
     fun isShowing(): Boolean = pillView != null
@@ -86,7 +88,10 @@ object FloatingTimerPillManager {
             try {
                 windowManager?.removeView(view)
             } catch (_: Exception) { }
+            // v1.5.1: tear down the overlay lifecycle host too.
+            runCatching { pillHost?.dismiss() }
             pillView = null
+            pillHost = null
             windowManager = null
         }
     }
@@ -94,11 +99,17 @@ object FloatingTimerPillManager {
     private fun show(appContext: Context, remainingSeconds: Int) {
         runOnMain {
             if (pillView != null) return@runOnMain // already showing
+            val host = OverlayLifecycleHost()
             try {
                 val wm = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                // v1.5.1: overlay ComposeViews have no Activity/Fragment, so install a
+                // dedicated lifecycle host — otherwise onAttachedToWindow throws
+                // IllegalStateException("ViewTreeLifecycleOwner not found") (Android 16).
                 val view = ComposeView(appContext).apply {
+                    host.installOn(this)
                     setContent { PillHost(remainingSeconds = remainingSeconds) }
                 }
+                host.show()
                 val params = WindowManager.LayoutParams(
                     WindowManager.LayoutParams.WRAP_CONTENT,
                     WindowManager.LayoutParams.WRAP_CONTENT,
@@ -113,10 +124,13 @@ object FloatingTimerPillManager {
                 }
                 wm.addView(view, params)
                 pillView = view
+                pillHost = host
                 windowManager = wm
             } catch (_: Exception) {
                 // Overlay add failed (permission revoked, etc.) — silent.
+                runCatching { host.dismiss() }
                 pillView = null
+                pillHost = null
                 windowManager = null
             }
         }
