@@ -82,7 +82,9 @@ import com.example.util.StudyNotificationBlockerManager
 @Composable
 fun DeepFocusSettingsSheet(
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // v1.4.0-round2: test hook — screenshot tests open the picker directly
+    initialShowThemePicker: Boolean = false
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -103,7 +105,7 @@ fun DeepFocusSettingsSheet(
     val rowBorder = if (isDark) Color(0x228CE000) else Color(0xFFDCE6D2)
 
     var showDeviceAdminPrompt by remember { mutableStateOf(false) }
-    var showThemePicker by remember { mutableStateOf(false) }
+    var showThemePicker by remember { mutableStateOf(initialShowThemePicker) }
     val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
     var showDigestSheet by remember { mutableStateOf(false) }
     val digestList by SessionNotificationDigestManager.digestList.collectAsState()
