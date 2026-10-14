@@ -342,7 +342,7 @@ fun ProfileScreen(
         computeAchievementBadges(
             sessionCount = sessionCount,
             distinctDaysCount = distinctDaysCount,
-            totalSeconds = totalSeconds,
+            totalSeconds = totalSeconds.toLong(),
             bestSessionSeconds = bestSessionSeconds,
             shieldAttempts = shieldAttempts,
             isAppBlockerEnabled = userPreferences?.isAppBlockerEnabled == true

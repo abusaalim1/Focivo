@@ -11,12 +11,15 @@ import androidx.compose.ui.test.onRoot
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.LeaderboardUser
 import com.example.data.model.FocusSessionEntity
+import com.example.data.model.ReflectionEntity
 import com.example.data.model.TaskEntity
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.ThemedScreenBackground
 import com.example.ui.screens.FocusScreen
 import com.example.ui.screens.HomeScreen
+import com.example.ui.screens.InsightsScreen
 import com.example.ui.screens.LeaderboardScreen
+import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.theme.FocuslyTheme
 import com.example.ui.theme.LocalAppAccent
@@ -211,5 +214,32 @@ class ContrastScreenshotsTest {
         useTheme("midnight")
         studyScreen()
         capture("study_midnight_dark")
+    }
+
+    @Test
+    fun insights_sunset_dark() {
+        useTheme("sunset")
+        themed {
+            InsightsScreen(
+                sessions = fakeSessions(),
+                reflections = emptyList(),
+                userPreferences = fakePrefs(),
+                onSaveReflection = {}
+            )
+        }
+        capture("insights_sunset_dark")
+    }
+
+    @Test
+    fun profile_midnight_dark() {
+        useTheme("midnight")
+        themed {
+            ProfileScreen(
+                userPreferences = fakePrefs(),
+                sessions = fakeSessions(),
+                onOpenSettings = {}
+            )
+        }
+        capture("profile_midnight_dark")
     }
 }
