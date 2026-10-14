@@ -34,6 +34,15 @@ jobs:
       - name: Run round2 screenshot tests (record mode)
         run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.*" --stacktrace
 
+      - name: Assemble debug APK (no publish - owner reviews first)
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify debug APK
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          if [ ! -s "$APK" ]; then echo "APK missing at $APK"; exit 1; fi
+          echo "Debug APK OK: $(du -h "$APK" | cut -f1)"
+
       - name: Locate generated PNGs
         if: always()
         run: |
