@@ -44,7 +44,7 @@ class WidgetScreenshotsTest {
     }
 
     private fun capture(view: View, name: String) {
-        captureRoboImage(view, filePath = "src/test/screenshots/round5/$name.png")
+        view.captureRoboImage("src/test/screenshots/round5/$name.png")
     }
 
     @Test
