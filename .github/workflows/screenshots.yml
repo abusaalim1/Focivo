@@ -1,13 +1,16 @@
 name: Round2 Screenshots
 
-# Manual only. Runs the Robolectric/Roborazzi owner-review screenshots on
-# the round2/premium-ui-fixes branch and uploads the PNGs as an artifact.
-# The owner reviews these before approving any deploy.
+# Owner-approved (round 3): runs the Robolectric/Roborazzi owner-review
+# screenshots on the round2/premium-ui-fixes branch and uploads the PNGs
+# as an artifact. The owner reviews these before approving any deploy.
 #
+# Trigger: push to THIS branch only. Nothing ever touches main.
 # Note: this repo has no gradle wrapper committed, so we provision Gradle
 # via gradle/actions/setup-gradle like the debug build workflow does.
 
 on:
+  push:
+    branches: [round2/premium-ui-fixes]
   workflow_dispatch:
 
 jobs:
@@ -15,10 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Checkout round2 branch
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: round2/premium-ui-fixes
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -31,32 +32,21 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Run round2 screenshot tests (record mode)
+      - name: Run screenshot tests (record mode)
         run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.*" --stacktrace
-
-      - name: Assemble debug APK (no publish - owner reviews first)
-        run: gradle :app:assembleDebug --stacktrace
-
-      - name: Verify debug APK
-        run: |
-          APK="app/build/outputs/apk/debug/app-debug.apk"
-          if [ ! -s "$APK" ]; then echo "APK missing at $APK"; exit 1; fi
-          echo "Debug APK OK: $(du -h "$APK" | cut -f1)"
 
       - name: Locate generated PNGs
         if: always()
         run: |
-          echo "=== app/src/test/screenshots ==="
-          find app/src/test/screenshots -type f 2>/dev/null | head -20
-          echo "=== PNGs modified in last 30 min ==="
-          find . -name "*.png" -newermt "-30 minutes" 2>/dev/null | grep -v "^\./\.git/" | head -20
-          echo "=== roborazzi build outputs ==="
-          find app/build -path "*roborazzi*" -name "*.png" 2>/dev/null | head -20
+          echo "=== test screenshot dirs ==="
+          find app/src/test/screenshots -type f 2>/dev/null | head -30
 
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: round2-screenshots
-          path: app/src/test/screenshots/round2/
+          name: round3-screenshots
+          path: |
+            app/src/test/screenshots/round2/
+            app/src/test/screenshots/round3/
           if-no-files-found: error

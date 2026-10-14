@@ -75,12 +75,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.UserPreferencesEntity
-import com.example.ui.components.AuroraBackground
 import com.example.ui.components.DistractionDialog
 import com.example.ui.components.MascotPose
 import com.example.ui.components.PreStudyAppBlockSheet
 import com.example.ui.components.RegainMascotView
 import com.example.ui.components.RegainStudyDial
+import com.example.ui.components.resolveThemeBackdropRes
 import com.example.R
 import com.example.ui.theme.LocalAppAccent
 import com.example.ui.theme.BottomNavClearance
@@ -136,7 +136,7 @@ fun FocusScreen(
     val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
     // v1.4.0-round2: interactive accents follow the full-screen theme.
     val appAccent = LocalAppAccent.current
-    val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
+    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
     val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
@@ -166,9 +166,8 @@ fun FocusScreen(
             .fillMaxSize()
             .testTag("focus_screen")
     ) {
-        AuroraBackground(
-            modifier = Modifier.fillMaxSize()
-        )
+        // Round-3: the full-bleed theme backdrop is drawn once at the
+        // MainActivity shell root; nothing per-screen here.
 
         Column(
             modifier = Modifier
@@ -417,11 +416,14 @@ fun FocusScreen(
                     }
                     if (timerStyle == "aurora") {
                         // v1.4.0: themed backdrop ambience behind the timer dial.
+                        // Round-3: backdrop resolved at runtime so new themes work too.
                         Box(
                             modifier = Modifier.fillMaxWidth(),
                             contentAlignment = Alignment.Center
                         ) {
-                            val backdropRes = selectedTheme.backdropRes
+                            val backdropRes = remember(selectedTheme.id) {
+                                resolveThemeBackdropRes(context, selectedTheme)
+                            }
                             if (backdropRes != null) {
                                 Image(
                                     painter = painterResource(id = backdropRes),

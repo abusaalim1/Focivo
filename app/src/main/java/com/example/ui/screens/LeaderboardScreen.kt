@@ -60,8 +60,6 @@ import com.example.data.HallOfFameItem
 import com.example.data.LeaderboardDateUtils
 import com.example.data.LeaderboardUser
 import com.example.data.model.FocusSessionEntity
-import com.example.ui.components.AuroraBackground
-import com.example.ui.components.ThemedScreenBackground
 import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -145,7 +143,7 @@ fun LeaderboardScreen(
 ) {
     val isDark = isAppInDarkTheme()
     val appAccent = LocalAppAccent.current // v1.4.0-round2 theme accent
-    val cardBg = if (isDark) Color(0xFF1B221B) else Color(0xFFFFFFFF)
+    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
     val cardBorder = if (isDark) Color(0x358CE000) else Color(0xFFDCE6D2)
     val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
     val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
@@ -246,9 +244,7 @@ fun LeaderboardScreen(
     Box(
         modifier = modifier.fillMaxSize()
     ) {
-        ThemedScreenBackground(
-            modifier = Modifier.fillMaxSize()
-        )
+        // Round-3: theme backdrop is drawn once at the MainActivity shell root.
 
         Column(
             modifier = Modifier
@@ -1048,7 +1044,7 @@ private fun HallOfFameCard(
     textPrimary: Color,
     textSecondary: Color
 ) {
-    val cardBg = if (isDark) Color(0xFF1B221B) else Color(0xFFFFFFFF)
+    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
     val cardBorder = if (isDark) Color(0x40FFD54F) else Color(0xFFFFE082)
     val weekLabel = remember(item.weekStart, item.weekEnd) {
         LeaderboardDateUtils.formatWeekRange(item.weekStart, item.weekEnd)

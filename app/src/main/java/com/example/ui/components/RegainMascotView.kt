@@ -64,7 +64,12 @@ enum class MascotPose {
     SAKURA,
     MIDNIGHT,
     DESERT,
-    ROYAL
+    ROYAL,
+    CRIMSON,
+    LAVENDER,
+    AMBER,
+    MINT,
+    STUDY_HAPPY
 }
 
 /**
@@ -121,6 +126,12 @@ fun RegainMascotView(
         MascotPose.MIDNIGHT -> R.drawable.theme_mascot_midnight
         MascotPose.DESERT -> R.drawable.theme_mascot_desert
         MascotPose.ROYAL -> R.drawable.theme_mascot_royal
+        // Round-3 themes resolve their mascot at runtime (theme_mascot_<id>);
+        // falls back to the study mascot when the asset is not packaged yet.
+        MascotPose.CRIMSON, MascotPose.LAVENDER, MascotPose.AMBER, MascotPose.MINT ->
+            resolveThemeMascotResId(LocalContext.current, pose)
+        // Round-3: happy default study mascot for the Aurora timer.
+        MascotPose.STUDY_HAPPY -> R.drawable.mascot_study_happy
         MascotPose.IDLE -> R.drawable.mascot_base
     }
 
@@ -197,4 +208,21 @@ fun MascotVideoPlayer(
         },
         modifier = modifier
     )
+}
+
+/**
+ * Round-3: resolves a theme mascot drawable at runtime by name
+ * ("theme_mascot_<pose>", e.g. theme_mascot_crimson). Returns the study
+ * mascot when the asset is not packaged yet, so new themes never crash.
+ */
+private fun resolveThemeMascotResId(
+    context: android.content.Context,
+    pose: MascotPose
+): Int {
+    val id = context.resources.getIdentifier(
+        "theme_mascot_" + pose.name.lowercase(),
+        "drawable",
+        context.packageName
+    )
+    return if (id != 0) id else R.drawable.mascot_study_transparent
 }

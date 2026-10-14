@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -241,7 +242,7 @@ fun DeepFocusSettingsSheet(
                     SettingsActionRow(
                         icon = Icons.Default.Palette,
                         title = "Timer theme",
-                        subtitle = selectedTheme.name + " — timer backdrop, mascot and glow",
+                        subtitle = selectedTheme.name + " — full-screen backdrop, mascot and glow",
                         onClick = { showThemePicker = !showThemePicker },
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
@@ -252,14 +253,19 @@ fun DeepFocusSettingsSheet(
                 }
                 if (showThemePicker) {
                     item {
+                        // Round-3: visual theme cards — each theme shows its real
+                        // backdrop artwork so users SEE it is a full-screen theme.
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             TimerThemeManager.THEMES.forEach { theme ->
                                 val isSelected = theme.id == selectedTheme.id
+                                val cardBackdrop = remember(theme.id) {
+                                    resolveThemeBackdropRes(context, theme)
+                                }
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier.clickable {
@@ -268,46 +274,81 @@ fun DeepFocusSettingsSheet(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(56.dp)
-                                            .clip(CircleShape)
+                                            .width(104.dp)
+                                            .height(138.dp)
+                                            .clip(RoundedCornerShape(16.dp))
                                             .border(
                                                 width = if (isSelected) 2.5.dp else 1.dp,
-                                                color = if (isSelected) RegainLimePrimary else rowBorder,
-                                                shape = CircleShape
-                                            ),
-                                        contentAlignment = Alignment.Center
+                                                color = if (isSelected) theme.accent else rowBorder,
+                                                shape = RoundedCornerShape(16.dp)
+                                            )
                                     ) {
-                                        if (theme.backdropRes != null) {
+                                        if (cardBackdrop != null) {
                                             Image(
-                                                painter = painterResource(id = theme.backdropRes),
+                                                painter = painterResource(id = cardBackdrop),
                                                 contentDescription = theme.name,
                                                 contentScale = ContentScale.Crop,
                                                 modifier = Modifier.fillMaxSize()
                                             )
                                         } else {
+                                            // Aurora (code-drawn) or an asset not packaged yet:
+                                            // accent-tinted gradient placeholder.
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxSize()
                                                     .background(
                                                         Brush.linearGradient(
                                                             colors = listOf(
-                                                                Color(0xFF8CE000),
-                                                                Color(0xFF00E5FF),
-                                                                Color(0xFF7C4DFF)
+                                                                theme.accent,
+                                                                Color(0xFF0E1512)
                                                             )
                                                         )
                                                     )
                                             )
                                         }
+                                        // Name strip on a scrim so it reads on any artwork.
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .align(Alignment.BottomCenter)
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        listOf(
+                                                            Color.Transparent,
+                                                            Color(0xCC000000)
+                                                        )
+                                                    )
+                                                )
+                                                .padding(top = 18.dp, bottom = 8.dp),
+                                            contentAlignment = Alignment.BottomCenter
+                                        ) {
+                                            Text(
+                                                text = theme.name,
+                                                fontFamily = PoppinsFontFamily,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                                fontSize = 11.sp,
+                                                color = Color.White
+                                            )
+                                        }
+                                        if (isSelected) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(6.dp)
+                                                    .size(22.dp)
+                                                    .clip(CircleShape)
+                                                    .background(theme.accent),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = "Selected",
+                                                    tint = Color(0xFF061505),
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
                                     }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = theme.name,
-                                        fontFamily = PoppinsFontFamily,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        fontSize = 10.sp,
-                                        color = if (isSelected) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary
-                                    )
                                 }
                             }
                         }

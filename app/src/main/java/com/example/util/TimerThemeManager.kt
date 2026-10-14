@@ -44,7 +44,7 @@ object TimerThemeManager {
             id = "aurora",
             name = "Aurora",
             backdropRes = null, // code-drawn aurora canvas (unchanged from v1.3.1)
-            mascotPose = MascotPose.STUDY_POSE,
+            mascotPose = MascotPose.STUDY_HAPPY, // round-3: happy default study face
             arcColors = emptyList(), // unused — AuroraTimer uses its built-in palette
             glowColor = Color.Transparent,
             accent = Color(0xFF8CE000)
@@ -102,6 +102,42 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFFFC107), Color(0xFFFFECB3), Color(0xFFFFA000)),
             glowColor = Color(0xFFFFC107),
             accent = Color(0xFFFFC107)
+        ),
+        TimerTheme(
+            id = "crimson",
+            name = "Crimson",
+            backdropRes = null, // resolved at runtime: theme_backdrop_crimson
+            mascotPose = MascotPose.CRIMSON,
+            arcColors = listOf(Color(0xFFFF5252), Color(0xFFFF8A80), Color(0xFFC62828)),
+            glowColor = Color(0xFFFF5252),
+            accent = Color(0xFFFF5252)
+        ),
+        TimerTheme(
+            id = "lavender",
+            name = "Lavender",
+            backdropRes = null, // resolved at runtime: theme_backdrop_lavender
+            mascotPose = MascotPose.LAVENDER,
+            arcColors = listOf(Color(0xFFCE93D8), Color(0xFFE1BEE7), Color(0xFFAB47BC)),
+            glowColor = Color(0xFFCE93D8),
+            accent = Color(0xFFCE93D8)
+        ),
+        TimerTheme(
+            id = "amber",
+            name = "Amber",
+            backdropRes = null, // resolved at runtime: theme_backdrop_amber
+            mascotPose = MascotPose.AMBER,
+            arcColors = listOf(Color(0xFFFFB300), Color(0xFFFFD54F), Color(0xFFFF8F00)),
+            glowColor = Color(0xFFFFB300),
+            accent = Color(0xFFFFB300)
+        ),
+        TimerTheme(
+            id = "mint",
+            name = "Mint",
+            backdropRes = null, // resolved at runtime: theme_backdrop_mint
+            mascotPose = MascotPose.MINT,
+            arcColors = listOf(Color(0xFF69F0AE), Color(0xFFB9F6CA), Color(0xFF00C853)),
+            glowColor = Color(0xFF69F0AE),
+            accent = Color(0xFF69F0AE)
         )
     )
 

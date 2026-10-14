@@ -64,9 +64,7 @@ import com.example.R
 import com.example.data.model.FocusSessionEntity
 import com.example.data.model.TaskEntity
 import com.example.data.model.UserPreferencesEntity
-import com.example.ui.components.AuroraBackground
 import com.example.ui.components.PremiumButton
-import com.example.ui.components.ThemedScreenBackground
 import com.example.ui.components.LinearButton
 import com.example.ui.components.LinearButtonVariant
 import com.example.ui.components.LinearGlowCard
@@ -112,7 +110,7 @@ fun HomeScreen(
     val appAccent = LocalAppAccent.current // v1.4.0-round2 theme accent
 
     // Semantic colors for Light/Dark mode - Apple-inspired minimal glass aesthetic
-    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
+    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
     val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
     val textPrimary = if (isDark) Color(0xFFF2F2F7) else Color(0xFF1C1C1E)
     val textSecondary = if (isDark) Color(0xFF8E8E93) else Color(0xFF6C6C70)
@@ -287,7 +285,7 @@ fun HomeScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        ThemedScreenBackground(modifier = Modifier.fillMaxSize())
+        // Round-3: theme backdrop is drawn once at the MainActivity shell root.
 
         // Top Atmospheric Header Backdrop Image Layer
         Box(

@@ -41,8 +41,6 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.FocusSessionEntity
 import com.example.data.model.ReflectionEntity
 import com.example.data.model.UserPreferencesEntity
-import com.example.ui.components.AuroraBackground
-import com.example.ui.components.ThemedScreenBackground
 import com.example.ui.components.GlassCard
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.WeeklyProductivityChart
@@ -70,7 +68,7 @@ fun InsightsScreen(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
-    val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
+    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
     val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
@@ -171,7 +169,7 @@ fun InsightsScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        ThemedScreenBackground(modifier = Modifier.fillMaxSize())
+        // Round-3: theme backdrop is drawn once at the MainActivity shell root.
 
         LazyColumn(
             modifier = Modifier
