@@ -83,6 +83,10 @@ class FocusTimerService : Service() {
         try {
             com.example.util.AiStudyGuardManager.cancelGuardStatusNotification(this)
         } catch (_: Exception) { }
+        // v1.5.0: hide the floating timer pill when the timer service dies.
+        try {
+            FloatingTimerPillManager.hide(this)
+        } catch (_: Exception) { }
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -261,10 +265,14 @@ class FocusTimerService : Service() {
                 .putBoolean(KEY_MANUAL_RUNNING, false)
                 .putLong(KEY_MANUAL_END, 0L)
                 .apply()
-            getSharedPreferences(PREFS_TIMER_STATE, Context.MODE_PRIVATE).edit()
-                .putBoolean(KEY_TIMER_RUNNING, false)
+            getSharedPreferences(PREFS_TIMER_STATE, Context.MODE_PRIVATE).edit()                .putBoolean(KEY_TIMER_RUNNING, false)
                 .apply()
         } catch (_: Exception) {}
+        // v1.5.0: the pill must disappear the moment the timer stops or completes.
+        // clearTimerPrefs() is the choke point on every stop/completion path.
+        try {
+            FloatingTimerPillManager.hide(this)
+        } catch (_: Exception) { }
     }
 
     private fun buildTimerNotification(remainingSec: Int, taskTitle: String): Notification {

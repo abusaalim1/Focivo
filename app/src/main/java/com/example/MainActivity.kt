@@ -107,6 +107,15 @@ class MainActivity : ComponentActivity() {
         // the timer is already live in this process or no timer is persisted).
         activeViewModel?.restoreTimerStateIfNeeded()
         com.example.service.ScheduledBlockScheduler.evaluateAndReschedule(this)
+        // v1.5.0: the floating timer pill is only for out-of-app use — kill it on return.
+        com.example.service.FloatingTimerPillManager.hide(this)
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // v1.5.0: show the floating countdown pill when leaving the app mid-session.
+        // No-op unless a session is actively running and overlay permission is granted.
+        com.example.service.FloatingTimerPillManager.showIfSessionRunning(this)
     }
 
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
