@@ -82,6 +82,7 @@ import com.example.ui.components.PreStudyAppBlockSheet
 import com.example.ui.components.RegainMascotView
 import com.example.ui.components.RegainStudyDial
 import com.example.R
+import com.example.ui.theme.LocalAppAccent
 import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
@@ -133,6 +134,8 @@ fun FocusScreen(
 ) {
     val isDark = isAppInDarkTheme()
     val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
+    // v1.4.0-round2: interactive accents follow the full-screen theme.
+    val appAccent = LocalAppAccent.current
     val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
@@ -367,7 +370,7 @@ fun FocusScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(18.dp))
-                                        .background(if (timerStyle == "aurora") RegainLimePrimary else Color.Transparent)
+                                        .background(if (timerStyle == "aurora") appAccent else Color.Transparent)
                                         .clickable { timerStyle = "aurora" }
                                         .padding(horizontal = 14.dp, vertical = 6.dp)
                                         .testTag("timer_style_aurora_btn")
@@ -493,7 +496,7 @@ fun FocusScreen(
                                         )
                                         .border(
                                             1.dp,
-                                            if (isSelected) RegainLimePrimary else cardBorder,
+                                            if (isSelected) appAccent else cardBorder,
                                             RoundedCornerShape(16.dp)
                                         )
                                         .clickable {
@@ -576,11 +579,11 @@ fun FocusScreen(
                                 .shadow(
                                     elevation = 6.dp,
                                     shape = CircleShape,
-                                    ambientColor = RegainLimePrimary.copy(alpha = 0.3f),
-                                    spotColor = RegainLimePrimary.copy(alpha = 0.4f)
+                                    ambientColor = appAccent.copy(alpha = 0.3f),
+                                    spotColor = appAccent.copy(alpha = 0.4f)
                                 )
                                 .clip(CircleShape)
-                                .background(RegainLimePrimary)
+                                .background(appAccent)
                                 .clickable {
                                     if (isRunning) {
                                         onPauseTimer()
@@ -911,7 +914,7 @@ fun FocusScreen(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(if (isChosen) RegainLimeContainer else cardBg)
-                                        .border(1.dp, if (isChosen) RegainLimePrimary else cardBorder, RoundedCornerShape(12.dp))
+                                        .border(1.dp, if (isChosen) appAccent else cardBorder, RoundedCornerShape(12.dp))
                                         .clickable {
                                             selectedSubject = subject
                                             customSubjectInput = ""
@@ -973,7 +976,7 @@ fun FocusScreen(
                             onSelectMode(finalSubject, mins)
                             showStudyTypeDialog = false
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = RegainLimePrimary, contentColor = NearBlack)
+                        colors = ButtonDefaults.buttonColors(containerColor = appAccent, contentColor = NearBlack)
                     ) {
                         Text("Apply Timer & Subject", fontWeight = FontWeight.Bold)
                     }

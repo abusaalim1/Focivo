@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import com.example.ui.components.WidgetsShowcaseSheet
+import com.example.ui.components.ThemedScreenBackground
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -312,7 +313,7 @@ fun ProfileScreen(
     )
 
     Box(modifier = modifier.fillMaxSize()) {
-        AuroraBackground(modifier = Modifier.fillMaxSize())
+        ThemedScreenBackground(modifier = Modifier.fillMaxSize())
 
         LazyColumn(
             modifier = Modifier

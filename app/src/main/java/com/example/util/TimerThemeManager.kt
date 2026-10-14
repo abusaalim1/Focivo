@@ -25,7 +25,13 @@ data class TimerTheme(
     @DrawableRes val backdropRes: Int?,
     val mascotPose: MascotPose,
     val arcColors: List<Color>,
-    val glowColor: Color
+    val glowColor: Color,
+    /**
+     * v1.4.0-round2: full-screen accent — primary buttons, active nav pill,
+     * selected chips on the main screens. Aurora keeps RegainLimePrimary so
+     * the default look is pixel-identical.
+     */
+    val accent: Color
 )
 
 object TimerThemeManager {
@@ -40,7 +46,8 @@ object TimerThemeManager {
             backdropRes = null, // code-drawn aurora canvas (unchanged from v1.3.1)
             mascotPose = MascotPose.STUDY_POSE,
             arcColors = emptyList(), // unused — AuroraTimer uses its built-in palette
-            glowColor = Color.Transparent
+            glowColor = Color.Transparent,
+            accent = Color(0xFF8CE000)
         ),
         TimerTheme(
             id = "forest",
@@ -48,7 +55,8 @@ object TimerThemeManager {
             backdropRes = R.drawable.theme_backdrop_forest,
             mascotPose = MascotPose.FOREST,
             arcColors = listOf(Color(0xFF66BB6A), Color(0xFFA5D6A7), Color(0xFF2E7D32)),
-            glowColor = Color(0xFF66BB6A)
+            glowColor = Color(0xFF66BB6A),
+            accent = Color(0xFF66BB6A)
         ),
         TimerTheme(
             id = "sunset",
@@ -56,7 +64,8 @@ object TimerThemeManager {
             backdropRes = R.drawable.theme_backdrop_sunset,
             mascotPose = MascotPose.SUNSET,
             arcColors = listOf(Color(0xFFFF8A65), Color(0xFFFFB74D), Color(0xFFE64A19)),
-            glowColor = Color(0xFFFF8A65)
+            glowColor = Color(0xFFFF8A65),
+            accent = Color(0xFFFF8A65)
         ),
         TimerTheme(
             id = "sakura",
@@ -64,7 +73,8 @@ object TimerThemeManager {
             backdropRes = R.drawable.theme_backdrop_sakura,
             mascotPose = MascotPose.SAKURA,
             arcColors = listOf(Color(0xFFF48FB1), Color(0xFFF8BBD0), Color(0xFFEC407A)),
-            glowColor = Color(0xFFF48FB1)
+            glowColor = Color(0xFFF48FB1),
+            accent = Color(0xFFF48FB1)
         ),
         TimerTheme(
             id = "midnight",
@@ -72,7 +82,8 @@ object TimerThemeManager {
             backdropRes = R.drawable.theme_backdrop_midnight,
             mascotPose = MascotPose.MIDNIGHT,
             arcColors = listOf(Color(0xFFB39DDB), Color(0xFF9575CD), Color(0xFF7E57C2)),
-            glowColor = Color(0xFF9575CD)
+            glowColor = Color(0xFF9575CD),
+            accent = Color(0xFF9575CD)
         ),
         TimerTheme(
             id = "desert",
@@ -80,7 +91,8 @@ object TimerThemeManager {
             backdropRes = R.drawable.theme_backdrop_desert,
             mascotPose = MascotPose.DESERT,
             arcColors = listOf(Color(0xFFFFD54F), Color(0xFFFFE082), Color(0xFFFF8F00)),
-            glowColor = Color(0xFFFFD54F)
+            glowColor = Color(0xFFFFD54F),
+            accent = Color(0xFFFFD54F)
         ),
         TimerTheme(
             id = "royal",
@@ -88,7 +100,8 @@ object TimerThemeManager {
             backdropRes = R.drawable.theme_backdrop_royal,
             mascotPose = MascotPose.ROYAL,
             arcColors = listOf(Color(0xFFFFC107), Color(0xFFFFECB3), Color(0xFFFFA000)),
-            glowColor = Color(0xFFFFC107)
+            glowColor = Color(0xFFFFC107),
+            accent = Color(0xFFFFC107)
         )
     )
 

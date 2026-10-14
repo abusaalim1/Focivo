@@ -42,6 +42,7 @@ import com.example.data.model.FocusSessionEntity
 import com.example.data.model.ReflectionEntity
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.AuroraBackground
+import com.example.ui.components.ThemedScreenBackground
 import com.example.ui.components.GlassCard
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.WeeklyProductivityChart
@@ -170,7 +171,7 @@ fun InsightsScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        AuroraBackground(modifier = Modifier.fillMaxSize())
+        ThemedScreenBackground(modifier = Modifier.fillMaxSize())
 
         LazyColumn(
             modifier = Modifier

@@ -65,6 +65,7 @@ import com.example.data.model.FocusSessionEntity
 import com.example.data.model.TaskEntity
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.AuroraBackground
+import com.example.ui.components.ThemedScreenBackground
 import com.example.ui.components.LinearButton
 import com.example.ui.components.LinearButtonVariant
 import com.example.ui.components.LinearGlowCard
@@ -80,6 +81,7 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
+import com.example.ui.theme.LocalAppAccent
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
@@ -106,6 +108,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
+    val appAccent = LocalAppAccent.current // v1.4.0-round2 theme accent
 
     // Semantic colors for Light/Dark mode - Apple-inspired minimal glass aesthetic
     val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
@@ -283,7 +286,7 @@ fun HomeScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        AuroraBackground(modifier = Modifier.fillMaxSize())
+        ThemedScreenBackground(modifier = Modifier.fillMaxSize())
 
         // Top Atmospheric Header Backdrop Image Layer
         Box(
@@ -1038,7 +1041,7 @@ fun HomeScreen(
                             Box(
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .background(RegainLimePrimary)
+                                    .background(appAccent)
                                     .clickable { onOpenTaskCreate() }
                                     .padding(horizontal = 18.dp, vertical = 10.dp)
                             ) {

@@ -433,6 +433,11 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
             )
         } else {
             // Main OS Shell (Direct Open)
+            // v1.4.0-round2: full-screen theme accent for nav + main screens.
+            val appTheme by com.example.util.TimerThemeManager.selectedTheme.collectAsState()
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.example.ui.theme.LocalAppAccent provides appTheme.accent
+            ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -885,6 +890,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     }
                 }
             }
+            } // CompositionLocalProvider (v1.4.0-round2 theme accent)
         }
     }
 }
