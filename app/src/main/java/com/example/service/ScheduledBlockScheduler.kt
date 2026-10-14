@@ -829,23 +829,6 @@ object ScheduledBlockScheduler {
         } catch (_: Exception) { }
     }
 
-    fun cancelAlarms(context: Context) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-        val intent = Intent(context, ScheduledBlockReceiver::class.java).apply {
-            action = ScheduledBlockReceiver.ACTION_SCHEDULE_TRANSITION
-        }
-        val pi = PendingIntent.getBroadcast(
-            context,
-            ALARM_REQUEST_CODE,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        try {
-            alarmManager.cancel(pi)
-        } catch (_: Exception) { }
-        Log.d(TAG, "Cancelled scheduled block alarm")
-    }
-
     fun formatDisplayTime(timeStr: String): String {
         return try {
             val parts = timeStr.split(":")
