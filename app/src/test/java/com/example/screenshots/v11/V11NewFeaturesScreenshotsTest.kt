@@ -259,9 +259,9 @@ class V11NewFeaturesScreenshotsTest {
         MascotWardrobe.saveOutfit(
             mapOf(
                 WardrobeCategory.CAPS to "cap_scholar",
-                WardrobeCategory.TOPS to "top_cardigan",
-                WardrobeCategory.BOTTOMS to "bottom_trousers",
-                WardrobeCategory.BOOKS to "book_tome",
+                WardrobeCategory.TOPS to "top_jacket_denim",
+                WardrobeCategory.BOTTOMS to "bottom_shorts_black",
+                WardrobeCategory.SHOES to "shoes_black",
                 WardrobeCategory.EXTRAS to "extra_glasses"
             )
         )
@@ -278,8 +278,8 @@ class V11NewFeaturesScreenshotsTest {
             mapOf(
                 WardrobeCategory.CAPS to "cap_lime",
                 WardrobeCategory.TOPS to "top_sweatshirt",
-                WardrobeCategory.BOTTOMS to "bottom_shorts",
-                WardrobeCategory.BOOKS to "book_notebook",
+                WardrobeCategory.BOTTOMS to "bottom_shorts_navy",
+                WardrobeCategory.SHOES to "shoes_lime",
                 WardrobeCategory.EXTRAS to "extra_badge"
             )
         )
