@@ -26,7 +26,7 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * v1.1: renders the 5 pack widget layouts (actual XML, sample data) —
  * used for the widget picker previewImage assets AND the in-app page
- * verification. PNGs go to app/src/test/screenshots/v11/.
+ * verification. PNGs go to src/test/screenshots/v11/.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -52,7 +52,7 @@ class V11WidgetPreviewScreenshotsTest {
                 )
             }
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/$fileName")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/$fileName")
     }
 
     @Test

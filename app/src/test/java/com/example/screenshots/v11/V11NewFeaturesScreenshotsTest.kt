@@ -41,7 +41,7 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * v1.1 screenshot round: new features (timer faces, pomodoro, mascot buddy,
  * blocked apps). Every capture is eyeballed before the round is reported.
- * PNGs go to app/src/test/screenshots/v11/.
+ * PNGs go to src/test/screenshots/v11/.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -105,7 +105,7 @@ class V11NewFeaturesScreenshotsTest {
         themed(dark = true) {
             TimerFaceHost(faceId = "ring", params = faceParams())
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/face_ring_dark.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/face_ring_dark.png")
     }
 
     @Test
@@ -114,7 +114,7 @@ class V11NewFeaturesScreenshotsTest {
         themed(dark = true) {
             TimerFaceHost(faceId = "digits", params = faceParams())
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/face_digits_dark.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/face_digits_dark.png")
     }
 
     @Test
@@ -123,7 +123,7 @@ class V11NewFeaturesScreenshotsTest {
         themed(dark = true) {
             TimerFaceHost(faceId = "glass", params = faceParams())
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/face_glass_dark.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/face_glass_dark.png")
     }
 
     @Test
@@ -132,7 +132,7 @@ class V11NewFeaturesScreenshotsTest {
         themed(dark = true) {
             TimerFaceHost(faceId = "arc", params = faceParams())
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/face_arc_dark.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/face_arc_dark.png")
     }
 
     @Test
@@ -141,7 +141,7 @@ class V11NewFeaturesScreenshotsTest {
         themed(dark = false) {
             TimerFaceHost(faceId = "editorial", params = faceParams())
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/face_editorial_light.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/face_editorial_light.png")
     }
 
     @Test
@@ -150,7 +150,7 @@ class V11NewFeaturesScreenshotsTest {
         themed(dark = true) {
             TimerFaceHost(faceId = "ring", params = faceParams(isBreak = true))
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/face_ring_break_phase.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/face_ring_break_phase.png")
     }
 
     @Test
@@ -168,7 +168,7 @@ class V11NewFeaturesScreenshotsTest {
                 onStartPomodoro = {}
             )
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/customize_timer_pomodoro_showcase.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/customize_timer_pomodoro_showcase.png")
     }
 
     @Test
@@ -206,7 +206,7 @@ class V11NewFeaturesScreenshotsTest {
                 onOpenMascot = {}
             )
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/study_timer_dressed_buddy.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/study_timer_dressed_buddy.png")
     }
 
     @Test
@@ -240,7 +240,7 @@ class V11NewFeaturesScreenshotsTest {
                 onUpdateTaskTitle = {}
             )
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/study_pomodoro_break_phase.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/study_pomodoro_break_phase.png")
     }
 
     @Test
@@ -250,7 +250,7 @@ class V11NewFeaturesScreenshotsTest {
         themed(dark = true) {
             MascotScreen(focusPoints = 1250, onBack = {})
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/mascot_screen_default.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/mascot_screen_default.png")
     }
 
     @Test
@@ -268,7 +268,7 @@ class V11NewFeaturesScreenshotsTest {
         themed(dark = true) {
             MascotScreen(focusPoints = 5200, onBack = {})
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/mascot_screen_dressed.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/mascot_screen_dressed.png")
     }
 
     @Test
@@ -291,6 +291,6 @@ class V11NewFeaturesScreenshotsTest {
                 BuddyMascot(modifier = Modifier.width(280.dp))
             }
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/buddy_mascot_dressed_closeup.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/buddy_mascot_dressed_closeup.png")
     }
 }

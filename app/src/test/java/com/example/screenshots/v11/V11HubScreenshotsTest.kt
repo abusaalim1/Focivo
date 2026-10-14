@@ -70,7 +70,7 @@ class V11HubScreenshotsTest {
         themed(dark = true) {
             StudyChannelsScreen(onBack = {})
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/study_channels.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/study_channels.png")
     }
 
     @Test
@@ -79,7 +79,7 @@ class V11HubScreenshotsTest {
         themed(dark = true) {
             AiStudyGuardHubSheet(onDismiss = {})
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/ai_guard_hub.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/ai_guard_hub.png")
     }
 
     @Test
@@ -101,7 +101,7 @@ class V11HubScreenshotsTest {
                 onDismiss = {}
             )
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/focus_shield_hub.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/focus_shield_hub.png")
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -115,6 +115,6 @@ class V11HubScreenshotsTest {
                 onDismiss = {}
             )
         }
-        composeTestRule.onRoot().captureRoboImage("app/src/test/screenshots/v11/widgets_gallery.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/widgets_gallery.png")
     }
 }
