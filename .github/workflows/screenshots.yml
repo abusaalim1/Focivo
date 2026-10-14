@@ -3,6 +3,9 @@ name: Round2 Screenshots
 # Manual only. Runs the Robolectric/Roborazzi owner-review screenshots on
 # the round2/premium-ui-fixes branch and uploads the PNGs as an artifact.
 # The owner reviews these before approving any deploy.
+#
+# Note: this repo has no gradle wrapper committed, so we provision Gradle
+# via gradle/actions/setup-gradle like the debug build workflow does.
 
 on:
   workflow_dispatch:
@@ -23,11 +26,13 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
 
       - name: Run round2 screenshot tests
-        run: ./gradlew :app:testDebugUnitTest --tests "com.example.screenshots.*"
+        run: gradle :app:testDebugUnitTest --tests "com.example.screenshots.*" --stacktrace
 
       - name: Upload screenshots
         if: always()
