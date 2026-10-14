@@ -2,7 +2,6 @@ package com.example.screenshots
 
 import android.content.Context
 import android.view.LayoutInflater
-import android.view.MeasureSpec
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -28,12 +27,13 @@ class WidgetScreenshotsTest {
     private val context: Context
         get() = ApplicationProvider.getApplicationContext()
 
+    // MeasureSpec-free: avoids a compile quirk in the unit-test source set.
+    // Encoding is the stable Android API: EXACTLY = 1 shl 30, spec = size | mode.
+    private fun exactSpec(size: Int): Int = size or (1 shl 30)
+
     private fun inflate(layout: Int, width: Int = 1000, height: Int = 520): View {
         val view = LayoutInflater.from(context).inflate(layout, null)
-        view.measure(
-            MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
-            MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY)
-        )
+        view.measure(exactSpec(width), exactSpec(height))
         view.layout(0, 0, width, height)
         return view
     }
