@@ -33,7 +33,7 @@ jobs:
           gradle-version: '9.3.1'
 
       - name: Run screenshot tests (record mode)
-        run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.v11.*" --stacktrace
+        run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.v11.*" --rerun-tasks --no-configuration-cache --stacktrace
 
       - name: Dump test failure stacks
         if: always()
