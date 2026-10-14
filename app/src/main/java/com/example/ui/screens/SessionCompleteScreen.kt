@@ -17,6 +17,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
+import com.example.ui.overlay.OverlayLifecycleHost
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -623,9 +624,13 @@ private suspend fun captureShareCardBitmap(
 ): Bitmap? = withContext(Dispatchers.Main) {
     suspendCancellableCoroutine { cont ->
         var composeView: ComposeView? = null
+        var overlayHost: OverlayLifecycleHost? = null
         var wm: WindowManager? = null
         fun cleanup() {
             try {
+                // v1.5.1: dismiss the overlay lifecycle host alongside the view.
+                runCatching { overlayHost?.dismiss() }
+                overlayHost = null
                 composeView?.let { v -> wm?.removeView(v) }
             } catch (_: Exception) {
             }
@@ -633,9 +638,16 @@ private suspend fun captureShareCardBitmap(
         cont.invokeOnCancellation { cleanup() }
         try {
             wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            // v1.5.1: overlay ComposeViews have no Activity/Fragment — install a
+            // dedicated lifecycle host or onAttachedToWindow throws
+            // IllegalStateException("ViewTreeLifecycleOwner not found") (Android 16).
+            val host = OverlayLifecycleHost()
             composeView = ComposeView(context).apply {
+                host.installOn(this)
                 setContent { ShareCardContent(minutes, distractionsCount, quote) }
             }
+            overlayHost = host
+            host.show()
             val params = WindowManager.LayoutParams(
                 1080,
                 WindowManager.LayoutParams.WRAP_CONTENT,
