@@ -28,7 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ChevronRight
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -145,8 +145,9 @@ fun BlockedAppOverlay(
             value = withContext(Dispatchers.IO) {
                 runCatching {
                     withTimeoutOrNull(2500L) {
-                        firstOrNull(FocuslyRepository.getInstance(context).topPriorities)
-                            ?.firstOrNull { !it.title.isNullOrBlank() }
+                        FocuslyRepository.getInstance(context).topPriorities
+                            .firstOrNull()
+                            ?.firstOrNull { it.title.isNotBlank() }
                             ?.title
                     }
                 }.getOrNull()
@@ -481,7 +482,7 @@ private fun SuggestionCard(
             )
             Spacer(modifier = Modifier.width(2.dp))
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.ChevronRight,
+                imageVector = Icons.Filled.ChevronRight,
                 contentDescription = null,
                 tint = accentColor,
                 modifier = Modifier.size(20.dp)
