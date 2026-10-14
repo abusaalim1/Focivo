@@ -56,6 +56,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import com.example.ui.components.CelebrateBuddyMascot
 import com.example.ui.components.SessionNotificationDigestSheet
 import com.example.util.SessionNotificationDigestManager
 import androidx.compose.ui.Alignment
@@ -486,14 +487,6 @@ private fun ShareActionButton(
         )
     }
 }
-
-/**
- * The card rendered into the downloaded PNG. Self-contained colors so it
- * renders correctly in an offscreen ComposeView without an Activity theme.
- * v1.3.1 — Regain-level aesthetic: lime card, big Focus Time, rotating quote
- * box, honest distractions line, brand footer.
- */
-@Composable
 /**
  * v1.1 — Minimal aesthetic share card.
  *
