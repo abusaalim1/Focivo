@@ -65,6 +65,7 @@ import com.example.data.model.FocusSessionEntity
 import com.example.data.model.TaskEntity
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.AuroraBackground
+import com.example.ui.components.PremiumButton
 import com.example.ui.components.ThemedScreenBackground
 import com.example.ui.components.LinearButton
 import com.example.ui.components.LinearButtonVariant
@@ -1038,23 +1039,11 @@ fun HomeScreen(
                                 )
                             )
                             Spacer(modifier = Modifier.height(14.dp))
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(appAccent)
-                                    .clickable { onOpenTaskCreate() }
-                                    .padding(horizontal = 18.dp, vertical = 10.dp)
-                            ) {
-                                Text(
-                                    text = "+ Add Priority",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontFamily = PoppinsFontFamily,
-                                        color = NearBlack,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp
-                                    )
-                                )
-                            }
+                            PremiumButton(
+                                text = "+ Add Priority",
+                                onClick = { onOpenTaskCreate() },
+                                compact = true
+                            )
                         }
                     }
                 }

@@ -44,6 +44,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import com.example.ui.components.WidgetsShowcaseSheet
 import com.example.ui.components.ThemedScreenBackground
+import com.example.ui.components.PremiumSecondaryButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -1724,9 +1725,10 @@ private fun AchievementDetailDialog(
             }
         },
         confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text("Close", fontFamily = PoppinsFontFamily, color = textSecondary)
-            }
+            PremiumSecondaryButton(
+                text = "Close",
+                onClick = onDismiss
+            )
         }
     )
 }

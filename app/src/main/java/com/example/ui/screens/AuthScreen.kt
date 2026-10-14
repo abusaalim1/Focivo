@@ -37,6 +37,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import com.example.ui.components.PrivacyPolicySheet
+import com.example.ui.components.PremiumButton
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -856,51 +857,14 @@ fun AuthScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Primary CTA Button (Solid Lime Green Fill with White Bold Text)
-            Button(
+            // Primary CTA Button (v1.4.0-round2 premium button system)
+            PremiumButton(
+                text = if (isLoading) "Please wait..." else if (isRegisterMode) "Create Account" else "Sign In",
                 onClick = { handleSubmit() },
                 enabled = !isLoading && (!isRegisterMode || hasAcceptedPrivacyPolicy),
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = RegainLimePrimary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    disabledContainerColor = RegainLimeContainer
-                ),
-                contentPadding = PaddingValues(0.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .shadow(
-                        elevation = 6.dp,
-                        shape = CircleShape,
-                        ambientColor = Color(0x3B8CE000),
-                        spotColor = Color(0x3B8CE000)
-                    )
-                    .testTag("btn_primary")
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.5.dp
-                        )
-                    } else {
-                        Text(
-                            text = if (isRegisterMode) "Create Account" else "Sign In",
-                            style = TextStyle(
-                                fontFamily = PoppinsFontFamily,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        )
-                    }
-                }
-            }
+                modifier = Modifier.fillMaxWidth(),
+                testTag = "btn_primary"
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -1289,22 +1253,13 @@ private fun ForgotPasswordDialog(
             val sending = resetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Sending
             val sent = resetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Sent
             if (!sent) {
-                TextButton(
+                PremiumButton(
+                    text = if (sending) "Sending..." else "Send link",
                     onClick = { onSend(email.trim()) },
                     enabled = !sending && email.contains("@"),
+                    compact = true,
                     modifier = Modifier.testTag("forgot_password_send")
-                ) {
-                    if (sending) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text(
-                            "Send link",
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDark) RegainLimePrimary else RegainLimeDeepText
-                        )
-                    }
-                }
+                )
             }
         },
         dismissButton = {
@@ -1398,7 +1353,8 @@ private fun SetNewPasswordSheet(
             }
         },
         confirmButton = {
-            TextButton(
+            PremiumButton(
+                text = if (updating) "Saving..." else "Save password",
                 onClick = {
                     localError = when {
                         password.length < 6 -> "Password must be at least 6 characters."
@@ -1408,19 +1364,9 @@ private fun SetNewPasswordSheet(
                     if (localError == null) onSubmit(password)
                 },
                 enabled = !updating,
+                compact = true,
                 modifier = Modifier.testTag("new_password_submit")
-            ) {
-                if (updating) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Text(
-                        "Save password",
-                        fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) RegainLimePrimary else RegainLimeDeepText
-                    )
-                }
-            }
+            )
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
