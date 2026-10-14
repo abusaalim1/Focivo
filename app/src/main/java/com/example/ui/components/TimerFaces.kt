@@ -56,7 +56,6 @@ import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
-import com.example.util.MascotPose
 import com.example.util.TimerFace
 import com.example.util.TimerFaceManager
 import com.example.util.TimerTheme
@@ -89,7 +88,8 @@ data class TimerFaceParams(
     val theme: TimerTheme?,
     val onTogglePlay: () -> Unit,
     val onReset: () -> Unit,
-    val onTagClick: (() -> Unit)?
+    val onTagClick: (() -> Unit)?,
+    val onTimeClick: (() -> Unit)? = null
 )
 
 fun formatFaceTime(remainingSeconds: Int): String {

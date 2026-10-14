@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.CivoChatBubble
+import com.example.ui.theme.RegainLimePrimary
 import com.example.util.PermissionUtils
 import kotlinx.coroutines.launch
 
