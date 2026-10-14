@@ -60,6 +60,8 @@ import com.example.data.HallOfFameItem
 import com.example.data.LeaderboardDateUtils
 import com.example.data.LeaderboardUser
 import com.example.data.model.FocusSessionEntity
+import com.example.R
+import com.example.ui.components.FeatureIcon
 import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -303,32 +305,11 @@ fun LeaderboardScreen(
                     }
 
                     // Global rank pill
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(cardBg)
-                            .border(1.dp, cardBorder, CircleShape)
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.EmojiEvents,
-                                contentDescription = null,
-                                tint = RegainGoldStar,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Global",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    color = textPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
-                            )
-                        }
-                    }
+                                        FeatureIcon(
+                        drawableRes = R.drawable.ic3d_trophy,
+                        contentDescription = "Leaderboard",
+                        size = 52.dp
+                    )
                 }
             }
 
@@ -985,11 +966,10 @@ private fun HallOfFameSection(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.MilitaryTech,
-                            contentDescription = null,
-                            tint = if (isDark) Color(0x80FFA000) else Color(0xFFE0A800),
-                            modifier = Modifier.size(56.dp)
+                        FeatureIcon(
+                            drawableRes = R.drawable.ic3d_trophy,
+                            contentDescription = "No Past Champions Yet",
+                            size = 84.dp
                         )
                         Text(
                             text = "No Past Champions Yet",

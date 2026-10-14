@@ -131,15 +131,7 @@ fun AlarmHubSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(
-                            text = "SOUND & ALARMS",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = textMuted,
-                                letterSpacing = 1.4.sp,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
+                        SectionLabel(text = "SOUND & ALARMS", color = textMuted)
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Alarm Studio",
@@ -205,15 +197,7 @@ fun AlarmHubSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "SCHEDULED ALARMS",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = textSecondary,
-                            letterSpacing = 1.2.sp,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
+                    SectionLabel(text = "SCHEDULED ALARMS", color = textSecondary)
 
                     Text(
                         text = if (isCreatingAlarm) "Cancel" else "+ New Alarm",

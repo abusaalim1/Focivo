@@ -86,6 +86,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.data.SupabaseScheduledBlockDto
 import com.example.data.SupabasePunishmentLogDto
+import com.example.R
+import com.example.ui.components.FeatureIcon
 import com.example.ui.components.GlassCard
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.theme.MutedBorderLight
@@ -367,9 +369,10 @@ fun FocusShieldHubSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 22.dp)
-                .padding(top = 18.dp, bottom = 36.dp),
+                .padding(top = 6.dp, bottom = 36.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item { SheetDragHandle() }
             // Header Row
             item {
                 Row(
@@ -378,22 +381,11 @@ fun FocusShieldHubSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(listOf(RegainLimePrimary, RegainLimeDeepText))
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Shield,
-                                contentDescription = null,
-                                tint = NearBlack,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                        FeatureIcon(
+                            drawableRes = R.drawable.ic3d_shield,
+                            contentDescription = "Focus Shield",
+                            size = 46.dp
+                        )
                         Spacer(modifier = Modifier.width(14.dp))
                         Column {
                             Text(
@@ -799,20 +791,11 @@ fun FocusShieldHubSheet(
                                 modifier = Modifier.weight(1f),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(accentLime.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Shield,
-                                        contentDescription = null,
-                                        tint = accentLime,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
+                                FeatureIcon(
+                                    drawableRes = R.drawable.ic3d_shield,
+                                    contentDescription = "Shield",
+                                    size = 44.dp
+                                )
 
                                 Spacer(modifier = Modifier.width(12.dp))
 

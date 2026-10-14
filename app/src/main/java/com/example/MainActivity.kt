@@ -10,6 +10,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -467,7 +469,13 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                         AnimatedContent(
                             targetState = if (isSettingsOpen) "SETTINGS" else selectedTab.name,
                             transitionSpec = {
-                                fadeIn(animationSpec = tween(240)) togetherWith fadeOut(animationSpec = tween(180))
+                                // Final phase: soft fade + gentle slide on tab switches
+                                (fadeIn(animationSpec = tween(260)) + slideInHorizontally(
+                                    animationSpec = tween(260)
+                                ) { it / 14 }) togetherWith
+                                (fadeOut(animationSpec = tween(200)) + slideOutHorizontally(
+                                    animationSpec = tween(200)
+                                ) { -it / 14 })
                             },
                             label = "tab_navigation"
                         ) { target ->

@@ -44,6 +44,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import com.example.ui.components.WidgetsShowcaseSheet
 import com.example.ui.components.PremiumSecondaryButton
+import com.example.ui.components.FeatureIcon
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -364,21 +365,11 @@ fun ProfileScreen(
                         )
                     }
 
-                    IconButton(
+                                        IconButton(
                         onClick = onOpenSettings,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(cardBg)
-                            .border(1.dp, cardBorder, CircleShape)
-                            .testTag("settings_button")
+                        modifier = Modifier.size(46.dp).testTag("settings_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = textPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        FeatureIcon(drawableRes = R.drawable.ic3d_gear, contentDescription = "Settings", size = 46.dp)
                     }
                 }
             }
@@ -400,20 +391,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Favorite,
-                                    contentDescription = "Support Focivo",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_heart,
+                                contentDescription = "Support Focivo",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -756,20 +738,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Security,
-                                    contentDescription = "Focus Shield",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_shield,
+                                contentDescription = "Focus Shield",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -839,20 +812,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Widgets,
-                                    contentDescription = "Home Widgets",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_widgets,
+                                contentDescription = "Home Widgets",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -936,20 +900,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isTodaySunday) RegainLimeContainer else Color(0xFF232A25)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.DateRange,
-                                    contentDescription = "Sunday Recap",
-                                    tint = if (isTodaySunday) RegainLimeDeepText else Color(0xFFA0A89E),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_calendar,
+                                contentDescription = "Sunday Recap",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -1021,20 +976,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Schedule,
-                                    contentDescription = "Session History",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_history,
+                                contentDescription = "Session History",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -1104,20 +1050,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Alarm,
-                                    contentDescription = null,
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_alarm,
+                                contentDescription = "Alarm Studio",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 
@@ -1214,20 +1151,11 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.SystemUpdate,
-                                    contentDescription = "Check for Updates",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                                                        FeatureIcon(
+                                drawableRes = R.drawable.ic3d_download,
+                                contentDescription = "Check for Updates",
+                                size = 46.dp
+                            )
 
                             Spacer(modifier = Modifier.width(14.dp))
 

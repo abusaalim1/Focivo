@@ -150,6 +150,7 @@ fun AiStudyGuardHubSheet(
         dragHandle = null
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            SheetDragHandle()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

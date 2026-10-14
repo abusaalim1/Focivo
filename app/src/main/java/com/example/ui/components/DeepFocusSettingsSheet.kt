@@ -233,6 +233,7 @@ fun DeepFocusSettingsSheet(
         dragHandle = null
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            SheetDragHandle()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -268,6 +269,7 @@ fun DeepFocusSettingsSheet(
                 item {
                     SettingsToggleRow(
                         icon = Icons.Default.Lock,
+                        icon3dRes = com.example.R.drawable.ic3d_lock,
                         title = "Strict mode",
                         subtitle = "You cannot end your session early without confirming. Ending early discards the session.",
                         checked = isStrictModeEnabled,
@@ -292,6 +294,9 @@ fun DeepFocusSettingsSheet(
                 item {
                     SettingsActionRow(
                         icon = Icons.Default.Palette,
+                        // Final phase: the theme row shows the selected theme's
+                        // own backdrop art as its icon tile.
+                        icon3dRes = resolveThemeBackdropRes(context, selectedTheme),
                         title = "Timer theme",
                         subtitle = selectedTheme.name + " — full-screen backdrop, mascot and glow",
                         onClick = { showThemePicker = !showThemePicker },
@@ -490,6 +495,7 @@ fun DeepFocusSettingsSheet(
                 item {
                     SettingsToggleRow(
                         icon = Icons.Default.NotificationsOff,
+                        icon3dRes = com.example.R.drawable.ic3d_bell,
                         title = "Block notifications",
                         subtitle = "Silence notifications during focus sessions so pings don't pull you out. Needs notification access + Do Not Disturb.",
                         checked = blockNotifications,
@@ -519,6 +525,7 @@ fun DeepFocusSettingsSheet(
                 item {
                     SettingsToggleRow(
                         icon = Icons.Default.Security,
+                        icon3dRes = com.example.R.drawable.ic3d_shield,
                         title = "Uninstall protection",
                         subtitle = "Focivo cannot be uninstalled while a focus session is running.",
                         checked = uninstallProtection,
@@ -533,6 +540,7 @@ fun DeepFocusSettingsSheet(
                 item {
                     SettingsToggleRow(
                         icon = Icons.Default.Home,
+                        icon3dRes = com.example.R.drawable.ic3d_home,
                         title = "Block phone home screen",
                         subtitle = "During deep focus, going to the home screen shows the focus overlay instead. Best-effort on some phones.",
                         checked = blockHomeScreen,
@@ -561,7 +569,10 @@ private fun SettingsToggleRow(
     textSecondary: Color,
     rowBg: Color,
     rowBorder: Color,
-    testTag: String
+    testTag: String,
+    // Final phase: 3D feature icon (drawable tile); falls back to the vector
+    // circle when null.
+    icon3dRes: Int? = null
 ) {
     val isDark = isAppInDarkTheme()
     Row(
@@ -570,29 +581,24 @@ private fun SettingsToggleRow(
             .clip(RoundedCornerShape(18.dp))
             .background(rowBg)
             .border(1.dp, rowBorder, RoundedCornerShape(18.dp))
+            .pressFeedback()
             .clickable { onCheckedChange(!checked) }
             .padding(horizontal = 14.dp, vertical = 13.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(
-                    if (checked) RegainLimePrimary.copy(alpha = 0.18f)
-                    else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (checked) (if (isDark) RegainLimePrimary else RegainLimeDeepText)
-                else textSecondary,
-                modifier = Modifier.size(20.dp)
-            )
-        }
+        // Final phase: 3D feature tile when a drawable is supplied, else the
+        // legacy vector circle.
+        FeatureIcon(
+            drawableRes = icon3dRes,
+            imageVector = if (icon3dRes == null) icon else null,
+            contentDescription = null,
+            size = 44.dp,
+            vectorCircleColor = if (checked) RegainLimePrimary.copy(alpha = 0.18f)
+            else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6),
+            vectorTint = if (checked) (if (isDark) RegainLimePrimary else RegainLimeDeepText)
+            else textSecondary
+        )
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -635,7 +641,10 @@ private fun SettingsActionRow(
     rowBg: Color,
     rowBorder: Color,
     badgeCount: Int = 0,
-    testTag: String
+    testTag: String,
+    // Final phase: 3D feature icon (drawable tile); falls back to the vector
+    // circle when null.
+    icon3dRes: Int? = null
 ) {
     val isDark = isAppInDarkTheme()
     Row(
@@ -644,28 +653,23 @@ private fun SettingsActionRow(
             .clip(RoundedCornerShape(18.dp))
             .background(rowBg)
             .border(1.dp, rowBorder, RoundedCornerShape(18.dp))
+            .pressFeedback()
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 13.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(
-                    if (badgeCount > 0) RegainLimePrimary.copy(alpha = 0.18f)
-                    else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (badgeCount > 0) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary,
-                modifier = Modifier.size(20.dp)
-            )
-        }
+        // Final phase: 3D feature tile when a drawable is supplied, else the
+        // legacy vector circle.
+        FeatureIcon(
+            drawableRes = icon3dRes,
+            imageVector = if (icon3dRes == null) icon else null,
+            contentDescription = null,
+            size = 44.dp,
+            vectorCircleColor = if (badgeCount > 0) RegainLimePrimary.copy(alpha = 0.18f)
+            else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6),
+            vectorTint = if (badgeCount > 0) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary
+        )
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(

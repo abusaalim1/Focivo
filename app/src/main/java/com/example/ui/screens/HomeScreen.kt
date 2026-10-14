@@ -64,6 +64,7 @@ import com.example.R
 import com.example.data.model.FocusSessionEntity
 import com.example.data.model.TaskEntity
 import com.example.data.model.UserPreferencesEntity
+import com.example.ui.components.FeatureIcon
 import com.example.ui.components.PremiumButton
 import com.example.ui.components.LinearButton
 import com.example.ui.components.LinearButtonVariant
@@ -387,35 +388,19 @@ fun HomeScreen(
                             IconButton(
                                 onClick = onOpenAutoSchedule,
                                 modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(headerButtonBg)
-                                    .border(1.dp, headerButtonBorder, CircleShape)
+                                    .size(40.dp)
                                     .testTag("home_auto_schedule_button")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Schedule,
-                                    contentDescription = "Auto Schedule",
-                                    tint = if (isDark) RegainLimeDeepText else Color(0xFF2E6800),
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                FeatureIcon(drawableRes = R.drawable.ic3d_calendar, contentDescription = "Auto Schedule", size = 40.dp)
                             }
 
                             IconButton(
                                 onClick = onOpenAlarmStudio,
                                 modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(headerButtonBg)
-                                    .border(1.dp, headerButtonBorder, CircleShape)
+                                    .size(40.dp)
                                     .testTag("home_alarm_button")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Alarm,
-                                    contentDescription = "Alarms",
-                                    tint = if (isDark) textPrimary else Color(0xFF151916),
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                FeatureIcon(drawableRes = R.drawable.ic3d_alarm, contentDescription = "Alarms", size = 40.dp)
                             }
                         }
                     }
@@ -726,20 +711,11 @@ fun HomeScreen(
                                 .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(RegainLimeContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Schedule,
-                                    contentDescription = "Auto Schedule",
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                            FeatureIcon(
+                                drawableRes = R.drawable.ic3d_calendar,
+                                contentDescription = "Auto Schedule",
+                                size = 40.dp
+                            )
 
                             Spacer(modifier = Modifier.width(10.dp))
 
@@ -786,20 +762,11 @@ fun HomeScreen(
                                 .padding(vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isShieldActive) RegainLimeContainer else (if (isDark) Color(0x30FFFFFF) else Color(0xFFF0F4EC))),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Security,
-                                    contentDescription = "Focus Shield",
-                                    tint = if (isShieldActive) RegainLimeDeepText else textSecondary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                            FeatureIcon(
+                                drawableRes = R.drawable.ic3d_shield,
+                                contentDescription = "Focus Shield",
+                                size = 40.dp
+                            )
 
                             Spacer(modifier = Modifier.width(10.dp))
 
@@ -862,20 +829,11 @@ fun HomeScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(CircleShape)
-                                        .background(RegainLimeContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Bolt,
-                                        contentDescription = null,
-                                        tint = RegainLimeDeepText,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
+                                FeatureIcon(
+                                    drawableRes = R.drawable.ic3d_bolt,
+                                    contentDescription = "Quick Focus",
+                                    size = 38.dp
+                                )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "QUICK FOCUS",

@@ -49,6 +49,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.ui.components.MascotPose
+import com.example.ui.components.RegainMascotView
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeContainer
@@ -119,6 +121,14 @@ fun OfflineScreen(
                     modifier = Modifier.size(92.dp)
                 )
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Final phase: concerned mascot softens the offline dead-end
+            RegainMascotView(
+                size = 110.dp,
+                pose = MascotPose.CONCERNED
+            )
 
             Spacer(modifier = Modifier.height(28.dp))
 
