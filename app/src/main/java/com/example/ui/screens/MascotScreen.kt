@@ -53,7 +53,9 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
+import com.example.R
 import com.example.util.MascotLevel
+import com.example.util.MascotPose
 import com.example.util.MascotWardrobe
 import com.example.util.WARDROBE_ITEMS
 import com.example.util.WardrobeCategory
@@ -351,7 +353,10 @@ fun MascotScreen(
                 ) {
                     Box(contentAlignment = Alignment.TopEnd) {
                         androidx.compose.foundation.Image(
-                            painter = painterResource(id = item.overlayRes),
+                            painter = painterResource(
+                                id = item.overlayFor(MascotPose.STANDING)?.resId
+                                    ?: R.drawable.mascot_base_standing
+                            ),
                             contentDescription = item.name,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier

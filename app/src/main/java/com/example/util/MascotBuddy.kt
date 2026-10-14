@@ -443,6 +443,18 @@ val WARDROBE_ITEMS: List<WardrobeItem> = listOf(
         category = WardrobeCategory.EXTRAS,
         unlockPoints = 7500, requiredLevel = MascotLevel.GRANDMASTER,
         overlays = mapOf(
+            MascotPose.STANDING to PoseOverlay(
+                resId = R.drawable.wardrobe_extra_badge_standing,
+                widthFrac = 0.1200f, cxFrac = 0.4450f, cyFrac = 0.5650f
+            ),
+            MascotPose.STUDY to PoseOverlay(
+                resId = R.drawable.wardrobe_extra_badge_study,
+                widthFrac = 0.1200f, cxFrac = 0.4650f, cyFrac = 0.5700f
+            ),
+            MascotPose.CELEBRATE to PoseOverlay(
+                resId = R.drawable.wardrobe_extra_badge_celebrate,
+                widthFrac = 0.1200f, cxFrac = 0.4650f, cyFrac = 0.5550f
+            ),
         )
     ),
 )
