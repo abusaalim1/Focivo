@@ -126,6 +126,7 @@ fun DeepFocusSettingsSheet(
         TimerThemeManager.validateSelection(context, focusPoints)
     }
 
+    var showDigestSheet by remember { mutableStateOf(false) }
     if (showDigestSheet) {
         SessionNotificationDigestSheet(onDismiss = { showDigestSheet = false })
     }
