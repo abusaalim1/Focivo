@@ -34,6 +34,16 @@ jobs:
       - name: Run round2 screenshot tests
         run: gradle :app:testDebugUnitTest --tests "com.example.screenshots.*" --stacktrace
 
+      - name: Locate generated PNGs
+        if: always()
+        run: |
+          echo "=== app/src/test/screenshots ==="
+          find app/src/test/screenshots -type f 2>/dev/null | head -20
+          echo "=== PNGs modified in last 30 min ==="
+          find . -name "*.png" -newermt "-30 minutes" 2>/dev/null | grep -v "^\./\.git/" | head -20
+          echo "=== roborazzi build outputs ==="
+          find app/build -path "*roborazzi*" -name "*.png" 2>/dev/null | head -20
+
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
