@@ -126,7 +126,7 @@
                 android:layout_height="88dp"
                 android:layout_gravity="center"
                 android:contentDescription="Focus guard mascot"
-                android:src="@drawable/mascot_guard" />
+                android:src="@drawable/mascot_guard_transparent" />
         </FrameLayout>
     </LinearLayout>
 
