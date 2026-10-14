@@ -320,6 +320,9 @@ private fun PlannerTaskRow(
     onDelete: () -> Unit,
     onStartFocus: () -> Unit
 ) {
+    // v1.4.2: explicit text colors (colorScheme.onSurface renders dark on dark cards)
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
