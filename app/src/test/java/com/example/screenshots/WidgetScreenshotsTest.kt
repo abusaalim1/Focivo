@@ -61,7 +61,7 @@ class WidgetScreenshotsTest {
         val v = inflate(R.layout.widget_study_timer)
             .tv(R.id.widget_timer_clock, "18:42")
             .tv(R.id.widget_timer_task_title, "Deep Work Session")
-            .tv(R.id.widget_timer_status_badge, "FOCUSING")
+            .tv(R.id.widget_timer_status_badge, "READY")
             .tv(R.id.widget_timer_subtitle, "Deep focus session in progress · Stay on track")
         capture(v, "widget_timer")
     }
