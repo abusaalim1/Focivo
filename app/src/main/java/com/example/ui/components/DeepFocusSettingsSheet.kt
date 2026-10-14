@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +39,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +57,8 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.material3.MaterialTheme
 import com.example.service.FocivoDeviceAdminReceiver
+import com.example.data.FocuslyRepository
+import com.example.util.TimerTheme
 import com.example.util.TimerThemeManager
 import com.example.util.SessionNotificationDigestManager
 import androidx.compose.ui.platform.LocalContext
@@ -108,11 +113,56 @@ fun DeepFocusSettingsSheet(
     var showDeviceAdminPrompt by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(initialShowThemePicker) }
     val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
-    var showDigestSheet by remember { mutableStateOf(false) }
-    val digestList by SessionNotificationDigestManager.digestList.collectAsState()
+    // Round-4: Focus Points balance (real currency, 1 pt per focused minute)
+    // drives theme locks. Guests / fresh accounts see 0 -> only free themes.
+    val prefsFlow = remember(context) { FocuslyRepository.getInstance(context).userPreferences }
+    val prefs by prefsFlow.collectAsState(initial = null)
+    val focusPoints = prefs?.focusPoints ?: 0
+    var lockedDialogTheme by remember { mutableStateOf<TimerTheme?>(null) }
+
+    // Round-4: if the persisted theme is no longer affordable (rules changed),
+    // fall back to Aurora gracefully instead of rendering a locked theme.
+    LaunchedEffect(focusPoints, selectedTheme.id) {
+        TimerThemeManager.validateSelection(context, focusPoints)
+    }
 
     if (showDigestSheet) {
         SessionNotificationDigestSheet(onDismiss = { showDigestSheet = false })
+    }
+    val digestList by SessionNotificationDigestManager.digestList.collectAsState()
+
+    // Round-4: locked-theme explainer dialog.
+    lockedDialogTheme?.let { lockedTheme ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { lockedDialogTheme = null },
+            title = {
+                Text(
+                    text = "Locked theme",
+                    fontFamily = BalooBrandFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp,
+                    color = textPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = "Collect ${(lockedTheme.unlockPoints - focusPoints).coerceAtLeast(1)} more Focus Points to unlock ${lockedTheme.name}. You earn 1 point per focused minute.",
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 13.sp,
+                    color = textSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { lockedDialogTheme = null }) {
+                    Text(
+                        text = "Got it",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = RegainLimePrimary
+                    )
+                }
+            }
+        )
     }
 
     if (showDeviceAdminPrompt) {
@@ -253,8 +303,33 @@ fun DeepFocusSettingsSheet(
                 }
                 if (showThemePicker) {
                     item {
+                        // Round-4: Focus Points header — the real earned balance
+                        // (1 pt per focused minute) that unlocks themes.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFFFD54F),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Your Focus Points: $focusPoints",
+                                fontFamily = PoppinsFontFamily,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                color = textPrimary
+                            )
+                        }
                         // Round-3: visual theme cards — each theme shows its real
                         // backdrop artwork so users SEE it is a full-screen theme.
+                        // Round-4: locked cards show a lock badge + price, and
+                        // tapping one explains how to earn it.
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -263,13 +338,18 @@ fun DeepFocusSettingsSheet(
                         ) {
                             TimerThemeManager.THEMES.forEach { theme ->
                                 val isSelected = theme.id == selectedTheme.id
+                                val isLocked = !theme.isUnlocked(focusPoints)
                                 val cardBackdrop = remember(theme.id) {
                                     resolveThemeBackdropRes(context, theme)
                                 }
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier.clickable {
-                                        TimerThemeManager.selectTheme(context, theme.id)
+                                        if (isLocked) {
+                                            lockedDialogTheme = theme
+                                        } else {
+                                            TimerThemeManager.trySelectTheme(context, theme.id, focusPoints)
+                                        }
                                     }
                                 ) {
                                     Box(
@@ -306,6 +386,32 @@ fun DeepFocusSettingsSheet(
                                                     )
                                             )
                                         }
+                                        if (isLocked) {
+                                            // Dim the artwork so locked cards read as unavailable.
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(Color(0xAA0B0F0B))
+                                            )
+                                        }
+                                        if (isLocked) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopStart)
+                                                    .padding(6.dp)
+                                                    .size(24.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xCC1A221B)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Lock,
+                                                    contentDescription = "Locked",
+                                                    tint = Color(0xFFFFD54F),
+                                                    modifier = Modifier.size(13.dp)
+                                                )
+                                            }
+                                        }
                                         // Name strip on a scrim so it reads on any artwork.
                                         Box(
                                             modifier = Modifier
@@ -319,18 +425,29 @@ fun DeepFocusSettingsSheet(
                                                         )
                                                     )
                                                 )
-                                                .padding(top = 18.dp, bottom = 8.dp),
+                                                .padding(top = 16.dp, bottom = 8.dp),
                                             contentAlignment = Alignment.BottomCenter
                                         ) {
-                                            Text(
-                                                text = theme.name,
-                                                fontFamily = PoppinsFontFamily,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                                fontSize = 11.sp,
-                                                color = Color.White
-                                            )
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text(
+                                                    text = theme.name,
+                                                    fontFamily = PoppinsFontFamily,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                                    fontSize = 11.sp,
+                                                    color = Color.White
+                                                )
+                                                if (isLocked) {
+                                                    Text(
+                                                        text = "${theme.unlockPoints} pts",
+                                                        fontFamily = PoppinsFontFamily,
+                                                        fontWeight = FontWeight.Medium,
+                                                        fontSize = 9.sp,
+                                                        color = Color(0xFFFFD54F)
+                                                    )
+                                                }
+                                            }
                                         }
-                                        if (isSelected) {
+                                        if (isSelected && !isLocked) {
                                             Box(
                                                 modifier = Modifier
                                                     .align(Alignment.TopEnd)
