@@ -64,6 +64,7 @@ import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.isAppInDarkTheme
+import com.example.util.TimerTheme
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -84,8 +85,9 @@ fun AuroraTimer(
     isBreak: Boolean = false,
     subjectTitle: String = "Deep Study",
     modifier: Modifier = Modifier,
-    dialSize: Dp = 320.dp,
+    dialSize: Dp = 344.dp,
     mascotPose: MascotPose = MascotPose.IDLE,
+    theme: TimerTheme? = null,
     onTogglePlay: () -> Unit = {},
     onReset: () -> Unit = {},
     onTagClick: (() -> Unit)? = null,
@@ -162,6 +164,15 @@ fun AuroraTimer(
         )
     }
 
+    // v1.4.0: themed arc palette. Aurora (or null theme) keeps the built-in
+    // palette above exactly as-is (pixel-identical to v1.3.1).
+    val arcColors = if (theme != null && theme.id != "aurora" && theme.arcColors.isNotEmpty()) {
+        theme.arcColors + theme.arcColors.first() // seamless sweep loop
+    } else {
+        auroraColors
+    }
+    val themedGlow: Color? = if (theme != null && theme.id != "aurora") theme.glowColor else null
+
     // Glass backdrop styling (iOS-inspired minimal frosted glass)
     val glassBg = if (isDark) Color(0xD0171F19) else Color(0xF2FFFFFF)
     val glassBorderTop = if (isDark) Color(0x40FFFFFF) else Color(0x90FFFFFF)
@@ -180,8 +191,14 @@ fun AuroraTimer(
             )
             .clip(CircleShape)
             .background(glassBg)
-            // iOS Minimal Frosted Glass Top Refraction Line
+            // iOS Minimal Frosted Glass Top Refraction Line +
+            // Apple-style outer hairline: thin, layered, premium.
             .drawBehind {
+                drawCircle(
+                    color = if (isDark) Color(0x1AFFFFFF) else Color(0x14000000),
+                    radius = size.minDimension / 2f - 0.6.dp.toPx(),
+                    style = Stroke(width = 0.8.dp.toPx())
+                )
                 drawCircle(
                     brush = Brush.verticalGradient(
                         colors = listOf(glassBorderTop, glassBorderBottom)
@@ -195,15 +212,17 @@ fun AuroraTimer(
         // 1. Ambient Living Aurora Halo Canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2f, size.height / 2f)
-            val radius = (size.minDimension / 2f) - 18.dp.toPx()
+            val radius = (size.minDimension / 2f) - 24.dp.toPx()
 
             // Ethereal background radial mesh glow (breathing behind dial)
             if (isRunning) {
+                val glowInner = themedGlow?.copy(alpha = 0.16f) ?: (if (isDark) Color(0x288CE000) else Color(0x1A8CE000))
+                val glowMid = themedGlow?.copy(alpha = 0.08f) ?: (if (isDark) Color(0x1500E5FF) else Color(0x1000E5FF))
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            (if (isDark) Color(0x288CE000) else Color(0x1A8CE000)),
-                            (if (isDark) Color(0x1500E5FF) else Color(0x1000E5FF)),
+                            glowInner,
+                            glowMid,
                             Color.Transparent
                         ),
                         center = center,
@@ -233,7 +252,7 @@ fun AuroraTimer(
                 rotate(degrees = -90f, pivot = center) {
                     drawArc(
                         brush = Brush.sweepGradient(
-                            colors = auroraColors.map { it.copy(alpha = if (isRunning) 0.35f * shimmerPhase else 0.22f) },
+                            colors = arcColors.map { it.copy(alpha = if (isRunning) 0.35f * shimmerPhase else 0.22f) },
                             center = center
                         ),
                         startAngle = 0f,
@@ -247,7 +266,7 @@ fun AuroraTimer(
                     // Crisp foreground progress arc (smooth aurora chromatic shift)
                     drawArc(
                         brush = Brush.sweepGradient(
-                            colors = auroraColors,
+                            colors = arcColors,
                             center = center
                         ),
                         startAngle = 0f,
@@ -348,14 +367,14 @@ fun AuroraTimer(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             // Main Digits: Soothing, Ultra-Crisp Countdown
             Text(
                 text = timeFormatted,
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = if (hours > 0) 36.sp else 46.sp,
+                fontSize = if (hours > 0) 32.sp else 38.sp,
                 color = textPrimary,
                 textAlign = TextAlign.Center,
                 letterSpacing = (-1).sp,
@@ -371,18 +390,18 @@ fun AuroraTimer(
                 color = textSecondary
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             // v1.3.1: Focivo mascot inside the timer, pose follows the timer state
             // (ready → studying-with-book, focusing → study video, break → resting).
             RegainMascotView(
-                size = 84.dp,
+                size = 126.dp,
                 pose = mascotPose,
                 animate = true,
                 modifier = Modifier.testTag("aurora_timer_mascot")
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             // iOS-Style Glass Action Buttons (Play/Pause, Reset)
             Row(
@@ -392,7 +411,7 @@ fun AuroraTimer(
                 // Reset Button
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(34.dp)
                         .clip(CircleShape)
                         .background(if (isDark) Color(0x25FFFFFF) else Color(0x14000000))
                         .clickable(onClick = onReset),
@@ -402,7 +421,7 @@ fun AuroraTimer(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Reset Timer",
                         tint = textSecondary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
 
@@ -411,7 +430,7 @@ fun AuroraTimer(
                 // Primary Play / Pause Button with Aurora Glow
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(44.dp)
                         .shadow(
                             elevation = 6.dp,
                             shape = CircleShape,
@@ -435,7 +454,7 @@ fun AuroraTimer(
                         imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isRunning) "Pause" else "Start",
                         tint = Color.Black,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }

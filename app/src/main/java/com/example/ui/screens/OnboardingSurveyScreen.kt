@@ -72,10 +72,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -250,11 +250,11 @@ fun OnboardingSurveyScreen(
 
     // Form field states
     var userName by remember { mutableStateOf(initialUserName) }
-    var selectedClassLevel by remember { mutableStateOf("Class 11 – 12 (Higher Secondary) 🎒") }
+    var selectedClassLevel by remember { mutableStateOf("Class 11 – 12 (Higher Secondary)") }
     var isBoardExamYear by remember { mutableStateOf(true) }
-    var selectedGoal by remember { mutableStateOf("Acing Exams & Top Academic Grades 🏆") }
+    var selectedGoal by remember { mutableStateOf("Acing Exams & Academic Excellence") }
     var selectedDistractionApps by remember { mutableStateOf(setOf<String>()) }
-    var selectedTimeWindow by remember { mutableStateOf("Evening (6 PM – 10 PM) 🌆") }
+    var selectedTimeWindow by remember { mutableStateOf("Evening (6 PM – 10 PM)") }
     var selectedDailyFocusMinutes by remember { mutableIntStateOf(240) }
     var selectedMotivationStyles by remember { mutableStateOf(setOf<String>()) }
 
@@ -753,7 +753,7 @@ fun OnboardingSurveyScreen(
                                     Spacer(modifier = Modifier.height(4.dp))
 
                                     Text(
-                                        text = "Your Focus Companion ✨",
+                                        text = "Your Focus Companion",
                                         style = MaterialTheme.typography.headlineMedium.copy(
                                             fontFamily = PoppinsFontFamily,
                                             fontWeight = FontWeight.Bold,
@@ -875,7 +875,7 @@ fun OnboardingSurveyScreen(
                                                     OutlinedTextField(
                                                         value = userName,
                                                         onValueChange = { userName = it },
-                                                        label = { Text("Your Preferred Name or Alias ✨") },
+                                                        label = { Text("Your Preferred Name or Alias") },
                                                         singleLine = true,
                                                         modifier = Modifier
                                                             .fillMaxWidth()
@@ -899,7 +899,8 @@ fun OnboardingSurveyScreen(
                                                 selectedOption = selectedClassLevel,
                                                 onSelect = {
                                                     selectedClassLevel = it
-                                                }
+                                                },
+                                                optionIcons = List(5) { R.drawable.icon_onboarding_book }
                                             )
                                         }
 
@@ -910,7 +911,8 @@ fun OnboardingSurveyScreen(
                                                 selectedOption = if (isBoardExamYear) boardOptions.getOrNull(0) ?: "" else boardOptions.getOrNull(1) ?: "",
                                                 onSelect = { option ->
                                                     isBoardExamYear = option.startsWith("Yes")
-                                                }
+                                                },
+                                                optionIcons = listOf(R.drawable.icon_onboarding_trophy, R.drawable.icon_onboarding_goal)
                                             )
                                         }
 
@@ -920,7 +922,13 @@ fun OnboardingSurveyScreen(
                                                 selectedOption = selectedGoal,
                                                 onSelect = {
                                                     selectedGoal = it
-                                                }
+                                                },
+                                                optionIcons = listOf(
+                                                    R.drawable.icon_onboarding_trophy,
+                                                    R.drawable.icon_onboarding_clock,
+                                                    R.drawable.icon_onboarding_notifications,
+                                                    R.drawable.icon_onboarding_goal
+                                                )
                                             )
                                         }
 
@@ -934,7 +942,14 @@ fun OnboardingSurveyScreen(
                                                     } else {
                                                         selectedDistractionApps + option
                                                     }
-                                                }
+                                                },
+                                                optionIcons = listOf(
+                                                    R.drawable.icon_onboarding_scrolling,
+                                                    R.drawable.icon_onboarding_scrolling,
+                                                    R.drawable.icon_onboarding_texting,
+                                                    R.drawable.icon_onboarding_games,
+                                                    R.drawable.icon_onboarding_notifications
+                                                )
                                             )
                                         }
 
@@ -944,7 +959,8 @@ fun OnboardingSurveyScreen(
                                                 selectedOption = selectedTimeWindow,
                                                 onSelect = {
                                                     selectedTimeWindow = it
-                                                }
+                                                },
+                                                optionIcons = List(4) { R.drawable.icon_onboarding_clock }
                                             )
                                         }
 
@@ -966,7 +982,8 @@ fun OnboardingSurveyScreen(
                                                         option.contains("3 Hours") -> 180
                                                         else -> 240
                                                     }
-                                                }
+                                                },
+                                                optionIcons = List(4) { R.drawable.icon_onboarding_clock }
                                             )
                                         }
 
@@ -980,7 +997,13 @@ fun OnboardingSurveyScreen(
                                                     } else {
                                                         selectedMotivationStyles + option
                                                     }
-                                                }
+                                                },
+                                                optionIcons = listOf(
+                                                    R.drawable.icon_onboarding_notifications,
+                                                    R.drawable.icon_onboarding_goal,
+                                                    R.drawable.icon_onboarding_clock,
+                                                    R.drawable.icon_onboarding_trophy
+                                                )
                                             )
                                         }
                                     }
@@ -1041,10 +1064,10 @@ fun OnboardingSurveyScreen(
                                 selectedClassLevel,
                                 isBoardExamYear,
                                 selectedGoal,
-                                if (selectedDistractionApps.isEmpty()) "Instagram / Reels 📸, YouTube / Shorts 🎥" else selectedDistractionApps.joinToString(", "),
+                                if (selectedDistractionApps.isEmpty()) "Instagram / Reels, YouTube / Shorts" else selectedDistractionApps.joinToString(", "),
                                 selectedTimeWindow,
                                 selectedDailyFocusMinutes,
-                                if (selectedMotivationStyles.isEmpty()) "Strict AI Guard & App Blocker 🔒" else selectedMotivationStyles.joinToString(", ")
+                                if (selectedMotivationStyles.isEmpty()) "Strict AI Guard & App Blocker" else selectedMotivationStyles.joinToString(", ")
                             )
                         }
                     },
@@ -1321,7 +1344,8 @@ private fun ObsidianPermissionModalOverlay(
 private fun OptionList(
     options: List<String>,
     selectedOption: String,
-    onSelect: (String) -> Unit
+    onSelect: (String) -> Unit,
+    optionIcons: List<Int>? = null
 ) {
     val darkTheme = isAppInDarkTheme()
 
@@ -1329,7 +1353,8 @@ private fun OptionList(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        options.forEach { option ->
+        options.forEachIndexed { index, option ->
+            val optionIconRes = optionIcons?.getOrNull(index)
             val isSelected = option == selectedOption
 
             val cardBg = if (isSelected) {
@@ -1368,6 +1393,18 @@ private fun OptionList(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    // v1.4.0: 3D icon tile (rounded clip trims the tile corners)
+                    if (optionIconRes != null) {
+                        Image(
+                            painter = painterResource(id = optionIconRes),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
                     Text(
                         text = option,
                         style = MaterialTheme.typography.titleMedium.copy(
@@ -1422,7 +1459,8 @@ private fun OptionList(
 private fun MultiSelectOptionList(
     options: List<String>,
     selectedOptions: Set<String>,
-    onToggleOption: (String) -> Unit
+    onToggleOption: (String) -> Unit,
+    optionIcons: List<Int>? = null
 ) {
     val darkTheme = isAppInDarkTheme()
 
@@ -1430,7 +1468,8 @@ private fun MultiSelectOptionList(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        options.forEach { option ->
+        options.forEachIndexed { index, option ->
+            val optionIconRes = optionIcons?.getOrNull(index)
             val isSelected = selectedOptions.contains(option)
 
             val cardBg = if (isSelected) {
@@ -1469,6 +1508,18 @@ private fun MultiSelectOptionList(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
+                    // v1.4.0: 3D icon tile (rounded clip trims the tile corners)
+                    if (optionIconRes != null) {
+                        Image(
+                            painter = painterResource(id = optionIconRes),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
                     Text(
                         text = option,
                         style = MaterialTheme.typography.titleMedium.copy(

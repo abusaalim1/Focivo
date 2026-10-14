@@ -245,4 +245,55 @@ object EssentialAppsGuard {
             .filter { it.isNotBlank() && !isEssentialApp(context, it) && !isStudyWhitelistedApp(it) }
             .toSet()
     }
+
+/**
+     * v1.3.1: home-screen launcher subset, used by the deep-focus
+     * "Block phone home screen" toggle in [isLauncherPackage].
+     */
+    val LAUNCHER_PACKAGES: Set<String> = setOf(
+        "com.android.systemui",
+        "com.google.android.apps.nexuslauncher",
+        "com.android.launcher",
+        "com.android.launcher2",
+        "com.android.launcher3",
+        "com.sec.android.app.launcher",
+        "com.samsung.android.app.launcher",
+        "com.miui.home",
+        "com.mi.android.globallauncher",
+        "com.oppo.launcher",
+        "com.coloros.launcher",
+        "com.oneplus.launcher",
+        "com.huawei.android.launcher",
+        "com.transsion.hilauncher",
+        "com.transsion.XOSLauncher",
+        "com.motorola.launcher3",
+        "com.teslacoilsw.launcher",
+        "com.actionlauncher.playstore",
+        "com.smartlauncher",
+        "com.lge.launcher2",
+        "com.lge.launcher3",
+        "com.bbk.launcher2",
+        "com.vivo.launcher"
+    )
+
+/**
+     * v1.3.1: checks if a package is a home-screen launcher (for the deep-focus
+     * "Block phone home screen" toggle). Uses the launcher subset of the protected
+     * list + the device's actual default home activity + a "launcher" name heuristic.
+     */
+    fun isLauncherPackage(context: Context, packageName: String?): Boolean {
+        if (packageName.isNullOrBlank()) return false
+        val lower = packageName.lowercase().trim()
+        if (LAUNCHER_PACKAGES.contains(lower)) return true
+        if (lower.contains("launcher")) return true
+        try {
+            val pm = context.packageManager
+            val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            val homeActivities = pm.queryIntentActivities(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            for (resolveInfo in homeActivities) {
+                if (resolveInfo.activityInfo?.packageName?.lowercase() == lower) return true
+            }
+        } catch (_: Exception) {}
+        return false
+    }
 }

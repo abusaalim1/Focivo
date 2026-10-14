@@ -404,7 +404,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 onGuestSignIn = { viewModel.signInAsGuest() },
                 onClearError = { viewModel.clearAuthError() }
             )
-        } else if (!viewModel.isGuestUser(currentUser) && (showQuestionnaire || userPreferences?.hasCompletedIntakeSurvey == false || userPreferences?.hasCompletedOnboarding == false)) {
+        // v1.4.0: first-launch onboarding runs for guests too (same survey;
+        // answers persist via the local repository / guest storage).
+        } else if (showQuestionnaire || userPreferences?.hasCompletedIntakeSurvey == false || userPreferences?.hasCompletedOnboarding == false) {
             OnboardingSurveyScreen(
                 initialUserName = currentUser?.fullName ?: userPreferences?.currentUserName ?: "Scholar",
                 onFinishSurvey = { name, studentClassLevel, isBoardExamYear, primaryStudyGoal, biggestDistractionApp, preferredStudyTimeWindow, dailyScreenTimeGoalMinutes, motivationStyle ->

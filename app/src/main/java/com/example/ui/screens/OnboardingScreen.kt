@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,11 +35,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.components.CivoChatBubble
 import com.example.ui.components.GlassButton
 import com.example.ui.components.GlassCard
@@ -49,11 +53,12 @@ import com.example.ui.theme.isAppInDarkTheme
 
 // v1.3.0 — onboarding distraction quiz: answer key -> suggested blocked packages.
 // "games" intentionally suggests nothing: installed games can't be guessed honestly.
+// v1.4.0: 3D icon tiles replace the old emoji glyphs.
 private val DISTRACTION_OPTIONS = listOf(
-    Triple("\uD83D\uDD14", "Distractions from notifications", "notifications" to "com.instagram.android,com.facebook.katana"),
-    Triple("\uD83C\uDFAE", "Games", "games" to ""),
-    Triple("\uD83D\uDCF1", "Texting on my phone", "texting" to "com.whatsapp,com.facebook.orca"),
-    Triple("\uD83D\uDCF3", "Scrolling reels & shorts", "reels" to "com.google.android.youtube,com.instagram.android")
+    Triple(R.drawable.icon_onboarding_notifications, "Distractions from notifications", "notifications" to "com.instagram.android,com.facebook.katana"),
+    Triple(R.drawable.icon_onboarding_games, "Games", "games" to ""),
+    Triple(R.drawable.icon_onboarding_texting, "Texting on my phone", "texting" to "com.whatsapp,com.facebook.orca"),
+    Triple(R.drawable.icon_onboarding_scrolling, "Scrolling reels & shorts", "reels" to "com.google.android.youtube,com.instagram.android")
 )
 
 private fun applyDistractionSuggestion(context: android.content.Context, answerKey: String) {
@@ -208,7 +213,7 @@ fun OnboardingScreen(
                         Spacer(modifier = Modifier.height(28.dp))
 
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            DISTRACTION_OPTIONS.forEach { (emoji, label, keyPair) ->
+                            DISTRACTION_OPTIONS.forEach { (iconRes, label, keyPair) ->
                                 val isSelected = selectedDistraction == keyPair.first
                                 GlassCard(
                                     modifier = Modifier
@@ -228,7 +233,14 @@ fun OnboardingScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(text = emoji, fontSize = 22.sp)
+                                            Image(
+                                                painter = painterResource(id = iconRes),
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .size(44.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                            )
                                             Spacer(modifier = Modifier.width(14.dp))
                                             Text(
                                                 text = label,

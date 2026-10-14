@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -299,10 +301,13 @@ fun FocusSessionLogScreen(
                     }
                 }
 
-                // Filter Chips
+                // Filter Chips (v1.4.0: horizontally scrollable, single-line labels,
+                // explicit light label color in dark theme)
                 item {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         listOf("All", "Today", "This Week", "Deep Work", "Classic").forEach { filter ->
@@ -313,6 +318,8 @@ fun FocusSessionLogScreen(
                                 label = {
                                     Text(
                                         text = filter,
+                                        maxLines = 1,
+                                        softWrap = false,
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontFamily = PoppinsFontFamily,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
@@ -324,7 +331,7 @@ fun FocusSessionLogScreen(
                                     selectedContainerColor = limeAccent,
                                     selectedLabelColor = NearBlack,
                                     containerColor = if (isDark) Color(0x18FFFFFF) else Color(0x0A000000),
-                                    labelColor = textSecondary
+                                    labelColor = if (isDark) Color(0xFFE9EFE7) else textSecondary
                                 ),
                                 border = FilterChipDefaults.filterChipBorder(
                                     borderColor = if (isSelected) limeAccent else (if (isDark) Color(0x20FFFFFF) else Color(0x15000000)),
@@ -352,7 +359,7 @@ fun FocusSessionLogScreen(
                                 verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
                                 RegainMascotView(
-                                    pose = MascotPose.IDLE,
+                                    pose = MascotPose.STUDY_POSE,
                                     size = 110.dp,
                                     animate = false
                                 )
