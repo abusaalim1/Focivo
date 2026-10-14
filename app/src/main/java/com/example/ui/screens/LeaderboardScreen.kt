@@ -65,6 +65,7 @@ import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainGoldStar
 import com.example.ui.theme.LocalAppAccent
+import com.example.ui.theme.themedCardBackground
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme

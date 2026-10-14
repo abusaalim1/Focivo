@@ -83,6 +83,7 @@ import com.example.ui.components.RegainStudyDial
 import com.example.ui.components.resolveThemeBackdropRes
 import com.example.R
 import com.example.ui.theme.LocalAppAccent
+import com.example.ui.theme.themedCardBackground
 import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
