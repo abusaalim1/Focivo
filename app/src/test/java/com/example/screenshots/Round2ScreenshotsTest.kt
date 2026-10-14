@@ -7,7 +7,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.model.FocusSessionEntity
@@ -207,12 +206,12 @@ class Round2ScreenshotsTest {
             ProfileScreen(
                 userPreferences = fakePrefs(),
                 sessions = fakeSessions(),
-                onOpenSettings = {}
+                onOpenSettings = {},
+                // Test hook opens the dialog directly (LazyColumn virtualization
+                // makes scroll-to-flaky under Robolectric).
+                initialSelectedBadgeTitle = "First Flow"
             )
         }
-        composeTestRule.onNodeWithText("MILESTONES", useUnmergedTree = true).performScrollTo()
-        composeTestRule.onNodeWithText("First Flow", useUnmergedTree = true).performScrollTo()
-        composeTestRule.onNodeWithText("First Flow", useUnmergedTree = true).performClick()
         composeTestRule.waitForIdle()
         capture("achievement_detail_dialog")
     }

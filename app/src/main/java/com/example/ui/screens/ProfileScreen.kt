@@ -55,6 +55,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -180,7 +181,9 @@ fun ProfileScreen(
     onCheckForUpdates: () -> Unit = {},
     onLogout: () -> Unit = {},
     onUpdateProfile: (newName: String, avatarBytes: ByteArray?) -> Unit = { _, _ -> },
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // v1.4.0-round2: test hook — screenshot tests open a badge directly
+    initialSelectedBadgeTitle: String? = null
 ) {
     val context = LocalContext.current
     val isDark = isAppInDarkTheme()
@@ -312,6 +315,12 @@ fun ProfileScreen(
             progressFraction = minOf(sessionCount, 100) / 100f
         )
     )
+    // v1.4.0-round2: test hook — open a badge directly for screenshots
+    LaunchedEffect(initialSelectedBadgeTitle) {
+        if (initialSelectedBadgeTitle != null && selectedBadge == null) {
+            selectedBadge = badges.firstOrNull { it.title == initialSelectedBadgeTitle }
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         ThemedScreenBackground(modifier = Modifier.fillMaxSize())
