@@ -37,20 +37,16 @@ jobs:
 
       - name: Dump test failure stacks
         if: always()
-        run: |
-          for f in app/build/test-results/testDebugUnitTest/TEST-*.xml; do
-            [ -f "$f" ] || continue
-            python3 - "$f" << 'PYEOF2'
-            import sys, xml.etree.ElementTree as ET
-            t = ET.parse(sys.argv[1]); r = t.getroot()
-            for tc in r.iter("testcase"):
-                for fail in list(tc.iter("failure")) + list(tc.iter("error")):
-                    print("=" * 80)
-                    print(tc.get("classname"), "::", tc.get("name"))
-                    print("MESSAGE:", (fail.get("message") or "")[:800])
-                    print("STACK:", (fail.text or "")[:5000])
-            PYEOF2
-          done
+        run: python3 -c "
+import glob, xml.etree.ElementTree as ET
+for f in glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml'):
+    r = ET.parse(f).getroot()
+    for tc in r.iter('testcase'):
+        for fail in list(tc.iter('failure')) + list(tc.iter('error')):
+            print('='*70); print(tc.get('classname'), '::', tc.get('name'))
+            print('MESSAGE:', (fail.get('message') or '')[:800])
+            print('STACK:', (fail.text or '')[:4000])
+"
 
       - name: Locate generated PNGs
         if: always()
