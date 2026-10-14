@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="fw_bg_top">#16191F</color>
+    <color name="fw_bg_bottom">#0B0D10</color>
+    <color name="fw_stroke">#1FFFFFFF</color>
+    <color name="fw_text_primary">#F5F5F7</color>
+    <color name="fw_text_secondary">#9094A0</color>
+    <color name="fw_text_tertiary">#5C6070</color>
+    <color name="fw_accent">#BDF04F</color>
+    <color name="fw_accent_tint">#1FBDF04F</color>
+    <color name="fw_accent_stroke">#33BDF04F</color>
+    <color name="fw_ink">#0B0D10</color>
+    <color name="fw_ghost">#12FFFFFF</color>
+</resources>

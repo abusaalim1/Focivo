@@ -10,6 +10,8 @@
     android:minResizeHeight="90dp"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="1800000"
-    android:initialLayout="@layout/widget_study_timer"
+    android:initialLayout="@layout/widget_focus_timer"
     android:description="@string/widget_timer_description"
-    android:widgetCategory="home_screen" />
+    android:widgetCategory="home_screen"
+    android:previewLayout="@layout/widget_focus_timer"
+    android:previewImage="@drawable/widget_preview_focus_timer" />
