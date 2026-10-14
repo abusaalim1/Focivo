@@ -392,7 +392,7 @@ object AiStudyGuardManager {
                 packageName = packageName,
                 appName = appName,
                 durationSec = GRACE_PERIOD_SECONDS,
-                reason = "⚠️ Study Warning: Non-study content detected in $appName.\n\nNon-study content mat dekho — padhai pe focus karo! 📚\n\nKeep your questions study & exam-related, warna $appName 3 ghante ke liye lock ho jayega.",
+                reason = "Study Warning: Non-study content detected in $appName.\n\nPlease avoid non-study content and stay focused on your studies!\n\nKeep your questions study & exam-related, or $appName will be locked for 3 hours.",
                 isPunishment = false,
                 guardVariant = com.example.ui.screens.BlockedAppLockActivity.GUARD_VARIANT_WARNING
             )
@@ -650,11 +650,11 @@ object AiStudyGuardManager {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
             .setSmallIcon(R.drawable.ic_notification_small)
             .setLargeIcon(largeIcon)
-            .setContentTitle("⚠️ Study Discipline Warning: ${warning.appName}")
+            .setContentTitle("Study Discipline Warning: ${warning.appName}")
             .setContentText("Casual/non-study activity detected. Return to studying within 3 min or this app locks for 3 hours!")
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("Non-study usage detected in ${warning.appName}.\n\nReason: ${warning.reason}\n\n⚠️ Continuing off-topic activity will trigger an immediate 3-HOUR LOCKOUT on ${warning.appName}. Return to your study goals now!")
+                    .bigText("Non-study usage detected in ${warning.appName}.\n\nReason: ${warning.reason}\n\nContinuing off-topic activity will trigger an immediate 3-HOUR LOCKOUT on ${warning.appName}. Return to your study goals now!")
             )
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
@@ -682,7 +682,7 @@ object AiStudyGuardManager {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
             .setSmallIcon(R.drawable.ic_notification_small)
             .setLargeIcon(largeIcon)
-            .setContentTitle("⛔ ${block.appName} Blocked for 3 Hours")
+            .setContentTitle("${block.appName} Blocked for 3 Hours")
             .setContentText("Study warning was ignored. ${block.appName} is now locked for 3 hours.")
             .setStyle(
                 NotificationCompat.BigTextStyle()
@@ -714,7 +714,7 @@ object AiStudyGuardManager {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
             .setSmallIcon(R.drawable.ic_notification_small)
             .setLargeIcon(largeIcon)
-            .setContentTitle("✅ Good — No Block Applied")
+            .setContentTitle("Good — No Block Applied")
             .setContentText("You corrected course in ${resolved.appName} in time. Keep up the great focus!")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pi)

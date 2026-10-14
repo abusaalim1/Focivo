@@ -76,13 +76,13 @@ import com.example.ui.theme.isAppInDarkTheme
 data class PresetTier(
     val amount: Int,
     val label: String,
-    val icon: String
+    @androidx.annotation.DrawableRes val iconRes: Int
 )
 
 val PRESET_TIERS = listOf(
-    PresetTier(49, "Chai", "☕"),
-    PresetTier(99, "Supporter", "🌟"),
-    PresetTier(199, "Hero", "🚀")
+    PresetTier(49, "Chai", R.drawable.emoji3d_coffee),
+    PresetTier(99, "Supporter", R.drawable.emoji3d_star),
+    PresetTier(199, "Hero", R.drawable.emoji3d_rocket)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -249,7 +249,7 @@ fun SupportLockZenSheet(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "Hey — if Focivo has helped you stay focused and reclaim your time, it'd mean a lot if you considered supporting its growth. I built this solo, and every bit helps keep it alive and free for everyone. Totally optional, no pressure at all 🌱",
+                        text = "Hey — if Focivo has helped you stay focused and reclaim your time, it'd mean a lot if you considered supporting its growth. I built this solo, and every bit helps keep it alive and free for everyone. Totally optional, no pressure at all.",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = PoppinsFontFamily,
                             color = textPrimary,
@@ -302,15 +302,23 @@ fun SupportLockZenSheet(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "${tier.icon} ₹${tier.amount}",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) RegainLimeDeepText else textPrimary,
-                                    fontSize = 15.sp
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Image(
+                                    painter = painterResource(id = tier.iconRes),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
                                 )
-                            )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "₹${tier.amount}",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) RegainLimeDeepText else textPrimary,
+                                        fontSize = 15.sp
+                                    )
+                                )
+                            }
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = tier.label,
@@ -464,7 +472,7 @@ fun SupportLockZenSheet(
             },
             title = {
                 Text(
-                    text = "Confirm Payment 🌱",
+                    text = "Confirm Payment",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
@@ -489,7 +497,7 @@ fun SupportLockZenSheet(
                     }
                 ) {
                     Text(
-                        text = "I've Completed Payment ✅",
+                        text = "I've Completed Payment",
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontFamily = PoppinsFontFamily,
                             color = RegainLimeDeepText,
@@ -536,7 +544,7 @@ fun SupportLockZenSheet(
             },
             title = {
                 Text(
-                    text = "Thank You! 💚",
+                    text = "Thank You!",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
@@ -590,7 +598,7 @@ fun SupportLockZenMilestoneDialog(
         },
         title = {
             Text(
-                text = "Support Focivo 🌱",
+                text = "Support Focivo",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontFamily = AppleLinearFontFamily,
                     fontWeight = FontWeight.Bold,
@@ -601,7 +609,7 @@ fun SupportLockZenMilestoneDialog(
         text = {
             Column {
                 Text(
-                    text = "Hey — if Focivo has helped you stay focused, it'd mean a lot if you considered supporting its growth. I built this solo, and every bit helps keep it alive. Totally optional, no pressure at all 🌱",
+                    text = "Hey — if Focivo has helped you stay focused, it'd mean a lot if you considered supporting its growth. I built this solo, and every bit helps keep it alive. Totally optional, no pressure at all.",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = AppleLinearFontFamily,
                         color = textPrimary,

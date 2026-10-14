@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,6 +73,7 @@ import com.example.ui.components.LinearButtonVariant
 import com.example.ui.components.LinearGlowCard
 import com.example.ui.components.PriorityItemRow
 import com.example.ui.components.RegainMascotView
+import com.example.ui.components.MascotPose
 import com.example.ui.components.SegmentedProgressBar
 import com.example.ui.components.appleCard
 import com.example.ui.components.pressFeedback
@@ -148,115 +150,9 @@ fun HomeScreen(
     }
     val isShieldActive = hasShieldPermissions && (userPreferences?.isAppBlockerEnabled == true)
 
-    val totalFocusSeconds = remember(sessions) { sessions.sumOf { it.durationSeconds } }
-    val totalFocusHours = totalFocusSeconds / 3600.0
-    val totalFocusHoursStr = remember(totalFocusSeconds) {
-        if (totalFocusHours >= 10.0) {
-            "${totalFocusHours.toInt()}h"
-        } else if (totalFocusHours >= 1.0) {
-            String.format(Locale.US, "%.1fh", totalFocusHours)
-        } else if (totalFocusSeconds > 0) {
-            "${totalFocusSeconds / 60}m"
-        } else {
-            "0h"
-        }
-    }
-    val totalSessionsCount = sessions.size
 
-    // Weekly Study Time Calculations
-    val currentWeekStart = remember {
-        val cal = Calendar.getInstance()
-        val dow = cal.get(Calendar.DAY_OF_WEEK)
-        val daysFromMonday = if (dow == Calendar.SUNDAY) 6 else (dow - Calendar.MONDAY)
-        cal.add(Calendar.DAY_OF_MONTH, -daysFromMonday)
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        cal.timeInMillis
-    }
-    val lastWeekStart = remember(currentWeekStart) {
-        currentWeekStart - (7 * 24 * 3600 * 1000L)
-    }
-    val thisWeekSessions = remember(sessions, currentWeekStart) {
-        sessions.filter { it.completedAt >= currentWeekStart }
-    }
-    val lastWeekSessions = remember(sessions, currentWeekStart, lastWeekStart) {
-        sessions.filter { it.completedAt >= lastWeekStart && it.completedAt < currentWeekStart }
-    }
-    val thisWeekSeconds = remember(thisWeekSessions) { thisWeekSessions.sumOf { it.durationSeconds } }
-    val lastWeekSeconds = remember(lastWeekSessions) { lastWeekSessions.sumOf { it.durationSeconds } }
 
-    val thisWeekHours = thisWeekSeconds / 3600.0
-    val lastWeekHours = lastWeekSeconds / 3600.0
-    val weekDiffHours = thisWeekHours - lastWeekHours
 
-    val weeklyHoursHeadlineStr = remember(thisWeekSeconds, thisWeekHours) {
-        if (thisWeekSeconds == 0) {
-            "0.0 hrs"
-        } else {
-            String.format(Locale.US, "%.1f hrs", thisWeekHours)
-        }
-    }
-
-    val weeklyTrendText = remember(thisWeekSeconds, weekDiffHours, thisWeekSessions) {
-        if (thisWeekSeconds == 0) {
-            "No sessions yet this week — let's start!"
-        } else if (kotlin.math.abs(weekDiffHours) < 0.1) {
-            "${thisWeekSessions.size} session${if (thisWeekSessions.size != 1) "s" else ""} completed this week"
-        } else if (weekDiffHours > 0) {
-            String.format(Locale.US, "+%.1f hrs vs last week", weekDiffHours)
-        } else {
-            String.format(Locale.US, "%.1f hrs vs last week", weekDiffHours)
-        }
-    }
-
-    // Weekly Study Goal & Daily Active Distribution calculations
-    val weeklyGoalMinutes = remember(userPreferences?.dailyGoalMinutes) {
-        val daily = (userPreferences?.dailyGoalMinutes ?: 240).coerceAtLeast(60)
-        daily * 7
-    }
-    val weeklyGoalHours = remember(weeklyGoalMinutes) {
-        weeklyGoalMinutes / 60.0
-    }
-    val thisWeekMinutes = remember(thisWeekSeconds) {
-        thisWeekSeconds / 60
-    }
-    val weeklyGoalProgress = remember(thisWeekMinutes, weeklyGoalMinutes) {
-        if (weeklyGoalMinutes > 0) {
-            (thisWeekMinutes.toFloat() / weeklyGoalMinutes.toFloat()).coerceIn(0f, 1f)
-        } else 0f
-    }
-    val weeklyGoalProgressPercent = remember(weeklyGoalProgress) {
-        (weeklyGoalProgress * 100).toInt()
-    }
-    val remainingWeeklyMinutes = remember(thisWeekMinutes, weeklyGoalMinutes) {
-        (weeklyGoalMinutes - thisWeekMinutes).coerceAtLeast(0)
-    }
-    val remainingWeeklyHoursStr = remember(remainingWeeklyMinutes) {
-        val hrs = remainingWeeklyMinutes / 60.0
-        if (hrs >= 1.0) String.format(Locale.US, "%.1fh", hrs) else "${remainingWeeklyMinutes}m"
-    }
-
-    val weekDaysStatus = remember(thisWeekSessions, currentWeekStart) {
-        val dayNames = listOf("M", "T", "W", "T", "F", "S", "S")
-        val cal = Calendar.getInstance()
-        val todayDayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
-        val todayIdx = if (todayDayOfWeek == Calendar.SUNDAY) 6 else (todayDayOfWeek - Calendar.MONDAY)
-
-        (0..6).map { dayOffset ->
-            val dayStart = currentWeekStart + (dayOffset * 24 * 3600 * 1000L)
-            val dayEnd = dayStart + (24 * 3600 * 1000L)
-            val daySecs = thisWeekSessions
-                .filter { it.completedAt >= dayStart && it.completedAt < dayEnd }
-                .sumOf { it.durationSeconds }
-            val isToday = dayOffset == todayIdx
-            val isCompleted = daySecs > 0
-            Triple(dayNames[dayOffset], isCompleted, isToday)
-        }
-    }
-
-    // Dynamic study metrics based on real local database sessions
     val todayStart = remember {
         Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -271,26 +167,13 @@ fun HomeScreen(
     val todayMinutes = remember(todaySessions) {
         todaySessions.sumOf { it.durationSeconds } / 60
     }
-    val totalCompletedSessions = remember(sessions) {
-        sessions.count { it.durationSeconds > 0 }
-    }
     val dailyGoalMinutes = (userPreferences?.dailyGoalMinutes ?: 240).coerceAtLeast(60)
-
     val dailyProgress = if (dailyGoalMinutes > 0 && todayMinutes > 0) {
         (todayMinutes.toFloat() / dailyGoalMinutes).coerceIn(0f, 1f)
     } else {
         0f
     }
 
-    val scoreSubtitle = if (totalCompletedSessions == 0) {
-        "No focus sessions yet · Start your first timer below!"
-    } else if (todayMinutes > 0) {
-        "${todaySessions.size} session${if (todaySessions.size > 1) "s" else ""} today · $todayMinutes of $dailyGoalMinutes min daily goal"
-    } else {
-        "$totalCompletedSessions total completed sessions · Ready for your next session"
-    }
-
-    // Dynamic greeting based on current time
     val greeting = remember {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         when (hour) {
@@ -448,281 +331,195 @@ fun HomeScreen(
                 }
             }
 
-            // 2. Consolidated Primary Hero: Weekly Study Time Card with Integrated Focus Score Badge
+            // 2. Today Hero: today focus time + one stat + single white Start Focus
+            // pill (reference pattern: clean dark stat card). All data real.
             item {
-                LinearGlowCard(
+                val todayTimeStr = remember(todayMinutes) {
+                    val h = todayMinutes / 60
+                    val m = todayMinutes % 60
+                    when {
+                        h > 0 && m > 0 -> "${h}h ${m}m"
+                        h > 0 -> "${h}h"
+                        else -> "${m}m"
+                    }
+                }
+                val todaySessionsCount = todaySessions.size
+                val animatedDailyProgress by animateFloatAsState(
+                    targetValue = dailyProgress,
+                    animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+                    label = "today_goal_progress_anim"
+                )
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("home_weekly_study_hero_card"),
-                    shape = RoundedCornerShape(24.dp),
-                    glowColor = RegainLimePrimary,
-                    glowAlpha = 0.2f
+                        .clip(RoundedCornerShape(26.dp))
+                        .background(Color(0xFF141716))
+                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(26.dp))
+                        .padding(22.dp)
+                        .testTag("home_today_hero_card")
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        // Top Row: Weekly Study Time Label + Integrated Focus Score Badge
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .clip(CircleShape)
-                                        .background(RegainLimeContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Schedule,
-                                        contentDescription = null,
-                                        tint = RegainLimeDeepText,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "WEEKLY STUDY TIME",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontFamily = AppleLinearFontFamily,
+                                    text = "TODAY'S FOCUS",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = PoppinsFontFamily,
                                         fontWeight = FontWeight.Bold,
-                                        color = textSecondary,
-                                        letterSpacing = 1.4.sp,
-                                        fontSize = 10.5.sp
+                                        color = Color(0xFF9AA79B),
+                                        letterSpacing = 1.6.sp,
+                                        fontSize = 11.sp
                                     )
                                 )
-                            }
-
-                            // Compact integrated Sessions badge with mini mascot
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(if (isDark) Color(0x30FFFFFF) else Color(0xFFF0F4EC))
-                                    .border(1.dp, cardBorder, CircleShape)
-                                    .padding(horizontal = 10.dp, vertical = 5.dp)
-                                    .testTag("home_integrated_sessions_badge")
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Image(
-                                        painter = painterResource(id = R.drawable.mascot_focus_score),
-                                        contentDescription = "Mascot",
-                                        modifier = Modifier.size(20.dp),
-                                        contentScale = ContentScale.Fit
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = todayTimeStr,
+                                    style = MaterialTheme.typography.headlineLarge.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFF7F8F4),
+                                        fontSize = 38.sp,
+                                        letterSpacing = (-0.5).sp
                                     )
+                                )
+                                Text(
+                                    text = "Time focused",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        color = Color(0xFF9AA79B),
+                                        fontSize = 13.sp
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(Color(0x22FFFFFF))
+                                        .border(1.dp, Color(0x2EFFFFFF), CircleShape)
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
                                     Text(
-                                        text = "$totalCompletedSessions sessions",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontFamily = AppleLinearFontFamily,
+                                        text = "$todaySessionsCount session${if (todaySessionsCount == 1) "" else "s"} today",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontFamily = PoppinsFontFamily,
                                             fontWeight = FontWeight.Bold,
-                                            color = textPrimary,
-                                            fontSize = 11.sp
+                                            color = RegainLimePrimary,
+                                            fontSize = 12.sp
                                         )
                                     )
                                 }
                             }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Large Headline Number
-                        Text(
-                            text = "$weeklyHoursHeadlineStr this week",
-                            style = MaterialTheme.typography.headlineLarge.copy(
-                                fontFamily = AppleLinearFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                color = textPrimary,
-                                fontSize = 30.sp,
-                                letterSpacing = (-0.6).sp
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Subtitle / Trend Indicator
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            if (thisWeekSeconds > 0 && weekDiffHours > 0) {
-                                Icon(
-                                    imageVector = Icons.Default.Bolt,
-                                    contentDescription = null,
-                                    tint = RegainLimeDeepText,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            Text(
-                                text = weeklyTrendText,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontFamily = AppleLinearFontFamily,
-                                    color = if (thisWeekSeconds == 0) textSecondary else if (weekDiffHours >= 0) RegainLimeDeepText else textSecondary,
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 13.sp
-                                )
+                            RegainMascotView(
+                                pose = theme.mascotPose,
+                                size = 96.dp,
+                                animate = true,
+                                modifier = Modifier.testTag("home_hero_mascot")
                             )
                         }
 
                         Spacer(modifier = Modifier.height(18.dp))
 
-                        // Visual Weekly Goal Progress Bar Header
-                        val animatedWeeklyProgress by animateFloatAsState(
-                            targetValue = weeklyGoalProgress,
-                            animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
-                            label = "weekly_goal_progress_anim"
-                        )
-
+                        // Slim daily-goal progress (merged from the old progress card)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = "WEEKLY GOAL",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = AppleLinearFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        color = textSecondary,
-                                        fontSize = 10.5.sp,
-                                        letterSpacing = 1.1.sp
-                                    )
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(RegainLimePrimary.copy(alpha = 0.16f))
-                                        .border(1.dp, RegainLimePrimary.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "$weeklyGoalProgressPercent%",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontFamily = AppleLinearFontFamily,
-                                            fontWeight = FontWeight.Bold,
-                                            color = RegainLimeDeepText,
-                                            fontSize = 10.5.sp
-                                        )
-                                    )
-                                }
-                            }
-
                             Text(
-                                text = String.format(Locale.US, "%.1fh / %.0fh", thisWeekHours, weeklyGoalHours),
+                                text = "DAILY GOAL",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = AppleLinearFontFamily,
+                                    fontFamily = PoppinsFontFamily,
                                     fontWeight = FontWeight.Bold,
-                                    color = textPrimary,
+                                    color = Color(0xFF9AA79B),
+                                    letterSpacing = 1.4.sp,
+                                    fontSize = 10.5.sp
+                                )
+                            )
+                            Text(
+                                text = "$todayMinutes / $dailyGoalMinutes min",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = PoppinsFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFF7F8F4),
                                     fontSize = 11.5.sp
                                 )
                             )
                         }
-
                         Spacer(modifier = Modifier.height(8.dp))
-
-                        // High-Precision Visual Progress Bar Track
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(10.dp)
-                                .clip(RoundedCornerShape(5.dp))
-                                .background(if (isDark) Color(0x24FFFFFF) else Color(0xFFE5EED9))
-                                .border(1.dp, if (isDark) Color(0x18FFFFFF) else Color(0x12000000), RoundedCornerShape(5.dp))
-                                .testTag("home_weekly_goal_progress_bar")
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0x24FFFFFF))
                         ) {
-                            if (animatedWeeklyProgress > 0f) {
+                            if (animatedDailyProgress > 0f) {
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth(animatedWeeklyProgress)
-                                        .height(10.dp)
-                                        .clip(RoundedCornerShape(5.dp))
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                colors = listOf(
-                                                    RegainLimePrimary,
-                                                    Color(0xFFAEF72A),
-                                                    RegainLimeLight
-                                                )
-                                            )
-                                        )
+                                        .fillMaxWidth(animatedDailyProgress)
+                                        .height(8.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(RegainLimePrimary)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
 
-                        // Weekly Active Days Continuity Tracker (M T W T F S S)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        // The one primary action: clean white pill
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = { onStartFocus("Deep Work Sprint", 25) }
+                                )
+                                .testTag("home_start_focus_pill"),
+                            contentAlignment = Alignment.Center
                         ) {
-                            weekDaysStatus.forEach { (dayLabel, isCompleted, isToday) ->
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(26.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                when {
-                                                    isCompleted -> RegainLimePrimary
-                                                    isToday -> if (isDark) Color(0x35FFFFFF) else Color(0xFFE2EBD6)
-                                                    else -> if (isDark) Color(0x14FFFFFF) else Color(0xFFF1F5EB)
-                                                }
-                                            )
-                                            .border(
-                                                width = if (isToday) 1.5.dp else 1.dp,
-                                                color = when {
-                                                    isCompleted -> RegainLimePrimary
-                                                    isToday -> RegainLimePrimary.copy(alpha = 0.8f)
-                                                    else -> if (isDark) Color(0x18FFFFFF) else Color(0xFFE2EBD6)
-                                                },
-                                                shape = CircleShape
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (isCompleted) {
-                                            Icon(
-                                                imageVector = Icons.Default.Check,
-                                                contentDescription = "Day active",
-                                                tint = NearBlack,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                        } else if (isToday) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(6.dp)
-                                                    .clip(CircleShape)
-                                                    .background(RegainLimePrimary)
-                                            )
-                                        }
-                                    }
-
-                                    Text(
-                                        text = dayLabel,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontFamily = AppleLinearFontFamily,
-                                            fontWeight = if (isToday || isCompleted) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isToday) textPrimary else textSecondary,
-                                            fontSize = 10.sp
-                                        )
+                            Text(
+                                text = "Start Focus",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontFamily = PoppinsFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0D1B05),
+                                    fontSize = 16.sp
+                                )
+                            )
+                        }
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = onCustomizeFocus
                                     )
-                                }
+                                    .padding(horizontal = 18.dp, vertical = 12.dp)
+                                    .testTag("home_customize_timer"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Customize timer",
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF9AA79B),
+                                        fontSize = 13.sp
+                                    )
+                                )
                             }
                         }
                     }
@@ -849,121 +646,6 @@ fun HomeScreen(
                 }
             }
 
-            // 5. Streamlined Quick Focus Card
-            item {
-                LinearGlowCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("quick_focus_card"),
-                    shape = RoundedCornerShape(24.dp),
-                    glowColor = RegainLimePrimary,
-                    glowAlpha = 0.15f
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                FeatureIcon(
-                                    drawableRes = R.drawable.ic3d_bolt,
-                                    contentDescription = "Quick Focus",
-                                    size = 38.dp
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "QUICK FOCUS",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = AppleLinearFontFamily,
-                                        color = RegainLimeDeepText,
-                                        letterSpacing = 1.4.sp,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                )
-                            }
-
-                            Text(
-                                text = "25 min",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontFamily = AppleLinearFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    color = textPrimary
-                                )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Text(
-                            text = "Start a 25m Focus Sprint",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontFamily = AppleLinearFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = textPrimary
-                            )
-                        )
-                        Text(
-                            text = "Clear distractions and enter flow state with classic cadence.",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = AppleLinearFontFamily,
-                                color = textSecondary,
-                                fontSize = 12.sp
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            LinearButton(
-                                text = "Start Focus",
-                                icon = Icons.Default.PlayArrow,
-                                onClick = { onStartFocus("Deep Work Sprint", 25) },
-                                modifier = Modifier
-                                    .weight(1.2f)
-                                    .height(44.dp),
-                                variant = LinearButtonVariant.PRIMARY
-                            )
-
-                            LinearButton(
-                                text = "Customize",
-                                icon = Icons.Default.Tune,
-                                onClick = onCustomizeFocus,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp),
-                                variant = LinearButtonVariant.SECONDARY
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 5. Today's Progress Card
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .appleCard(shape = RoundedCornerShape(24.dp), isDark = isDark)
-                        .padding(20.dp)
-                ) {
-                    val goal = userPreferences?.dailyGoalMinutes ?: 360
-                    SegmentedProgressBar(
-                        focusedMinutes = todayMinutes,
-                        goalMinutes = goal
-                    )
-                }
-            }
-
             // 6. Today's Priorities
             item {
                 Row(
@@ -1023,6 +705,13 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            RegainMascotView(
+                                pose = MascotPose.EMPTY_STATE,
+                                size = 92.dp,
+                                animate = false,
+                                modifier = Modifier.testTag("home_empty_priorities_mascot")
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = "No priorities set for today.",
                                 style = MaterialTheme.typography.titleMedium.copy(

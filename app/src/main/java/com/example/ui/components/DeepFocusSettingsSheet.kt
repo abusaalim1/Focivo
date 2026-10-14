@@ -132,37 +132,12 @@ fun DeepFocusSettingsSheet(
     }
     val digestList by SessionNotificationDigestManager.digestList.collectAsState()
 
-    // Round-4: locked-theme explainer dialog.
+    // Round-4: locked-theme explainer dialog (shared with the study hub).
     lockedDialogTheme?.let { lockedTheme ->
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { lockedDialogTheme = null },
-            title = {
-                Text(
-                    text = "Locked theme",
-                    fontFamily = BalooBrandFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 19.sp,
-                    color = textPrimary
-                )
-            },
-            text = {
-                Text(
-                    text = "Collect ${(lockedTheme.unlockPoints - focusPoints).coerceAtLeast(1)} more Focus Points to unlock ${lockedTheme.name}. You earn 1 point per focused minute.",
-                    fontFamily = PoppinsFontFamily,
-                    fontSize = 13.sp,
-                    color = textSecondary
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { lockedDialogTheme = null }) {
-                    Text(
-                        text = "Got it",
-                        fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        color = RegainLimePrimary
-                    )
-                }
-            }
+        LockedThemeDialog(
+            lockedTheme = lockedTheme,
+            focusPoints = focusPoints,
+            onDismiss = { lockedDialogTheme = null }
         )
     }
 
@@ -314,173 +289,21 @@ fun DeepFocusSettingsSheet(
                 }
                 if (showThemePicker) {
                     item {
-                        // Round-4: Focus Points header — the real earned balance
-                        // (1 pt per focused minute) that unlocks themes.
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 4.dp)
-                                .padding(bottom = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                tint = Color(0xFFFFD54F),
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "Your Focus Points: $focusPoints",
-                                fontFamily = PoppinsFontFamily,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp,
-                                color = textPrimary
-                            )
-                        }
-                        // Round-3: visual theme cards — each theme shows its real
-                        // backdrop artwork so users SEE it is a full-screen theme.
-                        // Round-4: locked cards show a lock badge + price, and
-                        // tapping one explains how to earn it.
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            TimerThemeManager.THEMES.forEach { theme ->
-                                val isSelected = theme.id == selectedTheme.id
-                                val isLocked = !theme.isUnlocked(focusPoints)
-                                val cardBackdrop = remember(theme.id) {
-                                    resolveThemeBackdropRes(context, theme)
-                                }
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.clickable {
-                                        if (isLocked) {
-                                            lockedDialogTheme = theme
-                                        } else {
-                                            TimerThemeManager.trySelectTheme(context, theme.id, focusPoints)
-                                        }
-                                    }
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width(104.dp)
-                                            .height(138.dp)
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .border(
-                                                width = if (isSelected) 2.5.dp else 1.dp,
-                                                color = if (isSelected) theme.accent else rowBorder,
-                                                shape = RoundedCornerShape(16.dp)
-                                            )
-                                    ) {
-                                        if (cardBackdrop != null) {
-                                            Image(
-                                                painter = painterResource(id = cardBackdrop),
-                                                contentDescription = theme.name,
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier.fillMaxSize()
-                                            )
-                                        } else {
-                                            // Aurora (code-drawn) or an asset not packaged yet:
-                                            // accent-tinted gradient placeholder.
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .background(
-                                                        Brush.linearGradient(
-                                                            colors = listOf(
-                                                                theme.accent,
-                                                                Color(0xFF0E1512)
-                                                            )
-                                                        )
-                                                    )
-                                            )
-                                        }
-                                        if (isLocked) {
-                                            // Dim the artwork so locked cards read as unavailable.
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .background(Color(0xAA0B0F0B))
-                                            )
-                                        }
-                                        if (isLocked) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .align(Alignment.TopStart)
-                                                    .padding(6.dp)
-                                                    .size(24.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color(0xCC1A221B)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Lock,
-                                                    contentDescription = "Locked",
-                                                    tint = Color(0xFFFFD54F),
-                                                    modifier = Modifier.size(13.dp)
-                                                )
-                                            }
-                                        }
-                                        // Name strip on a scrim so it reads on any artwork.
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .align(Alignment.BottomCenter)
-                                                .background(
-                                                    Brush.verticalGradient(
-                                                        listOf(
-                                                            Color.Transparent,
-                                                            Color(0xCC000000)
-                                                        )
-                                                    )
-                                                )
-                                                .padding(top = 16.dp, bottom = 8.dp),
-                                            contentAlignment = Alignment.BottomCenter
-                                        ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(
-                                                    text = theme.name,
-                                                    fontFamily = PoppinsFontFamily,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                                    fontSize = 11.sp,
-                                                    color = Color.White
-                                                )
-                                                if (isLocked) {
-                                                    Text(
-                                                        text = "${theme.unlockPoints} pts",
-                                                        fontFamily = PoppinsFontFamily,
-                                                        fontWeight = FontWeight.Medium,
-                                                        fontSize = 9.sp,
-                                                        color = Color(0xFFFFD54F)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        if (isSelected && !isLocked) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .align(Alignment.TopEnd)
-                                                    .padding(6.dp)
-                                                    .size(22.dp)
-                                                    .clip(CircleShape)
-                                                    .background(theme.accent),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Check,
-                                                    contentDescription = "Selected",
-                                                    tint = Color(0xFF061505),
-                                                    modifier = Modifier.size(14.dp)
-                                                )
-                                            }
-                                        }
-                                    }
+                        // v1.5.0: shared picker (also used by the study hub) —
+                        // same points-lock behavior, lock + price, tap explains.
+                        TimerThemePicker(
+                            focusPoints = focusPoints,
+                            selectedThemeId = selectedTheme.id,
+                            textPrimary = textPrimary,
+                            cardBorder = rowBorder,
+                            onThemeTap = { theme, isLocked ->
+                                if (isLocked) {
+                                    lockedDialogTheme = theme
+                                } else {
+                                    TimerThemeManager.trySelectTheme(context, theme.id, focusPoints)
                                 }
                             }
-                        }
+                        )
                     }
                 }
                 item {
@@ -721,3 +544,234 @@ private fun SettingsActionRow(
     }
 }
 
+
+/**
+ * v1.5.0 — shared locked-theme explainer. Same points-lock rules as the
+ * sheet: tapping a locked theme explains how many more Focus Points are
+ * needed (1 pt per focused minute). Used by DeepFocusSettingsSheet and the
+ * study hub.
+ */
+@Composable
+fun LockedThemeDialog(
+    lockedTheme: TimerTheme,
+    focusPoints: Int,
+    onDismiss: () -> Unit
+) {
+    val isDark = isAppInDarkTheme()
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Locked theme",
+                fontFamily = BalooBrandFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 19.sp,
+                color = textPrimary
+            )
+        },
+        text = {
+            Text(
+                text = "Collect ${(lockedTheme.unlockPoints - focusPoints).coerceAtLeast(1)} more Focus Points to unlock ${lockedTheme.name}. You earn 1 point per focused minute.",
+                fontFamily = PoppinsFontFamily,
+                fontSize = 13.sp,
+                color = textSecondary
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "Got it",
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    color = RegainLimePrimary
+                )
+            }
+        }
+    )
+}
+
+/**
+ * v1.5.0 — shared timer-theme picker grid. Round-4 behavior preserved:
+ * visual theme cards with real backdrop artwork, locked cards dimmed with
+ * a lock badge + price, tapping a locked card explains how to earn it
+ * (via [onThemeTap] with isLocked = true). Used by DeepFocusSettingsSheet
+ * and the study hub.
+ */
+@Composable
+fun TimerThemePicker(
+    focusPoints: Int,
+    selectedThemeId: String,
+    onThemeTap: (theme: TimerTheme, isLocked: Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    textPrimary: Color,
+    cardBorder: Color
+) {
+    val context = LocalContext.current
+    Column(modifier = modifier.fillMaxWidth()) {
+        // Round-4: Focus Points header — the real earned balance
+        // (1 pt per focused minute) that unlocks themes.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp)
+                .padding(bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                tint = Color(0xFFFFD54F),
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = "Your Focus Points: $focusPoints",
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                color = textPrimary
+            )
+        }
+        // Round-3: visual theme cards — each theme shows its real
+        // backdrop artwork so users SEE it is a full-screen theme.
+        // Round-4: locked cards show a lock badge + price, and
+        // tapping one explains how to earn it.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            TimerThemeManager.THEMES.forEach { theme ->
+                val isSelected = theme.id == selectedThemeId
+                val isLocked = !theme.isUnlocked(focusPoints)
+                val cardBackdrop = remember(theme.id) {
+                    resolveThemeBackdropRes(context, theme)
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.clickable {
+                        onThemeTap(theme, isLocked)
+                    }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(104.dp)
+                            .height(138.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .border(
+                                width = if (isSelected) 2.5.dp else 1.dp,
+                                color = if (isSelected) theme.accent else cardBorder,
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                    ) {
+                        if (cardBackdrop != null) {
+                            Image(
+                                painter = painterResource(id = cardBackdrop),
+                                contentDescription = theme.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            // Aurora (code-drawn) or an asset not packaged yet:
+                            // accent-tinted gradient placeholder.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                theme.accent,
+                                                Color(0xFF0E1512)
+                                            )
+                                        )
+                                    )
+                            )
+                        }
+                        if (isLocked) {
+                            // Dim the artwork so locked cards read as unavailable.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0xAA0B0F0B))
+                            )
+                        }
+                        if (isLocked) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(6.dp)
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xCC1A221B)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Locked",
+                                    tint = Color(0xFFFFD54F),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        }
+                        // Name strip on a scrim so it reads on any artwork.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter)
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color.Transparent,
+                                            Color(0xCC000000)
+                                        )
+                                    )
+                                )
+                                .padding(top = 16.dp, bottom = 8.dp),
+                            contentAlignment = Alignment.BottomCenter
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = theme.name,
+                                    fontFamily = PoppinsFontFamily,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                    fontSize = 11.sp,
+                                    color = Color.White
+                                )
+                                if (isLocked) {
+                                    Text(
+                                        text = "${theme.unlockPoints} pts",
+                                        fontFamily = PoppinsFontFamily,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 9.sp,
+                                        color = Color(0xFFFFD54F)
+                                    )
+                                }
+                            }
+                        }
+                        if (isSelected && !isLocked) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(6.dp)
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(theme.accent),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Selected",
+                                    tint = Color(0xFF061505),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

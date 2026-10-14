@@ -616,22 +616,22 @@ object ScheduledBlockScheduler {
                         } else {
                             "Break time is over. Focus Shield is active and apps are locked!"
                         }
-                        notifyScheduleEvent(context, "🔔 Break Ended - Study Resumed!", breakResumeMsg)
+                        notifyScheduleEvent(context, "Break Ended - Study Resumed!", breakResumeMsg)
                     } else {
                         val studyStartMsg = if (!subjectText.isNullOrBlank()) {
                             "Your study block for '$subjectText' has started. Focus Shield is active and apps are locked."
                         } else {
                             "Your study block has started. Focus Shield is active and apps are locked."
                         }
-                        notifyScheduleEvent(context, "📚 Study Schedule Started!", studyStartMsg)
+                        notifyScheduleEvent(context, "Study Schedule Started!", studyStartMsg)
                     }
                 }
                 "BREAK" -> {
-                    notifyScheduleEvent(context, "☕ Break Time Started!", "Take a break now! Your study break window is active.")
+                    notifyScheduleEvent(context, "Break Time Started!", "Take a break now! Your study break window is active.")
                 }
                 "FREE" -> {
                     if (prevState == "STUDY" || prevState == "BREAK") {
-                        notifyScheduleEvent(context, "🎉 Study Schedule Completed", "Your study window has ended. Great work!")
+                        notifyScheduleEvent(context, "Study Schedule Completed", "Your study window has ended. Great work!")
                     }
                 }
             }

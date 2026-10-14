@@ -9,6 +9,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -70,6 +71,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,6 +79,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.R
 import com.example.data.model.WeeklyDailyStat
 import com.example.data.model.WeeklyRecapSummary
 import com.example.data.model.WeeklySessionDetail
@@ -249,16 +252,28 @@ fun SundayRecapGlassDialog(
 
                                 Spacer(modifier = Modifier.height(6.dp))
 
-                                Text(
-                                    text = "Weekly Focus Recap ✨",
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontFamily = AppleLinearFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        color = textPrimary,
-                                        fontSize = 22.sp,
-                                        letterSpacing = (-0.4).sp
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Image(
+                                        painter = painterResource(id = R.drawable.emoji3d_sparkles),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp)
                                     )
-                                )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Weekly Focus Recap",
+                                        style = MaterialTheme.typography.titleLarge.copy(
+                                            fontFamily = AppleLinearFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textPrimary,
+                                            fontSize = 22.sp,
+                                            letterSpacing = (-0.4).sp
+                                        )
+                                    )
+                                }
 
                                 Text(
                                     text = recap.weekIdentifier,
@@ -292,7 +307,7 @@ fun SundayRecapGlassDialog(
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Text(
-                                            text = if (isSharingImage) "Preparing Card..." else "Tap to Share Story Image Card 📸",
+                                            text = if (isSharingImage) "Preparing Card..." else "Tap to Share Story Image Card",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = AppleLinearFontFamily,
                                                 fontWeight = FontWeight.Bold,
@@ -518,9 +533,16 @@ fun SundayRecapGlassDialog(
                         ) {
                             // Primary Image Card Share Button
                             GlassButton(
-                                text = if (isSharingImage) "Generating Card..." else "Share Image Card 🖼️",
+                                text = if (isSharingImage) "Generating Card..." else "Share Image Card",
                                 onClick = handleShareImage,
                                 isPrimary = true,
+                                leadingIcon = {
+                                    Image(
+                                        painter = painterResource(id = R.drawable.emoji3d_camera),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
                                 modifier = Modifier
                                     .weight(1.3f)
                                     .testTag("share_sunday_recap_image_btn")
@@ -528,9 +550,16 @@ fun SundayRecapGlassDialog(
 
                             // Secondary Text Share Button
                             GlassButton(
-                                text = "Text 💬",
+                                text = "Text",
                                 onClick = handleShareText,
                                 isPrimary = false,
+                                leadingIcon = {
+                                    Image(
+                                        painter = painterResource(id = R.drawable.emoji3d_chat),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
                                 modifier = Modifier
                                     .weight(0.7f)
                                     .testTag("share_sunday_recap_text_btn")
@@ -648,15 +677,23 @@ private fun DailyBarMiniVisualizer(
                 )
             )
             if (bestDayName.isNotBlank()) {
-                Text(
-                    text = "Best: $bestDayName 🏆",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontFamily = AppleLinearFontFamily,
-                        color = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 11.sp
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Best: $bestDayName",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = AppleLinearFontFamily,
+                            color = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 11.sp
+                        )
                     )
-                )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Image(
+                        painter = painterResource(id = R.drawable.emoji3d_trophy),
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
             }
         }
 

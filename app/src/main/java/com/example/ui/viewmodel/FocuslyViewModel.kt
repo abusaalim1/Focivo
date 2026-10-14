@@ -518,9 +518,9 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
 
         val motivationalQuotes = listOf(
             "“Success is the sum of small efforts, repeated day in and day out.” — Exceptional work this week!",
-            "“Deep focus is a superpower in the modern world.” You proved your dedication this week! 🚀",
+            "“Deep focus is a superpower in the modern world.” You proved your dedication this week!",
             "“Continuous improvement is better than delayed perfection.” Keep this momentum going strong!",
-            "“Focus on the step in front of you, not the whole staircase.” Stellar focus logged this week 🌱"
+            "“Focus on the step in front of you, not the whole staircase.” Stellar focus logged this week."
         )
         val quote = motivationalQuotes[kotlin.math.abs(weekKey.hashCode()) % motivationalQuotes.size]
 

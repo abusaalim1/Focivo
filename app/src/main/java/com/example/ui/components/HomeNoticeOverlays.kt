@@ -81,11 +81,12 @@ private fun OverlayShell(
 
 @Composable
 private fun OverlayMascot() {
-    Image(
-        painter = painterResource(id = R.drawable.mascot_study_happy),
-        contentDescription = "Focivo mascot",
-        contentScale = ContentScale.Fit,
-        modifier = Modifier.size(120.dp)
+    // v1.5.0: mascot with its gentle float animation — aesthetic presence in
+    // the update + announcement overlays.
+    RegainMascotView(
+        pose = MascotPose.STUDY_HAPPY,
+        size = 112.dp,
+        animate = true
     )
 }
 

@@ -31,21 +31,21 @@ object FocivoWidgetHelper {
     const val ACTION_OPEN_STREAK = "com.example.widget.ACTION_OPEN_STREAK"
 
     private val MOTIVATIONAL_QUOTES = listOf(
-        "\"Every page studied today is a step towards your dream ✨\"",
-        "\"Stay consistent. Small daily focus turns into giant victories 🚀\"",
-        "\"Your future self will thank you for studying right now 🌟\"",
-        "\"Deep focus beats shallow hustle every single day 🎯\"",
-        "\"Discipline is choosing between what you want now and what you want most 🔥\"",
-        "\"One chapter at a time. You are closer than you think 📚\"",
-        "\"Focus on the process, and the rank will follow automatically 💡\""
+        "\"Every page studied today is a step towards your dream.\"",
+        "\"Stay consistent. Small daily focus turns into giant victories.\"",
+        "\"Your future self will thank you for studying right now.\"",
+        "\"Deep focus beats shallow hustle every single day.\"",
+        "\"Discipline is choosing between what you want now and what you want most.\"",
+        "\"One chapter at a time. You are closer than you think.\"",
+        "\"Focus on the process, and the rank will follow automatically.\""
     )
 
     private val ZEN_STUDY_TIPS = listOf(
-        "\"Take a deep breath. 25 minutes of deep focus is better than 4 hours of distracted study 🧘\"",
-        "\"Clear your desk, take a sip of water, and conquer your next 25-minute study target 💧\"",
-        "\"When your mind feels scattered, 5 minutes of box breathing restores laser clarity 🌿\"",
-        "\"Break your hardest subject into 20-minute chunks. You got this! 🎯\"",
-        "\"Your mind is a muscle: the more you resist distractions, the stronger it grows 🧠\""
+        "\"Take a deep breath. 25 minutes of deep focus is better than 4 hours of distracted study.\"",
+        "\"Clear your desk, take a sip of water, and conquer your next 25-minute study target.\"",
+        "\"When your mind feels scattered, 5 minutes of box breathing restores laser clarity.\"",
+        "\"Break your hardest subject into 20-minute chunks. You got this!\"",
+        "\"Your mind is a muscle: the more you resist distractions, the stronger it grows.\""
     )
 
     fun updateAllWidgets(context: Context) {

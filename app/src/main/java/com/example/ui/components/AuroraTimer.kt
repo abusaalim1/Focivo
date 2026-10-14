@@ -61,8 +61,6 @@ import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
-import com.example.ui.theme.RegainLimeLight
-import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.util.TimerTheme
 import kotlin.math.cos
@@ -85,7 +83,7 @@ fun AuroraTimer(
     isBreak: Boolean = false,
     subjectTitle: String = "Deep Study",
     modifier: Modifier = Modifier,
-    dialSize: Dp = 344.dp,
+    dialSize: Dp = 352.dp,
     mascotPose: MascotPose = MascotPose.IDLE,
     theme: TimerTheme? = null,
     onTogglePlay: () -> Unit = {},
@@ -180,6 +178,25 @@ fun AuroraTimer(
     val textPrimary = if (isDark) Color(0xFFF2F5EE) else NearBlack
     val textSecondary = if (isDark) Color(0xFFA2AAA0) else Color(0xFF5A6258)
 
+    // v1.5.0: one accent lime for the hub redesign; break phases shift the
+    // ring toward mint so focus / break read as visually distinct phases.
+    val studyLime = Color(0xFF8FD400)
+    val mintPhase = Color(0xFF69F0AE)
+    val effectiveArcColors = if (isBreak) {
+        arcColors.map { c ->
+            val f = 0.45f
+            Color(
+                red = c.red + (mintPhase.red - c.red) * f,
+                green = c.green + (mintPhase.green - c.green) * f,
+                blue = c.blue + (mintPhase.blue - c.blue) * f,
+                alpha = c.alpha
+            )
+        }
+    } else {
+        arcColors
+    }
+    val effectiveGlow: Color? = if (isBreak) mintPhase else themedGlow
+
     Box(
         modifier = modifier
             .size(dialSize)
@@ -216,8 +233,8 @@ fun AuroraTimer(
 
             // Ethereal background radial mesh glow (breathing behind dial)
             if (isRunning) {
-                val glowInner = themedGlow?.copy(alpha = 0.16f) ?: (if (isDark) Color(0x288CE000) else Color(0x1A8CE000))
-                val glowMid = themedGlow?.copy(alpha = 0.08f) ?: (if (isDark) Color(0x1500E5FF) else Color(0x1000E5FF))
+                val glowInner = effectiveGlow?.copy(alpha = 0.16f) ?: (if (isDark) Color(0x288FD400) else Color(0x1A8FD400))
+                val glowMid = effectiveGlow?.copy(alpha = 0.08f) ?: (if (isDark) Color(0x1500E5FF) else Color(0x1000E5FF))
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
@@ -252,7 +269,7 @@ fun AuroraTimer(
                 rotate(degrees = -90f, pivot = center) {
                     drawArc(
                         brush = Brush.sweepGradient(
-                            colors = arcColors.map { it.copy(alpha = if (isRunning) 0.35f * shimmerPhase else 0.22f) },
+                            colors = effectiveArcColors.map { it.copy(alpha = if (isRunning) 0.35f * shimmerPhase else 0.22f) },
                             center = center
                         ),
                         startAngle = 0f,
@@ -266,7 +283,7 @@ fun AuroraTimer(
                     // Crisp foreground progress arc (smooth aurora chromatic shift)
                     drawArc(
                         brush = Brush.sweepGradient(
-                            colors = arcColors,
+                            colors = effectiveArcColors,
                             center = center
                         ),
                         startAngle = 0f,
@@ -286,7 +303,7 @@ fun AuroraTimer(
 
                 // Soft outer aura
                 drawCircle(
-                    color = (if (isDark) Color(0x558CE000) else Color(0x408CE000)),
+                    color = studyLime.copy(alpha = if (isDark) 0.33f else 0.25f),
                     radius = 9.dp.toPx(),
                     center = headCenter
                 )
@@ -313,12 +330,12 @@ fun AuroraTimer(
                         if (isBreak) {
                             if (isDark) Color(0x3069F0AE) else Color(0xFFE8F5E9)
                         } else {
-                            if (isDark) Color(0x308CE000) else RegainLimeContainer.copy(alpha = 0.5f)
+                            if (isDark) studyLime.copy(alpha = 0.19f) else RegainLimeContainer.copy(alpha = 0.5f)
                         }
                     )
                     .border(
                         1.dp,
-                        if (isBreak) Color(0x4569F0AE) else Color(0x458CE000),
+                        if (isBreak) Color(0x4569F0AE) else studyLime.copy(alpha = 0.27f),
                         RoundedCornerShape(14.dp)
                     )
                     .then(
@@ -335,7 +352,7 @@ fun AuroraTimer(
                             .clip(CircleShape)
                             .background(
                                 if (isRunning) {
-                                    if (isBreak) Color(0xFF00E676) else RegainLimePrimary
+                                    if (isBreak) Color(0xFF00E676) else studyLime
                                 } else {
                                     Color.Gray
                                 }
@@ -351,7 +368,7 @@ fun AuroraTimer(
                         color = if (isBreak) {
                             if (isDark) Color(0xFF69F0AE) else Color(0xFF2E7D32)
                         } else {
-                            if (isDark) RegainLimePrimary else RegainLimeDeepText
+                            if (isDark) studyLime else RegainLimeDeepText
                         },
                         maxLines = 1
                     )
@@ -360,21 +377,21 @@ fun AuroraTimer(
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Change Subject & Timer",
-                            tint = if (isDark) RegainLimePrimary else RegainLimeDeepText,
+                            tint = if (isDark) studyLime else RegainLimeDeepText,
                             modifier = Modifier.size(11.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Main Digits: Soothing, Ultra-Crisp Countdown
+            // Main Digits: Soothing, Ultra-Crisp Countdown (v1.5.0: bigger, airier)
             Text(
                 text = timeFormatted,
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = if (hours > 0) 32.sp else 38.sp,
+                fontSize = if (hours > 0) 38.sp else 46.sp,
                 color = textPrimary,
                 textAlign = TextAlign.Center,
                 letterSpacing = (-1).sp,
@@ -390,18 +407,18 @@ fun AuroraTimer(
                 color = textSecondary
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // v1.3.1: Focivo mascot inside the timer, pose follows the timer state
             // (ready → studying-with-book, focusing → study video, break → resting).
             RegainMascotView(
-                size = 126.dp,
+                size = 108.dp,
                 pose = mascotPose,
                 animate = true,
                 modifier = Modifier.testTag("aurora_timer_mascot")
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // iOS-Style Glass Action Buttons (Play/Pause, Reset)
             Row(
@@ -440,9 +457,9 @@ fun AuroraTimer(
                         .background(
                             Brush.linearGradient(
                                 colors = if (isRunning) {
-                                    listOf(RegainLimePrimary, Color(0xFF69F0AE))
+                                    listOf(studyLime, Color(0xFF69F0AE))
                                 } else {
-                                    listOf(RegainLimeLight, RegainLimePrimary)
+                                    listOf(Color(0xFFB8F04D), studyLime)
                                 }
                             )
                         )

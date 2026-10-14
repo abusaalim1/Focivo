@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,6 +44,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import com.example.R
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -98,7 +101,7 @@ fun BlockShieldOverlay(
             // Floating Decorative App Icons
             Box(modifier = Modifier.fillMaxSize()) {
                 FloatingDistractionBadge(
-                    text = "👻",
+                    iconRes = R.drawable.emoji3d_ghost,
                     bgColor = Color(0xFFFFFC00),
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -114,7 +117,7 @@ fun BlockShieldOverlay(
                 )
 
                 FloatingDistractionBadge(
-                    text = "📸",
+                    iconRes = R.drawable.emoji3d_camera,
                     bgColor = Color(0xFFE1306C),
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -122,7 +125,7 @@ fun BlockShieldOverlay(
                 )
 
                 FloatingDistractionBadge(
-                    text = "💬",
+                    iconRes = R.drawable.emoji3d_chat,
                     bgColor = Color(0xFF25D366),
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -226,8 +229,8 @@ fun BlockShieldOverlay(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (isGeminiDetected) "✨ GEMINI AI REAL-TIME SCREEN GUARD"
-                            else if (effectivePunishment) "⚠️ 6-HOUR AI DISCIPLINE LOCK"
+                            text = if (isGeminiDetected) "GEMINI AI REAL-TIME SCREEN GUARD"
+                            else if (effectivePunishment) "6-HOUR AI DISCIPLINE LOCK"
                             else "STRICT STUDY LOCK ACTIVE",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = if (isGeminiDetected) RegainNeonEmerald else Color(0xFFFF8A80),
@@ -464,7 +467,8 @@ fun BlockShieldOverlay(
 
 @Composable
 private fun FloatingDistractionBadge(
-    text: String,
+    iconRes: Int? = null,
+    text: String? = null,
     bgColor: Color,
     modifier: Modifier = Modifier
 ) {
@@ -477,11 +481,19 @@ private fun FloatingDistractionBadge(
             .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            fontSize = 16.sp,
-            color = Color.White
-        )
+        if (iconRes != null) {
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp)
+            )
+        } else {
+            Text(
+                text = text.orEmpty(),
+                fontSize = 16.sp,
+                color = Color.White
+            )
+        }
     }
 }
 

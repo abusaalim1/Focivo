@@ -134,7 +134,7 @@ fun AiStudyWarningDialog(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
-                    text = "⚠️ Continuing casual or non-study activity will trigger an immediate 3+ HOUR LOCKOUT on ${warning.appName}.",
+                    text = "Continuing casual or non-study activity will trigger an immediate 3+ HOUR LOCKOUT on ${warning.appName}.",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color(0xFFFCA5A5),
@@ -266,7 +266,7 @@ fun AiStudyBlockedDialog(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "🔒 Block Active: 180 Minutes (3 Hours)",
+                            text = "Block Active: 180 Minutes (3 Hours)",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFFCA5A5),
@@ -363,7 +363,7 @@ fun AiStudyResolvedDialog(
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Keep Studying 🎯", fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Keep Studying", fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     )

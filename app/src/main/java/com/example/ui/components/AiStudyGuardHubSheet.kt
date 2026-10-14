@@ -403,7 +403,7 @@ fun AiStudyGuardHubSheet(
                     GuardCard {
                         if (punishmentLogs.isEmpty()) {
                             Text(
-                                text = "No warnings yet — keep it that way! 📚",
+                                text = "No warnings yet — keep it that way!",
                                 fontSize = 13.sp,
                                 color = textSecondary,
                                 textAlign = TextAlign.Center,
@@ -506,7 +506,7 @@ fun AiStudyGuardHubSheet(
                             )
                         }
                         Text(
-                            text = "1st tap → mascot warning. Warning ke baad dobara tap → test app pe 3-hour lock lag jayega.",
+                            text = "1st tap → mascot warning. Tapping again after the warning locks the test app for 3 hours.",
                             fontSize = 11.5.sp,
                             color = textSecondary,
                             modifier = Modifier.padding(top = 8.dp)

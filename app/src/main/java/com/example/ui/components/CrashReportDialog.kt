@@ -67,7 +67,7 @@ fun CrashReportDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "⚠️ App pichhli baar crash hui thi",
+                    text = "The app crashed last time",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = textPrimary,
@@ -75,7 +75,7 @@ fun CrashReportDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Neeche crash ki detail hai. \"Copy\" dabakar humein bhej do — turant fix kar denge!",
+                    text = "The crash details are below. Tap \"Copy\" and send them to us — we will fix it right away!",
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
                     color = textSecondary,
@@ -102,7 +102,7 @@ fun CrashReportDialog(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Text("Band karo", color = textSecondary, fontWeight = FontWeight.SemiBold)
+                        Text("Close", color = textSecondary, fontWeight = FontWeight.SemiBold)
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Button(

@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -61,10 +62,12 @@ import com.example.ui.theme.NearBlack
 import com.example.ui.theme.SecondaryTextLight
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.components.GlassButton
 import com.example.ui.components.GlassCard
 import com.example.ui.theme.RegainLimePrimary
@@ -457,14 +460,22 @@ fun QuestionnaireScreen(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(14.dp)) {
-                                        Text(
-                                            text = "🎓 100% Student-Centric Focus Mode",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                color = RegainLimePrimary,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 11.sp
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Image(
+                                                painter = painterResource(id = R.drawable.emoji3d_cap),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
                                             )
-                                        )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "100% Student-Centric Focus Mode",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    color = RegainLimePrimary,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.sp
+                                                )
+                                            )
+                                        }
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = "Automatic timetable locking, emergency calls pass-through, and AI Academic Sentinel enabled.",
