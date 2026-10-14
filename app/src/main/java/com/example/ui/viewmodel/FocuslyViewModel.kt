@@ -2042,6 +2042,68 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         _showPreStudyBlockSheet.value = false
     }
 
+    // ------------------------------------------------------------------
+    // v1.1 — Pomodoro cycle engine.
+    // A pomodoro run is a sequence of phases (Focus → Short Break → … →
+    // Long Break) driven through the SAME session-start gate as the classic
+    // timer (pre-study block sheet included). Rules:
+    // - ONLY Focus phases record sessions / earn points — exactly like a
+    //   single focus session today. Break phases record nothing.
+    // - Phase notifications reuse the existing system (Session Complete for
+    //   focus phases, Break Over when a break ends), one per transition.
+    // - The classic flow is untouched: _pomodoroState == null behaves
+    //   exactly as before.
+    // ------------------------------------------------------------------
+    private val _pomodoroState = MutableStateFlow<com.example.util.PomodoroState?>(null)
+    val pomodoroState: StateFlow<com.example.util.PomodoroState?> = _pomodoroState.asStateFlow()
+
+    /** Armed by requestPomodoroStart; consumed by the next startTimer(). */
+    private var pendingPomodoroConfig: com.example.util.PomodoroConfig? = null
+
+    /**
+     * Starts a pomodoro run: persists the config (durations, cycles, last
+     * preset) via the existing prefs mechanism, then goes through the
+     * normal session-start gate.
+     */
+    fun requestPomodoroStart(config: com.example.util.PomodoroConfig) {
+        if (_isTimerRunning.value) return
+        val app = getApplication<Application>()
+        com.example.util.savePomodoroConfig(app, config)
+        pendingPomodoroConfig = config
+        // Clear any stale phase state before arming the new run.
+        _pomodoroState.value = null
+        requestStudySessionStart()
+    }
+
+    /** Clean stop: same teardown as stopping a session today. */
+    fun stopPomodoro() {
+        _pomodoroState.value = null
+        pendingPomodoroConfig = null
+        com.example.util.saveActivePomodoroState(getApplication(), null)
+        discardActiveSession()
+    }
+
+    /** Advance to the next pomodoro phase, or finish the run (null). */
+    private fun advancePomodoroPhase() {
+        val pomo = _pomodoroState.value ?: return
+        val next = com.example.util.nextPomodoroPhase(pomo)
+        if (next == null) {
+            // Run complete (long break finished): back to idle focus setup.
+            _pomodoroState.value = null
+            pendingPomodoroConfig = null
+            com.example.util.saveActivePomodoroState(getApplication(), null)
+            setMode("Focus", pomo.config.focusMinutes)
+            Log.i(TAG, "Pomodoro run complete (${pomo.config.cycles} cycles)")
+            return
+        }
+        _pomodoroState.value = next
+        com.example.util.saveActivePomodoroState(getApplication(), next)
+        setMode(next.phaseModeLabel(), next.phaseMinutes())
+        Log.i(TAG, "Pomodoro phase -> ${next.phaseModeLabel()} (${next.phaseMinutes()}m)")
+        // Quiet phase start: no "Session started" banner mid-cycle.
+        startTimer(quietPhaseStart = true)
+    }
+
     fun confirmPreStudyBlock(selectedPackages: Set<String>, saveForFuture: Boolean) {
         val app = getApplication<Application>()
         val sanitized = com.example.util.EssentialAppsGuard.sanitizeBlockedPackages(app, selectedPackages)
@@ -2059,8 +2121,53 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         startTimer(overrideBlockedList = joined)
     }
 
-    fun startTimer(overrideBlockedList: String? = null) {
+    /**
+     * v1.1 — dedicated Blocked Apps list (Study Hub row destination).
+     * Saves the block list WITHOUT starting a timer — the list is the same
+     * source the shield reads (userPreferences.blockedAppsList).
+     */
+    fun updateBlockedAppsList(selectedPackages: Set<String>) {
+        val app = getApplication<Application>()
+        val sanitized = com.example.util.EssentialAppsGuard.sanitizeBlockedPackages(app, selectedPackages)
+        val currentPrefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
+        viewModelScope.launch {
+            repository.savePreferences(currentPrefs.copy(blockedAppsList = sanitized.joinToString(",")))
+        }
+    }
+
+    /** v1.1 — remove one app from the block list (same source the shield uses). */
+    fun removeBlockedApp(packageName: String) {
+        val currentPrefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
+        val remaining = currentPrefs.blockedAppsList.split(",")
+            .map { it.trim() }
+            .filter { it.isNotBlank() && it != packageName }
+        viewModelScope.launch {
+            repository.savePreferences(currentPrefs.copy(blockedAppsList = remaining.joinToString(",")))
+        }
+    }
+
+    fun startTimer(overrideBlockedList: String? = null, quietPhaseStart: Boolean = false) {
         if (_isTimerRunning.value) return
+
+        // v1.1: pomodoro — arm the cycle engine. The first Focus phase starts
+        // now with the configured duration; phases advance automatically in
+        // onTimerCompleted(). Classic flow: pendingPomodoroConfig is null and
+        // _pomodoroState stays null (behavior identical to before).
+        pendingPomodoroConfig?.let { cfg ->
+            pendingPomodoroConfig = null
+            _pomodoroState.value = com.example.util.PomodoroState(
+                config = cfg,
+                phase = com.example.util.PomodoroPhase.FOCUS,
+                focusCompleted = 0
+            )
+            setMode("Focus", cfg.focusMinutes)
+            // v1.1: persist the active run so process death can't corrupt
+            // phase accounting (a break must never record as a session).
+            com.example.util.saveActivePomodoroState(getApplication(), _pomodoroState.value)
+            Log.i(TAG, "Pomodoro started: ${cfg.cycles}x${cfg.focusMinutes}m " +
+                "(short ${cfg.shortBreakMinutes}m / long ${cfg.longBreakMinutes}m)")
+        }
+
         _isTimerRunning.value = true
         if (sessionStartTimeMs == 0L) {
             sessionStartTimeMs = System.currentTimeMillis()
@@ -2204,23 +2311,26 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         }
 
         // 4. Combined confirmation banner: e.g. "Session started · 12 apps blocked · AI Guard active · Deep Focus locked"
-        val parts = mutableListOf<String>()
-        parts.add("Session started")
-        if (blockerActive && blockedCount > 0) {
-            parts.add("$blockedCount apps blocked")
-        }
-        if (aiGuardActive) {
-            parts.add("AI Guard active")
-        }
-        if (isDeepFocusOn) {
-            parts.add("Deep Focus locked")
-        }
-        val bannerMsg = parts.joinToString(" · ")
-        _sessionStartConfirmation.value = bannerMsg
-        viewModelScope.launch {
-            delay(4000L)
-            if (_sessionStartConfirmation.value == bannerMsg) {
-                _sessionStartConfirmation.value = null
+        // v1.1: skipped on quiet pomodoro phase starts (no banner spam mid-cycle).
+        if (!quietPhaseStart) {
+            val parts = mutableListOf<String>()
+            parts.add("Session started")
+            if (blockerActive && blockedCount > 0) {
+                parts.add("$blockedCount apps blocked")
+            }
+            if (aiGuardActive) {
+                parts.add("AI Guard active")
+            }
+            if (isDeepFocusOn) {
+                parts.add("Deep Focus locked")
+            }
+            val bannerMsg = parts.joinToString(" · ")
+            _sessionStartConfirmation.value = bannerMsg
+            viewModelScope.launch {
+                delay(4000L)
+                if (_sessionStartConfirmation.value == bannerMsg) {
+                    _sessionStartConfirmation.value = null
+                }
             }
         }
 
@@ -2299,9 +2409,20 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         val prefs = app.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
         val tPrefs = app.getSharedPreferences("focusly_timer_state", Context.MODE_PRIVATE)
 
+        // v1.1: restore the active pomodoro phase (if any) so completion
+        // branches correctly — a restored break phase must not record.
+        _pomodoroState.value = com.example.util.loadActivePomodoroState(app)
+
         val running = prefs.getBoolean("is_manual_timer_running", false) ||
                 tPrefs.getBoolean("is_timer_running", false)
-        if (!running) return false
+        if (!running) {
+            // No timer running: drop any stale pomodoro state.
+            if (_pomodoroState.value != null) {
+                _pomodoroState.value = null
+                com.example.util.saveActivePomodoroState(app, null)
+            }
+            return false
+        }
 
         val endTime = prefs.getLong("manual_timer_end_time_ms", 0L)
         val now = System.currentTimeMillis()
@@ -2477,6 +2598,11 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         // v1.1.5: owner rule — ONLY sessions whose timer runs to natural completion
         // are recorded. Finishing early DISCARDS the session: no record, no points,
         // no streak change, no completion screen.
+        // v1.1: also clears any active pomodoro run (stop everything cleanly;
+        // only completed focus phases were ever recorded).
+        _pomodoroState.value = null
+        pendingPomodoroConfig = null
+        com.example.util.saveActivePomodoroState(getApplication(), null)
         discardActiveSession()
     }
 
@@ -2584,6 +2710,36 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             if (userPreferences.value?.notificationsEnabled == true) {
                 audioEngine.playShieldUnlockChime()
             }
+        }
+
+        // v1.1: pomodoro BREAK phase completed — breaks earn nothing and log
+        // nothing as study. Post "Break's over" (existing system), reset the
+        // timer, and advance to the next phase. Focus phases fall through to
+        // the normal recording path below (identical accounting to classic).
+        val pomo = _pomodoroState.value
+        if (pomo != null && pomo.phase != com.example.util.PomodoroPhase.FOCUS) {
+            try {
+                if (userPreferences.value?.notificationsEnabled == true) {
+                    com.example.service.FocivoNotifications.postBreakOver(getApplication())
+                }
+            } catch (_: Exception) {}
+            _remainingSeconds.value = _targetSeconds.value
+            _distractionsCount.value = 0
+            _loggedDistractions.value = emptyList()
+            _sessionNotes.value = ""
+            accumulatedSessionElapsedSecs = 0
+            sessionStartTimeMs = 0L
+            try {
+                val tPrefs = getApplication<Application>().getSharedPreferences("focusly_timer_state", Context.MODE_PRIVATE)
+                tPrefs.edit()
+                    .putBoolean("is_timer_running", false)
+                    .putInt("remaining_seconds", _targetSeconds.value)
+                    .apply()
+                com.example.widget.FocivoWidgetHelper.updateAllWidgets(getApplication())
+            } catch (_: Exception) {}
+            Log.i(TAG, "Pomodoro break phase complete (not recorded, no points)")
+            advancePomodoroPhase()
+            return
         }
 
         val durationSpent = _targetSeconds.value - _remainingSeconds.value
@@ -2703,7 +2859,15 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         }
 
         _completedSessionSummary.value = session
-        _showCompletionScreen.value = true
+        // v1.1: pomodoro FOCUS phases are recorded above with real
+        // minutes+points and the Session Complete notification already fired —
+        // skip the completion screen mid-cycle and advance automatically.
+        // Classic flow: completion screen as before.
+        if (_pomodoroState.value != null) {
+            _showCompletionScreen.value = false
+        } else {
+            _showCompletionScreen.value = true
+        }
 
         // Reset timer
         _remainingSeconds.value = _targetSeconds.value
@@ -2719,6 +2883,12 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 .apply()
             com.example.widget.FocivoWidgetHelper.updateAllWidgets(getApplication())
         } catch (_: Exception) {}
+
+        // v1.1: advance the pomodoro cycle (Focus -> Short Break -> … ->
+        // Long Break -> done). Classic flow: _pomodoroState is null, no-op.
+        if (_pomodoroState.value != null) {
+            advancePomodoroPhase()
+        }
     }
 
     /**

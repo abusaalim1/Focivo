@@ -58,8 +58,12 @@ import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
+import com.example.util.PomodoroConfig
+import com.example.util.TimerFaceManager
 import com.example.util.TimerTheme
 import com.example.util.TimerThemeManager
+import com.example.util.loadLastPomodoroPresetId
+import com.example.util.loadPomodoroConfig
 
 /**
  * v1.5.0 — Customize Timer sheet (replaces the old "Study Focus & Custom
@@ -104,6 +108,9 @@ fun CustomizeTimerSheet(
     onSelectAmbientSound: (String) -> Unit,
     onSelectMode: (mode: String, durationMinutes: Int) -> Unit,
     onUpdateSubject: (String) -> Unit,
+    // v1.1: starts a pomodoro run (goes through the same session-start gate
+    // as the classic timer — pre-study block sheet included).
+    onStartPomodoro: (PomodoroConfig) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -121,15 +128,20 @@ fun CustomizeTimerSheet(
     var customSubjectInput by remember { mutableStateOf("") }
     var focusMins by remember { mutableStateOf(currentFocusMinutes.coerceAtLeast(1)) }
     var customFocusInput by remember { mutableStateOf("") }
-    var shortBreakMins by remember { mutableStateOf(5) }
-    var longBreakMins by remember { mutableStateOf(15) }
-    // v1.5.0: session count is cycle-planning state for the pomodoro summary.
-    // Full automatic phase cycling would need timer-engine changes (out of
-    // scope); the count is shown in the cycle summary.
-    var sessionCount by remember { mutableStateOf(4) }
+    // v1.1: pomodoro showcase state — initialized from the last-used config
+    // (persisted via the existing prefs mechanism), separate from the classic
+    // focus duration above. Also drives the quick "Set break" buttons below.
+    val savedPomo = remember(context) { loadPomodoroConfig(context) }
+    var pomoFocusMins by remember { mutableStateOf(savedPomo.focusMinutes) }
+    var pomoShortMins by remember { mutableStateOf(savedPomo.shortBreakMinutes) }
+    var pomoLongMins by remember { mutableStateOf(savedPomo.longBreakMinutes) }
+    var pomoCycles by remember { mutableStateOf(savedPomo.cycles) }
+    var lastPresetId by remember { mutableStateOf(loadLastPomodoroPresetId(context)) }
     var lockedDialogTheme by remember { mutableStateOf<TimerTheme?>(null) }
+    var lockedDialogFace by remember { mutableStateOf<com.example.util.TimerFace?>(null) }
 
     val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
+    val selectedFace by TimerFaceManager.selectedFace.collectAsState()
     val prefsFlow = remember(context) { FocuslyRepository.getInstance(context).userPreferences }
     val prefs by prefsFlow.collectAsState(initial = null)
     val focusPoints = prefs?.focusPoints ?: 0
@@ -139,6 +151,13 @@ fun CustomizeTimerSheet(
             lockedTheme = lockedTheme,
             focusPoints = focusPoints,
             onDismiss = { lockedDialogTheme = null }
+        )
+    }
+    lockedDialogFace?.let { lockedFace ->
+        LockedTimerFaceDialog(
+            face = lockedFace,
+            focusPoints = focusPoints,
+            onDismiss = { lockedDialogFace = null }
         )
     }
 
@@ -254,116 +273,41 @@ fun CustomizeTimerSheet(
                     )
                 }
 
+                // v1.1: aesthetic Pomodoro showcase — tilted phase cards,
+                // editable durations, cycles, preset plans, real cycle engine.
                 item {
-                    CustomizeSectionLabel(text = "Pomodoro cycle", textSecondary = textSecondary)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Short break",
-                        fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp,
-                        color = textSecondary
+                    PomodoroShowcaseSection(
+                        focusMins = pomoFocusMins,
+                        shortBreakMins = pomoShortMins,
+                        longBreakMins = pomoLongMins,
+                        sessionCount = pomoCycles,
+                        lastPresetId = lastPresetId,
+                        onFocusMinsChange = { pomoFocusMins = it },
+                        onShortBreakMinsChange = { pomoShortMins = it },
+                        onLongBreakMinsChange = { pomoLongMins = it },
+                        onSessionCountChange = { pomoCycles = it },
+                        onPresetTap = { preset ->
+                            pomoFocusMins = preset.focus
+                            pomoShortMins = preset.shortBreak
+                            pomoLongMins = preset.longBreak
+                            pomoCycles = preset.cycles
+                            lastPresetId = preset.id
+                            onStartPomodoro(preset.toConfig())
+                            onDismiss()
+                        },
+                        onStartCustom = {
+                            lastPresetId = null
+                            onStartPomodoro(
+                                PomodoroConfig(pomoFocusMins, pomoShortMins, pomoLongMins, pomoCycles, presetId = null)
+                            )
+                            onDismiss()
+                        },
+                        textPrimary = textPrimary,
+                        textSecondary = textSecondary,
+                        cardBg = cardBg,
+                        cardBorder = cardBorder,
+                        isDark = isDark
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(5, 10, 15).forEach { mins ->
-                            CustomizeChip(
-                                text = "${mins}m",
-                                selected = shortBreakMins == mins,
-                                onClick = { shortBreakMins = mins },
-                                textPrimary = textPrimary,
-                                cardBg = cardBg,
-                                cardBorder = cardBorder,
-                                selectedBg = selectedBg,
-                                modifier = Modifier.weight(1f),
-                                testTag = "customize_short_break_chip_$mins"
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Long break",
-                        fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp,
-                        color = textSecondary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(15, 20, 30).forEach { mins ->
-                            CustomizeChip(
-                                text = "${mins}m",
-                                selected = longBreakMins == mins,
-                                onClick = { longBreakMins = mins },
-                                textPrimary = textPrimary,
-                                cardBg = cardBg,
-                                cardBorder = cardBorder,
-                                selectedBg = selectedBg,
-                                modifier = Modifier.weight(1f),
-                                testTag = "customize_long_break_chip_$mins"
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Focus sessions per cycle",
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp,
-                            color = textSecondary
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.testTag("customize_sessions_stepper")
-                        ) {
-                            CustomizeStepperButton(
-                                icon = Icons.Default.Remove,
-                                contentDescription = "Fewer sessions",
-                                onClick = { sessionCount = (sessionCount - 1).coerceAtLeast(2) },
-                                cardBg = cardBg,
-                                cardBorder = cardBorder,
-                                textPrimary = textPrimary
-                            )
-                            Text(
-                                text = "$sessionCount",
-                                fontFamily = PoppinsFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = textPrimary,
-                                modifier = Modifier.padding(horizontal = 14.dp)
-                            )
-                            CustomizeStepperButton(
-                                icon = Icons.Default.Add,
-                                contentDescription = "More sessions",
-                                onClick = { sessionCount = (sessionCount + 1).coerceAtMost(8) },
-                                cardBg = cardBg,
-                                cardBorder = cardBorder,
-                                textPrimary = textPrimary
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(selectedBg)
-                            .border(1.dp, CustomizeAccent.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                    ) {
-                        Text(
-                            text = "$sessionCount × ${resolvedFocusMins}m focus · ${shortBreakMins}m short breaks · ${longBreakMins}m long break",
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 12.sp,
-                            color = textPrimary
-                        )
-                    }
                 }
 
                 item {
@@ -472,6 +416,42 @@ fun CustomizeTimerSheet(
                     }
                 }
 
+                // v1.1: Timer Style — switchable timer faces with live
+                // previews, same lock model as themes (Focus Points balance
+                // in the header, gold lock + cost, explainer dialog).
+                item {
+                    CustomizeSectionLabel(text = "Timer Style", textSecondary = textSecondary)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                    ) {
+                        Text(
+                            text = "Focus Points: ",
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 12.sp,
+                            color = textSecondary
+                        )
+                        Text(
+                            text = "$focusPoints",
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = if (isDark) CustomizeAccent else Color(0xFF4A7A00)
+                        )
+                    }
+                    TimerFacePicker(
+                        selectedFaceId = selectedFace.id,
+                        focusPoints = focusPoints,
+                        onSelectFace = { face ->
+                            TimerFaceManager.trySelectFace(context, face.id, focusPoints)
+                        },
+                        onLockedFaceTap = { face -> lockedDialogFace = face },
+                        isDark = isDark
+                    )
+                }
+
                 item {
                     Button(
                         onClick = {
@@ -510,7 +490,7 @@ fun CustomizeTimerSheet(
                     ) {
                         TextButton(
                             onClick = {
-                                onSelectMode("Short Break", shortBreakMins)
+                                onSelectMode("Short Break", pomoShortMins)
                                 onDismiss()
                             },
                             modifier = Modifier
@@ -518,7 +498,7 @@ fun CustomizeTimerSheet(
                                 .testTag("customize_set_short_break_btn")
                         ) {
                             Text(
-                                text = "Set short break · ${shortBreakMins}m",
+                                text = "Set short break · ${pomoShortMins}m",
                                 fontFamily = PoppinsFontFamily,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
@@ -527,7 +507,7 @@ fun CustomizeTimerSheet(
                         }
                         TextButton(
                             onClick = {
-                                onSelectMode("Long Break", longBreakMins)
+                                onSelectMode("Long Break", pomoLongMins)
                                 onDismiss()
                             },
                             modifier = Modifier
@@ -535,7 +515,7 @@ fun CustomizeTimerSheet(
                                 .testTag("customize_set_long_break_btn")
                         ) {
                             Text(
-                                text = "Set long break · ${longBreakMins}m",
+                                text = "Set long break · ${pomoLongMins}m",
                                 fontFamily = PoppinsFontFamily,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
