@@ -1412,6 +1412,8 @@ fun OnboardingFlowScreen(
                 }
             }
         }
+    }
+
     fun requestPermission(spec: PermissionSpec) {
         // v1.1 final: sensitive permissions (Accessibility, Device Admin) go
         // through the trust explainer card first (already-built component).
