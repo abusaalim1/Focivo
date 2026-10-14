@@ -155,7 +155,7 @@ fun CustomizeTimerSheet(
     }
     lockedDialogFace?.let { lockedFace ->
         LockedTimerFaceDialog(
-            face = lockedFace,
+            lockedFace = lockedFace,
             focusPoints = focusPoints,
             onDismiss = { lockedDialogFace = null }
         )
@@ -442,13 +442,17 @@ fun CustomizeTimerSheet(
                         )
                     }
                     TimerFacePicker(
-                        selectedFaceId = selectedFace.id,
                         focusPoints = focusPoints,
-                        onSelectFace = { face ->
-                            TimerFaceManager.trySelectFace(context, face.id, focusPoints)
+                        selectedFaceId = selectedFace.id,
+                        onFaceTap = { face, isLocked ->
+                            if (isLocked) {
+                                lockedDialogFace = face
+                            } else {
+                                TimerFaceManager.trySelectFace(context, face.id, focusPoints)
+                            }
                         },
-                        onLockedFaceTap = { face -> lockedDialogFace = face },
-                        isDark = isDark
+                        textPrimary = textPrimary,
+                        cardBorder = cardBorder
                     )
                 }
 
