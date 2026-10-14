@@ -43,7 +43,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.BalooBrandFontFamily
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeDeepText
@@ -114,7 +113,7 @@ fun SessionNotificationDigestSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Notification Digest",
-                        fontFamily = BalooBrandFontFamily,
+                        fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
                         color = textPrimary
@@ -193,7 +192,7 @@ fun SessionNotificationDigestSheet(
                         Spacer(modifier = Modifier.height(14.dp))
                         Text(
                             text = "No suppressed notifications",
-                            fontFamily = BalooBrandFontFamily,
+                            fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
                             color = textPrimary

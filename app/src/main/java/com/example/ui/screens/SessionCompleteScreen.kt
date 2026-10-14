@@ -6,18 +6,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.PixelFormat
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.view.View
-import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
-import com.example.ui.overlay.OverlayLifecycleHost
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -59,6 +56,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import com.example.ui.components.CelebrateBuddyMascot
 import com.example.ui.components.SessionNotificationDigestSheet
 import com.example.util.SessionNotificationDigestManager
 import androidx.compose.ui.Alignment
@@ -84,8 +82,8 @@ import com.example.ui.components.GlassButton
 import com.example.ui.components.MascotPose
 import com.example.ui.components.RegainMascotView
 import com.example.ui.theme.LavenderSoft
-import com.example.ui.theme.BalooBrandFontFamily
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
@@ -201,7 +199,7 @@ fun SessionCompleteScreen(
             Text(
                 text = "Well done.",
                 style = MaterialTheme.typography.displayMedium.copy(
-                    fontFamily = BalooBrandFontFamily,
+                    fontFamily = PoppinsFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 36.sp,
                     color = if (isDark) Color(0xFFF0F4ED) else NearBlack
@@ -339,11 +337,28 @@ private fun ShareSessionCard(minutesSpent: Int, distractionsCount: Int, quote: S
     val isDark = isAppInDarkTheme()
     val scope = rememberCoroutineScope()
 
+    // v1.1: streak + date for the minimal share card.
+    val streakDays = remember {
+        try {
+            val prefs = context.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
+            val userPrefsJson = prefs.getString("user_preferences", null)
+            if (userPrefsJson != null) {
+                org.json.JSONObject(userPrefsJson).optInt("currentStreak", 1).coerceAtLeast(1)
+            } else 1
+        } catch (_: Exception) { 1 }
+    }
+    val dateLine = remember {
+        try {
+            java.text.SimpleDateFormat("EEEE, MMM d", java.util.Locale.getDefault())
+                .format(java.util.Date())
+        } catch (_: Exception) { "" }
+    }
+
     val headerText = if (distractionsCount == 0) {
-        "\uD83C\uDF89 You focused for ${minutesSpent}m without distractions!"
+        "You focused for ${minutesSpent}m without distractions!"
     } else {
         val dWord = if (distractionsCount == 1) "distraction" else "distractions"
-        "\uD83C\uDF89 You focused for ${minutesSpent}m with only $distractionsCount $dWord!"
+        "You focused for ${minutesSpent}m with only $distractionsCount $dWord!"
     }
     val shareText = if (distractionsCount == 0) {
         "I focused for $minutesSpent minutes without distractions with Focivo! Stay focused, stay sharp."
@@ -355,7 +370,7 @@ private fun ShareSessionCard(minutesSpent: Int, distractionsCount: Int, quote: S
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            scope.launch { saveShareCard(context, minutesSpent, distractionsCount, quote) }
+            scope.launch { saveShareCard(context, minutesSpent, streakDays, dateLine) }
         } else {
             Toast.makeText(context, "Storage permission is needed to save the image.", Toast.LENGTH_SHORT).show()
         }
@@ -364,7 +379,7 @@ private fun ShareSessionCard(minutesSpent: Int, distractionsCount: Int, quote: S
     // Shares the card image (saved to gallery first) + text; falls back to text-only.
     fun shareWithImage(toWhatsApp: Boolean) {
         scope.launch {
-            val imageUri = saveShareCardImage(context, minutesSpent, distractionsCount, quote)
+            val imageUri = saveShareCardImage(context, minutesSpent, streakDays, dateLine)
             if (imageUri != null) {
                 shareImageAndText(context, imageUri, shareText, toWhatsApp)
             } else {
@@ -427,7 +442,7 @@ private fun ShareSessionCard(minutesSpent: Int, distractionsCount: Int, quote: S
                     ) {
                         storagePermissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
                     } else {
-                        scope.launch { saveShareCard(context, minutesSpent, distractionsCount, quote) }
+                        scope.launch { saveShareCard(context, minutesSpent, streakDays, dateLine) }
                     }
                 }
             )
@@ -472,27 +487,25 @@ private fun ShareActionButton(
         )
     }
 }
-
 /**
- * The card rendered into the downloaded PNG. Self-contained colors so it
- * renders correctly in an offscreen ComposeView without an Activity theme.
- * v1.3.1 — Regain-level aesthetic: lime card, big Focus Time, rotating quote
- * box, honest distractions line, brand footer.
+ * v1.1 — Minimal aesthetic share card.
+ *
+ * ONLY the essentials: total study time (hero), session/date line, small
+ * streak. The mascot appears in the CELEBRATION pose as the USER'S BUDDY
+ * (equipped wardrobe items + level styling via CelebrateBuddyMascot).
+ * No emoji, no extra blocks.
  */
 @Composable
-private fun ShareCardContent(minutes: Int, distractionsCount: Int, quote: String) {
+private fun ShareCardContent(
+    minutes: Int,
+    streakDays: Int,
+    dateLine: String
+) {
     val lime = Color(0xFF8CE000)
     val ink = Color(0xFF121511)
     val cardBg = Color(0xFF1D221C)
     val softText = Color(0xFFA0A89E)
     val brightText = Color(0xFFF0F4ED)
-
-    val focusLine = if (distractionsCount == 0) {
-        "without distractions!"
-    } else {
-        val dWord = if (distractionsCount == 1) "distraction" else "distractions"
-        "with only $distractionsCount $dWord"
-    }
 
     Box(
         modifier = Modifier
@@ -504,74 +517,48 @@ private fun ShareCardContent(minutes: Int, distractionsCount: Int, quote: String
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .clip(RoundedCornerShape(36.dp))
-                .background(lime)
-                .padding(horizontal = 8.dp, vertical = 8.dp)
+                .background(cardBg)
+                .border(1.5.dp, lime.copy(alpha = 0.5f), RoundedCornerShape(36.dp))
+                .padding(horizontal = 48.dp, vertical = 40.dp)
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(30.dp))
-                    .background(cardBg)
-                    .border(2.dp, lime.copy(alpha = 0.6f), RoundedCornerShape(30.dp))
-                    .padding(horizontal = 56.dp, vertical = 48.dp)
-            ) {
-                Text(
-                    text = "\uD83C\uDF89",
-                    fontSize = 64.sp
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Yay! You focused for",
-                    color = softText,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "${minutes}m",
-                    color = lime,
-                    fontSize = 110.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = BalooBrandFontFamily
-                )
-                Text(
-                    text = "Focus Time",
-                    color = brightText,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 2.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = focusLine,
-                    color = brightText,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                if (quote.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(28.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xFF2A3129))
-                            .border(1.dp, lime.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
-                            .padding(horizontal = 28.dp, vertical = 20.dp)
-                    ) {
-                        Text(
-                            text = "\u201C$quote\u201D",
-                            color = brightText,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(28.dp))
-                Text(
-                    text = "Focivo \u2014 Stay focused, stay sharp.",
-                    color = softText,
-                    fontSize = 20.sp
-                )
-            }
+            // Dressed buddy in celebration pose — the user's ONE buddy identity.
+            CelebrateBuddyMascot(
+                modifier = Modifier.fillMaxWidth(0.55f)
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            // Hero: total study time
+            Text(
+                text = "${minutes}m",
+                color = lime,
+                fontSize = 96.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = PoppinsFontFamily,
+                letterSpacing = (-2).sp
+            )
+            Text(
+                text = "FOCUS TIME",
+                color = brightText,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 4.sp
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            // Session/date line
+            Text(
+                text = dateLine,
+                color = softText,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            // Small streak
+            Text(
+                text = "$streakDays day streak",
+                color = lime.copy(alpha = 0.9f),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.sp
+            )
         }
     }
 }
@@ -606,59 +593,61 @@ private fun shareGeneric(context: Context, text: String) {
 }
 
 /**
- * v1.3.1 — renders the card by briefly attaching a ComposeView to the WindowManager
- * (TYPE_APPLICATION_OVERLAY), awaiting one layout pass, then drawing it to a bitmap.
+ * v1.1 FIX — renders the card IN-PROCESS by briefly attaching a ComposeView to
+ * the Activity's decor view (INVISIBLE), awaiting one layout pass, then drawing
+ * it to a bitmap.
  *
- * Why: the old approach measured a DETACHED ComposeView, which defers composition
- * until onAttachedToWindow — so nothing ever composed and drawToBitmap() threw on a
- * 0-height bitmap (every Download tap ended at the failure toast).
+ * ROOT CAUSE of the "app exits on Save" bug: the old path used
+ * TYPE_APPLICATION_OVERLAY via WindowManager.addView(), which requires
+ * SYSTEM_ALERT_WINDOW. On Android 16 (SDK 36), when the overlay permission is
+ * missing/revoked — or when the OverlayLifecycleHost's lifecycle teardown
+ * races the Activity's window token — addView/removeView throws or the host
+ * teardown tears down MainActivity's window, killing the app on Save/Share.
+ *
+ * New path: no overlay, no WindowManager, no lifecycle host. The ComposeView
+ * inherits the Activity's lifecycle owner automatically, renders invisibly,
+ * and is detached after capture. The Activity is never at risk.
  *
  * Must be called from a coroutine (suspends on Main until the frame is drawn).
- * Returns null when the overlay permission is missing or anything fails.
+ * Returns null when anything fails.
  */
 private suspend fun captureShareCardBitmap(
     context: Context,
     minutes: Int,
-    distractionsCount: Int,
-    quote: String
+    streakDays: Int,
+    dateLine: String
 ): Bitmap? = withContext(Dispatchers.Main) {
     suspendCancellableCoroutine { cont ->
+        val activity = context as? Activity
+        if (activity == null) {
+            if (!cont.isCompleted) cont.resume(null) {}
+            return@suspendCancellableCoroutine
+        }
         var composeView: ComposeView? = null
-        var overlayHost: OverlayLifecycleHost? = null
-        var wm: WindowManager? = null
         fun cleanup() {
             try {
-                // v1.5.1: dismiss the overlay lifecycle host alongside the view.
-                runCatching { overlayHost?.dismiss() }
-                overlayHost = null
-                composeView?.let { v -> wm?.removeView(v) }
-            } catch (_: Exception) {
-            }
+                composeView?.let { v ->
+                    (v.parent as? android.view.ViewGroup)?.removeView(v)
+                }
+            } catch (_: Exception) { }
+            composeView = null
         }
         cont.invokeOnCancellation { cleanup() }
         try {
-            wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            // v1.5.1: overlay ComposeViews have no Activity/Fragment — install a
-            // dedicated lifecycle host or onAttachedToWindow throws
-            // IllegalStateException("ViewTreeLifecycleOwner not found") (Android 16).
-            val host = OverlayLifecycleHost()
+            val decor = activity.window.decorView as android.view.ViewGroup
             composeView = ComposeView(context).apply {
-                host.installOn(this)
-                setContent { ShareCardContent(minutes, distractionsCount, quote) }
+                // INVISIBLE (not GONE): measures/layouts/composes, never flashes.
+                visibility = android.view.View.INVISIBLE
+                setContent { ShareCardContent(minutes, streakDays, dateLine) }
             }
-            overlayHost = host
-            host.show()
-            val params = WindowManager.LayoutParams(
-                1080,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                PixelFormat.TRANSLUCENT
-            )
             val view = composeView!!
-            val manager = wm!!
+            decor.addView(
+                view,
+                android.view.ViewGroup.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
             view.doOnLayout {
                 try {
                     val bmp = it.drawToBitmap()
@@ -669,7 +658,6 @@ private suspend fun captureShareCardBitmap(
                     cleanup()
                 }
             }
-            manager.addView(view, params)
         } catch (e: Exception) {
             cleanup()
             if (!cont.isCompleted) cont.resume(null) {}
@@ -684,10 +672,10 @@ private suspend fun captureShareCardBitmap(
 private suspend fun saveShareCardImage(
     context: Context,
     minutes: Int,
-    distractionsCount: Int,
-    quote: String
+    streakDays: Int,
+    dateLine: String
 ): Uri? {
-    val bitmap = captureShareCardBitmap(context, minutes, distractionsCount, quote) ?: return null
+    val bitmap = captureShareCardBitmap(context, minutes, streakDays, dateLine) ?: return null
     return withContext(Dispatchers.IO) {
         try {
             val filename = "Focivo-Focus-${System.currentTimeMillis()}.png"
@@ -725,10 +713,10 @@ private suspend fun saveShareCardImage(
 private suspend fun saveShareCard(
     context: Context,
     minutes: Int,
-    distractionsCount: Int,
-    quote: String
+    streakDays: Int,
+    dateLine: String
 ) {
-    val uri = saveShareCardImage(context, minutes, distractionsCount, quote)
+    val uri = saveShareCardImage(context, minutes, streakDays, dateLine)
     withContext(Dispatchers.Main) {
         Toast.makeText(
             context,

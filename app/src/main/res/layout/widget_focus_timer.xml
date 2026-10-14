@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/fw_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/fw_bg">
+
+    <!-- soft lime glow behind mascot -->
+    <ImageView android:layout_width="240dp" android:layout_height="240dp" android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="-40dp" android:src="@drawable/fw_glow" android:importantForAccessibility="no"/>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+        android:orientation="vertical" android:padding="20dp">
+
+        <!-- header -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <ImageView android:layout_width="16dp" android:layout_height="16dp" android:layout_marginEnd="8dp"
+                android:src="@drawable/ic_widget_timer" android:importantForAccessibility="no"/>
+            <TextView android:id="@+id/tv_eyebrow" android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="Focus Timer" android:textAllCaps="true"
+                android:letterSpacing="0.16" android:textSize="10sp" android:fontFamily="@font/inter_medium"
+                android:textColor="@color/fw_text_secondary"/>
+            <LinearLayout android:layout_width="wrap_content" android:layout_height="26dp"
+                android:gravity="center_vertical" android:paddingStart="10dp" android:paddingEnd="12dp"
+                android:background="@drawable/fw_pill">
+                <ImageView android:layout_width="6dp" android:layout_height="6dp" android:layout_marginEnd="6dp" android:src="@drawable/fw_dot" android:importantForAccessibility="no"/>
+                <TextView android:id="@+id/tv_badge" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Ready" android:textSize="11sp" android:fontFamily="@font/inter_medium"
+                    android:textColor="@color/fw_accent"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- body -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:orientation="vertical" android:layout_marginEnd="8dp">
+                <TextView android:id="@+id/tv_title" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="25:00" android:textSize="46sp" android:fontFamily="@font/inter_light"
+                    android:textColor="@color/fw_text_primary" android:letterSpacing="-0.03" android:includeFontPadding="false"/>
+                <TextView android:id="@+id/tv_sub" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="Deep work session" android:textSize="12sp" android:fontFamily="@font/inter_regular"
+                    android:textColor="@color/fw_text_secondary" android:layout_marginTop="4dp"/>
+            </LinearLayout>
+            <ImageView android:id="@+id/iv_mascot" android:layout_width="104dp" android:layout_height="104dp"
+                android:scaleType="fitCenter" android:src="@drawable/mascot_study_happy" android:contentDescription="Focivo mascot"/>
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <TextView android:id="@+id/btn_25" android:layout_width="64dp" android:layout_height="44dp"
+                android:layout_weight="0" android:layout_marginEnd="8dp" android:gravity="center"
+                android:background="@drawable/fw_btn_ghost" android:text="25m" android:textSize="13sp"
+                android:fontFamily="@font/inter_medium" android:textColor="@color/fw_text_primary"/>
+            <TextView android:id="@+id/btn_50" android:layout_width="64dp" android:layout_height="44dp"
+                android:layout_weight="0" android:layout_marginEnd="8dp" android:gravity="center"
+                android:background="@drawable/fw_btn_ghost" android:text="50m" android:textSize="13sp"
+                android:fontFamily="@font/inter_medium" android:textColor="@color/fw_text_primary"/>
+            <TextView android:id="@+id/btn_primary" android:layout_width="0dp" android:layout_height="44dp"
+                android:layout_weight="1" android:layout_marginEnd="0dp" android:gravity="center"
+                android:background="@drawable/fw_btn_primary" android:text="Start" android:textSize="13sp"
+                android:fontFamily="@font/inter_semibold" android:textColor="@color/fw_ink"/>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

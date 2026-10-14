@@ -96,9 +96,9 @@ object FocivoWidgetHelper {
         }
     }
 
-    // --- 1. Study Timer Widget ---
+    // --- 1. Study Timer Widget (v1.1 pack: widget_focus_timer) ---
     fun updateTimerWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
-        val views = RemoteViews(context.packageName, R.layout.widget_study_timer)
+        val views = RemoteViews(context.packageName, R.layout.widget_focus_timer)
 
         val timerPrefs = context.getSharedPreferences("focusly_timer_state", Context.MODE_PRIVATE)
         val isRunning = timerPrefs.getBoolean("is_timer_running", false)
@@ -109,21 +109,17 @@ object FocivoWidgetHelper {
         val seconds = remainingSecs % 60
         val timeDisplay = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
 
-        views.setTextViewText(R.id.widget_timer_clock, if (isRunning) timeDisplay else "25:00")
+        views.setTextViewText(R.id.tv_title, if (isRunning) timeDisplay else "25:00")
         views.setTextViewText(
-            R.id.widget_timer_task_title,
-            if (isRunning) "Focus: $currentTask" else "Deep Work Session"
+            R.id.tv_sub,
+            if (isRunning) "Focus: $currentTask" else "Deep work session"
         )
         views.setTextViewText(
-            R.id.widget_timer_status_badge,
-            if (isRunning) "• FOCUSING" else "• READY"
+            R.id.tv_badge,
+            if (isRunning) "Focusing" else "Ready"
         )
         views.setTextViewText(
-            R.id.widget_timer_subtitle,
-            if (isRunning) "Deep focus session in progress · Stay on track" else "Tap to start a deep work session"
-        )
-        views.setTextViewText(
-            R.id.widget_btn_open_timer,
+            R.id.btn_primary,
             if (isRunning) "Focus" else "Start"
         )
 
@@ -138,7 +134,7 @@ object FocivoWidgetHelper {
             context, 101, start25Intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.widget_btn_quick_25, p25)
+        views.setOnClickPendingIntent(R.id.btn_25, p25)
 
         val start50Intent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_START_50M
@@ -151,7 +147,7 @@ object FocivoWidgetHelper {
             context, 102, start50Intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.widget_btn_quick_50, p50)
+        views.setOnClickPendingIntent(R.id.btn_50, p50)
 
         val openTimerIntent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_OPEN_TIMER
@@ -166,15 +162,15 @@ object FocivoWidgetHelper {
             context, 103, openTimerIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.widget_btn_open_timer, pOpen)
-        views.setOnClickPendingIntent(R.id.widget_timer_root, pOpen)
+        views.setOnClickPendingIntent(R.id.btn_primary, pOpen)
+        views.setOnClickPendingIntent(R.id.fw_root, pOpen)
 
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
-    // --- 2. Daily Streak & Motivation Widget ---
+    // --- 2. Daily Streak & Motivation Widget (v1.1 pack: widget_streak) ---
     fun updateStreakWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
-        val views = RemoteViews(context.packageName, R.layout.widget_streak_motivation)
+        val views = RemoteViews(context.packageName, R.layout.widget_streak)
 
         val localPrefs = context.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
         val userPrefsJson = localPrefs.getString("user_preferences", null)
@@ -216,19 +212,19 @@ object FocivoWidgetHelper {
         val quote = MOTIVATIONAL_QUOTES[dayOfYear % MOTIVATIONAL_QUOTES.size]
 
         views.setTextViewText(
-            R.id.widget_streak_title,
+            R.id.tv_title,
             "$streak day${if (streak > 1) "s" else ""} streak"
         )
         views.setTextViewText(
-            R.id.widget_streak_level,
+            R.id.tv_sub,
             "Level $level Student · $focusPoints XP"
         )
-        views.setTextViewText(R.id.widget_streak_quote, quote)
+        views.setTextViewText(R.id.tv_quote, "\u201C$quote\u201D")
         views.setTextViewText(
-            R.id.widget_streak_goal_text,
-            "${todayMinutes}m / ${dailyGoal}m ($progress%)"
+            R.id.tv_goal,
+            "$todayMinutes / $dailyGoal min"
         )
-        views.setProgressBar(R.id.widget_streak_progress_bar, 100, progress, false)
+        views.setProgressBar(R.id.pb_goal, 100, progress, false)
 
         val streakIntent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_OPEN_STREAK
@@ -239,17 +235,17 @@ object FocivoWidgetHelper {
             context, 201, streakIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.widget_streak_root, pendingIntent)
+        views.setOnClickPendingIntent(R.id.fw_root, pendingIntent)
 
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
-    // --- 3. Today's Schedule & Targets Widget ---
+    // --- 3. Today's Schedule & Targets Widget (v1.1 pack: widget_timetable) ---
     fun updateScheduleWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
-        val views = RemoteViews(context.packageName, R.layout.widget_today_schedule)
+        val views = RemoteViews(context.packageName, R.layout.widget_timetable)
 
         val todayDateStr = SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(Date())
-        views.setTextViewText(R.id.widget_schedule_date, todayDateStr)
+        views.setTextViewText(R.id.tv_eyebrow, "Today · $todayDateStr")
 
         val localPrefs = context.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
         var topPriorityTitle = ""
@@ -279,21 +275,16 @@ object FocivoWidgetHelper {
 
         if (topPriorityTitle.isNotEmpty()) {
             views.setTextViewText(
-                R.id.widget_schedule_next_time,
-                "NEXT TARGET · ${topPriorityDuration} MIN · ${topPriorityCategory.uppercase()}"
-            )
-            views.setTextViewText(
-                R.id.widget_schedule_next_title,
+                R.id.tv_title,
                 topPriorityTitle
             )
             views.setTextViewText(
-                R.id.widget_schedule_pending_count,
-                "$pendingCount task${if (pendingCount > 1) "s" else ""} remaining for today"
+                R.id.tv_sub,
+                "Next target · $topPriorityDuration min · $pendingCount task${if (pendingCount > 1) "s" else ""} remaining"
             )
         } else {
-            views.setTextViewText(R.id.widget_schedule_next_time, "ALL TARGETS COMPLETED")
-            views.setTextViewText(R.id.widget_schedule_next_title, "Great work today!")
-            views.setTextViewText(R.id.widget_schedule_pending_count, "Tap to plan new study blocks")
+            views.setTextViewText(R.id.tv_title, "Great work today.")
+            views.setTextViewText(R.id.tv_sub, "All targets completed. Plan new study blocks?")
         }
 
         val openScheduleIntent = Intent(context, MainActivity::class.java).apply {
@@ -305,7 +296,7 @@ object FocivoWidgetHelper {
             context, 301, openScheduleIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.widget_btn_open_schedule, pSchedule)
+        views.setOnClickPendingIntent(R.id.btn_secondary, pSchedule)
 
         val startTargetIntent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_START_25M
@@ -322,13 +313,13 @@ object FocivoWidgetHelper {
             context, 302, startTargetIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.widget_btn_start_scheduled_block, pStart)
-        views.setOnClickPendingIntent(R.id.widget_schedule_root, pSchedule)
+        views.setOnClickPendingIntent(R.id.btn_primary, pStart)
+        views.setOnClickPendingIntent(R.id.fw_root, pSchedule)
 
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
-    // --- 4. Focus Shield & Deep Lock Widget ---
+    // --- 4. Focus Shield & Deep Lock Widget (v1.1 pack: widget_focus_shield) ---
     fun updateShieldWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
         val views = RemoteViews(context.packageName, R.layout.widget_focus_shield)
 
@@ -351,19 +342,19 @@ object FocivoWidgetHelper {
         }
 
         views.setTextViewText(
-            R.id.widget_shield_status_badge,
-            if (isShieldActive) "ARMED" else "READY"
+            R.id.tv_badge,
+            if (isShieldActive) "Armed" else "Ready"
         )
         views.setTextViewText(
-            R.id.widget_shield_blocked_count,
+            R.id.tv_title,
             "$blockedCount app${if (blockedCount != 1) "s" else ""} blocked"
         )
         views.setTextViewText(
-            R.id.widget_shield_subtext,
-            if (isDeepFocusOn) "Deep Focus active · Shorts and Reels locked" else "Shorts and Reels auto-intercept active"
+            R.id.tv_sub,
+            if (isDeepFocusOn) "Deep Focus active · Shorts and Reels locked" else "Shorts & Reels auto-intercept is on"
         )
         views.setTextViewText(
-            R.id.widget_btn_toggle_shield,
+            R.id.btn_primary,
             if (isShieldActive) "Armed" else "Arm Shield"
         )
 
@@ -376,14 +367,14 @@ object FocivoWidgetHelper {
             context, 401, hubIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.widget_btn_open_shield_hub, pHub)
-        views.setOnClickPendingIntent(R.id.widget_btn_toggle_shield, pHub)
-        views.setOnClickPendingIntent(R.id.widget_shield_root, pHub)
+        views.setOnClickPendingIntent(R.id.btn_secondary, pHub)
+        views.setOnClickPendingIntent(R.id.btn_primary, pHub)
+        views.setOnClickPendingIntent(R.id.fw_root, pHub)
 
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
-    // --- 5. AI Study Coach & Zen Break Widget ---
+    // --- 5. AI Study Coach & Zen Break Widget (v1.1 pack: widget_zen_coach) ---
     fun updateZenWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
         val views = RemoteViews(context.packageName, R.layout.widget_zen_coach)
 
@@ -406,10 +397,11 @@ object FocivoWidgetHelper {
         val tip = ZEN_STUDY_TIPS[dayOfYear % ZEN_STUDY_TIPS.size]
 
         views.setTextViewText(
-            R.id.widget_zen_user_points,
+            R.id.tv_sub,
             "Level $level Student · $focusPoints Focus XP"
         )
-        views.setTextViewText(R.id.widget_zen_tip_text, tip)
+        // Pack pattern: serif tip in quotes.
+        views.setTextViewText(R.id.tv_title, "\u201C$tip\u201D")
 
         val zenIntent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_OPEN_ZEN_BREAK
@@ -420,7 +412,7 @@ object FocivoWidgetHelper {
             context, 501, zenIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.widget_btn_zen_break, pZen)
+        views.setOnClickPendingIntent(R.id.btn_primary, pZen)
 
         val coachIntent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_OPEN_STREAK
@@ -431,8 +423,8 @@ object FocivoWidgetHelper {
             context, 502, coachIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.widget_btn_open_companion, pCoach)
-        views.setOnClickPendingIntent(R.id.widget_zen_root, pCoach)
+        views.setOnClickPendingIntent(R.id.btn_secondary, pCoach)
+        views.setOnClickPendingIntent(R.id.fw_root, pCoach)
 
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }

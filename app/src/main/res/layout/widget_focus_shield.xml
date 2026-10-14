@@ -1,170 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_shield_root"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/widget_v2_card"
-    android:orientation="vertical"
-    android:padding="18dp">
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/fw_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/fw_bg">
 
-    <!-- Header: 3D shield tile + name + status -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+    <!-- soft lime glow behind mascot -->
+    <ImageView android:layout_width="240dp" android:layout_height="240dp" android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="-40dp" android:src="@drawable/fw_glow" android:importantForAccessibility="no"/>
 
-        <ImageView
-            android:id="@+id/widget_shield_mascot"
-            android:layout_width="54dp"
-            android:layout_height="54dp"
-            android:background="@drawable/widget_v2_icon_tile"
-            android:contentDescription="Focus Shield"
-            android:padding="9dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic3d_shield" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+        android:orientation="vertical" android:padding="20dp">
 
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/poppins_semibold"
-                android:letterSpacing="0.09"
-                android:text="FOCUS SHIELD"
-                android:textColor="@color/focivo_lime_primary"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/widget_shield_mode_desc"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:fontFamily="@font/poppins_semibold"
-                android:text="Distraction Blocker"
-                android:textColor="@color/focivo_text_primary"
-                android:textSize="13sp" />
+        <!-- header -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <ImageView android:layout_width="16dp" android:layout_height="16dp" android:layout_marginEnd="8dp"
+                android:src="@drawable/ic_widget_shield" android:importantForAccessibility="no"/>
+            <TextView android:id="@+id/tv_eyebrow" android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="Focus Shield" android:textAllCaps="true"
+                android:letterSpacing="0.16" android:textSize="10sp" android:fontFamily="@font/inter_medium"
+                android:textColor="@color/fw_text_secondary"/>
+            <LinearLayout android:layout_width="wrap_content" android:layout_height="26dp"
+                android:gravity="center_vertical" android:paddingStart="10dp" android:paddingEnd="12dp"
+                android:background="@drawable/fw_pill">
+                <ImageView android:layout_width="6dp" android:layout_height="6dp" android:layout_marginEnd="6dp" android:src="@drawable/fw_dot" android:importantForAccessibility="no"/>
+                <TextView android:id="@+id/tv_badge" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Ready" android:textSize="11sp" android:fontFamily="@font/inter_medium"
+                    android:textColor="@color/fw_accent"/>
+            </LinearLayout>
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/widget_shield_status_badge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/widget_v2_pill"
-            android:fontFamily="@font/poppins_semibold"
-            android:letterSpacing="0.06"
-            android:paddingStart="12dp"
-            android:paddingTop="5dp"
-            android:paddingEnd="12dp"
-            android:paddingBottom="5dp"
-            android:text="ARMED"
-            android:textColor="@color/focivo_lime_primary"
-            android:textSize="10sp"
-            android:maxLines="1"
-            android:ellipsize="end" />
-    </LinearLayout>
-
-    <!-- Center: blocked apps stat + guard mascot -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginBottom="10dp"
-        android:layout_weight="1"
-        android:background="@drawable/widget_v2_inner"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="14dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="8dp">
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/widget_shield_blocked_count"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/poppins_semibold"
-                android:text="8 apps blocked"
-                android:textColor="@color/focivo_text_primary"
-                android:textSize="17sp" />
-
-            <TextView
-                android:id="@+id/widget_shield_subtext"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:fontFamily="@font/poppins_medium"
-                android:text="Shorts and reels auto-intercept active"
-                android:textColor="@color/focivo_text_muted"
-                android:textSize="11sp" />
+        <!-- body -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:orientation="vertical" android:layout_marginEnd="8dp">
+                <TextView android:id="@+id/tv_title" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="6 apps blocked" android:textSize="22sp" android:fontFamily="@font/inter_semibold"
+                    android:textColor="@color/fw_text_primary" android:letterSpacing="-0.02"/>
+                <TextView android:id="@+id/tv_sub" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="Shorts &amp; Reels auto-intercept is on" android:textSize="12sp" android:fontFamily="@font/inter_regular"
+                    android:textColor="@color/fw_text_secondary" android:layout_marginTop="4dp"/>
+            </LinearLayout>
+            <ImageView android:id="@+id/iv_mascot" android:layout_width="104dp" android:layout_height="104dp"
+                android:scaleType="fitCenter" android:src="@drawable/mascot_guard_transparent" android:contentDescription="Focivo mascot"/>
         </LinearLayout>
 
-        <FrameLayout
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:layout_marginStart="6dp">
-
-            <ImageView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:contentDescription="@null"
-                android:src="@drawable/widget_mascot_glow" />
-
-            <ImageView
-                android:layout_width="88dp"
-                android:layout_height="88dp"
-                android:layout_gravity="center"
-                android:contentDescription="Focus guard mascot"
-                android:src="@drawable/mascot_guard_transparent" />
-        </FrameLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <TextView android:id="@+id/btn_primary" android:layout_width="0dp" android:layout_height="44dp"
+                android:layout_weight="1" android:layout_marginEnd="8dp" android:gravity="center"
+                android:background="@drawable/fw_btn_primary" android:text="Arm Shield" android:textSize="13sp"
+                android:fontFamily="@font/inter_semibold" android:textColor="@color/fw_ink"/>
+            <TextView android:id="@+id/btn_secondary" android:layout_width="0dp" android:layout_height="44dp"
+                android:layout_weight="1" android:layout_marginEnd="0dp" android:gravity="center"
+                android:background="@drawable/fw_btn_ghost" android:text="Shield Hub" android:textSize="13sp"
+                android:fontFamily="@font/inter_medium" android:textColor="@color/fw_text_primary"/>
+        </LinearLayout>
     </LinearLayout>
-
-    <!-- Bottom actions -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/widget_btn_toggle_shield"
-            android:layout_width="0dp"
-            android:layout_height="42dp"
-            android:layout_marginEnd="5dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_v2_btn_lime"
-            android:fontFamily="@font/poppins_semibold"
-            android:minHeight="0dp"
-            android:padding="0dp"
-            android:text="Arm Shield"
-            android:textAllCaps="false"
-            android:textColor="#FF10130E"
-            android:textSize="13sp" />
-
-        <Button
-            android:id="@+id/widget_btn_open_shield_hub"
-            android:layout_width="0dp"
-            android:layout_height="42dp"
-            android:layout_marginStart="5dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_v2_btn_ghost"
-            android:fontFamily="@font/poppins_semibold"
-            android:minHeight="0dp"
-            android:padding="0dp"
-            android:text="Shield Hub"
-            android:textAllCaps="false"
-            android:textColor="@color/focivo_text_primary"
-            android:textSize="12sp" />
-    </LinearLayout>
-</LinearLayout>
+</FrameLayout>

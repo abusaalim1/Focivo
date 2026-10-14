@@ -81,7 +81,7 @@ data class WeeklyRecapSummary(
             sb.append("*Highlights:*\n")
             for (session in sessionDetails.take(4)) {
                 val noteSnippet = if (session.notes.isNotBlank()) " — \"${session.notes.take(30)}\"" else ""
-                sb.append("✓ ${session.title.ifBlank { session.subject }} (${session.durationMinutes}m)$noteSnippet\n")
+                sb.append("• ${session.title.ifBlank { session.subject }} (${session.durationMinutes}m)$noteSnippet\n")
             }
             sb.append("\n")
         }

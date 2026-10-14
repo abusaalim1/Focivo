@@ -25,6 +25,10 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
         const val EXTRA_REMINDER_SUBJECT = "extra_reminder_subject"
         /** v1.4.3: daily 19:00 streak-saver evaluation. */
         const val ACTION_STREAK_SAVER_CHECK = "com.example.action.STREAK_SAVER_CHECK"
+        // v1.1: notification survival — every scheduled type is AlarmManager-backed.
+        const val ACTION_SUNDAY_RECAP_CHECK = "com.example.action.SUNDAY_RECAP_CHECK"
+        const val ACTION_UPDATE_CHECK = "com.example.action.UPDATE_CHECK"
+        const val ACTION_COMEBACK_CHECK = "com.example.action.COMEBACK_CHECK"
 
         /**
          * Restores alarms and study-block schedules after boot or app update.
@@ -63,6 +67,10 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
                     }
 
                     ScheduledBlockScheduler.evaluateAndReschedule(context)
+                    // v1.1: re-arm ALL survival alarms (streak saver, study
+                    // reminder, Sunday recap, update check, comeback) —
+                    // idempotent, no duplicates.
+                    FocivoNotifications.scheduleAllSurvivalAlarms(context)
                 } catch (e: Exception) {
                     Log.e(TAG, "[BootCompleted] Error restoring alarms/schedules on boot: ${e.message}")
                 } finally {
@@ -156,6 +164,19 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
             ACTION_STREAK_SAVER_CHECK -> {
                 Log.i(TAG, "Streak-saver check fired")
                 FocivoNotifications.handleStreakSaverCheck(context)
+            }
+            // v1.1: survival-hardened scheduled types.
+            ACTION_SUNDAY_RECAP_CHECK -> {
+                Log.i(TAG, "Sunday recap check fired")
+                FocivoNotifications.handleSundayRecapCheck(context)
+            }
+            ACTION_UPDATE_CHECK -> {
+                Log.i(TAG, "Update check fired")
+                FocivoNotifications.handleUpdateCheck(context)
+            }
+            ACTION_COMEBACK_CHECK -> {
+                Log.i(TAG, "Comeback check fired")
+                FocivoNotifications.handleComebackCheck(context)
             }
             else -> {
                 ScheduledBlockScheduler.evaluateAndReschedule(context)

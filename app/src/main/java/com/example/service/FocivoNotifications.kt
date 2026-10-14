@@ -14,6 +14,7 @@ import com.example.MainActivity
 import com.example.R
 import com.example.util.PermissionUtils
 import java.util.Calendar
+import kotlinx.coroutines.flow.first
 
 /**
  * v1.4.3: one central helper for all Focivo notifications, in the cute/minimal
@@ -48,6 +49,7 @@ object FocivoNotifications {
     private const val CHANNEL_UPDATES = "focivo_updates_channel"
     private const val CHANNEL_SCHEDULE = "focivo_schedule_channel"
     private const val CHANNEL_DIGEST = "focivo_digest_channel"
+    private const val CHANNEL_RECAP = "focivo_recap_channel"
 
     private const val ID_SESSION_COMPLETE = 9101
     private const val ID_BREAK_OVER = 9102
@@ -57,6 +59,8 @@ object FocivoNotifications {
     private const val ID_UPDATE_AVAILABLE = 9150
     private const val ID_HELD_DIGEST = 9151
     private const val ID_SCHEDULE_REMINDER = 9152
+    private const val ID_COMEBACK = 9153
+    private const val ID_SUNDAY_RECAP = 9154
 
     private const val LIME_ACCENT = 0xFF8CE000
 
@@ -427,5 +431,169 @@ object FocivoNotifications {
             if (lastDay == today) return // already studied today
             postStreakSaver(context, streak)
         } catch (_: Exception) { }
+    }
+
+    // ---------------------------------------------------------------
+    // v1.1 — notification survival hardening: every scheduled type is
+    // backed by AlarmManager (never in-process timers), re-armed on boot.
+    // ---------------------------------------------------------------
+
+    /** 11. Comeback — "Your mascot misses you" after 3 days away. */
+    fun postComeback(context: Context) {
+        post(
+            context,
+            CHANNEL_MOTIVATION, "Motivation", "Gentle re-engagement nudges",
+            NotificationManager.IMPORTANCE_HIGH,
+            ID_COMEBACK,
+            "Your mascot misses you",
+            "It has been 3 days — one small focus session today keeps your habit alive."
+        )
+    }
+
+    /**
+     * Stamp every app open. Resets the comeback dedupe flag so the next
+     * 3-day absence can fire exactly once.
+     */
+    fun stampAppOpen(context: Context) {
+        try {
+            context.getSharedPreferences(PREFS_STATE, Context.MODE_PRIVATE).edit()
+                .putLong("last_app_open_ms", System.currentTimeMillis())
+                .putBoolean("comeback_fired_for_absence", false)
+                .apply()
+        } catch (_: Exception) { }
+    }
+
+    /** Receiver-side: fires the comeback notification at most once per absence. */
+    fun handleComebackCheck(context: Context) {
+        try {
+            if (!canNotify(context)) return
+            val p = context.getSharedPreferences(PREFS_STATE, Context.MODE_PRIVATE)
+            val lastOpen = p.getLong("last_app_open_ms", 0L)
+            if (lastOpen == 0L) return
+            val gapDays = (System.currentTimeMillis() - lastOpen) / (24 * 60 * 60 * 1000L)
+            if (gapDays < 3) return
+            if (p.getBoolean("comeback_fired_for_absence", false)) return // already fired for this absence
+            p.edit().putBoolean("comeback_fired_for_absence", true).apply()
+            postComeback(context)
+        } catch (_: Exception) { }
+    }
+
+    /** Receiver-side: Sunday recap — posts the weekly recap notification if due. */
+    fun handleSundayRecapCheck(context: Context) {
+        try {
+            if (!canNotify(context)) return
+            val cal = java.util.Calendar.getInstance()
+            if (cal.get(java.util.Calendar.DAY_OF_WEEK) != java.util.Calendar.SUNDAY) return
+            val weekKey = "${cal.get(java.util.Calendar.YEAR)}-W${cal.get(java.util.Calendar.WEEK_OF_YEAR)}"
+            val p = context.getSharedPreferences(PREFS_STATE, Context.MODE_PRIVATE)
+            if (p.getString("recap_notified_week", null) == weekKey) return // once per week
+            // Build the recap from local sessions (same summary the dialog uses).
+            val sessions = try {
+                com.example.data.FocuslyRepository.getInstance(context).let { repo ->
+                    kotlinx.coroutines.runBlocking {
+                        repo.allSessions.first()
+                    }
+                }
+            } catch (_: Exception) { emptyList<com.example.data.model.FocusSessionEntity>() }
+            if (sessions.isEmpty()) return
+            val totalMin = sessions.sumOf { it.durationSeconds } / 60
+            val count = sessions.count { it.durationSeconds > 0 }
+            p.edit().putString("recap_notified_week", weekKey).apply()
+            post(
+                context,
+                CHANNEL_RECAP, "Weekly Recap", "Sunday study recaps",
+                NotificationManager.IMPORTANCE_HIGH,
+                ID_SUNDAY_RECAP,
+                "Your week in focus",
+                "$count sessions · $totalMin minutes. Tap to see your Sunday recap."
+            )
+        } catch (_: Exception) { }
+    }
+
+    /** Receiver-side: daily update check — notifies once per new version. */
+    fun handleUpdateCheck(context: Context) {
+        try {
+            val info = kotlinx.coroutines.runBlocking {
+                com.example.util.AppUpdateManager.checkForUpdates(context, isManualCheck = false)
+            }
+            if (info != null && info.isUpdateAvailable && info.checkSucceeded) {
+                // postUpdateAvailable dedupes per version internally.
+                postUpdateAvailable(context, info.latestVersionName, info.latestVersionCode)
+            }
+        } catch (_: Exception) { }
+    }
+
+    /** Weekly Sunday ~20:00 recap check (inexact). */
+    fun scheduleSundayRecapWeekly(context: Context) {
+        scheduleInexactDailyAt(context, 9303,
+            com.example.service.ScheduledBlockReceiver.ACTION_SUNDAY_RECAP_CHECK,
+            20, 0, java.util.Calendar.SUNDAY)
+    }
+
+    /** Daily update-available check (inexact, midday). */
+    fun scheduleUpdateCheckDaily(context: Context) {
+        scheduleInexactDailyAt(context, 9304,
+            com.example.service.ScheduledBlockReceiver.ACTION_UPDATE_CHECK,
+            12, 0, null)
+    }
+
+    /** Daily comeback-absence check (inexact, morning). */
+    fun scheduleComebackCheckDaily(context: Context) {
+        scheduleInexactDailyAt(context, 9305,
+            com.example.service.ScheduledBlockReceiver.ACTION_COMEBACK_CHECK,
+            9, 0, null)
+    }
+
+    /**
+     * Inexact repeating alarm at a fixed local time; optionally restricted
+     * to one weekday (e.g. Sunday). Idempotent — same request code replaces.
+     */
+    private fun scheduleInexactDailyAt(
+        context: Context,
+        requestCode: Int,
+        action: String,
+        hour: Int,
+        minute: Int,
+        onlyWeekday: Int?
+    ) {
+        try {
+            val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            val intent = Intent(context, com.example.service.ScheduledBlockReceiver::class.java).apply {
+                this.action = action
+            }
+            val pi = PendingIntent.getBroadcast(
+                context, requestCode, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val next = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.HOUR_OF_DAY, hour)
+                set(java.util.Calendar.MINUTE, minute)
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+                if (onlyWeekday != null) {
+                    // Advance to the next occurrence of that weekday.
+                    while (get(java.util.Calendar.DAY_OF_WEEK) != onlyWeekday ||
+                        timeInMillis <= System.currentTimeMillis()
+                    ) {
+                        add(java.util.Calendar.DAY_OF_YEAR, 1)
+                    }
+                } else if (timeInMillis <= System.currentTimeMillis()) {
+                    add(java.util.Calendar.DAY_OF_YEAR, 1)
+                }
+            }.timeInMillis
+            am.setInexactRepeating(AlarmManager.RTC_WAKEUP, next, AlarmManager.INTERVAL_DAY, pi)
+            Log.i(TAG, "Scheduled $action (req=$requestCode)")
+        } catch (e: Exception) {
+            Log.e(TAG, "scheduleInexactDailyAt($action) failed: ${e.message}")
+        }
+    }
+
+    /** Re-arm every Focivo alarm (idempotent). Called on app start + boot. */
+    fun scheduleAllSurvivalAlarms(context: Context) {
+        scheduleStreakSaverDaily(context)
+        scheduleStudyReminder(context)
+        scheduleSundayRecapWeekly(context)
+        scheduleUpdateCheckDaily(context)
+        scheduleComebackCheckDaily(context)
     }
 }

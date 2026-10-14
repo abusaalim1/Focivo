@@ -566,12 +566,22 @@ object WeeklyRecapImageGenerator {
         var sessY = curY + 68f
         if (topSessions.isNotEmpty()) {
             for (s in topSessions) {
+                // Checkmark drawn as vector strokes (no unicode glyphs in UI).
                 val checkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = 0xFFA6EB38.toInt()
-                    textSize = 21f
-                    typeface = fontBold
+                    style = Paint.Style.STROKE
+                    strokeWidth = 4f
+                    strokeCap = Paint.Cap.ROUND
+                    strokeJoin = Paint.Join.ROUND
                 }
-                canvas.drawText("✓", contentLeft + 26f, sessY + 18f, checkPaint)
+                val cx = contentLeft + 26f
+                val cy = sessY + 10f
+                val checkPath = android.graphics.Path().apply {
+                    moveTo(cx, cy)
+                    lineTo(cx + 7f, cy + 7f)
+                    lineTo(cx + 17f, cy - 7f)
+                }
+                canvas.drawPath(checkPath, checkPaint)
 
                 val sessNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = 0xFFF0F6EC.toInt()

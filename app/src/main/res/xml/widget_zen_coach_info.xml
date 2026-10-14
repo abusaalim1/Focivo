@@ -12,4 +12,6 @@
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_zen_coach"
     android:description="@string/widget_zen_description"
-    android:widgetCategory="home_screen" />
+    android:widgetCategory="home_screen"
+    android:previewLayout="@layout/widget_zen_coach"
+    android:previewImage="@drawable/widget_preview_zen_coach" />

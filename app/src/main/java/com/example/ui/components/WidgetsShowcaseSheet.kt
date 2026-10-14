@@ -5,17 +5,19 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.os.Build
+import android.view.LayoutInflater
+import android.widget.TextView
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -27,9 +29,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Widgets
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,24 +40,95 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.example.R
-import com.example.ui.components.FeatureIcon
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
-import com.example.ui.theme.RegainLimePrimary
 import com.example.widget.FocusShieldWidgetProvider
 import com.example.widget.StreakMotivationWidgetProvider
 import com.example.widget.StudyTimerWidgetProvider
 import com.example.widget.TodayScheduleWidgetProvider
 import com.example.widget.ZenStudyCoachWidgetProvider
+
+/**
+ * v1.1 — Widgets page (rebuilt per owner fix).
+ *
+ * Shows the ACTUAL home-screen widgets — each pack layout
+ * (widget_{focus_timer,streak,focus_shield,timetable,zen_coach}) inflated
+ * for real via AndroidView with sample-but-realistic data, pixel-consistent
+ * with what the launcher renders. One full widget preview per card, with a
+ * "+ Add" action BELOW each preview that does the REAL pin flow
+ * (AppWidgetManager.requestPinAppWidget + graceful fallback).
+ */
+private val PageLime = Color(0xFF8FD400)
+
+private data class WidgetEntry(
+    val title: String,
+    val layoutRes: Int,
+    val providerClass: Class<*>,
+    val sampleData: (android.view.View) -> Unit
+)
+
+private fun widgetEntries(): List<WidgetEntry> = listOf(
+    WidgetEntry(
+        title = "Focus Timer",
+        layoutRes = R.layout.widget_focus_timer,
+        providerClass = StudyTimerWidgetProvider::class.java,
+        sampleData = { v ->
+            v.findViewById<TextView>(R.id.tv_title)?.text = "25:00"
+            v.findViewById<TextView>(R.id.tv_sub)?.text = "Deep work session"
+            v.findViewById<TextView>(R.id.tv_badge)?.text = "Ready"
+        }
+    ),
+    WidgetEntry(
+        title = "Streak",
+        layoutRes = R.layout.widget_streak,
+        providerClass = StreakMotivationWidgetProvider::class.java,
+        sampleData = { v ->
+            v.findViewById<TextView>(R.id.tv_title)?.text = "12 day streak"
+            v.findViewById<TextView>(R.id.tv_sub)?.text = "Level 3 Student · 1,240 XP"
+            v.findViewById<TextView>(R.id.tv_quote)?.text = "\u201CEvery page studied today is a step towards your dream.\u201D"
+            v.findViewById<TextView>(R.id.tv_goal)?.text = "120 / 360 min"
+            v.findViewById<android.widget.ProgressBar>(R.id.pb_goal)?.progress = 33
+        }
+    ),
+    WidgetEntry(
+        title = "Focus Shield",
+        layoutRes = R.layout.widget_focus_shield,
+        providerClass = FocusShieldWidgetProvider::class.java,
+        sampleData = { v ->
+            v.findViewById<TextView>(R.id.tv_title)?.text = "8 apps blocked"
+            v.findViewById<TextView>(R.id.tv_sub)?.text = "Shorts & Reels auto-intercept is on"
+            v.findViewById<TextView>(R.id.tv_badge)?.text = "Armed"
+        }
+    ),
+    WidgetEntry(
+        title = "Timetable",
+        layoutRes = R.layout.widget_timetable,
+        providerClass = TodayScheduleWidgetProvider::class.java,
+        sampleData = { v ->
+            v.findViewById<TextView>(R.id.tv_eyebrow)?.text = "Today · Wed, Oct 14"
+            v.findViewById<TextView>(R.id.tv_title)?.text = "Physics numericals"
+            v.findViewById<TextView>(R.id.tv_sub)?.text = "Next target · 50 min · 4 tasks remaining"
+        }
+    ),
+    WidgetEntry(
+        title = "Zen Coach",
+        layoutRes = R.layout.widget_zen_coach,
+        providerClass = ZenStudyCoachWidgetProvider::class.java,
+        sampleData = { v ->
+            v.findViewById<TextView>(R.id.tv_title)?.text =
+                "\u201CWhen your mind feels scattered, 5 minutes of box breathing restores clarity.\u201D"
+            v.findViewById<TextView>(R.id.tv_sub)?.text = "Level 3 Student · 1,240 Focus XP"
+        }
+    )
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,6 +137,7 @@ fun WidgetsShowcaseSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val entries = widgetEntries()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -81,11 +152,11 @@ fun WidgetsShowcaseSheet(
                 .padding(horizontal = 18.dp)
                 .padding(bottom = 32.dp)
         ) {
-            // Header
+            // Header — premium language with mascot touch
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -93,14 +164,12 @@ fun WidgetsShowcaseSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    FeatureIcon(
-                        drawableRes = R.drawable.ic3d_widgets,
+                    Image(
+                        painter = painterResource(id = R.drawable.mascot_celebration),
                         contentDescription = null,
-                        size = 40.dp
+                        modifier = Modifier.size(46.dp)
                     )
-
                     Spacer(modifier = Modifier.width(12.dp))
-
                     Column {
                         Text(
                             text = "Home Screen Widgets",
@@ -108,20 +177,19 @@ fun WidgetsShowcaseSheet(
                                 fontFamily = PoppinsFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
-                                fontSize = 17.sp
+                                fontSize = 18.sp
                             )
                         )
                         Text(
-                            text = "Apple-style minimal widgets for your home screen",
+                            text = "Your focus setup, right on your home screen",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
                                 color = Color(0xFF94A3B8),
-                                fontSize = 11.5.sp
+                                fontSize = 12.sp
                             )
                         )
                     }
                 }
-
                 IconButton(
                     onClick = onDismiss,
                     modifier = Modifier
@@ -139,211 +207,127 @@ fun WidgetsShowcaseSheet(
             }
 
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // 1. Study Timer Widget
-                item {
-                    WidgetItemPreviewCard(
-                        title = "Focus Timer",
-                        description = "Live countdown timer with 25m & 50m 1-tap instant study start.",
-                        badge = "TIMER",
-                        badgeColor = RegainLimePrimary,
-                        mascotRes = R.drawable.mascot_studying,
-                        onPin = { pinWidget(context, StudyTimerWidgetProvider::class.java) }
-                    )
-                }
-
-                // 2. Streak & Motivation Widget
-                item {
-                    WidgetItemPreviewCard(
-                        title = "Daily Streak & Goal",
-                        description = "Streak flame, daily study goal progress bar, and student quotes.",
-                        badge = "STREAK",
-                        badgeColor = Color(0xFFFF9F0A),
-                        mascotRes = R.drawable.mascot_celebration,
-                        onPin = { pinWidget(context, StreakMotivationWidgetProvider::class.java) }
-                    )
-                }
-
-                // 3. Focus Shield Widget
-                item {
-                    WidgetItemPreviewCard(
-                        title = "Focus Shield",
-                        description = "Armed status, blocked app count, and instant shield hub control.",
-                        badge = "SHIELD",
-                        badgeColor = Color(0xFF30D158),
-                        mascotRes = R.drawable.mascot_blocked,
-                        onPin = { pinWidget(context, FocusShieldWidgetProvider::class.java) }
-                    )
-                }
-
-                // 4. Today's Timetable Widget
-                item {
-                    WidgetItemPreviewCard(
-                        title = "Today's Schedule",
-                        description = "Next upcoming study block target, pending tasks, and planner.",
-                        badge = "SCHEDULE",
-                        badgeColor = Color(0xFFBF5AF2),
-                        mascotRes = R.drawable.mascot_studying,
-                        onPin = { pinWidget(context, TodayScheduleWidgetProvider::class.java) }
-                    )
-                }
-
-                // 5. Zen Study Companion Widget
-                item {
-                    WidgetItemPreviewCard(
-                        title = "AI Companion & Zen",
-                        description = "Mindful focus tips, XP points, and 5-minute guided breath breaks.",
-                        badge = "ZEN",
-                        badgeColor = Color(0xFF64D2FF),
-                        mascotRes = R.drawable.mascot_grateful,
-                        onPin = { pinWidget(context, ZenStudyCoachWidgetProvider::class.java) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun WidgetItemPreviewCard(
-    title: String,
-    description: String,
-    badge: String,
-    badgeColor: Color,
-    mascotRes: Int,
-    onPin: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(Color(0xFF191D28), Color(0xFF12141C))
-                )
-            )
-            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(20.dp))
-            .padding(14.dp)
-    ) {
-        Column {
-            Row(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                contentPadding = PaddingValues(top = 8.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Image(
-                        painter = painterResource(id = mascotRes),
-                        contentDescription = null,
-                        modifier = Modifier.size(34.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    fontSize = 14.5.sp
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(badgeColor.copy(alpha = 0.16f))
-                                    .border(0.8.dp, badgeColor.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 5.dp, vertical = 1.5.dp)
-                            ) {
-                                Text(
-                                    text = badge,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = PoppinsFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        color = badgeColor,
-                                        fontSize = 8.5.sp
-                                    )
-                                )
-                            }
-                        }
+                entries.forEach { entry ->
+                    item(key = entry.title) {
+                        ActualWidgetCard(
+                            entry = entry,
+                            onAdd = { pinWidget(context, entry.providerClass, entry.title) }
+                        )
                     }
                 }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Button(
-                    onClick = onPin,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = RegainLimePrimary,
-                        contentColor = NearBlack
-                    ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                    modifier = Modifier
-                        .height(32.dp)
-                        .defaultMinSize(minWidth = 68.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                item {
+                    // How-to fallback (also shown when pinning isn't supported)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color(0xFF1A2030))
+                            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(18.dp))
+                            .padding(16.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(13.dp),
-                            tint = NearBlack
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = "Add",
+                            text = "CAN'T PIN AUTOMATICALLY?",
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.5.sp,
-                            color = NearBlack
+                            fontSize = 10.sp,
+                            letterSpacing = 1.5.sp,
+                            color = PageLime
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Long-press your home screen, choose Widgets, then find Focivo and drag the widget you want into place.",
+                            fontFamily = PoppinsFontFamily,
+                            fontSize = 12.5.sp,
+                            color = Color(0xFFF1F5F9),
+                            lineHeight = 17.sp
                         )
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Subtitle Description in Clean Frosted Pill
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0x10FFFFFF))
-                    .border(0.8.dp, Color(0x14FFFFFF), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
+/**
+ * One full ACTUAL widget preview (the real pack layout, inflated) + the
+ * "+ Add" action below it.
+ */
+@Composable
+private fun ActualWidgetCard(
+    entry: WidgetEntry,
+    onAdd: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color(0xFF151923))
+            .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(22.dp))
+            .padding(14.dp)
+    ) {
+        Text(
+            text = entry.title,
+            fontFamily = PoppinsFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            color = Color(0xFFF1F5F9),
+            modifier = Modifier.padding(start = 4.dp, bottom = 10.dp)
+        )
+        // THE actual widget — same XML the launcher inflates.
+        AndroidView(
+            factory = { ctx ->
+                LayoutInflater.from(ctx).inflate(entry.layoutRes, null, false).apply {
+                    entry.sampleData(this)
+                    // Preview only: disable clicks inside the inflated widget.
+                    isClickable = false
+                    isFocusable = false
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(PageLime)
+                .pressFeedback()
+                .clickable(onClick = onAdd)
+                .padding(vertical = 13.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    tint = NearBlack,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = PoppinsFontFamily,
-                        color = Color(0xFFCBD5E1),
-                        fontSize = 11.5.sp,
-                        lineHeight = 15.sp
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    text = "Add",
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = NearBlack
                 )
             }
         }
     }
 }
 
-private fun pinWidget(context: Context, providerClass: Class<*>) {
+/**
+ * REAL pin flow: requestPinAppWidget where the launcher supports it,
+ * graceful in-context fallback otherwise.
+ */
+private fun pinWidget(context: Context, providerClass: Class<*>, title: String) {
     val appWidgetManager = AppWidgetManager.getInstance(context)
     val myProvider = ComponentName(context, providerClass)
 
@@ -351,11 +335,14 @@ private fun pinWidget(context: Context, providerClass: Class<*>) {
         if (appWidgetManager.isRequestPinAppWidgetSupported) {
             val successCallback: PendingIntent? = null
             appWidgetManager.requestPinAppWidget(myProvider, null, successCallback)
-            Toast.makeText(context, "Adding widget to home screen...", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "Long-press your home screen to place this widget", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Adding $title to home screen...", Toast.LENGTH_SHORT).show()
+            return
         }
-    } else {
-        Toast.makeText(context, "Long-press your home screen to place this widget", Toast.LENGTH_LONG).show()
     }
+    // Fallback: short in-context instructions.
+    Toast.makeText(
+        context,
+        "Long-press your home screen → Widgets → find Focivo → drag \"$title\" into place.",
+        Toast.LENGTH_LONG
+    ).show()
 }

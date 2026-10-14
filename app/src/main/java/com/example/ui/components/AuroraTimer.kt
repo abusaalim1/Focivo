@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -54,6 +55,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,7 +91,17 @@ fun AuroraTimer(
     onTogglePlay: () -> Unit = {},
     onReset: () -> Unit = {},
     onTagClick: (() -> Unit)? = null,
-    onSwitchMode: (() -> Unit)? = null
+    onSwitchMode: (() -> Unit)? = null,
+    // v1.1: tap-time-to-modify — tapping the digits opens the duration
+    // editor. Only wired when the timer is idle/paused (mid-session edits
+    // stay disallowed, matching the hub's Customize row + tag behavior).
+    onTimeClick: (() -> Unit)? = null,
+    // v1.1: Mascot Buddy — when provided, this content replaces the default
+    // RegainMascotView (dressed buddy on the default theme; themed mascots
+    // keep using mascotPose). onMascotClick opens the Mascot screen; tap is
+    // distinct from the swipe-up gesture (drag vs tap).
+    mascotContent: @Composable (() -> Unit)? = null,
+    onMascotClick: (() -> Unit)? = null
 ) {
     val isDark = isAppInDarkTheme()
     val progress = if (totalSeconds > 0) {
@@ -323,8 +335,11 @@ fun AuroraTimer(
             modifier = Modifier.padding(horizontal = 24.dp)
         ) {
             // Atmospheric Phase Pill (Deep Focus / Break / Sprint / Custom Subject)
+            // v1.1: capped at 70% of the dial width with ellipsis so the chip
+            // always sits FULLY INSIDE the ring, even for long subject names.
             Box(
                 modifier = Modifier
+                    .widthIn(max = dialSize * 0.7f)
                     .clip(RoundedCornerShape(14.dp))
                     .background(
                         if (isBreak) {
@@ -370,7 +385,8 @@ fun AuroraTimer(
                         } else {
                             if (isDark) studyLime else RegainLimeDeepText
                         },
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     if (!isRunning && onTagClick != null && !isBreak) {
                         Spacer(modifier = Modifier.width(4.dp))
@@ -387,6 +403,8 @@ fun AuroraTimer(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Main Digits: Soothing, Ultra-Crisp Countdown (v1.5.0: bigger, airier)
+            // v1.1: tap-time-to-modify — digits are tappable when idle/paused.
+            val timeTappable = onTimeClick != null && !isRunning
             Text(
                 text = timeFormatted,
                 fontFamily = PoppinsFontFamily,
@@ -395,8 +413,29 @@ fun AuroraTimer(
                 color = textPrimary,
                 textAlign = TextAlign.Center,
                 letterSpacing = (-1).sp,
-                modifier = Modifier.testTag("aurora_timer_countdown_text")
+                modifier = Modifier
+                    .testTag("aurora_timer_countdown_text")
+                    .then(
+                        if (timeTappable) Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { onTimeClick?.invoke() }
+                        ) else Modifier
+                    )
             )
+
+            // v1.1: subtle tappability affordance (idle/paused only)
+            if (timeTappable) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "tap to edit",
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 9.sp,
+                    letterSpacing = 2.sp,
+                    color = textSecondary.copy(alpha = 0.75f)
+                )
+            }
 
             // Progress percentage & phase cue
             Text(
@@ -411,12 +450,27 @@ fun AuroraTimer(
 
             // v1.3.1: Focivo mascot inside the timer, pose follows the timer state
             // (ready → studying-with-book, focusing → study video, break → resting).
-            RegainMascotView(
-                size = 108.dp,
-                pose = mascotPose,
-                animate = true,
-                modifier = Modifier.testTag("aurora_timer_mascot")
-            )
+            // v1.1: mascotContent (dressed buddy) wins when provided; tapping
+            // the mascot opens the Mascot screen.
+            val mascotModifier = Modifier
+                .testTag("aurora_timer_mascot")
+                .then(
+                    if (onMascotClick != null) {
+                        Modifier
+                            .pressFeedback()
+                            .clickable(onClick = onMascotClick)
+                    } else Modifier
+                )
+            if (mascotContent != null) {
+                Box(modifier = mascotModifier) { mascotContent() }
+            } else {
+                RegainMascotView(
+                    size = 108.dp,
+                    pose = mascotPose,
+                    animate = true,
+                    modifier = mascotModifier
+                )
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 

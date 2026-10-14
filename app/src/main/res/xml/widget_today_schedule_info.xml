@@ -10,6 +10,8 @@
     android:minResizeHeight="90dp"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="1800000"
-    android:initialLayout="@layout/widget_today_schedule"
+    android:initialLayout="@layout/widget_timetable"
     android:description="@string/widget_schedule_description"
-    android:widgetCategory="home_screen" />
+    android:widgetCategory="home_screen"
+    android:previewLayout="@layout/widget_timetable"
+    android:previewImage="@drawable/widget_preview_timetable" />

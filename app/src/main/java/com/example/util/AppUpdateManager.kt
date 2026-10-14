@@ -275,6 +275,42 @@ object AppUpdateManager {
         }
     }
 
+    /**
+     * v1.1: fetches the donation URL (app_config key "donate_url").
+     * Returns the URL, or null when unset/blank/unreachable.
+     * Any failure is silent — callers must never block the app on this.
+     */
+    suspend fun fetchDonateUrl(): String? = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("$UPDATES_SUPABASE_URL/rest/v1/app_config?select=value&key=eq.donate_url")
+                .addHeader("apikey", UPDATES_SUPABASE_KEY)
+                .addHeader("Authorization", "Bearer $UPDATES_SUPABASE_KEY")
+                .get()
+                .build()
+            httpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    if (!body.isNullOrBlank() && body.startsWith("[")) {
+                        val array = JSONObject("{\"rows\":$body}").getJSONArray("rows")
+                        if (array.length() > 0) {
+                            val value = array.getJSONObject(0).optJSONObject("value")
+                                ?: return@withContext null
+                            // Support both {"url": "..."} and plain string values
+                            val url = value.optString("url", "").trim()
+                                .ifBlank { value.optString("text", "").trim() }
+                            return@withContext url.ifBlank { null }
+                        }
+                    }
+                }
+            }
+            null
+        } catch (e: Exception) {
+            Log.e(TAG, "Donate URL fetch failed", e)
+            null
+        }
+    }
+
     fun launchDownload(context: Context, downloadUrl: String) {
         try {
             if (downloadUrl.isNotBlank()) {

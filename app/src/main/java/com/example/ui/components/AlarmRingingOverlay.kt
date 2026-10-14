@@ -48,8 +48,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.AlarmItem
-import com.example.ui.theme.LavenderSoft
-import com.example.ui.theme.VioletAccent
 
 @Composable
 fun AlarmRingingOverlay(
@@ -100,7 +98,7 @@ fun AlarmRingingOverlay(
                     .clip(CircleShape)
                     .background(
                         Brush.radialGradient(
-                            listOf(VioletAccent.copy(alpha = 0.25f), Color.Transparent)
+                            listOf(com.example.ui.theme.RegainLimePrimary.copy(alpha = 0.22f), Color.Transparent)
                         )
                     )
             )
@@ -123,7 +121,7 @@ fun AlarmRingingOverlay(
                             .size(150.dp)
                             .scale(pulseScale)
                             .clip(CircleShape)
-                            .background(VioletAccent.copy(alpha = haloAlpha))
+                            .background(com.example.ui.theme.RegainLimePrimary.copy(alpha = haloAlpha))
                     )
                     // Inner ring
                     Box(
@@ -132,7 +130,7 @@ fun AlarmRingingOverlay(
                             .clip(CircleShape)
                             .background(
                                 Brush.linearGradient(
-                                    listOf(VioletAccent, LavenderSoft)
+                                    listOf(com.example.ui.theme.RegainLimePrimary, com.example.ui.theme.RegainLimePrimary.copy(alpha = 0.7f))
                                 )
                             ),
                         contentAlignment = Alignment.Center
@@ -185,14 +183,14 @@ fun AlarmRingingOverlay(
                     Icon(
                         imageVector = Icons.Default.MusicNote,
                         contentDescription = null,
-                        tint = LavenderSoft,
+                        tint = com.example.ui.theme.RegainLimePrimary,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = alarm.ringtone,
                         style = MaterialTheme.typography.labelMedium.copy(
-                            color = LavenderSoft,
+                            color = com.example.ui.theme.RegainLimePrimary,
                             fontWeight = FontWeight.Medium
                         )
                     )
@@ -236,8 +234,8 @@ fun AlarmRingingOverlay(
                             .testTag("alarm_stop_button"),
                         shape = RoundedCornerShape(28.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = VioletAccent,
-                            contentColor = Color.White
+                            containerColor = Color.White,
+                            contentColor = com.example.ui.theme.NearBlack
                         )
                     ) {
                         Icon(

@@ -12,4 +12,6 @@
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_focus_shield"
     android:description="@string/widget_shield_description"
-    android:widgetCategory="home_screen" />
+    android:widgetCategory="home_screen"
+    android:previewLayout="@layout/widget_focus_shield"
+    android:previewImage="@drawable/widget_preview_focus_shield" />

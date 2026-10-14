@@ -240,6 +240,8 @@ fun ProfileScreen(
     onOpenSundayRecap: () -> Unit = {},
     onOpenSupportLockZen: () -> Unit = {},
     onOpenSessionHistory: () -> Unit = {},
+    // v1.1: Mascot Buddy screen.
+    onOpenMascot: () -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
     onLogout: () -> Unit = {},
     onUpdateProfile: (newName: String, avatarBytes: ByteArray?) -> Unit = { _, _ -> },
@@ -812,6 +814,94 @@ fun ProfileScreen(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "Distraction App & Site Blocker",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        color = textSecondary,
+                                        fontSize = 12.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                            contentDescription = null,
+                            tint = textSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
+
+            // v1.1: Mascot Buddy Card — level badge + wardrobe entry.
+            item {
+                val mascotLevel = com.example.util.levelForPoints(userPreferences?.focusPoints ?: 0)
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    onClick = { onOpenMascot() }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (isDark) Color(0xFF1E251D) else Color(0xFFF0F4EC)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        RegainLimePrimary.copy(alpha = 0.4f),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                com.example.ui.components.BuddyMascot(
+                                    modifier = Modifier.width(40.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Mascot Buddy",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontFamily = PoppinsFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textPrimary,
+                                            fontSize = 15.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF8FD400))
+                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = mascotLevel.displayName.uppercase(),
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontFamily = PoppinsFontFamily,
+                                                color = NearBlack,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 9.sp
+                                            )
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Dress your buddy, level up with Focus Points",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         color = textSecondary,

@@ -54,9 +54,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.LavenderSoft
-import com.example.ui.theme.VioletAccent
 import com.example.ui.components.CivoChatBubble
+import com.example.ui.theme.RegainLimePrimary
 import com.example.util.PermissionUtils
 import kotlinx.coroutines.launch
 
@@ -99,7 +98,7 @@ fun NotificationAlarmPermissionSheet(
     }
 
     val sheetBackground = Color(0xFF100D1C)
-    val accentViolet = VioletAccent
+    val accentLime = RegainLimePrimary
     val accentGreen = Color(0xFF69F0AE)
 
     ModalBottomSheet(

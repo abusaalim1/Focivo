@@ -17,9 +17,12 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * v1.4.3-widgets: owner-review screenshots for the redesigned home-screen widgets.
+ * v1.1: owner-review screenshots for the home-screen widgets, now using the
+ * owner-supplied aesthetic pack layouts (widget_focus_timer / widget_streak /
+ * widget_timetable / widget_focus_shield / widget_zen_coach) with the pack's
+ * IDs (tv_title, tv_sub, tv_badge, tv_eyebrow, tv_quote, pb_goal, ...).
  * Inflates the REAL widget layouts at 4x2 widget size with realistic sample
- * data (same fields FocivoWidgetHelper binds) and captures them for review.
+ * data (same fields the widget providers bind) and captures them for review.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -57,51 +60,64 @@ class WidgetScreenshotsTest {
     }
 
     @Test
-    fun widget_study_timer() {
-        val v = inflate(R.layout.widget_study_timer)
-            .tv(R.id.widget_timer_clock, "18:42")
-            .tv(R.id.widget_timer_task_title, "Deep Work Session")
-            .tv(R.id.widget_timer_status_badge, "READY")
-            .tv(R.id.widget_timer_subtitle, "Deep focus session in progress · Stay on track")
+    fun widget_focus_timer() {
+        val v = inflate(R.layout.widget_focus_timer)
+            .tv(R.id.tv_eyebrow, "FOCUS TIMER")
+            .tv(R.id.tv_badge, "READY")
+            .tv(R.id.tv_title, "25:00")
+            .tv(R.id.tv_sub, "Deep work session")
+            .tv(R.id.btn_25, "25")
+            .tv(R.id.btn_50, "50")
+            .tv(R.id.btn_primary, "START")
         capture(v, "widget_timer")
     }
 
     @Test
     fun widget_streak_motivation() {
-        val v = inflate(R.layout.widget_streak_motivation)
-            .tv(R.id.widget_streak_title, "12 day streak")
-            .tv(R.id.widget_streak_level, "Level 3 Student · 1,240 XP")
-            .tv(R.id.widget_streak_quote, "Every page studied today is a step towards your dream.")
-            .tv(R.id.widget_streak_goal_text, "120 / 360 min")
-        v.findViewById<ProgressBar>(R.id.widget_streak_progress_bar).progress = 33
+        val v = inflate(R.layout.widget_streak)
+            .tv(R.id.tv_eyebrow, "DAILY STREAK")
+            .tv(R.id.tv_badge, "ON FIRE")
+            .tv(R.id.tv_title, "12 day streak")
+            .tv(R.id.tv_sub, "Level 3 Student · 1,240 XP")
+            .tv(R.id.tv_quote, "Every page studied today is a step towards your dream.")
+            .tv(R.id.tv_goal, "120 / 360 min")
+        v.findViewById<ProgressBar>(R.id.pb_goal).progress = 33
         capture(v, "widget_streak")
     }
 
     @Test
     fun widget_today_schedule() {
-        val v = inflate(R.layout.widget_today_schedule)
-            .tv(R.id.widget_schedule_date, "Wed, Oct 14")
-            .tv(R.id.widget_schedule_next_time, "NEXT TARGET · 50 MIN · DEEP WORK")
-            .tv(R.id.widget_schedule_next_title, "Physics numericals")
-            .tv(R.id.widget_schedule_pending_count, "4 tasks remaining for today")
+        val v = inflate(R.layout.widget_timetable)
+            .tv(R.id.tv_eyebrow, "TODAY'S SCHEDULE")
+            .tv(R.id.tv_badge, "WED, OCT 14")
+            .tv(R.id.tv_title, "Physics numericals")
+            .tv(R.id.tv_sub, "Next target · 50 min · 4 tasks remaining")
+            .tv(R.id.btn_primary, "PLANNER")
+            .tv(R.id.btn_secondary, "VIEW")
         capture(v, "widget_schedule")
     }
 
     @Test
     fun widget_focus_shield() {
         val v = inflate(R.layout.widget_focus_shield)
-            .tv(R.id.widget_shield_status_badge, "ARMED")
-            .tv(R.id.widget_shield_blocked_count, "8 apps blocked")
-            .tv(R.id.widget_shield_subtext, "Shorts and Reels auto-intercept active")
-            .tv(R.id.widget_btn_toggle_shield, "Armed")
+            .tv(R.id.tv_eyebrow, "FOCUS SHIELD")
+            .tv(R.id.tv_badge, "ARMED")
+            .tv(R.id.tv_title, "8 apps blocked")
+            .tv(R.id.tv_sub, "Shorts & Reels auto-intercept is on")
+            .tv(R.id.btn_primary, "SHIELD HUB")
+            .tv(R.id.btn_secondary, "PAUSE")
         capture(v, "widget_shield")
     }
 
     @Test
     fun widget_zen_coach() {
         val v = inflate(R.layout.widget_zen_coach)
-            .tv(R.id.widget_zen_user_points, "Level 3 · 1,240 XP")
-            .tv(R.id.widget_zen_tip_text, "Clear your desk, take a sip of water, and conquer your next 25-minute target.")
+            .tv(R.id.tv_eyebrow, "ZEN COACH")
+            .tv(R.id.tv_badge, "ZEN")
+            .tv(R.id.tv_title, "Level 3 · 1,240 XP")
+            .tv(R.id.tv_sub, "Clear your desk, take a sip of water, and conquer your next 25-minute target.")
+            .tv(R.id.btn_primary, "BREATHE")
+            .tv(R.id.btn_secondary, "TIPS")
         capture(v, "widget_zen")
     }
 }
