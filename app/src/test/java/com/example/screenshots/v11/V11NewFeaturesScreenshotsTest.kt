@@ -14,7 +14,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.BuddyMascot
 import com.example.ui.components.CustomizeTimerSheet
-import com.example.util.MascotPose
+import com.example.ui.components.MascotPose
 import com.example.ui.components.TimerFaceHost
 import com.example.ui.components.TimerFaceParams
 import com.example.ui.screens.FocusScreen
@@ -90,7 +90,7 @@ class V11NewFeaturesScreenshotsTest {
             isRunning = false,
             isBreak = isBreak,
             subjectTitle = "Deep Work Session",
-            mascotPose = MascotPose.STUDY,
+            mascotPose = MascotPose.STUDYING,
             theme = theme,
             onTogglePlay = {},
             onReset = {},
