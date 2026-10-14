@@ -1,6 +1,8 @@
 package com.example.screenshots
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ProgressBar
@@ -44,7 +46,14 @@ class WidgetScreenshotsTest {
     }
 
     private fun capture(view: View, name: String) {
-        view.captureRoboImage("src/test/screenshots/round5/$name.png")
+        // View.captureRoboImage needs an Activity context; render to a bitmap instead.
+        val bitmap = Bitmap.createBitmap(
+            view.measuredWidth.coerceAtLeast(1),
+            view.measuredHeight.coerceAtLeast(1),
+            Bitmap.Config.ARGB_8888
+        )
+        view.draw(Canvas(bitmap))
+        bitmap.captureRoboImage("src/test/screenshots/round5/$name.png")
     }
 
     @Test
