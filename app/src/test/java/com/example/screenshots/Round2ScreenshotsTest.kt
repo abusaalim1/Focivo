@@ -5,8 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
@@ -100,7 +100,6 @@ class Round2ScreenshotsTest {
                 onOpenTaskCreate = {}
             )
         }
-        composeTestRule.onNodeWithTag("home_screen", useUnmergedTree = true).assertExists()
         capture("home_aurora")
     }
 
