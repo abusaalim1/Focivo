@@ -88,12 +88,15 @@ class AiStudyAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * v1.3.0 — multi-window protections.
+     * v1.3.0 — multi-window protections. v1.1 final: enforcement is now
+     * UNCONDITIONAL during an active focus period — a blocked package running
+     * in split-screen or a floating/small window is intercepted the same way
+     * as in fullscreen, redirecting it to the standard BlockedAppLockActivity.
+     * (The old StrictMode opt-in toggles no longer gate this path; they remain
+     * for standalone-shield use outside focus periods.)
      *
      * Scans interactive application windows (best-effort; requires the
-     * service's flagRetrieveInteractiveWindows) for blocked packages running
-     * in split-screen or floating/freeform windows, then redirects them to the
-     * standard BlockedAppLockActivity.
+     * service's flagRetrieveInteractiveWindows) for blocked packages.
      *
      * Signals used:
      * - split-screen: 2+ TYPE_APPLICATION windows visible at once.
@@ -106,9 +109,12 @@ class AiStudyAccessibilityService : AccessibilityService() {
      */
     private fun enforceMultiWindowProtections(nowTime: Long) {
         val ctx = applicationContext
-        val blockSplit = try { StrictModeManager.isBlockSplitScreenEnabled(ctx) } catch (_: Exception) { false }
-        val blockFloat = try { StrictModeManager.isBlockFloatingWindowEnabled(ctx) } catch (_: Exception) { false }
-        if (!blockSplit && !blockFloat) return
+        // v1.1 final: during an active focus period a blocked app must be
+        // intercepted in EVERY window mode — fullscreen, split-screen and
+        // floating/small windows alike. The old StrictMode opt-in toggles
+        // (blockSplit/blockFloat) no longer gate this: if the app is blocked
+        // during focus, it is blocked wherever it appears. The toggles are
+        // retained for standalone-shield use outside focus periods.
         if (nowTime - lastMultiWindowScanMs < 3000L) return
         lastMultiWindowScanMs = nowTime
         try {
@@ -135,7 +141,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 if (rect.width() <= 0 || rect.height() <= 0) continue
                 val isFloating = rect.width() < dispW * 0.85f && rect.height() < dispH * 0.85f
                 val inSplit = multiWindowActive && !isFloating
-                val shouldBlock = (blockFloat && isFloating) || (blockSplit && inSplit)
+                // v1.1 final: a blocked app is blocked in every window mode
+                // during focus — fullscreen, split-screen, floating.
+                val shouldBlock = isFloating || inSplit
                 if (!shouldBlock) continue
                 if (nowTime - lastGeneralAppInterceptTimeMs > 2500L || lastGeneralInterceptedPkg != pkg) {
                     lastGeneralAppInterceptTimeMs = nowTime
@@ -148,7 +156,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         packageName = pkg,
                         appName = friendlyName,
                         durationSec = try { FocusShieldService.getRemainingSeconds(ctx) } catch (_: Exception) { 0 },
-                        reason = "$friendlyName is locked during your active focus session ($mode is blocked).",
+                        reason = "$friendlyName is locked during your active focus session ($mode windows are blocked during focus).",
                         isPunishment = false
                     )
                     try { ctx.startActivity(intent) } catch (_: Exception) {}

@@ -76,11 +76,14 @@ import com.example.service.FocivoDeviceAdminReceiver
 import com.example.ui.components.FeatureIcon
 import com.example.ui.components.MascotPose
 import com.example.ui.components.RegainMascotView
+import com.example.ui.components.SensitivePermission
+import com.example.ui.components.TrustExplainerDialog
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
+import com.example.util.AiStudyGuardManager
 import com.example.util.PermissionUtils
 import kotlinx.coroutines.delay
 
@@ -307,6 +310,26 @@ private fun buildPermissionSpecs(): List<PermissionSpec> = listOf(
         privacyLine = "Your privacy matters to us. We never share your data.",
         whyBody = "Some phones aggressively kill background apps. This keeps your focus sessions protected.",
         pose = MascotPose.GUARD
+    ),
+    PermissionSpec(
+        id = "exact_alarm",
+        rowLabel = "Alarm permission",
+        bubbleLead = "So your focus sessions and reminders ",
+        bubbleAccent = "start on time",
+        bubbleTail = ", we need exact alarm access.",
+        privacyLine = "Your privacy matters to us. We never share your data.",
+        whyBody = "Session end alarms, scheduled blocks and study reminders fire exactly when promised. Without it, the system may delay them.",
+        pose = MascotPose.GUARD
+    ),
+    PermissionSpec(
+        id = "accessibility",
+        rowLabel = "AI Study Guard",
+        bubbleLead = "To ",
+        bubbleAccent = "detect non-study apps during focus",
+        bubbleTail = ", the AI Study Guard needs accessibility access.",
+        privacyLine = "Detection happens on your phone. We never collect or share your data.",
+        whyBody = "This is what powers the guard: when a blocked app opens during a focus session, Focivo notices and brings up the block screen.",
+        pose = MascotPose.GUARD_WARNING
     ),
     PermissionSpec(
         id = "device_admin",
@@ -1036,23 +1059,13 @@ private fun isPermissionGranted(context: Context, id: String): Boolean = when (i
     "usage" -> PermissionUtils.hasUsageStatsPermission(context)
     "overlay" -> PermissionUtils.hasOverlayPermission(context)
     "battery" -> PermissionUtils.isBatteryOptimizationDisabled(context)
+    "exact_alarm" -> PermissionUtils.hasExactAlarmPermission(context)
+    "accessibility" -> AiStudyGuardManager.isAccessibilityPermissionGranted(context)
     "device_admin" -> {
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
         dpm?.isAdminActive(FocivoDeviceAdminReceiver.getComponentName(context)) == true
     }
     else -> false
-}
-
-/** Device Admin appears only when the uninstall-protection/strict path was
- *  explicitly enabled before (fresh installs skip it). */
-private fun needsDeviceAdminStep(context: Context): Boolean {
-    if (isPermissionGranted(context, "device_admin")) return false
-    return try {
-        context.getSharedPreferences("focivo_strict_mode_prefs", Context.MODE_PRIVATE)
-            .getBoolean("key_uninstall_protection", false)
-    } catch (_: Exception) {
-        false
-    }
 }
 
 @Composable
@@ -1294,9 +1307,9 @@ fun OnboardingFlowScreen(
     val questions = remember { buildQuestions() }
     val slides = remember { buildShowcaseSlides() }
     val permSpecs = remember {
-        buildPermissionSpecs().filter { spec ->
-            spec.id != "device_admin" || needsDeviceAdminStep(context)
-        }
+        // v1.1 final: every permission the app requests appears here —
+        // no conditional gating. Later/NotNow keeps the user inside onboarding.
+        buildPermissionSpecs()
     }
 
     val showIntro = remember {
@@ -1316,6 +1329,9 @@ fun OnboardingFlowScreen(
 
     var stepPos by remember { mutableIntStateOf(0) }
     var permTick by remember { mutableIntStateOf(0) }
+    // v1.1 final: trust explainer card for sensitive permissions (Accessibility,
+    // Device Admin) — shown before the system prompt.
+    var explainerFor by remember { mutableStateOf<PermissionSpec?>(null) }
 
     // Answers — bound only to the existing intake fields.
     var nameText by remember { mutableStateOf(initialUserName) }
@@ -1363,6 +1379,16 @@ fun OnboardingFlowScreen(
     }
 
     fun requestPermission(spec: PermissionSpec) {
+        // v1.1 final: sensitive permissions (Accessibility, Device Admin) go
+        // through the trust explainer card first (already-built component).
+        if (spec.id == "accessibility" || spec.id == "device_admin") {
+            explainerFor = spec
+            return
+        }
+        firePermissionIntent(spec)
+    }
+
+    fun firePermissionIntent(spec: PermissionSpec) {
         when (spec.id) {
             "notifications" -> {
                 markNotificationsDecided()
@@ -1376,6 +1402,8 @@ fun OnboardingFlowScreen(
             "usage" -> PermissionUtils.openUsageStatsSettings(context)
             "overlay" -> PermissionUtils.openOverlaySettings(context)
             "battery" -> PermissionUtils.openBatteryOptimizationSettings(context)
+            "exact_alarm" -> PermissionUtils.openExactAlarmSettings(context)
+            "accessibility" -> AiStudyGuardManager.openAccessibilitySettings(context)
             "device_admin" -> {
                 try {
                     val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
@@ -1516,5 +1544,23 @@ fun OnboardingFlowScreen(
                 onBack = if (stepPos > 0) ({ stepPos-- }) else null
             )
         }
+    }
+
+    // v1.1 final: trust explainer card before the system prompt for sensitive
+    // permissions. NotNow keeps the user inside onboarding (same as Later).
+    explainerFor?.let { spec ->
+        TrustExplainerDialog(
+            permission = if (spec.id == "device_admin") SensitivePermission.DEVICE_ADMIN else SensitivePermission.ACCESSIBILITY,
+            onContinue = {
+                val pending = spec
+                explainerFor = null
+                firePermissionIntent(pending)
+            },
+            onNotNow = {
+                explainerFor = null
+                if (spec.id == "notifications") markNotificationsDecided()
+                advance()
+            }
+        )
     }
 }

@@ -1273,7 +1273,11 @@ class SupabaseService {
                     }
                     val avatarMap = userProfiles.associate { it.id to it.avatar_url }
                     leaderboard.forEach { item ->
-                        item.avatar_url = avatarMap[item.user_id]
+                        // v1.1 final: the users-table read is RLS-restricted on
+                        // some projects (only the current user's row returns),
+                        // so never overwrite a row's own avatar_url with null —
+                        // keep whatever the leaderboard row already carries.
+                        item.avatar_url = avatarMap[item.user_id] ?: item.avatar_url
                     }
                 }
             }

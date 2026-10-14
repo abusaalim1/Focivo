@@ -59,7 +59,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.data.HallOfFameItem
 import com.example.data.LeaderboardDateUtils
 import com.example.data.LeaderboardUser
 import com.example.data.model.FocusSessionEntity
@@ -113,21 +112,16 @@ fun LeaderboardAvatar(
         }
     }
 
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap.asImageBitmap(),
-            contentDescription = displayName,
-            modifier = modifier.fillMaxSize().clip(CircleShape),
-            contentScale = ContentScale.Crop
-        )
-    } else if (!avatarUrl.isNullOrBlank()) {
-        AsyncImage(
-            model = avatarUrl,
-            contentDescription = displayName,
-            modifier = modifier.fillMaxSize().clip(CircleShape),
-            contentScale = ContentScale.Crop
-        )
-    } else {
+    // v1.1 final: initials are ALWAYS drawn as the background layer, with the
+    // avatar image stacked on top. If the URL is blank, broken, or fails to
+    // load, the initials show through instead of a blank circle — so every
+    // user gets a visible avatar identity.
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .clip(CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
         Text(
             text = initials,
             style = MaterialTheme.typography.titleMedium.copy(
@@ -137,13 +131,27 @@ fun LeaderboardAvatar(
                 fontSize = textSizeSp.sp
             )
         )
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = displayName,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else if (!avatarUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = avatarUrl,
+                contentDescription = displayName,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
     }
 }
 
 @Composable
 fun LeaderboardScreen(
     users: List<LeaderboardUser>,
-    hallOfFame: List<HallOfFameItem> = emptyList(),
     currentUserName: String,
     currentUserPhotoUrl: String? = null,
     currentUserPoints: Int,
@@ -286,15 +294,6 @@ fun LeaderboardScreen(
                             fontSize = 24.sp
                         )
                     )
-                    Text(
-                        text = if (selectedFilter == "Hall of Fame") "Weekly champions enshrined in history" else "Study together & stay disciplined",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = PoppinsFontFamily,
-                            color = onBackdrop.copy(alpha = 0.75f),
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 12.sp
-                        )
-                    )
                 }
 
                 Row(
@@ -327,7 +326,7 @@ fun LeaderboardScreen(
                 }
             }
 
-            // Time Filter Pills: "Today", "This Week", "All Time", "Hall of Fame"
+            // Time Filter Pills: "Today", "This Week", "All Time" (v1.1 final: minimal)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -335,7 +334,7 @@ fun LeaderboardScreen(
                     .padding(horizontal = 20.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf("Today", "This Week", "All Time", "Hall of Fame").forEach { filter ->
+                listOf("Today", "This Week", "All Time").forEach { filter ->
                     val isSelected = selectedFilter == filter
                     val pillBg = if (isSelected) {
                         appAccent
@@ -363,15 +362,6 @@ fun LeaderboardScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (filter == "Hall of Fame") {
-                                Icon(
-                                    imageVector = Icons.Default.WorkspacePremium,
-                                    contentDescription = null,
-                                    tint = pillTextColor,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                            }
                             Text(
                                 text = filter,
                                 style = MaterialTheme.typography.labelMedium.copy(
@@ -388,15 +378,8 @@ fun LeaderboardScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Main Content Area
-            if (selectedFilter == "Hall of Fame") {
-                HallOfFameSection(
-                    hallOfFame = hallOfFame,
-                    isDark = isDark,
-                    textPrimary = textPrimary,
-                    textSecondary = textSecondary
-                )
-            } else {
+            // Main Content Area — v1.1 final: only essentials (podium + ranked list)
+            run {
                 // Podium + Ranked List for Today, This Week, All Time
                 LazyColumn(
                     modifier = Modifier
@@ -909,254 +892,6 @@ private fun LeaderboardUserRow(
 }
 
 @Composable
-private fun HallOfFameSection(
-    hallOfFame: List<HallOfFameItem>,
-    isDark: Boolean,
-    textPrimary: Color,
-    textSecondary: Color
-) {
-    LazyColumn(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = BottomNavClearance),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // Banner card
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isDark) Color(0xFF22291E) else Color(0xFFF4F9EE)
-                ),
-                border = BorderStroke(1.5.dp, if (isDark) Color(0x608CE000) else Color(0xFFD3E7BF))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(Color(0xFFFFD54F), Color(0xFFFFA000))
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.EmojiEvents,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Hall of Fame",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontFamily = PoppinsFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                color = textPrimary,
-                                fontSize = 17.sp
-                            )
-                        )
-                        Text(
-                            text = "Past weekly champions permanently recorded in glory every Monday.",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                color = textSecondary,
-                                fontSize = 12.sp
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        if (hallOfFame.isEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 40.dp, horizontal = 20.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        // v1.5.0: mascot in the empty state
-                        RegainMascotView(
-                            pose = MascotPose.EMPTY_STATE,
-                            size = 92.dp,
-                            animate = false
-                        )
-                        Text(
-                            text = "No Past Champions Yet",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontFamily = PoppinsFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                color = textPrimary,
-                                fontSize = 16.sp
-                            )
-                        )
-                        Text(
-                            text = "The current week's champion will be enshrined here automatically when the week resets on Monday. Stay focused to claim the first title!",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                color = textSecondary,
-                                fontSize = 12.sp,
-                                textAlign = TextAlign.Center
-                            )
-                        )
-                    }
-                }
-            }
-        } else {
-            item {
-                Text(
-                    text = "PAST WEEKLY CHAMPIONS",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontFamily = PoppinsFontFamily,
-                        color = textSecondary,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.4.sp,
-                        fontSize = 11.sp
-                    )
-                )
-            }
-
-            itemsIndexed(hallOfFame) { _, item ->
-                HallOfFameCard(
-                    item = item,
-                    isDark = isDark,
-                    textPrimary = textPrimary,
-                    textSecondary = textSecondary
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HallOfFameCard(
-    item: HallOfFameItem,
-    isDark: Boolean,
-    textPrimary: Color,
-    textSecondary: Color
-) {
-    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
-    val cardBorder = if (isDark) Color(0x40FFD54F) else Color(0xFFFFE082)
-    val weekLabel = remember(item.weekStart, item.weekEnd) {
-        LeaderboardDateUtils.formatWeekRange(item.weekStart, item.weekEnd)
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("hall_of_fame_item_${item.weekStart}"),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBg),
-        border = BorderStroke(1.2.dp, cardBorder),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 0.dp else 1.5.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                // Gold trophy badge
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(Color(0xFFFFD54F), Color(0xFFFFA000))
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.EmojiEvents,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(14.dp))
-
-                Column {
-                    // Week range
-                    Text(
-                        text = weekLabel,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontFamily = PoppinsFontFamily,
-                            color = if (isDark) Color(0xFFFFD54F) else Color(0xFFB45309),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    // Winner Display Name
-                    Text(
-                        text = item.displayName,
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            color = textPrimary,
-                            fontSize = 15.sp
-                        )
-                    )
-                }
-            }
-
-            // Winning Time Badge
-            Column(horizontalAlignment = Alignment.End) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isDark) Color(0x308CE000) else Color(0xFFE8F5E9),
-                    border = BorderStroke(1.dp, if (isDark) Color(0x508CE000) else Color(0xFFC8E6C9))
-                ) {
-                    Text(
-                        text = formatHoursMins(item.winningStudySeconds),
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDark) RegainLimePrimary else Color(0xFF2E6300),
-                            fontSize = 13.sp
-                        ),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Weekly Champion",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontFamily = PoppinsFontFamily,
-                        color = textSecondary,
-                        fontSize = 9.sp
-                    )
-                )
-            }
-        }
-    }
-}
-
 private fun formatHoursMins(seconds: Long): String {
     if (seconds <= 0) return "0m"
     val totalMins = seconds / 60

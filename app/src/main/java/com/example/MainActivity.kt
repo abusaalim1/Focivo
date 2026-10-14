@@ -235,7 +235,6 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val standaloneShieldRemainingSeconds by viewModel.standaloneShieldRemainingSeconds.collectAsState()
     val installedApps by viewModel.installedApps.collectAsState()
     val leaderboardUsers by viewModel.leaderboardUsers.collectAsState()
-    val hallOfFame by viewModel.hallOfFame.collectAsState()
 
     // Scheduled Blocks & AI Study Guard states
     val scheduledBlocks by viewModel.scheduledBlocks.collectAsState()
@@ -657,7 +656,6 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                 NavTab.LEADERBOARD.name -> {
                                     LeaderboardScreen(
                                         users = leaderboardUsers,
-                                        hallOfFame = hallOfFame,
                                         currentUserName = userPreferences?.currentUserName ?: "You",
                                         currentUserPhotoUrl = userPreferences?.currentUserPhotoUrl,
                                         currentUserPoints = userPreferences?.focusPoints ?: 0,
