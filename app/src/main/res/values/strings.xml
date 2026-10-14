@@ -1,7 +1,6 @@
 <resources>
     <string name="app_name">Focivo</string>
     <string name="accessibility_service_description">Focivo AI Academic Sentinel · Intelligently protects study flow and verifies academic study inquiries in real-time. 100% private, on-device &amp; safe.</string>
-    <string name="device_admin_description">Focivo Anti-Uninstall Shield · Prevents uninstalling the app while the shield is active. You can turn this off anytime in Settings.</string>
     <string name="widget_timer_title">Focivo Quick Timer</string>
     <string name="widget_timer_description">Quickly start 25m Pomodoro or 50m Deep Work sessions with cute studying mascot.</string>
     <string name="widget_streak_title">Daily Streak &amp; Motivation</string>
