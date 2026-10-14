@@ -112,7 +112,7 @@ object FocivoWidgetHelper {
         views.setTextViewText(R.id.widget_timer_clock, if (isRunning) timeDisplay else "25:00")
         views.setTextViewText(
             R.id.widget_timer_task_title,
-            if (isRunning) "Focus: $currentTask" else "Ready to Focus"
+            if (isRunning) "Focus: $currentTask" else "Deep Work Session"
         )
         views.setTextViewText(
             R.id.widget_timer_status_badge,
@@ -120,11 +120,11 @@ object FocivoWidgetHelper {
         )
         views.setTextViewText(
             R.id.widget_timer_subtitle,
-            if (isRunning) "Deep focus session in progress · Stay on track 🎯" else "Tap 25m or Start for instant deep work ⚡"
+            if (isRunning) "Deep focus session in progress · Stay on track" else "Tap to start a deep work session"
         )
         views.setTextViewText(
             R.id.widget_btn_open_timer,
-            if (isRunning) "⏸ Focus" else "▶ Start"
+            if (isRunning) "Focus" else "Start"
         )
 
         val start25Intent = Intent(context, MainActivity::class.java).apply {
@@ -217,7 +217,7 @@ object FocivoWidgetHelper {
 
         views.setTextViewText(
             R.id.widget_streak_title,
-            "🔥 $streak DAY${if (streak > 1) "S" else ""} STREAK"
+            "$streak day${if (streak > 1) "s" else ""} streak"
         )
         views.setTextViewText(
             R.id.widget_streak_level,
@@ -280,7 +280,7 @@ object FocivoWidgetHelper {
         if (topPriorityTitle.isNotEmpty()) {
             views.setTextViewText(
                 R.id.widget_schedule_next_time,
-                "🎯 TARGET (${topPriorityDuration}m · $topPriorityCategory)"
+                "NEXT TARGET · ${topPriorityDuration} MIN · ${topPriorityCategory.uppercase()}"
             )
             views.setTextViewText(
                 R.id.widget_schedule_next_title,
@@ -288,11 +288,11 @@ object FocivoWidgetHelper {
             )
             views.setTextViewText(
                 R.id.widget_schedule_pending_count,
-                "📖 $pendingCount task${if (pendingCount > 1) "s" else ""} remaining for today"
+                "$pendingCount task${if (pendingCount > 1) "s" else ""} remaining for today"
             )
         } else {
-            views.setTextViewText(R.id.widget_schedule_next_time, "🎯 ALL TARGETS COMPLETED")
-            views.setTextViewText(R.id.widget_schedule_next_title, "Great work today! 🌟")
+            views.setTextViewText(R.id.widget_schedule_next_time, "ALL TARGETS COMPLETED")
+            views.setTextViewText(R.id.widget_schedule_next_title, "Great work today!")
             views.setTextViewText(R.id.widget_schedule_pending_count, "Tap to plan new study blocks")
         }
 
@@ -356,15 +356,15 @@ object FocivoWidgetHelper {
         )
         views.setTextViewText(
             R.id.widget_shield_blocked_count,
-            "🚫 $blockedCount Distracting App${if (blockedCount != 1) "s" else ""} Blocked"
+            "$blockedCount app${if (blockedCount != 1) "s" else ""} blocked"
         )
         views.setTextViewText(
             R.id.widget_shield_subtext,
-            if (isDeepFocusOn) "🔒 Deep Focus Active · Shorts & Reels Locked" else "⚡ Shorts & Reels auto-intercept active"
+            if (isDeepFocusOn) "Deep Focus active · Shorts and Reels locked" else "Shorts and Reels auto-intercept active"
         )
         views.setTextViewText(
             R.id.widget_btn_toggle_shield,
-            if (isShieldActive) "🛡️ Armed" else "🛡️ Arm Shield"
+            if (isShieldActive) "Armed" else "Arm Shield"
         )
 
         val hubIntent = Intent(context, MainActivity::class.java).apply {
@@ -407,7 +407,7 @@ object FocivoWidgetHelper {
 
         views.setTextViewText(
             R.id.widget_zen_user_points,
-            "⭐ Level $level Student · 🪙 $focusPoints Focus XP"
+            "Level $level Student · $focusPoints Focus XP"
         )
         views.setTextViewText(R.id.widget_zen_tip_text, tip)
 

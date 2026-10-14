@@ -3,11 +3,11 @@
     android:id="@+id/widget_zen_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_card_bg_zen"
+    android:background="@drawable/widget_v2_card"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="18dp">
 
-    <!-- Header Row -->
+    <!-- Header: happy mascot + coach -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -16,81 +16,95 @@
 
         <ImageView
             android:id="@+id/widget_zen_mascot"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:contentDescription="Coach Mascot"
-            android:src="@drawable/mascot_grateful" />
+            android:layout_width="54dp"
+            android:layout_height="54dp"
+            android:background="@drawable/widget_v2_icon_tile"
+            android:contentDescription="Zen Coach Mascot"
+            android:padding="6dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/mascot_study_happy" />
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="12dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/poppins_bold"
-                android:letterSpacing="-0.01"
-                android:text="AI Study Companion"
-                android:textColor="@color/focivo_text_primary"
-                android:textSize="13sp" />
+                android:fontFamily="@font/poppins_semibold"
+                android:letterSpacing="0.09"
+                android:text="ZEN COACH"
+                android:textColor="@color/focivo_lime_primary"
+                android:textSize="10sp" />
 
             <TextView
                 android:id="@+id/widget_zen_user_points"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/poppins_medium"
-                android:text="⭐ 0 Focus XP · Mindful Coach"
-                android:textColor="@color/focivo_text_muted"
-                android:textSize="11sp" />
+                android:layout_marginTop="3dp"
+                android:fontFamily="@font/poppins_semibold"
+                android:text="Level 3 · 1,240 XP"
+                android:textColor="@color/focivo_text_primary"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/widget_zen_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/widget_pill_badge_purple"
-            android:fontFamily="@font/poppins_bold"
-            android:letterSpacing="0.04"
-            android:paddingStart="10dp"
-            android:paddingTop="3.5dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="3.5dp"
-            android:text="ZEN"
-            android:textColor="@color/focivo_purple"
-            android:textSize="9.5sp" />
+            android:background="@drawable/widget_v2_pill"
+            android:fontFamily="@font/poppins_semibold"
+            android:letterSpacing="0.06"
+            android:paddingStart="12dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="5dp"
+            android:text="MINDFUL"
+            android:textColor="@color/focivo_lime_primary"
+            android:textSize="10sp" />
     </LinearLayout>
 
-    <!-- Center AI Advice in Frosted Glass Card -->
+    <!-- Center: coach tip -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="10dp"
         android:layout_weight="1"
-        android:background="@drawable/widget_glass_inner_card"
+        android:background="@drawable/widget_v2_inner"
         android:gravity="center_vertical"
         android:orientation="vertical"
-        android:paddingStart="12dp"
-        android:paddingTop="6dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="6dp">
+        android:paddingStart="14dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/poppins_semibold"
+            android:letterSpacing="0.09"
+            android:text="TODAY'S TIP"
+            android:textColor="@color/focivo_lime_primary"
+            android:textSize="9sp" />
 
         <TextView
             android:id="@+id/widget_zen_tip_text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
             android:ellipsize="end"
             android:fontFamily="@font/poppins_medium"
             android:maxLines="2"
-            android:text="&quot;Take a deep breath. 25 minutes of deep focus is better than 4 hours of distracted study 🧘&quot;"
+            android:text="Clear your desk, take a sip of water, and conquer your next 25-minute target."
             android:textColor="@color/focivo_text_secondary"
-            android:textSize="11sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- Bottom Action Row -->
+    <!-- Bottom actions -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -100,29 +114,29 @@
         <Button
             android:id="@+id/widget_btn_zen_break"
             android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_marginEnd="4dp"
+            android:layout_height="42dp"
+            android:layout_marginEnd="5dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_btn_lime"
-            android:fontFamily="@font/poppins_bold"
+            android:background="@drawable/widget_v2_btn_lime"
+            android:fontFamily="@font/poppins_semibold"
             android:minHeight="0dp"
             android:padding="0dp"
-            android:text="🧘 5m Zen Break"
+            android:text="5m Zen Break"
             android:textAllCaps="false"
-            android:textColor="@color/focivo_near_black"
-            android:textSize="12sp" />
+            android:textColor="#FF10130E"
+            android:textSize="13sp" />
 
         <Button
             android:id="@+id/widget_btn_open_companion"
             android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_marginStart="4dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="5dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_btn_secondary"
-            android:fontFamily="@font/poppins_bold"
+            android:background="@drawable/widget_v2_btn_ghost"
+            android:fontFamily="@font/poppins_semibold"
             android:minHeight="0dp"
             android:padding="0dp"
-            android:text="⭐ AI Coach"
+            android:text="AI Coach"
             android:textAllCaps="false"
             android:textColor="@color/focivo_text_primary"
             android:textSize="12sp" />
