@@ -54,9 +54,12 @@ fun CelebrateBuddyMascot(
         // Same items, repositioned for the celebrate pose.
         // The celebrate pose has raised arms and a tilted head; caps sit
         // higher, tops/bottoms center on the torso, extras near the face.
+        // Items flagged renderOnCelebrate=false (books, bottoms, glasses) are
+        // skipped — they can't fit this pose (per-item overrides carry the
+        // eye-verified geometry).
         WARDROBE_LAYER_ORDER.forEach { category ->
             val item = outfit[category] ?: return@forEach
-            val (wFrac, cx, cy) = celebratePosePosition(item, category)
+            val (wFrac, cx, cy) = celebratePosePosition(item, category) ?: return@forEach
             Image(
                 painter = painterResource(id = item.overlayRes),
                 contentDescription = item.name,
@@ -77,21 +80,25 @@ fun CelebrateBuddyMascot(
 /**
  * Maps a wardrobe item's study-pose fractions to celebrate-pose fractions.
  * Celebrate pose: head higher and tilted, torso centered, arms raised.
+ *
+ * Returns null when the item must not render on the celebrate pose
+ * ([WardrobeItem.renderOnCelebrate] == false). Per-item celebrate overrides
+ * win; the fallback scales study widths by 640/889 (celebrate base width in
+ * the square Box) and re-anchors by category.
  */
 private fun celebratePosePosition(
     item: WardrobeItem,
     category: WardrobeCategory
-): Triple<Float, Float, Float> {
-    val wFrac = item.widthFrac
-    return when (category) {
-        WardrobeCategory.CAPS -> Triple(wFrac, 0.5f, 0.18f) // top of head
-        WardrobeCategory.TOPS -> Triple(wFrac, 0.5f, 0.52f) // torso
-        WardrobeCategory.BOTTOMS -> Triple(wFrac, 0.5f, 0.78f) // lower body
-        WardrobeCategory.BOOKS -> Triple(wFrac * 0.9f, 0.62f, 0.55f) // held to the side
-        WardrobeCategory.EXTRAS -> {
-            // Glasses/scarf near face; badge on chest
-            if (item.id.contains("glasses")) Triple(wFrac, 0.5f, 0.30f)
-            else Triple(wFrac, 0.5f, 0.45f)
-        }
+): Triple<Float, Float, Float>? {
+    if (!item.renderOnCelebrate) return null
+    val wFrac = item.celebrateWidthFrac ?: (item.widthFrac * 640f / 889f)
+    val cx = item.celebrateCxFrac ?: 0.5f
+    val cy = item.celebrateCyFrac ?: when (category) {
+        WardrobeCategory.CAPS -> 0.18f // top of head
+        WardrobeCategory.TOPS -> 0.52f // torso
+        WardrobeCategory.BOTTOMS -> 0.78f // lower body
+        WardrobeCategory.BOOKS -> 0.55f
+        WardrobeCategory.EXTRAS -> if (item.id.contains("glasses")) 0.30f else 0.45f
     }
+    return Triple(wFrac, cx, cy)
 }

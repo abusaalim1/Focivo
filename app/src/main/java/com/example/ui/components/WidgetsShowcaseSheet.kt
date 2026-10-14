@@ -312,7 +312,7 @@ private fun ActualWidgetCard(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "+ Add",
+                    text = "Add",
                     fontFamily = PoppinsFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,

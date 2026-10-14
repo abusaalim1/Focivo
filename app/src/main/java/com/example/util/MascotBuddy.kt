@@ -60,7 +60,14 @@ enum class WardrobeCategory(val displayName: String) {
 /**
  * A wardrobe item. Overlay art is fitted to the mascot's main study pose
  * (mascot_study_transparent, 640x889); [widthFrac]/[cxFrac]/[cyFrac] place the
- * trimmed overlay by its center as fractions of the base width/height.
+ * full-canvas overlay by its center as fractions of the base width/height.
+ *
+ * Celebrate-pose (share card) overrides: the celebrate Box is square and the
+ * base renders at 640/889 of its width, so celebrate widths default to
+ * [widthFrac] * 640/889. Per-item [celebrate*] overrides fine-tune placement;
+ * [renderOnCelebrate]=false skips items that can't fit the pose (books and
+ * bottoms on the arms-raised celebrate pose; glasses, which read as goggles
+ * on the smaller celebrate face).
  */
 data class WardrobeItem(
     val id: String,
@@ -71,7 +78,11 @@ data class WardrobeItem(
     @DrawableRes val overlayRes: Int,
     val widthFrac: Float,
     val cxFrac: Float,
-    val cyFrac: Float
+    val cyFrac: Float,
+    val celebrateWidthFrac: Float? = null,
+    val celebrateCxFrac: Float? = null,
+    val celebrateCyFrac: Float? = null,
+    val renderOnCelebrate: Boolean = true
 ) {
     fun isUnlocked(focusPoints: Int): Boolean {
         if (focusPoints < unlockPoints) return false
@@ -92,65 +103,79 @@ data class WardrobeItem(
 }
 
 val WARDROBE_ITEMS: List<WardrobeItem> = listOf(
-    // Caps
+    // Caps — sit on the head TOP (35-50% of mascot width), never over the eyes.
+    // Eyes measured at y≈0.455; cap bottoms rest on the hood dome (y≈0.19-0.23).
     WardrobeItem(
         id = "cap_lime", name = "Lime Cap", category = WardrobeCategory.CAPS,
         unlockPoints = 0, overlayRes = R.drawable.wardrobe_cap_lime,
-        widthFrac = 0.82f, cxFrac = 0.50f, cyFrac = 0.19f
+        widthFrac = 0.46f, cxFrac = 0.50f, cyFrac = 0.13f,
+        celebrateWidthFrac = 0.26f, celebrateCxFrac = 0.50f, celebrateCyFrac = 0.10f
     ),
     WardrobeItem(
         id = "cap_scholar", name = "Scholar Mortarboard", category = WardrobeCategory.CAPS,
         unlockPoints = 1500, requiredLevel = MascotLevel.SCHOLAR,
         overlayRes = R.drawable.wardrobe_cap_scholar,
-        widthFrac = 0.88f, cxFrac = 0.50f, cyFrac = 0.18f
+        widthFrac = 0.50f, cxFrac = 0.50f, cyFrac = 0.125f,
+        celebrateWidthFrac = 0.26f, celebrateCxFrac = 0.50f, celebrateCyFrac = 0.10f
     ),
-    // Tops
+    // Tops — unchanged (verified to fit the torso).
     WardrobeItem(
         id = "top_sweatshirt", name = "Cream Sweatshirt", category = WardrobeCategory.TOPS,
         unlockPoints = 0, overlayRes = R.drawable.wardrobe_top_sweatshirt,
-        widthFrac = 0.70f, cxFrac = 0.50f, cyFrac = 0.70f
+        widthFrac = 0.70f, cxFrac = 0.50f, cyFrac = 0.70f,
+        celebrateWidthFrac = 0.50f, celebrateCxFrac = 0.50f, celebrateCyFrac = 0.60f
     ),
     WardrobeItem(
         id = "top_cardigan", name = "Sage Cardigan", category = WardrobeCategory.TOPS,
         unlockPoints = 2500, requiredLevel = MascotLevel.SCHOLAR,
         overlayRes = R.drawable.wardrobe_top_cardigan,
-        widthFrac = 0.70f, cxFrac = 0.50f, cyFrac = 0.70f
+        widthFrac = 0.70f, cxFrac = 0.50f, cyFrac = 0.70f,
+        celebrateWidthFrac = 0.50f, celebrateCxFrac = 0.50f, celebrateCyFrac = 0.60f
     ),
-    // Bottoms
+    // Bottoms — refit to the lap at sane scale; excluded on celebrate pose.
     WardrobeItem(
         id = "bottom_shorts", name = "Cloud Shorts", category = WardrobeCategory.BOTTOMS,
         unlockPoints = 0, overlayRes = R.drawable.wardrobe_bottom_shorts,
-        widthFrac = 0.60f, cxFrac = 0.50f, cyFrac = 0.83f
+        widthFrac = 0.48f, cxFrac = 0.50f, cyFrac = 0.85f,
+        renderOnCelebrate = false
     ),
     WardrobeItem(
         id = "bottom_trousers", name = "Sage Trousers", category = WardrobeCategory.BOTTOMS,
         unlockPoints = 2000, requiredLevel = MascotLevel.SCHOLAR,
         overlayRes = R.drawable.wardrobe_bottom_trousers,
-        widthFrac = 0.60f, cxFrac = 0.50f, cyFrac = 0.83f
+        widthFrac = 0.52f, cxFrac = 0.50f, cyFrac = 0.84f,
+        renderOnCelebrate = false
     ),
-    // Books
+    // Books — only on poses that hold a book; sized to the held book.
+    // Excluded on celebrate (arms raised, would cover the torso).
     WardrobeItem(
         id = "book_notebook", name = "Lime Notebook", category = WardrobeCategory.BOOKS,
         unlockPoints = 500, overlayRes = R.drawable.wardrobe_book_notebook,
-        widthFrac = 0.55f, cxFrac = 0.50f, cyFrac = 0.66f
+        widthFrac = 0.55f, cxFrac = 0.50f, cyFrac = 0.66f,
+        renderOnCelebrate = false
     ),
     WardrobeItem(
         id = "book_tome", name = "Forest Tome", category = WardrobeCategory.BOOKS,
         unlockPoints = 4500, requiredLevel = MascotLevel.SCHOLAR,
         overlayRes = R.drawable.wardrobe_book_tome,
-        widthFrac = 0.55f, cxFrac = 0.50f, cyFrac = 0.66f
+        widthFrac = 0.55f, cxFrac = 0.50f, cyFrac = 0.66f,
+        renderOnCelebrate = false
     ),
-    // Extras
+    // Extras — glasses aligned to measured eye centers (0.439/0.705, y 0.455);
+    // lens span of the asset (0.487) matched to the eye span (0.266).
+    // Glasses don't fit the smaller celebrate face -> study pose only.
     WardrobeItem(
         id = "extra_glasses", name = "Round Glasses", category = WardrobeCategory.EXTRAS,
         unlockPoints = 800, overlayRes = R.drawable.wardrobe_extra_glasses,
-        widthFrac = 0.44f, cxFrac = 0.50f, cyFrac = 0.42f
+        widthFrac = 0.55f, cxFrac = 0.572f, cyFrac = 0.451f,
+        renderOnCelebrate = false
     ),
     WardrobeItem(
         id = "extra_badge", name = "Star Badge", category = WardrobeCategory.EXTRAS,
         unlockPoints = 7500, requiredLevel = MascotLevel.GRANDMASTER,
         overlayRes = R.drawable.wardrobe_extra_badge,
-        widthFrac = 0.15f, cxFrac = 0.70f, cyFrac = 0.55f
+        widthFrac = 0.15f, cxFrac = 0.70f, cyFrac = 0.55f,
+        celebrateWidthFrac = 0.11f, celebrateCxFrac = 0.62f, celebrateCyFrac = 0.55f
     )
 )
 
