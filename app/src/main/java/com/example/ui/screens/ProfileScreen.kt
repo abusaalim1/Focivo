@@ -55,6 +55,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -94,6 +95,9 @@ import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.themedCardBackground
+import com.example.ui.theme.backdropContentColor
+import com.example.ui.theme.backdropTitleShadow
+import com.example.util.TimerThemeManager
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.ui.draw.alpha
@@ -199,6 +203,11 @@ fun ProfileScreen(
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
     val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
+    // v1.4.2: header text sits directly on the full-bleed theme backdrop, so it
+    // follows the selected theme (not the app dark/light mode).
+    val theme by TimerThemeManager.selectedTheme.collectAsState()
+    val onBackdrop = theme.onBackdropContent
+    val titleShadow = backdropTitleShadow(onBackdrop)
 
     val sessionCount = sessions.count { it.durationSeconds > 0 }
     val totalSeconds = sessions.sumOf { it.durationSeconds }
@@ -347,7 +356,7 @@ fun ProfileScreen(
                             text = "IDENTITY",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = textSecondary,
+                                color = onBackdrop.copy(alpha = 0.7f),
                                 letterSpacing = 2.sp,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -359,7 +368,8 @@ fun ProfileScreen(
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontFamily = PoppinsFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                color = textPrimary,
+                                color = onBackdrop,
+                                shadow = titleShadow,
                                 fontSize = 24.sp
                             )
                         )

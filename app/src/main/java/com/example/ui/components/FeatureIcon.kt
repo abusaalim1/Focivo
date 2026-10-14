@@ -25,6 +25,9 @@ import androidx.compose.ui.unit.dp
  * vector glyphs keep the old circular tile for backwards compatibility.
  * Utility glyphs (chevrons, close X, play/pause, toggles) intentionally stay
  * vectors — only FEATURE icons become 3D.
+ *
+ * v1.4.2: [customContent] renders arbitrary composable art (e.g. the
+ * code-drawn aurora thumbnail) in the same rounded tile.
  */
 @Composable
 fun FeatureIcon(
@@ -34,9 +37,19 @@ fun FeatureIcon(
     size: Dp = 46.dp,
     vectorCircleColor: Color = Color(0xFF2C3238),
     vectorTint: Color = Color(0xFFA0A89E),
+    customContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    if (drawableRes != null) {
+    if (customContent != null) {
+        Box(
+            modifier = modifier
+                .size(size)
+                .clip(RoundedCornerShape(28)),
+            contentAlignment = Alignment.Center
+        ) {
+            customContent()
+        }
+    } else if (drawableRes != null) {
         Image(
             painter = painterResource(id = drawableRes),
             contentDescription = contentDescription,

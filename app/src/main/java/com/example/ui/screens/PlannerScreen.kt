@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +46,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.NearBlack
+import com.example.ui.theme.backdropContentColor
+import com.example.ui.theme.backdropTitleShadow
+import com.example.util.TimerThemeManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -71,6 +77,14 @@ fun PlannerScreen(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
+    // v1.4.2: explicit text colors (colorScheme.onSurface renders dark on dark cards)
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    // v1.4.2: top-of-screen text sits on the full-bleed theme backdrop, so it
+    // follows the selected theme (not the app dark/light mode).
+    val theme by TimerThemeManager.selectedTheme.collectAsState()
+    val onBackdrop = theme.onBackdropContent
+    val titleShadow = backdropTitleShadow(onBackdrop)
     var showBottomSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -117,7 +131,7 @@ fun PlannerScreen(
                         Text(
                             text = "WEDNESDAY · SEP 2",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = textSecondary,
                                 letterSpacing = 2.sp,
                                 fontSize = 11.sp
                             )
@@ -127,7 +141,8 @@ fun PlannerScreen(
                             text = "Schedule",
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Normal,
-                                color = MaterialTheme.colorScheme.onBackground
+                                color = onBackdrop,
+                                shadow = titleShadow
                             )
                         )
                     }
@@ -191,7 +206,7 @@ fun PlannerScreen(
                             Text(
                                 text = day.first,
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = if (isSelected) Color.Black else textSecondary,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -200,7 +215,7 @@ fun PlannerScreen(
                             Text(
                                 text = day.second,
                                 style = MaterialTheme.typography.titleMedium.copy(
-                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onBackground,
+                                    color = if (isSelected) Color.White else onBackdrop,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 15.sp
                                 )
@@ -233,7 +248,7 @@ fun PlannerScreen(
                             text = "$timeLabel planned",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onBackground
+                                color = onBackdrop
                             )
                         )
                     }
@@ -241,7 +256,7 @@ fun PlannerScreen(
                     Text(
                         text = "$completedCount / ${tasks.size} done",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = textSecondary
                         )
                     )
                 }
@@ -266,7 +281,7 @@ fun PlannerScreen(
                                 text = "Day is clear",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Light,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = textSecondary
                                 )
                             )
                         }
@@ -317,7 +332,7 @@ private fun PlannerTaskRow(
             Text(
                 text = task.scheduledTime,
                 style = MaterialTheme.typography.labelSmall.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = textSecondary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -375,7 +390,7 @@ private fun PlannerTaskRow(
                                 fontWeight = FontWeight.Normal,
                                 fontSize = 15.sp,
                                 textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                                color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onBackground
+                                color = if (task.isCompleted) textSecondary.copy(alpha = 0.5f) else textPrimary
                             )
                         )
 
@@ -393,7 +408,7 @@ private fun PlannerTaskRow(
                             Text(
                                 text = " · ${task.category}",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = textSecondary,
                                     fontSize = 11.sp
                                 )
                             )
@@ -426,7 +441,7 @@ private fun PlannerTaskRow(
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,
                             contentDescription = "Delete",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            tint = textSecondary.copy(alpha = 0.4f),
                             modifier = Modifier.size(16.dp)
                         )
                     }

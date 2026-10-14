@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.NearBlack
+import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import kotlinx.coroutines.delay
 
@@ -210,7 +212,7 @@ fun CivoChatBubble(
                             fontWeight = FontWeight.Medium,
                             fontSize = 14.5.sp,
                             lineHeight = 21.sp,
-                            color = MaterialTheme.colorScheme.onBackground
+                            color = if (darkTheme) Color(0xFFF0F4ED) else NearBlack
                         )
                     )
 
@@ -237,7 +239,7 @@ fun CivoChatBubble(
                             fontWeight = FontWeight.Normal,
                             fontSize = 12.sp,
                             lineHeight = 17.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                            color = (if (darkTheme) Color(0xFFA0A89E) else SecondaryTextLight).copy(alpha = 0.85f)
                         )
                     )
                 }

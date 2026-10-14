@@ -91,36 +91,30 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Create temporary debug keystore
+      - name: Restore Release Keystore from Base64 Secret
+        # v1.4.2: CI debug APKs are signed with the SAME production release key
+        # as release builds, so they install directly over them (no more
+        # "uninstall first" signature mismatch for the owner).
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          if [ ! -f ./debug.keystore ]; then
-            echo "Creating temporary debug keystore..."
-            "$JAVA_HOME/bin/keytool" -genkeypair -v \
-              -keystore ./debug.keystore \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US" \
-              -storetype JKS
-          else
-            echo "./debug.keystore already exists."
-          fi
-
-          mkdir -p ~/.android
-          cp ./debug.keystore ~/.android/debug.keystore 2>/dev/null || true
-          cp ./debug.keystore app/debug.keystore 2>/dev/null || true
-
-          if [ ! -f ./debug.keystore ]; then
-            echo "Error: Failed to create ./debug.keystore."
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "Error: KEYSTORE_BASE64 secret is not set or empty. Cannot sign debug APK with the release key."
             exit 1
           fi
-          echo "Temporary debug keystore verified."
+          echo "Restoring release keystore to ./my-upload-key.jks"
+          echo "$KEYSTORE_BASE64" | base64 --decode > ./my-upload-key.jks
+          if [ ! -f ./my-upload-key.jks ] || [ ! -s ./my-upload-key.jks ]; then
+            echo "Error: Failed to restore keystore file or restored file is empty."
+            exit 1
+          fi
+          echo "Keystore successfully restored."
 
       - name: Build debug APK
         env:
+          KEYSTORE_PATH: "${{ github.workspace }}/my-upload-key.jks"
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3584m -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false"
         run: |
           echo "Starting Gradle debug build..."
@@ -249,7 +243,7 @@ jobs:
           - **Run Attempt**: ${{ github.run_attempt }}
           - **Source Commit**: ${{ github.sha }}
 
-          > **Notice**: This APK is intended for testing and development purposes only. It is not a Play Store production release and is signed only with a temporary debug keystore.
+          > **Notice**: This APK is intended for testing and development purposes only. It is not a Play Store production release. It is signed with the production release key, so it installs directly over the release build (no uninstall needed).
           EOF
           )
 

@@ -45,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -83,6 +84,9 @@ import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.LocalAppAccent
 import com.example.ui.theme.themedCardBackground
+import com.example.ui.theme.backdropContentColor
+import com.example.ui.theme.backdropTitleShadow
+import com.example.util.TimerThemeManager
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
@@ -116,8 +120,13 @@ fun HomeScreen(
     val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
     val textPrimary = if (isDark) Color(0xFFF2F2F7) else Color(0xFF1C1C1E)
     val textSecondary = if (isDark) Color(0xFF8E8E93) else Color(0xFF6C6C70)
-    val headerDateColor = Color.White.copy(alpha = 0.90f)
-    val headerTitleColor = Color.White
+    // v1.4.2: the greeting header sits directly on the full-bleed theme
+    // backdrop, so it follows the selected theme (not the app dark/light mode).
+    val theme by TimerThemeManager.selectedTheme.collectAsState()
+    val onBackdrop = theme.onBackdropContent
+    val titleShadow = backdropTitleShadow(onBackdrop)
+    val headerDateColor = onBackdrop.copy(alpha = 0.90f)
+    val headerTitleColor = onBackdrop
     val headerButtonBg = if (isDark) Color(0xCC2C2C2E) else Color(0xF0FFFFFF)
     val headerButtonBorder = if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
 
@@ -375,6 +384,7 @@ fun HomeScreen(
                                     fontFamily = BalooBrandFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     color = headerTitleColor,
+                                    shadow = titleShadow,
                                     fontSize = 26.sp
                                 )
                             )

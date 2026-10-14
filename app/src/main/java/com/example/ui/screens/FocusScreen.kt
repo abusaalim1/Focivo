@@ -84,6 +84,8 @@ import com.example.ui.components.resolveThemeBackdropRes
 import com.example.R
 import com.example.ui.theme.LocalAppAccent
 import com.example.ui.theme.themedCardBackground
+import com.example.ui.theme.backdropContentColor
+import com.example.ui.theme.backdropTitleShadow
 import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
@@ -141,6 +143,9 @@ fun FocusScreen(
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
     val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
+    // v1.4.2: explicit text for dark card surfaces (scheme colors render dark on the owner's device)
+    val tPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val tSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
 
     var showDistractionModal by remember { mutableStateOf(false) }
     var showSoundSelector by remember { mutableStateOf(false) }
@@ -206,7 +211,7 @@ fun FocusScreen(
                                 text = "${userStreak}d",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontFamily = PoppinsFontFamily,
-                                    color = textPrimary,
+                                    color = selectedTheme.onBackdropContent,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp
                                 )
@@ -218,12 +223,15 @@ fun FocusScreen(
                 }
 
                 // App Brand Title / Active Topic Title
+                // v1.4.2: the idle "REGAIN" brand header is removed; the title
+                // only shows while a session runs, in the theme's backdrop color.
                 Text(
-                    text = if (isRunning) "FOCUSING · ${currentTag.uppercase()}" else "REGAIN",
+                    text = if (isRunning) "FOCUSING · ${currentTag.uppercase()}" else "",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
-                        color = textPrimary,
+                        color = selectedTheme.onBackdropContent,
+                        shadow = backdropTitleShadow(selectedTheme.onBackdropContent),
                         letterSpacing = 2.sp,
                         fontSize = 14.sp
                     ),
@@ -513,7 +521,7 @@ fun FocusScreen(
                                             text = label,
                                             style = MaterialTheme.typography.labelMedium.copy(
                                                 fontFamily = PoppinsFontFamily,
-                                                color = if (isSelected) RegainLimeDeepText else textPrimary,
+                                                color = if (isSelected) RegainLimeDeepText else tPrimary,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 13.sp
                                             )
@@ -522,7 +530,7 @@ fun FocusScreen(
                                             text = modeName,
                                             style = MaterialTheme.typography.bodySmall.copy(
                                                 fontFamily = PoppinsFontFamily,
-                                                color = textSecondary,
+                                                color = tSecondary,
                                                 fontSize = 9.sp
                                             )
                                         )
@@ -666,7 +674,7 @@ fun FocusScreen(
                                         text = "AI Study Guard",
                                         style = MaterialTheme.typography.titleSmall.copy(
                                             fontFamily = PoppinsFontFamily,
-                                            color = textPrimary,
+                                            color = tPrimary,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 14.sp
                                         )
@@ -675,7 +683,7 @@ fun FocusScreen(
                                         text = "YouTube + AI chat monitor · warnings · 3h lock",
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             fontFamily = PoppinsFontFamily,
-                                            color = textSecondary,
+                                            color = tSecondary,
                                             fontSize = 11.sp
                                         )
                                     )
@@ -732,7 +740,7 @@ fun FocusScreen(
                                         text = "Deep focus settings",
                                         style = MaterialTheme.typography.titleSmall.copy(
                                             fontFamily = PoppinsFontFamily,
-                                            color = textPrimary,
+                                            color = tPrimary,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp
                                         )
@@ -741,7 +749,7 @@ fun FocusScreen(
                                         text = "Strict mode · notifications · uninstall & home-screen protection",
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             fontFamily = PoppinsFontFamily,
-                                            color = textSecondary,
+                                            color = tSecondary,
                                             fontSize = 11.sp
                                         )
                                     )
@@ -786,7 +794,7 @@ fun FocusScreen(
                                         text = ambientSound,
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontFamily = PoppinsFontFamily,
-                                            color = textPrimary,
+                                            color = tPrimary,
                                             fontWeight = FontWeight.Medium,
                                             fontSize = 11.sp
                                         )
@@ -815,7 +823,7 @@ fun FocusScreen(
                                         text = "Custom Timer",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontFamily = PoppinsFontFamily,
-                                            color = textPrimary,
+                                            color = tPrimary,
                                             fontWeight = FontWeight.Medium,
                                             fontSize = 11.sp
                                         )
@@ -928,7 +936,7 @@ fun FocusScreen(
                                         text = subject,
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontFamily = PoppinsFontFamily,
-                                            color = if (isChosen) RegainLimeDeepText else textPrimary,
+                                            color = if (isChosen) RegainLimeDeepText else tPrimary,
                                             fontWeight = if (isChosen) FontWeight.Bold else FontWeight.Normal,
                                             fontSize = 11.sp
                                         )

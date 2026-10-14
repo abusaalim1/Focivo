@@ -224,6 +224,57 @@ object AppUpdateManager {
             .apply()
     }
 
+    // v1.4.2: Home update overlay dismissal is stored per versionCode and only
+    // reappears when a NEWER versionCode arrives (no 24h re-show).
+    private const val KEY_HOME_OVERLAY_DISMISSED_VERSION = "home_overlay_dismissed_version_code"
+
+    fun isUpdateOverlayDismissed(context: Context, versionCode: Int): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getInt(KEY_HOME_OVERLAY_DISMISSED_VERSION, 0) >= versionCode
+    }
+
+    fun dismissUpdateOverlay(context: Context, versionCode: Int) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(KEY_HOME_OVERLAY_DISMISSED_VERSION, versionCode)
+            .apply()
+    }
+
+    /**
+     * v1.4.2: fetches the backend announcement (app_config key "announcement").
+     * Returns the announcement text, or null when disabled/blank/unreachable.
+     * Any failure is silent — callers must never block the app on this.
+     */
+    suspend fun fetchAnnouncement(): String? = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("$UPDATES_SUPABASE_URL/rest/v1/app_config?select=value&key=eq.announcement")
+                .addHeader("apikey", UPDATES_SUPABASE_KEY)
+                .addHeader("Authorization", "Bearer $UPDATES_SUPABASE_KEY")
+                .get()
+                .build()
+            httpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    if (!body.isNullOrBlank() && body.startsWith("[")) {
+                        val array = JSONObject("{\"rows\":$body}").getJSONArray("rows")
+                        if (array.length() > 0) {
+                            val value = array.getJSONObject(0).optJSONObject("value")
+                                ?: return@withContext null
+                            if (!value.optBoolean("enabled", true)) return@withContext null
+                            val text = value.optString("text", "").trim()
+                            return@withContext text.ifBlank { null }
+                        }
+                    }
+                }
+            }
+            null
+        } catch (e: Exception) {
+            Log.e(TAG, "Announcement fetch failed", e)
+            null
+        }
+    }
+
     fun launchDownload(context: Context, downloadUrl: String) {
         try {
             if (downloadUrl.isNotBlank()) {

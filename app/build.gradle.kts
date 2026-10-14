@@ -18,8 +18,8 @@ android {
     applicationId = "com.aistudio.focusly.kqpzxr"
     minSdk = 24
     targetSdk = 36
-    versionCode = 17
-    versionName = "1.4.1"
+    versionCode = 18
+    versionName = "1.4.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -33,10 +33,24 @@ android {
       keyPassword = System.getenv("KEY_PASSWORD")
     }
     create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+      // v1.4.2: in CI the debug build signs with the SAME release keystore so
+      // CI debug APKs install directly over release builds (no more
+      // "uninstall first" signature mismatch). Local dev keeps the default
+      // Android debug key because the CI env vars are absent.
+      val ciKeystorePath = System.getenv("KEYSTORE_PATH")
+      val ciStorePassword = System.getenv("STORE_PASSWORD")
+      val ciKeyPassword = System.getenv("KEY_PASSWORD")
+      if (ciKeystorePath != null && ciStorePassword != null && ciKeyPassword != null) {
+        storeFile = file(ciKeystorePath)
+        storePassword = ciStorePassword
+        keyAlias = "upload"
+        keyPassword = ciKeyPassword
+      } else {
+        storeFile = file("${rootDir}/debug.keystore")
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
     }
   }
 
@@ -47,7 +61,13 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug {
+      // v1.4.2: only wire the custom debug signing when the CI keystore env is
+      // present. Local builds keep AGP's default Android debug key.
+      if (System.getenv("KEYSTORE_PATH") != null) {
+        signingConfig = signingConfigs.getByName("debugConfig")
+      }
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11

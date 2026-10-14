@@ -305,20 +305,11 @@ fun AppLimitsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0x28F59E0B)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Security,
-                                    contentDescription = null,
-                                    tint = Color(0xFFF59E0B),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
+                            FeatureIcon(
+                                drawableRes = R.drawable.ic3d_key,
+                                contentDescription = null,
+                                size = 44.dp
+                            )
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "Enable Usage Access",
@@ -513,20 +504,11 @@ fun AppLimitsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(RegainLimePrimary.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Shield,
-                                contentDescription = null,
-                                tint = RegainLimePrimary,
-                                modifier = Modifier.size(38.dp)
-                            )
-                        }
+                        FeatureIcon(
+                            drawableRes = R.drawable.ic3d_shield,
+                            contentDescription = null,
+                            size = 72.dp
+                        )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = if (searchQuery.isBlank()) "No Apps Found" else "No matching apps found",

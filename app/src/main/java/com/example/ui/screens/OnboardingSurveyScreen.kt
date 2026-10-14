@@ -85,6 +85,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.example.R
 import com.example.ui.components.GlassCard
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.RegainLimePrimary
@@ -758,7 +759,7 @@ fun OnboardingSurveyScreen(
                                             fontFamily = PoppinsFontFamily,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 24.sp,
-                                            color = MaterialTheme.colorScheme.onBackground
+                                            color = if (darkTheme) Color(0xFFF0F4ED) else NearBlack
                                         )
                                     )
 
@@ -801,7 +802,7 @@ fun OnboardingSurveyScreen(
                                                     fontWeight = FontWeight.Medium,
                                                     fontSize = 15.sp,
                                                     lineHeight = 22.sp,
-                                                    color = MaterialTheme.colorScheme.onBackground
+                                                    color = if (darkTheme) Color(0xFFF0F4ED) else NearBlack
                                                 )
                                             )
                                         }
@@ -846,7 +847,7 @@ fun OnboardingSurveyScreen(
                                                     fontFamily = PoppinsFontFamily,
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 18.sp,
-                                                    color = MaterialTheme.colorScheme.onBackground
+                                                    color = if (darkTheme) Color(0xFFF0F4ED) else NearBlack
                                                 )
                                             )
                                             Spacer(modifier = Modifier.height(2.dp))
@@ -856,7 +857,7 @@ fun OnboardingSurveyScreen(
                                                     fontFamily = PoppinsFontFamily,
                                                     fontSize = 12.sp,
                                                     lineHeight = 16.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    color = if (darkTheme) Color(0xFFA0A89E) else SecondaryTextLight
                                                 )
                                             )
                                         }

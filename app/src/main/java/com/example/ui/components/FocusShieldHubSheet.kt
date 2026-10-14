@@ -1434,20 +1434,11 @@ fun FocusShieldHubSheet(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isStrictModeEnabled) Color(0xFFFF5252).copy(alpha = 0.2f) else Color(0x18FFFFFF)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Security,
-                                        contentDescription = null,
-                                        tint = if (isStrictModeEnabled) Color(0xFFFF5252) else textSecondary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
+                                FeatureIcon(
+                                    drawableRes = R.drawable.ic3d_lock,
+                                    contentDescription = null,
+                                    size = 38.dp
+                                )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
@@ -1689,20 +1680,11 @@ fun FocusShieldHubSheet(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(accentCyan.copy(alpha = 0.2f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Shield,
-                                        contentDescription = null,
-                                        tint = accentCyan,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
+                                FeatureIcon(
+                                    drawableRes = R.drawable.ic3d_shield,
+                                    contentDescription = null,
+                                    size = 40.dp
+                                )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(

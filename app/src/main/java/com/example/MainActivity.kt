@@ -49,6 +49,8 @@ import com.example.ui.components.AiStudyWarningDialog
 import com.example.ui.components.AiStudyBlockedDialog
 import com.example.ui.components.AiStudyResolvedDialog
 import com.example.ui.components.AppUpdateDialog
+import com.example.ui.components.HomeNoticeOverlay
+import com.example.ui.components.HomeUpdateOverlay
 import com.example.ui.screens.AutoStudyScheduleScreen
 import com.example.ui.screens.FocusSessionLogScreen
 import com.example.ui.components.NavTab
@@ -263,6 +265,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     // Local Auth & Questionnaire states
     val currentUser by viewModel.currentUser.collectAsState()
     val availableAppUpdate by viewModel.availableAppUpdate.collectAsState()
+    val pendingAnnouncement by viewModel.pendingAnnouncement.collectAsState()
     val manualUpdateCheckResult by viewModel.manualUpdateCheckResult.collectAsState()
     val isCheckingForUpdates by viewModel.isCheckingForUpdates.collectAsState()
     val isAuthChecking by viewModel.isAuthChecking.collectAsState()
@@ -349,6 +352,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     // runs for guests too, not just logged-in users.
     LaunchedEffect(Unit) {
         viewModel.checkForAppUpdates(context, isManual = false)
+        // v1.4.2: backend announcement notice (silent on any failure).
+        viewModel.checkForNotices(context)
     }
 
     // Screen navigation states
@@ -889,9 +894,40 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     )
                 }
 
-                // In-App Update Overlay Dialog
+                // v1.4.2: premium Home overlays (update + backend notice) with mascot.
+                // The update overlay reappears only for a NEWER versionCode after
+                // "Later"; the notice overlay shows once per announcement change.
+                // Both are Home-only and silently skip when the backend is down.
+                val isOnHome = selectedTab == NavTab.HOME && !isSettingsOpen
+                val homeUpdateInfo = availableAppUpdate?.takeIf {
+                    it.isUpdateAvailable && !it.isForceUpdate &&
+                    !com.example.util.AppUpdateManager.isUpdateOverlayDismissed(context, it.latestVersionCode)
+                }
+                val showHomeUpdateOverlay = isOnHome && homeUpdateInfo != null
+                if (showHomeUpdateOverlay) {
+                    val info = homeUpdateInfo!!
+                    HomeUpdateOverlay(
+                        updateInfo = info,
+                        onUpdateNow = { viewModel.downloadAndInstallUpdate(context, info.downloadUrl) },
+                        onLater = {
+                            com.example.util.AppUpdateManager.dismissUpdateOverlay(context, info.latestVersionCode)
+                            viewModel.dismissAppUpdate(context)
+                        }
+                    )
+                } else {
+                    pendingAnnouncement?.let { text ->
+                        if (isOnHome) {
+                            HomeNoticeOverlay(
+                                announcementText = text,
+                                onGotIt = { viewModel.dismissAnnouncement(context) }
+                            )
+                        }
+                    }
+                }
+
+                // In-App Update Overlay Dialog (kept for force updates and off-Home tabs)
                 availableAppUpdate?.let { updateInfo ->
-                    if (updateInfo.isUpdateAvailable) {
+                    if (updateInfo.isUpdateAvailable && !showHomeUpdateOverlay) {
                         AppUpdateDialog(
                             updateInfo = updateInfo,
                             onDownloadClick = { downloadUrl ->

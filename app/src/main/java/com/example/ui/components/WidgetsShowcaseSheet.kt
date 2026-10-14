@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.ui.components.FeatureIcon
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimePrimary
@@ -92,21 +93,11 @@ fun WidgetsShowcaseSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0x208CE000))
-                            .border(1.dp, Color(0x408CE000), RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Widgets,
-                            contentDescription = null,
-                            tint = RegainLimePrimary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
+                    FeatureIcon(
+                        drawableRes = R.drawable.ic3d_widgets,
+                        contentDescription = null,
+                        size = 40.dp
+                    )
 
                     Spacer(modifier = Modifier.width(12.dp))
 
