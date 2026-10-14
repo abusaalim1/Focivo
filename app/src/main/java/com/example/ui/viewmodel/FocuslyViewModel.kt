@@ -597,6 +597,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             val app = getApplication<Application>()
             com.example.util.AiStudyGuardManager.init(app)
             com.example.util.DeepFocusManager.init(app)
+            com.example.util.TimerThemeManager.init(app)
             com.example.util.InstalledAppsManager.preloadApps(app)
 
             // Restore a running study timer FIRST (before slow network work), so the

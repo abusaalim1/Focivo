@@ -58,7 +58,13 @@ enum class MascotPose {
     GUARD,
     STUDY_POSE,
     CELEBRATE_NEW,
-    BREAK
+    BREAK,
+    FOREST,
+    SUNSET,
+    SAKURA,
+    MIDNIGHT,
+    DESERT,
+    ROYAL
 }
 
 /**
@@ -104,11 +110,17 @@ fun RegainMascotView(
         MascotPose.CONCERNED -> R.drawable.mascot_concerned
         MascotPose.STOP_SIGN, MascotPose.ANGRY -> R.drawable.mascot_blocked
         MascotPose.STUDYING -> R.drawable.mascot_studying
-        MascotPose.GUARD_WARNING -> R.drawable.mascot_warning
-        MascotPose.GUARD -> R.drawable.mascot_guard
-        MascotPose.STUDY_POSE -> R.drawable.mascot_study
+        MascotPose.GUARD_WARNING -> R.drawable.mascot_warning_transparent
+        MascotPose.GUARD -> R.drawable.mascot_guard_transparent
+        MascotPose.STUDY_POSE -> R.drawable.mascot_study_transparent
         MascotPose.CELEBRATE_NEW -> R.drawable.mascot_celebrate_transparent
         MascotPose.BREAK -> R.drawable.mascot_break
+        MascotPose.FOREST -> R.drawable.theme_mascot_forest
+        MascotPose.SUNSET -> R.drawable.theme_mascot_sunset
+        MascotPose.SAKURA -> R.drawable.theme_mascot_sakura
+        MascotPose.MIDNIGHT -> R.drawable.theme_mascot_midnight
+        MascotPose.DESERT -> R.drawable.theme_mascot_desert
+        MascotPose.ROYAL -> R.drawable.theme_mascot_royal
         MascotPose.IDLE -> R.drawable.mascot_base
     }
 

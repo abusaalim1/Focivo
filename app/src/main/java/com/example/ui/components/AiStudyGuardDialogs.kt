@@ -84,7 +84,7 @@ fun AiStudyWarningDialog(
                 RegainMascotView(
                     width = 130.dp,
                     height = 170.dp,
-                    pose = MascotPose.CONCERNED
+                    pose = MascotPose.GUARD
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(

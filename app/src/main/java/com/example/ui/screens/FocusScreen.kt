@@ -56,6 +56,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,6 +90,7 @@ import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
+import com.example.util.TimerThemeManager
 import com.example.ui.components.DeepFocusToggleCard
 import com.example.ui.components.DeepFocusActiveBanner
 import com.example.ui.components.DeepFocusSettingsSheet
@@ -129,6 +131,7 @@ fun FocusScreen(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
+    val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
     val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
@@ -402,34 +405,52 @@ fun FocusScreen(
                     Spacer(modifier = Modifier.height(2.dp))
                     val isBreakMode = currentMode.contains("break", ignoreCase = true)
                     // v1.3.1: mascot pose follows the timer state (ready / focusing / break).
+                    // v1.4.0: ready-state mascot follows the selected timer theme.
                     val timerMascotPose = when {
                         isBreakMode -> MascotPose.BREAK
                         isRunning -> MascotPose.STUDYING
-                        else -> MascotPose.STUDY_POSE
+                        else -> selectedTheme.mascotPose
                     }
                     if (timerStyle == "aurora") {
-                        AuroraTimer(
-                            totalSeconds = targetSeconds,
-                            remainingSeconds = remainingSeconds,
-                            isRunning = isRunning,
-                            isBreak = isBreakMode,
-                            subjectTitle = currentTag,
-                            mascotPose = timerMascotPose,
-                            onTogglePlay = {
-                                if (isRunning) {
-                                    onPauseTimer()
-                                } else if (remainingSeconds < targetSeconds) {
-                                    onResumeTimer()
-                                } else {
-                                    onStartTimer()
-                                }
-                            },
-                            onReset = onFinishEarly,
-                            onTagClick = {
-                                if (!isRunning) showStudyTypeDialog = true
-                            },
-                            modifier = Modifier.testTag("aurora_timer_component")
-                        )
+                        // v1.4.0: themed backdrop ambience behind the timer dial.
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val backdropRes = selectedTheme.backdropRes
+                            if (backdropRes != null) {
+                                Image(
+                                    painter = painterResource(id = backdropRes),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.matchParentSize(),
+                                    alpha = 0.35f
+                                )
+                            }
+                            AuroraTimer(
+                                totalSeconds = targetSeconds,
+                                remainingSeconds = remainingSeconds,
+                                isRunning = isRunning,
+                                isBreak = isBreakMode,
+                                subjectTitle = currentTag,
+                                mascotPose = timerMascotPose,
+                                theme = selectedTheme,
+                                onTogglePlay = {
+                                    if (isRunning) {
+                                        onPauseTimer()
+                                    } else if (remainingSeconds < targetSeconds) {
+                                        onResumeTimer()
+                                    } else {
+                                        onStartTimer()
+                                    }
+                                },
+                                onReset = onFinishEarly,
+                                onTagClick = {
+                                    if (!isRunning) showStudyTypeDialog = true
+                                },
+                                modifier = Modifier.testTag("aurora_timer_component")
+                            )
+                        }
                     } else {
                         RegainStudyDial(
                             remainingSeconds = remainingSeconds,
