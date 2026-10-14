@@ -1188,7 +1188,7 @@ private fun ForgotPasswordDialog(
     var email by remember { mutableStateOf(initialEmail) }
     val isDark = isAppInDarkTheme()
     val textPrimary = if (isDark) PureWhite else NearBlack
-    val textSecondary = if (isDark) SecondaryTextDark else SecondaryTextLight
+    val textSecondary = if (isDark) Color(0xFFA9B3AB) else SecondaryTextLight
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1285,7 +1285,7 @@ private fun SetNewPasswordSheet(
     var localError by remember { mutableStateOf<String?>(null) }
     val isDark = isAppInDarkTheme()
     val textPrimary = if (isDark) PureWhite else NearBlack
-    val textSecondary = if (isDark) SecondaryTextDark else SecondaryTextLight
+    val textSecondary = if (isDark) Color(0xFFA9B3AB) else SecondaryTextLight
     val updating = resetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Updating
 
     AlertDialog(
