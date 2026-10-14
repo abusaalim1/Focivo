@@ -50,12 +50,14 @@ class OverlayLifecycleHost :
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
     private val store = ViewModelStore()
 
-    override fun getLifecycle(): Lifecycle = lifecycleRegistry
+    override val lifecycle: Lifecycle
+        get() = lifecycleRegistry
 
-    override fun getViewModelStore(): ViewModelStore = store
+    override val viewModelStore: ViewModelStore
+        get() = store
 
-    override fun getSavedStateRegistry(): SavedStateRegistry =
-        savedStateRegistryController.savedStateRegistry
+    override val savedStateRegistry: SavedStateRegistry
+        get() = savedStateRegistryController.savedStateRegistry
 
     /**
      * Sets this host as all three ViewTree owners for [view].
