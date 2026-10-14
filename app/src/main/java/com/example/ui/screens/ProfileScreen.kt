@@ -91,6 +91,7 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import java.text.SimpleDateFormat
@@ -265,7 +266,7 @@ fun ProfileScreen(
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
                 .testTag("profile_screen"),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = BottomNavClearance),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Header

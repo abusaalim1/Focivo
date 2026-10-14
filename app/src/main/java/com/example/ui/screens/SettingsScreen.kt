@@ -399,13 +399,22 @@ fun SettingsScreen(
                             Switch(
                                 checked = blockStudyNotifications,
                                 onCheckedChange = { enabled ->
-                                    blockStudyNotifications = enabled
-                                    StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, enabled)
-                                    Toast.makeText(
-                                        context,
-                                        if (enabled) "Notifications will be blocked during study sessions" else "Study notification blocking disabled",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                    if (!enabled) {
+                                        blockStudyNotifications = false
+                                        StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, false)
+                                        Toast.makeText(context, "Study notification blocking disabled", Toast.LENGTH_SHORT).show()
+                                    } else if (!StudyNotificationBlockerManager.hasNotificationListenerAccess(context)) {
+                                        // v1.4.0-round2: the suppressor needs listener access to run.
+                                        StudyNotificationBlockerManager.openNotificationListenerSettings(context)
+                                        Toast.makeText(context, "Grant notification access to enable blocking", Toast.LENGTH_LONG).show()
+                                    } else if (!StudyNotificationBlockerManager.hasDndPermission(context)) {
+                                        StudyNotificationBlockerManager.openDndSettings(context)
+                                        Toast.makeText(context, "Grant Do Not Disturb access to enable blocking", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        blockStudyNotifications = true
+                                        StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, true)
+                                        Toast.makeText(context, "Notifications will be blocked during study sessions", Toast.LENGTH_SHORT).show()
+                                    }
                                 },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,

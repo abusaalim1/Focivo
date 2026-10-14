@@ -329,15 +329,22 @@ fun DeepFocusSettingsSheet(
                     SettingsToggleRow(
                         icon = Icons.Default.NotificationsOff,
                         title = "Block notifications",
-                        subtitle = "Silence notifications during focus sessions so pings don't pull you out.",
+                        subtitle = "Silence notifications during focus sessions so pings don't pull you out. Needs notification access + Do Not Disturb.",
                         checked = blockNotifications,
                         onCheckedChange = { enabled ->
-                            if (enabled && !StudyNotificationBlockerManager.hasDndPermission(context)) {
-                                // Ask for Do Not Disturb access first; keep the toggle off until granted.
+                            if (!enabled) {
+                                StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, false)
+                                blockNotifications = false
+                            } else if (!StudyNotificationBlockerManager.hasNotificationListenerAccess(context)) {
+                                // v1.4.0-round2: without listener access the suppressor
+                                // never runs — send the user to grant it first.
+                                StudyNotificationBlockerManager.openNotificationListenerSettings(context)
+                            } else if (!StudyNotificationBlockerManager.hasDndPermission(context)) {
+                                // Ask for Do Not Disturb access next; keep the toggle off until granted.
                                 StudyNotificationBlockerManager.openDndSettings(context)
                             } else {
-                                StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, enabled)
-                                blockNotifications = enabled
+                                StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, true)
+                                blockNotifications = true
                             }
                         },
                         textPrimary = textPrimary,

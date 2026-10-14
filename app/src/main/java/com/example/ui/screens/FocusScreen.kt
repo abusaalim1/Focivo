@@ -82,6 +82,7 @@ import com.example.ui.components.PreStudyAppBlockSheet
 import com.example.ui.components.RegainMascotView
 import com.example.ui.components.RegainStudyDial
 import com.example.R
+import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -269,7 +270,7 @@ fun FocusScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = if (isRunning) 24.dp else 96.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = if (isRunning) 24.dp else BottomNavClearance),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {

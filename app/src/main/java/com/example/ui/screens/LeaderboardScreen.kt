@@ -61,6 +61,7 @@ import com.example.data.LeaderboardDateUtils
 import com.example.data.LeaderboardUser
 import com.example.data.model.FocusSessionEntity
 import com.example.ui.components.AuroraBackground
+import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainGoldStar
@@ -406,7 +407,7 @@ fun LeaderboardScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 96.dp),
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = BottomNavClearance),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Podium Section (Top 3)
@@ -909,7 +910,7 @@ private fun HallOfFameSection(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 96.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = BottomNavClearance),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Banner card

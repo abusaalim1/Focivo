@@ -45,6 +45,7 @@ import com.example.ui.components.AuroraBackground
 import com.example.ui.components.GlassCard
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.WeeklyProductivityChart
+import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -176,7 +177,7 @@ fun InsightsScreen(
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
                 .testTag("insights_screen"),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 120.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = BottomNavClearance),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Minimalist Header

@@ -1,6 +1,7 @@
 package com.example.util
 
 import android.app.NotificationManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
@@ -38,6 +39,43 @@ object StudyNotificationBlockerManager {
     fun hasDndPermission(context: Context): Boolean {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         return notificationManager?.isNotificationPolicyAccessGranted == true
+    }
+
+    /**
+     * v1.4.0-round2: Notification-listener access is what lets
+     * FocivoNotificationListenerService actually suppress notifications
+     * (cancelNotification + digest badge). The app previously never asked
+     * for it, so the whole suppressor silently never ran.
+     */
+    fun hasNotificationListenerAccess(context: Context): Boolean {
+        return try {
+            val flat = Settings.Secure.getString(
+                context.contentResolver,
+                "enabled_notification_listeners"
+            ) ?: return false
+            val ours = ComponentName(
+                context,
+                "com.example.service.FocivoNotificationListenerService"
+            ).flattenToString()
+            flat.split(":").any { entry ->
+                entry.equals(ours, ignoreCase = true) ||
+                        entry.contains(context.packageName, ignoreCase = true)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not read enabled_notification_listeners: ${e.message}")
+            false
+        }
+    }
+
+    fun openNotificationListenerSettings(context: Context) {
+        try {
+            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open notification-listener settings: ${e.message}")
+        }
     }
 
     fun openDndSettings(context: Context) {
@@ -92,6 +130,13 @@ object StudyNotificationBlockerManager {
 
             isCurrentlyMuted = true
             Log.i(TAG, "Study notification blocker ACTIVATED")
+            AiStudyGuardManager.logGuardActivity(
+                context = context,
+                app = "Notification Shield",
+                stage = "NOTIF_SHIELD",
+                verdict = "ARMED",
+                reason = "Notification blocking armed for focus session"
+            )
         } catch (t: Throwable) {
             Log.e(TAG, "Error activating study notification block: ${t.message}", t)
         }
@@ -139,6 +184,13 @@ object StudyNotificationBlockerManager {
 
             isCurrentlyMuted = false
             Log.i(TAG, "Study notification blocker DEACTIVATED")
+            AiStudyGuardManager.logGuardActivity(
+                context = context,
+                app = "Notification Shield",
+                stage = "NOTIF_SHIELD",
+                verdict = "DISARMED",
+                reason = "Notification blocking released after focus session"
+            )
         } catch (t: Throwable) {
             Log.e(TAG, "Error deactivating study notification block: ${t.message}", t)
         }
