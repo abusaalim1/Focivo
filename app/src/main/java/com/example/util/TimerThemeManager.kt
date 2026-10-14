@@ -158,6 +158,127 @@ object TimerThemeManager {
             glowColor = Color(0xFF69F0AE),
             accent = Color(0xFF69F0AE),
             unlockPoints = 0
+        ),
+        // Round-4b: 12 new distinct premium themes (runtime-resolved assets).
+        TimerTheme(
+            id = "lagoon",
+            name = "Lagoon",
+            backdropRes = null,
+            mascotPose = MascotPose.LAGOON,
+            arcColors = listOf(Color(0xFF4DD0E1), Color(0xFF80DEEA), Color(0xFF00ACC1)),
+            glowColor = Color(0xFF4DD0E1),
+            accent = Color(0xFF4DD0E1),
+            unlockPoints = 3000
+        ),
+        TimerTheme(
+            id = "rain",
+            name = "Rain",
+            backdropRes = null,
+            mascotPose = MascotPose.RAIN,
+            arcColors = listOf(Color(0xFF90A4AE), Color(0xFFB0BEC5), Color(0xFF607D8B)),
+            glowColor = Color(0xFF90A4AE),
+            accent = Color(0xFF90A4AE),
+            unlockPoints = 3500
+        ),
+        TimerTheme(
+            id = "bamboo",
+            name = "Bamboo",
+            backdropRes = null,
+            mascotPose = MascotPose.BAMBOO,
+            arcColors = listOf(Color(0xFF9CCC65), Color(0xFFC5E1A5), Color(0xFF689F38)),
+            glowColor = Color(0xFF9CCC65),
+            accent = Color(0xFF9CCC65),
+            unlockPoints = 4000
+        ),
+        TimerTheme(
+            id = "autumn",
+            name = "Autumn",
+            backdropRes = null,
+            mascotPose = MascotPose.AUTUMN,
+            arcColors = listOf(Color(0xFFFF7043), Color(0xFFFFAB91), Color(0xFFD84315)),
+            glowColor = Color(0xFFFF7043),
+            accent = Color(0xFFFF7043),
+            unlockPoints = 4500
+        ),
+        TimerTheme(
+            id = "coffee",
+            name = "Coffee",
+            backdropRes = null,
+            mascotPose = MascotPose.COFFEE,
+            arcColors = listOf(Color(0xFFA1887F), Color(0xFFD7CCC8), Color(0xFF795548)),
+            glowColor = Color(0xFFA1887F),
+            accent = Color(0xFFA1887F),
+            unlockPoints = 5000
+        ),
+        TimerTheme(
+            id = "winter",
+            name = "Winter",
+            backdropRes = null,
+            mascotPose = MascotPose.WINTER,
+            arcColors = listOf(Color(0xFF81D4FA), Color(0xFFB3E5FC), Color(0xFF039BE5)),
+            glowColor = Color(0xFF81D4FA),
+            accent = Color(0xFF81D4FA),
+            unlockPoints = 6000
+        ),
+        TimerTheme(
+            id = "rose",
+            name = "Rose",
+            backdropRes = null,
+            mascotPose = MascotPose.ROSE,
+            arcColors = listOf(Color(0xFFF06292), Color(0xFFF8BBD0), Color(0xFFC2185B)),
+            glowColor = Color(0xFFF06292),
+            accent = Color(0xFFF06292),
+            unlockPoints = 7000
+        ),
+        TimerTheme(
+            id = "ember",
+            name = "Ember",
+            backdropRes = null,
+            mascotPose = MascotPose.EMBER,
+            arcColors = listOf(Color(0xFFFF6E40), Color(0xFFFFAB91), Color(0xFFBF360C)),
+            glowColor = Color(0xFFFF6E40),
+            accent = Color(0xFFFF6E40),
+            unlockPoints = 8000
+        ),
+        TimerTheme(
+            id = "storm",
+            name = "Storm",
+            backdropRes = null,
+            mascotPose = MascotPose.STORM,
+            arcColors = listOf(Color(0xFF7E8BB8), Color(0xFFAEB9D6), Color(0xFF455182)),
+            glowColor = Color(0xFF7E8BB8),
+            accent = Color(0xFF7E8BB8),
+            unlockPoints = 9000
+        ),
+        TimerTheme(
+            id = "crystal",
+            name = "Crystal",
+            backdropRes = null,
+            mascotPose = MascotPose.CRYSTAL,
+            arcColors = listOf(Color(0xFF4FC3F7), Color(0xFFB3E5FC), Color(0xFF0288D1)),
+            glowColor = Color(0xFF4FC3F7),
+            accent = Color(0xFF4FC3F7),
+            unlockPoints = 10000
+        ),
+        TimerTheme(
+            id = "galaxy",
+            name = "Galaxy",
+            backdropRes = null,
+            mascotPose = MascotPose.GALAXY,
+            arcColors = listOf(Color(0xFFBA68C8), Color(0xFFE1BEE7), Color(0xFF7B1FA2)),
+            glowColor = Color(0xFFBA68C8),
+            accent = Color(0xFFBA68C8),
+            unlockPoints = 12000
+        ),
+        TimerTheme(
+            id = "lantern",
+            name = "Lantern",
+            backdropRes = null,
+            mascotPose = MascotPose.LANTERN,
+            arcColors = listOf(Color(0xFFFFB74D), Color(0xFFFFE0B2), Color(0xFFEF6C00)),
+            glowColor = Color(0xFFFFB74D),
+            accent = Color(0xFFFFB74D),
+            unlockPoints = 15000
         )
     )
 

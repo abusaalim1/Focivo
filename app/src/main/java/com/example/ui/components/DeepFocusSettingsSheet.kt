@@ -309,7 +309,8 @@ fun DeepFocusSettingsSheet(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 4.dp, bottom = 8.dp),
+                                .padding(horizontal = 4.dp)
+                                .padding(bottom = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {

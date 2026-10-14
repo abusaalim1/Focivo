@@ -49,4 +49,5 @@ jobs:
           path: |
             app/src/test/screenshots/round2/
             app/src/test/screenshots/round3/
+            app/src/test/screenshots/round4/
           if-no-files-found: error

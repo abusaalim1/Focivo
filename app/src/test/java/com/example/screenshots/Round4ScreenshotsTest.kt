@@ -133,6 +133,13 @@ class Round4ScreenshotsTest {
         capture("study_timer_royal_new")
     }
 
+    @Test
+    fun study_timer_galaxy_new_backdrop() {
+        useTheme("galaxy")
+        focusScreen()
+        capture("study_timer_galaxy_new")
+    }
+
     private fun capture(name: String) {
         composeTestRule.waitForIdle()
         composeTestRule.onRoot().captureRoboImage(

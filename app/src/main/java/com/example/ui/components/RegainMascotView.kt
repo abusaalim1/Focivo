@@ -69,6 +69,18 @@ enum class MascotPose {
     LAVENDER,
     AMBER,
     MINT,
+    LAGOON,
+    RAIN,
+    BAMBOO,
+    AUTUMN,
+    COFFEE,
+    WINTER,
+    ROSE,
+    EMBER,
+    STORM,
+    CRYSTAL,
+    GALAXY,
+    LANTERN,
     STUDY_HAPPY
 }
 
@@ -126,9 +138,12 @@ fun RegainMascotView(
         MascotPose.MIDNIGHT -> R.drawable.theme_mascot_midnight
         MascotPose.DESERT -> R.drawable.theme_mascot_desert
         MascotPose.ROYAL -> R.drawable.theme_mascot_royal
-        // Round-3 themes resolve their mascot at runtime (theme_mascot_<id>);
+        // Round-3/4 themes resolve their mascot at runtime (theme_mascot_<id>);
         // falls back to the study mascot when the asset is not packaged yet.
-        MascotPose.CRIMSON, MascotPose.LAVENDER, MascotPose.AMBER, MascotPose.MINT ->
+        MascotPose.CRIMSON, MascotPose.LAVENDER, MascotPose.AMBER, MascotPose.MINT,
+        MascotPose.LAGOON, MascotPose.RAIN, MascotPose.BAMBOO, MascotPose.AUTUMN,
+        MascotPose.COFFEE, MascotPose.WINTER, MascotPose.ROSE, MascotPose.EMBER,
+        MascotPose.STORM, MascotPose.CRYSTAL, MascotPose.GALAXY, MascotPose.LANTERN ->
             resolveThemeMascotResId(LocalContext.current, pose)
         // Round-3: happy default study mascot for the Aurora timer.
         MascotPose.STUDY_HAPPY -> R.drawable.mascot_study_happy
