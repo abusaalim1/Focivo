@@ -53,22 +53,25 @@ object WeeklyRecapNotificationHelper {
             pendingIntentFlags
         )
 
-        val summaryTitle = "⚡ Your Sunday Study Recap is Ready!"
-        val summaryBody = "You logged ${recap.totalHoursFormatted} hrs across ${recap.sessionCount} sessions this week. Tap to see what you studied & share!"
+        // v1.4.3: cute/minimal house style — mascot icon, no emoji, one-line text.
+        val summaryTitle = "Your Sunday Recap is ready"
+        val summaryBody = "See how your study week went."
         val bigText = buildString {
-            append("⏱️ Focus Time: ${recap.totalHoursFormatted} hrs (${recap.sessionCount} sessions)\n")
+            append("Focus time: ${recap.totalHoursFormatted} hrs (${recap.sessionCount} sessions)\n")
             if (recap.topSubject.isNotBlank() && recap.topSubject != "General Study") {
-                append("📚 Top Subject: ${recap.topSubject}\n")
+                append("Top subject: ${recap.topSubject}\n")
             }
-            append("🏆 Best Day: ${recap.bestDayName}\n")
-            append("🔥 Tap to see your full weekly study breakdown & share with friends!")
+            append("Best day: ${recap.bestDayName}\n")
+            append("Tap to see your full weekly study breakdown.")
         }
 
-        val largeIcon = android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
+        val largeIcon = try {
+            android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.mascot_study_happy)
+        } catch (_: Exception) { null }
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setLargeIcon(largeIcon)
+            .setColor(0xFF8CE000.toInt())
             .setContentTitle(summaryTitle)
             .setContentText(summaryBody)
             .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
@@ -76,6 +79,7 @@ object WeeklyRecapNotificationHelper {
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+        if (largeIcon != null) builder.setLargeIcon(largeIcon)
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         notificationManager?.notify(NOTIFICATION_ID, builder.build())

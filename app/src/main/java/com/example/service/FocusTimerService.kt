@@ -79,6 +79,10 @@ class FocusTimerService : Service() {
         try {
             com.example.util.StudyNotificationBlockerManager.deactivateStudyNotificationBlock(this)
         } catch (_: Exception) { }
+        // v1.4.3: guard status notification lives only while a session runs.
+        try {
+            com.example.util.AiStudyGuardManager.cancelGuardStatusNotification(this)
+        } catch (_: Exception) { }
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -152,6 +156,10 @@ class FocusTimerService : Service() {
         // "Block notifications" toggle did nothing during normal timers).
         try {
             com.example.util.StudyNotificationBlockerManager.activateStudyNotificationBlock(this)
+        } catch (_: Exception) { }
+        // v1.4.3: guard status notification appears only while a session runs.
+        try {
+            com.example.util.AiStudyGuardManager.updateGuardStatusNotification(this)
         } catch (_: Exception) { }
         return START_STICKY
     }
@@ -294,13 +302,18 @@ class FocusTimerService : Service() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
             val pi = PendingIntent.getActivity(this, NOTIFICATION_ID + 1, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            val largeIcon = try {
+                android.graphics.BitmapFactory.decodeResource(resources, R.drawable.mascot_study_happy)
+            } catch (_: Exception) { null }
             val notif = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification_small)
-                .setContentTitle("✅ Focus session complete")
-                .setContentText("\"$taskTitle\" finished while you were away — great discipline!")
+                .setColor(0xFF8CE000.toInt())
+                .setContentTitle("Session complete")
+                .setContentText("\"$taskTitle\" finished while you were away \u2014 great discipline!")
                 .setContentIntent(pi)
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .apply { if (largeIcon != null) setLargeIcon(largeIcon) }
                 .build()
             manager.notify(NOTIFICATION_ID + 1, notif)
         } catch (_: Exception) {}

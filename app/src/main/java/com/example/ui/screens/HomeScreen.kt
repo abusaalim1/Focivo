@@ -71,6 +71,7 @@ import com.example.ui.components.LinearButton
 import com.example.ui.components.LinearButtonVariant
 import com.example.ui.components.LinearGlowCard
 import com.example.ui.components.PriorityItemRow
+import com.example.ui.components.RegainMascotView
 import com.example.ui.components.SegmentedProgressBar
 import com.example.ui.components.appleCard
 import com.example.ui.components.pressFeedback
@@ -120,13 +121,22 @@ fun HomeScreen(
     val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
     val textPrimary = if (isDark) Color(0xFFF2F2F7) else Color(0xFF1C1C1E)
     val textSecondary = if (isDark) Color(0xFF8E8E93) else Color(0xFF6C6C70)
-    // v1.4.2: the greeting header sits directly on the full-bleed theme
-    // backdrop, so it follows the selected theme (not the app dark/light mode).
+    // v1.4.3: text drawn directly over the theme backdrop (or over
+    // translucent/glass surfaces above it) must use the theme's
+    // onBackdropContent color — full strength for titles, >=85% alpha for
+    // subtitles. App-mode textPrimary/textSecondary are NOT used on backdrops.
+    // (The greeting header above is the one exception: it sits on a fixed
+    // dark scrim, so it is always light via onHeaderScrim.)
     val theme by TimerThemeManager.selectedTheme.collectAsState()
     val onBackdrop = theme.onBackdropContent
-    val titleShadow = backdropTitleShadow(onBackdrop)
-    val headerDateColor = onBackdrop.copy(alpha = 0.90f)
-    val headerTitleColor = onBackdrop
+    // v1.4.3: the greeting header sits on home_header_bg under a FIXED
+    // 60%-black scrim — so it is ALWAYS light text. (v1.4.2 used the theme's
+    // onBackdropContent here; before TimerThemeManager.init() ran the default
+    // Aurora theme made it render dark-on-dark on cold start.)
+    val onHeaderScrim = Color(0xFFF7F8F4)
+    val titleShadow = backdropTitleShadow(onHeaderScrim)
+    val headerDateColor = onHeaderScrim.copy(alpha = 0.90f)
+    val headerTitleColor = onHeaderScrim
     val headerButtonBg = if (isDark) Color(0xCC2C2C2E) else Color(0xF0FFFFFF)
     val headerButtonBorder = if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
 
@@ -387,6 +397,27 @@ fun HomeScreen(
                                     shadow = titleShadow,
                                     fontSize = 26.sp
                                 )
+                            )
+                        }
+
+                        // v1.4.3: the SELECTED theme's mascot, always visible in the
+                        // greeting header (it was never rendered on Home — the
+                        // "gayeb" mascot). Resolves via theme.mascotPose, same
+                        // as the Study timer circle.
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 10.dp)
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(Color(0x22000000))
+                                .border(1.dp, Color(0x33FFFFFF), CircleShape)
+                                .testTag("home_theme_mascot"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            RegainMascotView(
+                                pose = theme.mascotPose,
+                                size = 48.dp,
+                                animate = false
                             )
                         }
 
@@ -941,11 +972,13 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
+                        // v1.4.3: section headings sit directly on the backdrop —
+                        // always the theme's onBackdrop color (not app-mode text).
                         Text(
                             text = "TODAY'S PRIORITIES",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontFamily = AppleLinearFontFamily,
-                                color = textSecondary,
+                                color = onBackdrop.copy(alpha = 0.85f),
                                 letterSpacing = 1.4.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp
@@ -956,7 +989,8 @@ fun HomeScreen(
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontFamily = AppleLinearFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                color = textPrimary
+                                color = onBackdrop,
+                                shadow = backdropTitleShadow(onBackdrop)
                             )
                         )
                     }
@@ -972,7 +1006,7 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Add Priority",
-                            tint = textPrimary,
+                            tint = onBackdrop,
                             modifier = Modifier.size(20.dp)
                         )
                     }

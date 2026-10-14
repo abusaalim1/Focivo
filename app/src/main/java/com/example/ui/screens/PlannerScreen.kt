@@ -131,7 +131,8 @@ fun PlannerScreen(
                         Text(
                             text = "WEDNESDAY · SEP 2",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = textSecondary,
+                                // v1.4.3: directly on the backdrop — theme color.
+                                color = onBackdrop.copy(alpha = 0.85f),
                                 letterSpacing = 2.sp,
                                 fontSize = 11.sp
                             )
@@ -256,7 +257,8 @@ fun PlannerScreen(
                     Text(
                         text = "$completedCount / ${tasks.size} done",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = textSecondary
+                            // v1.4.3: directly on the backdrop — theme color.
+                            color = onBackdrop.copy(alpha = 0.85f)
                         )
                     )
                 }
@@ -292,6 +294,7 @@ fun PlannerScreen(
                     PlannerTaskRow(
                         task = task,
                         isDark = isDark,
+                        onBackdrop = onBackdrop,
                         onToggle = { onToggleTask(task) },
                         onDelete = { onDeleteTask(task) },
                         onStartFocus = { onStartFocus(task.title, task.durationMinutes) }
@@ -316,6 +319,7 @@ fun PlannerScreen(
 private fun PlannerTaskRow(
     task: TaskEntity,
     isDark: Boolean,
+    onBackdrop: androidx.compose.ui.graphics.Color,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
     onStartFocus: () -> Unit
@@ -335,7 +339,8 @@ private fun PlannerTaskRow(
             Text(
                 text = task.scheduledTime,
                 style = MaterialTheme.typography.labelSmall.copy(
-                    color = textSecondary,
+                    // v1.4.3: timeline gutter sits on the backdrop — theme color.
+                    color = onBackdrop.copy(alpha = 0.85f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )

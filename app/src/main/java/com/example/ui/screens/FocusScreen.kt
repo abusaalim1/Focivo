@@ -674,7 +674,11 @@ fun FocusScreen(
                                         text = "AI Study Guard",
                                         style = MaterialTheme.typography.titleSmall.copy(
                                             fontFamily = PoppinsFontFamily,
-                                            color = tPrimary,
+                                            // v1.4.3: in dark mode this card is only
+                                            // 10%-alpha lime over the backdrop —
+                                            // title/subtitle use the theme's
+                                            // onBackdropContent for contrast.
+                                            color = if (isDark) selectedTheme.onBackdropContent else tPrimary,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 14.sp
                                         )
@@ -683,7 +687,7 @@ fun FocusScreen(
                                         text = "YouTube + AI chat monitor · warnings · 3h lock",
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             fontFamily = PoppinsFontFamily,
-                                            color = tSecondary,
+                                            color = if (isDark) selectedTheme.onBackdropContent.copy(alpha = 0.85f) else tSecondary,
                                             fontSize = 11.sp
                                         )
                                     )
