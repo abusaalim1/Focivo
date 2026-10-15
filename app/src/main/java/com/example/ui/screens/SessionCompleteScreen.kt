@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -218,9 +219,10 @@ fun SessionCompleteScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Points & Distractions Glass Capsule
+            // Points & Distractions Glass Capsule (requiredWidth: never clip mid-word)
             Box(
                 modifier = Modifier
+                    .requiredWidth(IntrinsicSize.Max)
                     .shadow(
                         elevation = 8.dp,
                         shape = RoundedCornerShape(24.dp),
