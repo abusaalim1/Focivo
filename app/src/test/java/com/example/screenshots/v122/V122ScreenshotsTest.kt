@@ -32,6 +32,14 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import com.example.ui.screens.ShareBlockedApp
+import com.example.ui.screens.ShareCard
+import com.example.ui.screens.ShareScreenData
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * v1.2.2 fix-round verify (branch feat/v122-fixes, NEVER merged blindly):
@@ -196,5 +204,149 @@ class V122ScreenshotsTest {
             )
         }
         composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v122/v122_focus_idle.png")
+    }
+
+    // -- Owner's share-screen design (native Compose port, v1.2.2) -------------
+
+    private fun seedSharePrefs(sessionStartMs: Long) {
+        val prefs = context.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString(
+                "user_preferences",
+                JSONObject().put("currentUserName", "Abu Saalim").put("currentStreak", 7).toString()
+            )
+            .apply()
+        // focus_sessions: one earlier session today + 6 previous days
+        val now = System.currentTimeMillis()
+        val sessions = JSONArray()
+        fun add(mins: Int, atMs: Long) {
+            sessions.put(
+                JSONObject()
+                    .put("id", atMs)
+                    .put("completedAt", atMs)
+                    .put("durationSeconds", mins * 60)
+            )
+        }
+        add(45, now - 3 * 3600 * 1000L)
+        val past = listOf(30, 50, 20, 65, 40, 15)
+        past.forEachIndexed { i, mins ->
+            add(mins, now - (i + 1) * 24L * 3600 * 1000 - 2 * 3600 * 1000L)
+        }
+        prefs.edit().putString("focus_sessions", sessions.toString()).apply()
+        // session_blocked_apps_json: 3 real intercepts inside the session window
+        val blocked = JSONArray()
+        listOf(
+            "com.instagram.android" to "Instagram",
+            "com.google.android.youtube" to "YouTube",
+            "com.zhiliaoapp.musically" to "TikTok"
+        ).forEachIndexed { i, (pkg, name) ->
+            blocked.put(
+                JSONObject()
+                    .put("ts", sessionStartMs + (i + 1) * 5 * 60 * 1000L)
+                    .put("pkg", pkg)
+                    .put("name", name)
+            )
+        }
+        prefs.edit().putString("session_blocked_apps_json", blocked.toString()).apply()
+    }
+
+    private fun shareTestSession(): FocusSessionEntity {
+        val now = System.currentTimeMillis()
+        return FocusSessionEntity(
+            taskTitle = "Physics: Units & Measurement",
+            mode = "Deep Work",
+            durationSeconds = 25 * 60,
+            targetDurationSeconds = 25 * 60,
+            distractionsCount = 1,
+            focusPointsEarned = 25,
+            startTime = now - 25 * 60 * 1000L,
+            endTime = now,
+            completedAt = now
+        )
+    }
+
+    private fun shareTestData(): ShareScreenData = ShareScreenData(
+        minutes = 25,
+        distractions = 1,
+        dateLabel = "Oct 15",
+        userName = "Abu Saalim",
+        todayTotalMinutes = 95,
+        todaySessions = 3,
+        streakDays = 7,
+        weekMinutes = listOf(30, 50, 20, 65, 40, 15, 95),
+        weekLabels = listOf("F", "S", "S", "M", "T", "W", "T"),
+        blockedApps = listOf(
+            ShareBlockedApp("com.instagram.android", "Instagram"),
+            ShareBlockedApp("com.google.android.youtube", "YouTube"),
+            ShareBlockedApp("com.zhiliaoapp.musically", "TikTok")
+        )
+    )
+
+    @Test
+    fun v122_share_screen_full() {
+        initManagers()
+        val session = shareTestSession()
+        seedSharePrefs(session.startTime)
+        composeTestRule.setContent {
+            FocuslyTheme(darkTheme = true) {
+                SessionCompleteScreen(
+                    session = session,
+                    onDismiss = {},
+                    animateEntrance = false
+                )
+            }
+        }
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v122/v122_share_screen_full.png")
+    }
+
+    @Test
+    fun v122_share_card_ring() {
+        val data = shareTestData()
+        composeTestRule.setContent {
+            FocuslyTheme(darkTheme = true) {
+                Box(
+                    modifier = Modifier
+                        .size(360.dp, 450.dp)
+                        .background(Color(0xFF0A0C0B))
+                ) {
+                    ShareCard(index = 0, data = data, scale = 1f)
+                }
+            }
+        }
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v122/v122_share_card_ring.png")
+    }
+
+    @Test
+    fun v122_share_card_today() {
+        val data = shareTestData()
+        composeTestRule.setContent {
+            FocuslyTheme(darkTheme = true) {
+                Box(
+                    modifier = Modifier
+                        .size(360.dp, 450.dp)
+                        .background(Color(0xFF0A0C0B))
+                ) {
+                    ShareCard(index = 1, data = data, scale = 1f)
+                }
+            }
+        }
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v122/v122_share_card_today.png")
+    }
+
+    @Test
+    fun v122_share_card_shield() {
+        val data = shareTestData()
+        composeTestRule.setContent {
+            FocuslyTheme(darkTheme = true) {
+                Box(
+                    modifier = Modifier
+                        .size(360.dp, 450.dp)
+                        .background(Color(0xFF0A0C0B))
+                ) {
+                    ShareCard(index = 3, data = data, scale = 1f)
+                }
+            }
+        }
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v122/v122_share_card_shield.png")
     }
 }

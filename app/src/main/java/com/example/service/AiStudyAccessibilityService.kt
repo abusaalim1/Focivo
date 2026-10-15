@@ -224,6 +224,11 @@ class AiStudyAccessibilityService : AccessibilityService() {
             applicationContext, surfaceLabel, "shorts-block", "BLOCKED",
             "shorts-reels-toggle", surface.name
         )
+        // v1.2.2 (share screen): shorts/reels surface blocks count as shield
+        // activity for the session's "apps stayed locked" card.
+        com.example.service.SessionBlockRecorder.record(
+            applicationContext, blockedPackage, surfaceLabel
+        )
         val shown = BlockOverlayManager.showShortsBlock(applicationContext, surfaceLabel)
         if (!shown) {
             Log.w(TAG, "[Shorts Lock] Overlay permission missing — back-press only for $surfaceLabel.")

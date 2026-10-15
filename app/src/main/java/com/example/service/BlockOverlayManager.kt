@@ -228,6 +228,9 @@ object BlockOverlayManager {
         reason: String? = null,
         isPunishment: Boolean = false
     ) {
+        // v1.2.2 (share screen): record every real intercept so the Session
+        // Complete "Shield" card can show the apps blocked during the session.
+        SessionBlockRecorder.record(context, blockedPackage, appName)
         if (showIfPermitted(context, blockedPackage, appName, durationSec, reason, isPunishment)) return
         try {
             val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
@@ -341,6 +344,70 @@ object BlockOverlayManager {
             shortsOverlayView = null
             shortsOverlayHost = null
             shortsOverlayWm = null
+        }
+    }
+}
+
+/**
+ * v1.2.2 (share screen) — per-session record of apps the shield actually
+ * intercepted. Written on every real block (intercept() choke point +
+ * Shorts & Reels surface intercepts), read by the Session Complete "Shield"
+ * card. SharedPreferences ring (cap 80, prune > 45 days). Real data only —
+ * never seeded with fake apps.
+ */
+object SessionBlockRecorder {
+    private const val TAG = "SessionBlockRec"
+    private const val PREFS = "focusly_local_data"
+    private const val KEY = "session_blocked_apps_json"
+    private const val CAP = 80
+    private const val PRUNE_MS = 45L * 24 * 3600 * 1000
+
+    data class BlockedApp(val packageName: String, val appName: String, val ts: Long)
+
+    fun record(context: Context, packageName: String, appName: String) {
+        try {
+            if (packageName.isBlank()) return
+            val prefs = context.applicationContext
+                .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val arr = org.json.JSONArray(prefs.getString(KEY, "[]") ?: "[]")
+            arr.put(
+                org.json.JSONObject()
+                    .put("ts", System.currentTimeMillis())
+                    .put("pkg", packageName)
+                    .put("name", appName.ifBlank { packageName })
+            )
+            val cutoff = System.currentTimeMillis() - PRUNE_MS
+            val kept = org.json.JSONArray()
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                if (o.optLong("ts", 0L) >= cutoff) kept.put(o)
+            }
+            while (kept.length() > CAP) kept.remove(0)
+            prefs.edit().putString(KEY, kept.toString()).apply()
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "record failed", e)
+        }
+    }
+
+    /** Apps blocked within [fromMs, toMs], deduplicated by package (first hit kept). */
+    fun forWindow(context: Context, fromMs: Long, toMs: Long): List<BlockedApp> {
+        try {
+            val prefs = context.applicationContext
+                .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val arr = org.json.JSONArray(prefs.getString(KEY, "[]") ?: "[]")
+            val seen = LinkedHashMap<String, BlockedApp>()
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val ts = o.optLong("ts", 0L)
+                if (ts < fromMs || ts > toMs) continue
+                val pkg = o.optString("pkg", "")
+                if (pkg.isBlank() || seen.containsKey(pkg)) continue
+                seen[pkg] = BlockedApp(pkg, o.optString("name", pkg), ts)
+            }
+            return seen.values.toList()
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "forWindow failed", e)
+            return emptyList()
         }
     }
 }
