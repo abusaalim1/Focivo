@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.service.FocusShieldService
+import com.example.data.AndroidPreferenceSessionManager
 import com.example.ui.components.CrashReportDialog
 import com.example.FocuslyApplication
 import com.example.ui.components.AlarmHubSheet
@@ -292,6 +293,18 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val isSigningOut by viewModel.isSigningOut.collectAsState()
 
     val context = LocalContext.current
+    // v1.2 (owner-ordered): guest accounts NEVER see onboarding — they go
+    // straight into the app. Treat survey/onboarding as completed for guests
+    // and persist it so the skip survives relaunch.
+    val isGuestSession = remember(currentUser) {
+        AndroidPreferenceSessionManager.isGuestSession(context) ||
+            viewModel.isGuestUser(currentUser)
+    }
+    LaunchedEffect(isGuestSession, currentUser?.id) {
+        if (isGuestSession && currentUser != null) {
+            viewModel.skipOnboardingForGuest()
+        }
+    }
     var isNetworkConnected by remember { mutableStateOf(com.example.util.NetworkUtils.isInternetAvailable(context)) }
     var allowOfflineSession by rememberSaveable { mutableStateOf(false) }
     var hasCheckedNotificationPermissionOnStartup by rememberSaveable(currentUser?.id) { mutableStateOf(false) }
@@ -434,11 +447,12 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 onClearPasswordReset = { viewModel.clearPasswordReset() },
                 onSetNewPassword = { password -> viewModel.completePasswordRecovery(password) }
             )
-        // v1.4.0: first-launch onboarding runs for guests too (same survey;
-        // answers persist via the local repository / guest storage).
+        // v1.4.0: first-launch onboarding ran for guests too — v1.2 REVERSED
+        // this (owner-ordered): guest sessions skip onboarding entirely and
+        // go straight into the app. Non-guest flow is unchanged.
         // v1.5.0: rebuilt flow — intro animation -> questions -> mascot showcase
         // -> group step -> permissions (one per screen, last).
-        } else if (showQuestionnaire || userPreferences?.hasCompletedIntakeSurvey == false || userPreferences?.hasCompletedOnboarding == false) {
+        } else if (!isGuestSession && (showQuestionnaire || userPreferences?.hasCompletedIntakeSurvey == false || userPreferences?.hasCompletedOnboarding == false)) {
             OnboardingFlowScreen(
                 initialUserName = currentUser?.fullName ?: userPreferences?.currentUserName ?: "",
                 leaderboardUsers = leaderboardUsers,

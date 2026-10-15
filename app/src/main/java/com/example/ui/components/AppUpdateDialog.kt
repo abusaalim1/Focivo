@@ -24,11 +24,14 @@ import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +49,7 @@ import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimePrimary
 import com.example.util.AppUpdateInfo
+import com.example.util.AppUpdateManager
 
 @Composable
 fun AppUpdateDialog(
@@ -59,6 +63,12 @@ fun AppUpdateDialog(
     val textPrimary = Color(0xFFF2F7EE)
     val textSecondary = Color(0xFFA5B2A2)
     val scrollState = rememberScrollState()
+
+    // v1.2: in-app update progress — the dialog now downloads + installs
+    // inside the app (AppUpdateManager). Same dialog API as before.
+    val downloadState by AppUpdateManager.downloadState.collectAsState()
+    val isBusy = downloadState is AppUpdateManager.UpdateDownloadState.Downloading ||
+        downloadState is AppUpdateManager.UpdateDownloadState.Installing
 
     Dialog(
         onDismissRequest = {
@@ -229,11 +239,58 @@ fun AppUpdateDialog(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
+                // v1.2: in-app download/install progress + failure notice.
+                when (val s = downloadState) {
+                    is AppUpdateManager.UpdateDownloadState.Downloading -> {
+                        LinearProgressIndicator(
+                            progress = { s.percent / 100f },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = limeAccent,
+                            trackColor = cardBg
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Downloading update... ${s.percent}%",
+                            color = textSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = PoppinsFontFamily
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+                    is AppUpdateManager.UpdateDownloadState.Installing -> {
+                        Text(
+                            text = "Download complete. Opening installer...",
+                            color = limeAccent,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = PoppinsFontFamily
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+                    is AppUpdateManager.UpdateDownloadState.Failed -> {
+                        Text(
+                            text = s.reason,
+                            color = Color(0xFFFF8A80),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = PoppinsFontFamily,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+                    else -> {}
+                }
+
                 // Primary Download / Update button
                 Button(
                     onClick = {
                         onDownloadClick(updateInfo.downloadUrl)
                     },
+                    enabled = !isBusy,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)

@@ -4,17 +4,27 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInfo
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.util.Log
+import androidx.core.content.FileProvider
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 @Serializable
@@ -125,7 +135,14 @@ object AppUpdateManager {
 
         val dismissedCode = prefs.getInt(KEY_DISMISSED_VERSION, 0)
         val dismissedAt = prefs.getLong(KEY_DISMISSED_AT, 0L)
-        val isUpdateAvailable = remoteDto.versionCode > currentCode
+        // v1.2: a newer versionCode with a blank download URL is not actionable
+        // (the dialog's Update button would silently do nothing) — treat it as
+        // no update available instead of showing a dead dialog.
+        val isUpdateAvailable = remoteDto.versionCode > currentCode &&
+            remoteDto.downloadUrl.isNotBlank()
+        if (!isUpdateAvailable && remoteDto.versionCode > currentCode) {
+            Log.w(TAG, "Update ${remoteDto.versionCode} has a blank download_url; suppressing update UI")
+        }
 
         // Dismissal suppresses the auto dialog only for 24h; force updates
         // always show; manual checks always report truthfully.
@@ -311,14 +328,153 @@ object AppUpdateManager {
         }
     }
 
+    // ------------------------------------------------------------------
+    // v1.2: REAL in-app update. Downloads the APK with OkHttp into
+    // context.cacheDir and launches the system package installer through a
+    // FileProvider URI (provider "${applicationId}.fileprovider" is declared
+    // in the manifest; res/xml/file_paths.xml exposes the cache dir).
+    // The browser is now only a last-resort fallback. Safe to call from the
+    // main thread — all work happens on an IO coroutine.
+    // ------------------------------------------------------------------
+    sealed interface UpdateDownloadState {
+        data object Idle : UpdateDownloadState
+        data class Downloading(val percent: Int) : UpdateDownloadState
+        data object Installing : UpdateDownloadState
+        data class Failed(val reason: String) : UpdateDownloadState
+    }
+
+    private val updateScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val _downloadState =
+        MutableStateFlow<UpdateDownloadState>(UpdateDownloadState.Idle)
+
+    /** Progress of the current in-app update download (Idle when none). */
+    val downloadState: StateFlow<UpdateDownloadState> = _downloadState.asStateFlow()
+
+    fun resetDownloadState() {
+        _downloadState.value = UpdateDownloadState.Idle
+    }
+
+    /**
+     * v1.2: replaces the old browser-only behavior. Existing call sites
+     * (AppUpdateDialog.onDownloadClick, HomeUpdateOverlay.onUpdateNow via
+     * FocuslyViewModel.downloadAndInstallUpdate) keep working unchanged —
+     * this now downloads and installs in-app instead of opening Chrome.
+     */
     fun launchDownload(context: Context, downloadUrl: String) {
-        try {
-            if (downloadUrl.isNotBlank()) {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl)).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                context.startActivity(intent)
+        if (downloadUrl.isBlank()) return
+        val appContext = context.applicationContext
+
+        // Android 8+: installing an APK from the app requires the
+        // "install unknown apps" grant for our own package. Route the user to
+        // that settings page first; they tap Update again afterwards.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !appContext.packageManager.canRequestPackageInstalls()
+        ) {
+            Log.i(TAG, "Install-unknown-apps not granted; routing to settings")
+            try {
+                val settingsIntent = Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:${appContext.packageName}")
+                ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                appContext.startActivity(settingsIntent)
+                _downloadState.value = UpdateDownloadState.Failed(
+                    "Please allow \"Install unknown apps\" for Focivo, then tap Update again."
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to open unknown-app-sources settings", e)
+                openInBrowser(appContext, downloadUrl)
             }
+            return
+        }
+
+        _downloadState.value = UpdateDownloadState.Downloading(0)
+        updateScope.launch {
+            try {
+                val apkFile = downloadApk(appContext, downloadUrl) { pct ->
+                    _downloadState.value = UpdateDownloadState.Downloading(pct)
+                }
+                _downloadState.value = UpdateDownloadState.Installing
+                installApk(appContext, apkFile)
+                // The system installer takes over from here; reset so a later
+                // dialog never shows a stale state if the user backs out.
+                _downloadState.value = UpdateDownloadState.Idle
+            } catch (e: Exception) {
+                Log.e(TAG, "In-app update failed; falling back to browser", e)
+                _downloadState.value = UpdateDownloadState.Failed(
+                    e.message ?: "Download failed"
+                )
+                openInBrowser(appContext, downloadUrl)
+            }
+        }
+    }
+
+    @Throws(Exception::class)
+    private fun downloadApk(
+        context: Context,
+        downloadUrl: String,
+        onProgress: (Int) -> Unit
+    ): File {
+        val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+        // One file per URL so a newer build never collides with a stale one.
+        val safeHash = downloadUrl.hashCode().toString().replace("-", "n")
+        val outFile = File(dir, "focivo-update-$safeHash.apk")
+        if (outFile.exists()) outFile.delete()
+
+        val request = Request.Builder().url(downloadUrl).get().build()
+        httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw java.io.IOException("HTTP ${response.code} while downloading update")
+            }
+            val body = response.body ?: throw java.io.IOException("Empty update download")
+            val total = body.contentLength()
+            var written = 0L
+            var lastPct = -1
+            body.byteStream().use { input ->
+                outFile.outputStream().use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read == -1) break
+                        output.write(buffer, 0, read)
+                        written += read
+                        if (total > 0) {
+                            val pct = ((written * 100) / total).toInt().coerceIn(0, 100)
+                            if (pct != lastPct) {
+                                lastPct = pct
+                                onProgress(pct)
+                            }
+                        }
+                    }
+                    output.flush()
+                }
+            }
+            if (outFile.length() == 0L) throw java.io.IOException("Downloaded update is empty")
+        }
+        onProgress(100)
+        Log.i(TAG, "Update APK downloaded: ${outFile.absolutePath} (${outFile.length()} bytes)")
+        return outFile
+    }
+
+    private fun installApk(context: Context, apkFile: File) {
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            apkFile
+        )
+        val installIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+        }
+        context.startActivity(installIntent)
+    }
+
+    /** Last-resort fallback: open the download URL in the browser. */
+    private fun openInBrowser(context: Context, downloadUrl: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl)).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to launch update download URL: ${e.message}")
         }

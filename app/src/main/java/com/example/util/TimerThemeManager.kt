@@ -47,7 +47,9 @@ data class TimerTheme(
      */
     val onBackdropContent: Color = Color(0xFFF7F8F4)
 ) {
-    fun isUnlocked(userPoints: Int): Boolean = userPoints >= unlockPoints
+    // v1.2 test build: ALL_CONTENT_UNLOCKED frees every timer theme.
+    fun isUnlocked(userPoints: Int): Boolean =
+        ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
 }
 
 object TimerThemeManager {

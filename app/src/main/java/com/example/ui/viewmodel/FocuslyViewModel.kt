@@ -3579,6 +3579,27 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * v1.2 (owner-ordered): guest accounts skip onboarding entirely and go
+     * straight into the app. Marks both the intake-survey and onboarding
+     * flags completed and persists them via the repository (the same local
+     * path the guest session restore reads), so the skip survives relaunch.
+     */
+    fun skipOnboardingForGuest() {
+        viewModelScope.launch {
+            val prefs = userPreferences.value ?: UserPreferencesEntity()
+            if (!prefs.hasCompletedOnboarding || !prefs.hasCompletedIntakeSurvey) {
+                repository.savePreferences(
+                    prefs.copy(
+                        hasCompletedOnboarding = true,
+                        hasCompletedIntakeSurvey = true
+                    )
+                )
+            }
+            _showQuestionnaire.value = false
+        }
+    }
+
     fun resetOnboarding() {
         viewModelScope.launch {
             val prefs = userPreferences.value ?: UserPreferencesEntity()
