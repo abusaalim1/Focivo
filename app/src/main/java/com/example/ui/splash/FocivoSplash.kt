@@ -63,11 +63,24 @@ private fun seg(p: Float, a: Float, b: Float) = eo(cl((p - a) / (b - a)))
 /** NEW_USER -> onFinished(true)  => Auth screen "Create Account" tab pe kholo
  *  RETURNING -> onFinished(false) => Home */
 @Composable
-fun FocivoSplash(variant: SplashVariant, onFinished: (openCreateAccount: Boolean) -> Unit) {
+fun FocivoSplash(
+    variant: SplashVariant,
+    onFinished: (openCreateAccount: Boolean) -> Unit,
+    /**
+     * v1.2.1 screenshot-test seam: when non-null the clock animation is
+     * skipped and the scene renders at this fixed progress (0..1).
+     * Production callers leave it null.
+     */
+    testProgress: Float? = null
+) {
     val progress = remember { Animatable(0f) }
-    LaunchedEffect(variant) {
-        progress.animateTo(1f, tween(variant.totalMs, easing = LinearEasing))
-        onFinished(variant == SplashVariant.NEW_USER)
+    LaunchedEffect(variant, testProgress) {
+        if (testProgress == null) {
+            progress.animateTo(1f, tween(variant.totalMs, easing = LinearEasing))
+            onFinished(variant == SplashVariant.NEW_USER)
+        } else {
+            progress.snapTo(testProgress.coerceIn(0f, 1f))
+        }
     }
     val p = progress.value
 
