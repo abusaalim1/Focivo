@@ -780,6 +780,15 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     )
                 }
 
+                // v1.2.2 — automatic donation popup: triggered by the
+                // ViewModel's session-completion path (first session for new
+                // users, otherwise at most once every 7 days).
+                if (showSessionDonationPrompt) {
+                    com.example.ui.components.DonationDialog(
+                        onDismiss = { viewModel.dismissSessionDonationPrompt() }
+                    )
+                }
+
                 // v1.2.1 — Start-Study permission gate: missing focus
                 // permissions route here instead of starting the session.
                 val permissionGateMissing by viewModel.permissionGateMissing.collectAsState()

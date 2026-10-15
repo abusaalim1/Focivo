@@ -305,6 +305,9 @@ class FocusTimerService : Service() {
 
     private fun postCompletionNotification(taskTitle: String) {
         try {
+            // v1.2.2: clear-but-not-harsh timer-end alarm — plays even when the
+            // app is backgrounded (completion path runs with the UI dead).
+            com.example.util.SoundFx.playTimerEnd(this)
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
             val intent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP

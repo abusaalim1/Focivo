@@ -46,6 +46,10 @@ object StrictModeManager {
         _blockFloatingWindowState.value = getPrefs(context).getBoolean(KEY_BLOCK_FLOATING_WINDOW, false)
         _uninstallProtectionState.value = getPrefs(context).getBoolean(KEY_UNINSTALL_PROTECTION, true)
         _blockHomeScreenState.value = getPrefs(context).getBoolean(KEY_BLOCK_HOME_SCREEN, false)
+        // v1.2.2: defensive — re-assert our launcher entry on every app
+        // start. No-op when already enabled; restores visibility if anything
+        // (e.g. an OEM launcher after a failed uninstall) disabled it.
+        StrictUninstallGuard.reassertLauncherEntryEnabled(context)
     }
 
     fun isStrictModeEnabled(context: Context): Boolean {

@@ -7,6 +7,7 @@ import android.content.Intent
 import android.util.Log
 import com.example.util.AiStudyGuardManager
 import com.example.util.StrictModeManager
+import com.example.util.StrictUninstallGuard
 
 class FocivoDeviceAdminReceiver : DeviceAdminReceiver() {
 
@@ -15,6 +16,11 @@ class FocivoDeviceAdminReceiver : DeviceAdminReceiver() {
      * its only job is [onDisableRequested], which warns while a strict
      * session is genuinely running. Every callback is defensively guarded so
      * a system broadcast can never crash the app or loop services.
+     *
+     * v1.2.2: the disable-requested warning now carries the owner's exact
+     * uninstall-blocked copy, and the launcher entry is defensively
+     * re-asserted at attempt time (OEM launchers have dropped the icon after
+     * a failed device-admin uninstall).
      */
     override fun onEnabled(context: Context, intent: Intent) {
         try {
@@ -53,6 +59,10 @@ class FocivoDeviceAdminReceiver : DeviceAdminReceiver() {
             val isStrictActive = StrictModeManager.shouldBlockUninstallation(context)
             if (isStrictActive) {
                 Log.w(TAG, "Device Admin disable attempted during active strict focus session!")
+                // v1.2.2: defensive — a blocked uninstall attempt is exactly
+                // when OEM launchers have been seen dropping our icon, so
+                // re-assert the launcher entry right here.
+                StrictUninstallGuard.reassertLauncherEntryEnabled(context)
                 AiStudyGuardManager.logGuardActivity(
                     context = context,
                     app = "Device Admin",
@@ -60,7 +70,9 @@ class FocivoDeviceAdminReceiver : DeviceAdminReceiver() {
                     verdict = "TAMPER_PREVENTED",
                     reason = "Attempted to deactivate Device Admin while strict study session is active."
                 )
-                "Strict Focus Session in progress! Focivo uninstall protection remains active until your study timer ends."
+                // v1.2.2: this text is shown by the SYSTEM in its device-admin
+                // deactivation warning at the moment of the uninstall attempt.
+                "Strict Mode is ON. Focivo can't be uninstalled during an active focus lock. Turn off Strict Mode in Settings after your session to uninstall."
             } else {
                 null
             }
