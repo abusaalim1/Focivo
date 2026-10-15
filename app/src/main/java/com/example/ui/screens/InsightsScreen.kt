@@ -574,4 +574,3 @@ private fun Eyebrow(text: String) =
 
 private fun formatMinutes(m: Int): String =
     if (m < 60) "${m}m" else "${m / 60}h ${m % 60}m".replace(" 0m", "")
-}
