@@ -86,7 +86,7 @@ object PermissionUtils {
         "exact_alarm" -> hasExactAlarmPermission(context)
         "accessibility" -> AiStudyGuardManager.isAccessibilityPermissionGranted(context)
         "device_admin" -> {
-            val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? android.app.DevicePolicyManager
+            val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? android.app.admin.DevicePolicyManager
             dpm?.isAdminActive(com.example.service.FocivoDeviceAdminReceiver.getComponentName(context)) == true
         }
         else -> false
@@ -110,14 +110,14 @@ object PermissionUtils {
                 "device_admin" -> {
                     try {
                         val intent = android.content.Intent(
-                            android.app.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN
+                            android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN
                         ).apply {
                             putExtra(
-                                android.app.DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                                android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN,
                                 com.example.service.FocivoDeviceAdminReceiver.getComponentName(context)
                             )
                             putExtra(
-                                android.app.DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                                android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION,
                                 "Prevents uninstalling Focivo during strict focus sessions."
                             )
                         }

@@ -65,13 +65,14 @@ private fun seg(p: Float, a: Float, b: Float) = eo(cl((p - a) / (b - a)))
 @Composable
 fun FocivoSplash(
     variant: SplashVariant,
-    onFinished: (openCreateAccount: Boolean) -> Unit,
     /**
      * v1.2.1 screenshot-test seam: when non-null the clock animation is
      * skipped and the scene renders at this fixed progress (0..1).
-     * Production callers leave it null.
+     * Production callers leave it null. Kept BEFORE onFinished so existing
+     * trailing-lambda call sites keep compiling unchanged.
      */
-    testProgress: Float? = null
+    testProgress: Float? = null,
+    onFinished: (openCreateAccount: Boolean) -> Unit
 ) {
     val progress = remember { Animatable(0f) }
     LaunchedEffect(variant, testProgress) {
