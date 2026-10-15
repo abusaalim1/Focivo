@@ -153,7 +153,8 @@ fun loadShareScreenData(context: Context, session: FocusSessionEntity): ShareScr
  * app icons (already in the app for the splash) are used only when that
  * lookup fails (e.g. screenshot tests), so a tile never renders blank.
  */
-private fun knownAppIconRes(packageName: String): Int? = when (packageName) {
+/** Shared with FocivoShareScreen.kt's shield tiles. */
+internal fun knownAppIconRes(packageName: String): Int? = when (packageName) {
     "com.instagram.android" -> R.drawable.ic_instagram
     "com.google.android.youtube", "com.google.android.youtube.tv" -> R.drawable.ic_youtube
     "com.zhiliaoapp.musically", "com.ss.android.ugc.trill" -> R.drawable.ic_tiktok
