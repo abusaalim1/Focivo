@@ -79,9 +79,10 @@ import java.util.Locale
 
 /**
  * Dedicated AI Study Guard section: mascot-guarded hub for everything the guard does —
- * master switch, accessibility permission status, YouTube AI filter, Shorts/Reels locks,
+ * master switch, accessibility permission status, Shorts/Reels locks,
  * strict mode, punishment history and a "how it works" explainer. Reuses the existing
- * managers; no parallel state.
+ * managers; no parallel state. (v1.2.2: the YouTube AI filter is no longer merged
+ * into the master switch — it is its own explicit toggle in the Focus Shield hub.)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,7 +105,6 @@ fun AiStudyGuardHubSheet(
     var showOptInDialog by remember { mutableStateOf(false) }
 
     val isShortsReelsBlocked by ShortsLockManager.isShortsReelsBlockState.collectAsState()
-    val blockedVideoCount by YouTubeStudyGuardManager.blockedVideosCountState.collectAsState()
     val isStrictModeEnabled by StrictModeManager.isStrictModeState.collectAsState()
     val punishmentLogs by AiStudyGuardManager.punishmentLogs.collectAsState()
     // v1.1.9: diagnostic activity log
@@ -220,7 +220,7 @@ fun AiStudyGuardHubSheet(
                                     color = textPrimary
                                 )
                                 Text(
-                                    text = "Watches your AI chats and YouTube during study — non-study videos get blocked, off-topic chats get a mascot warning first; ignored warnings lock the app for 3 hours.",
+                                    text = "Watches your AI chats and browser during study — off-topic chats get a warning first; ignored warnings lock the app for 3 hours. YouTube video filtering is a separate toggle (Focus Shield hub).",
                                     fontSize = 12.5.sp,
                                     lineHeight = 17.sp,
                                     color = textSecondary
@@ -230,15 +230,16 @@ fun AiStudyGuardHubSheet(
                     }
                 }
 
-                // 1. AI Study Guard master — merged (includes YouTube AI detection),
-                // permission-aware: every required permission gets an inline status + Fix
+                // 1. AI Study Guard master — AI chat + browser detection.
+                // (v1.2.2: no longer merged with the YouTube AI filter — that is
+                // its own explicit toggle in the Focus Shield hub.)
                 item {
                     GuardSectionTitle("AI Study Guard", textPrimary)
                     GuardCard {
                         GuardSwitchRow(
                             title = "AI Study Guard",
                             description = if (hasAccessibility)
-                                "AI chat + YouTube detection during study ($blockedVideoCount videos blocked)"
+                                "AI chat + browser detection during study"
                             else
                                 "Needs permissions below to work",
                             checked = isAiGuardEnabled,
@@ -449,8 +450,8 @@ fun AiStudyGuardHubSheet(
                     GuardCard {
                         val steps = listOf(
                             "1. Turn on AI Study Guard and grant the permissions above — it arms automatically during focus timers and study schedules.",
-                            "2. It watches ChatGPT, Claude, Gemini, Copilot, Perplexity and YouTube — only during study.",
-                            "3. Non-study YouTube videos get blocked automatically; off-topic AI chats get a mascot warning first.",
+                            "2. It watches ChatGPT, Claude, Gemini, Copilot, Perplexity and your browser — only during study.",
+                            "3. Off-topic AI chats get a warning first; YouTube video filtering is a separate toggle in the Focus Shield hub.",
                             "4. Shorts & Reels Block stops the Shorts player and Reels viewer during study.",
                             "5. Ignore the warning and keep going → that app locks for 3 hours. Genuine study doubts stay allowed."
                         )

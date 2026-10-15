@@ -124,6 +124,16 @@ object YouTubeVideoClassifier {
     )
 
     /**
+     * v1.2.2 (B4): whole-word / whole-phrase matching only. The haystack is
+     * padded with spaces and every keyword is matched as " keyword " via plain
+     * contains() — no regex, no backtracking risk, and "art" can never match
+     * "party" (or "sex" match "Middlesex", "film" match "thin film").
+     */
+    private fun containsPhrase(haystack: String, phrase: String): Boolean {
+        return " $haystack ".contains(" $phrase ")
+    }
+
+    /**
      * Contextually classifies a YouTube video.
      */
     fun evaluate(
@@ -177,12 +187,12 @@ object YouTubeVideoClassifier {
         // 1. Check if channel is recognized trusted educational platform
         val isTrustedChannel = TrustedEducationalChannels.isKnownEducationalChannel(cleanChannel)
 
-        // 2. Count Academic Indicators
+        // 2. Count Academic Indicators (v1.2.2 B4: whole-word matching only)
         var academicScore = 0.0f
         var academicMatches = mutableListOf<String>()
 
         for (keyword in ACADEMIC_KEYWORDS) {
-            if (fullCombined.contains(keyword)) {
+            if (containsPhrase(fullCombined, keyword)) {
                 academicScore += 0.35f
                 academicMatches.add(keyword)
             }
@@ -198,12 +208,12 @@ object YouTubeVideoClassifier {
             academicMatches.add("exam_or_dsa_tag")
         }
 
-        // 3. Count Entertainment & Distraction Indicators
+        // 3. Count Entertainment & Distraction Indicators (v1.2.2 B4: whole-word matching only)
         var entertainmentScore = 0.0f
         var entertainmentMatches = mutableListOf<String>()
 
         for (keyword in ENTERTAINMENT_KEYWORDS) {
-            if (fullCombined.contains(keyword)) {
+            if (containsPhrase(fullCombined, keyword)) {
                 entertainmentScore += 0.50f
                 entertainmentMatches.add(keyword)
             }
@@ -276,14 +286,18 @@ object YouTubeVideoClassifier {
             )
         }
 
-        // Case F: FAIL-SAFE LOCK RULE
-        // If content cannot be confirmed as genuinely educational with high confidence,
-        // lock it as review-required/distraction to protect study time.
+        // Case F: UNCERTAIN — v1.2.2 (B2): no confident signal either way.
+        // The old fail-safe BLOCKED here ("lock it as review-required"), which
+        // produced NON_STUDY verdicts from thin air: opening YouTube and
+        // seeing any recommendation title could block the whole app. Callers
+        // must NOT block on this verdict — it falls through to Gemini, and if
+        // Gemini is unavailable the result is FAIL-OPEN (allow). Confidence is
+        // deliberately below the 0.90 confident-action threshold.
         return VideoVerdict(
             isEducational = false,
             confidence = 0.75f,
-            category = "Non-Educational / Review Required",
-            reason = "Content does not meet educational criteria during active study session"
+            category = "Uncertain / Review Required",
+            reason = "No confident study or distraction signal — needs AI review, never a block by itself"
         )
     }
 

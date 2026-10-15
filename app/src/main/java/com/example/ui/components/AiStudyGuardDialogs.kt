@@ -2,27 +2,16 @@ package com.example.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,16 +23,30 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import com.example.ui.theme.LinearDarkCardBg
+import com.example.ui.theme.NearBlack
+import com.example.ui.theme.RegainLimePrimary
 import com.example.util.ActiveAiBlock
 import com.example.util.ActiveAiResolved
 import com.example.util.ActiveAiWarning
 import kotlinx.coroutines.delay
 
+/**
+ * v1.2.2 (G) — premium minimal redesign of the AI Study Guard dialogs.
+ *
+ * Dark card, lime accent, big clear headline, ONE short line of explanation,
+ * ONE primary button + one quiet text button, generous spacing. Copy kept to
+ * the essentials: app name, the warning fact, and the grace countdown as a
+ * small chip when active. No behaviour changes — the countdown logic,
+ * callbacks and state flow are untouched.
+ */
 @Composable
 fun AiStudyWarningDialog(
     warning: ActiveAiWarning,
@@ -67,119 +70,112 @@ fun AiStudyWarningDialog(
     val seconds = remainingSeconds % 60
     val timeFormatted = String.format("%d:%02d", minutes, seconds)
 
-    val dialogBg = androidx.compose.material3.MaterialTheme.colorScheme.surface
-    val amberWarning = if (androidx.compose.material3.MaterialTheme.colorScheme.background != com.example.ui.theme.RegainBgTop) Color(0xFFFFB74D) else Color(0xFFD97706)
-    val textPrimary = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-    val textSecondary = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .background(LinearDarkCardBg)
+                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(28.dp))
+                .padding(horizontal = 28.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            RegainMascotView(
+                width = 88.dp,
+                height = 112.dp,
+                pose = MascotPose.GUARD
+            )
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = dialogBg,
-        shape = RoundedCornerShape(20.dp),
-        title = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                RegainMascotView(
-                    width = 130.dp,
-                    height = 170.dp,
-                    pose = MascotPose.GUARD
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Study Discipline Warning",
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = textPrimary,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = warning.appName,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = amberWarning
-                )
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "This looks like non-study usage. This is your official warning:",
-                    fontSize = 14.sp,
-                    color = textPrimary,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 20.sp
-                )
-                Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
+            Text(
+                text = "Study warning",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = warning.appName,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = RegainLimePrimary,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Non-study activity detected.",
+                fontSize = 14.sp,
+                color = Color(0xFFB9C4B9),
+                textAlign = TextAlign.Center,
+                lineHeight = 21.sp
+            )
+
+            if (remainingSeconds > 0) {
+                Spacer(modifier = Modifier.height(18.dp))
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(10.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(RegainLimePrimary.copy(alpha = 0.14f))
+                        .border(1.dp, RegainLimePrimary.copy(alpha = 0.45f), RoundedCornerShape(50))
+                        .padding(horizontal = 18.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = "Reason: ${warning.reason}",
-                        fontSize = 12.sp,
-                        color = textPrimary,
-                        lineHeight = 17.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text(
-                    text = "Continuing casual or non-study activity will trigger an immediate 3+ HOUR LOCKOUT on ${warning.appName}.",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFFFCA5A5),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 18.sp
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Grace Countdown Badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(amberWarning.copy(alpha = 0.2f))
-                        .border(1.dp, amberWarning.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "Grace Window Remaining: $timeFormatted",
+                        text = "$timeFormatted left to get back on track",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = amberWarning
+                        color = RegainLimePrimary
                     )
                 }
             }
-        },
-        confirmButton = {
+
+            Spacer(modifier = Modifier.height(26.dp))
+
             Button(
                 onClick = onReturnToStudy,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth()
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = RegainLimePrimary,
+                    contentColor = NearBlack
+                ),
+                shape = RoundedCornerShape(50),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(50),
+                        spotColor = RegainLimePrimary.copy(alpha = 0.35f)
+                    ),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
             ) {
-                Text("I'll Return to Studying", fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    text = "Return to study",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = NearBlack
+                )
             }
-        },
-        dismissButton = {
+
+            Spacer(modifier = Modifier.height(4.dp))
+
             TextButton(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Dismiss", color = textSecondary)
+                Text(
+                    text = "Dismiss",
+                    color = Color(0xFF8A978B),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -187,114 +183,80 @@ fun AiStudyBlockedDialog(
     block: ActiveAiBlock,
     onDismiss: () -> Unit
 ) {
-    val dialogBg = androidx.compose.material3.MaterialTheme.colorScheme.surface
-    val accentRed = if (androidx.compose.material3.MaterialTheme.colorScheme.background != com.example.ui.theme.RegainBgTop) Color(0xFFFF5252) else Color(0xFFD32F2F)
-    val textPrimary = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-    val textSecondary = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .background(LinearDarkCardBg)
+                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(28.dp))
+                .padding(horizontal = 28.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            RegainMascotView(
+                width = 88.dp,
+                height = 112.dp,
+                pose = MascotPose.GUARD
+            )
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = dialogBg,
-        shape = RoundedCornerShape(20.dp),
-        title = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(accentRed.copy(alpha = 0.18f))
-                        .border(1.5.dp, accentRed, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = "Locked",
-                        tint = accentRed,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "App Blocked for 3 Hours",
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = accentRed,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = block.appName,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = textPrimary
-                )
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Non-study activity continued after the warning was issued.",
-                    fontSize = 14.sp,
-                    color = textPrimary,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = block.reason,
-                    fontSize = 12.sp,
-                    color = textSecondary,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF33161A))
-                        .border(1.dp, accentRed.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "Block Active: 180 Minutes (3 Hours)",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFCA5A5),
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = "Focus Shield will intercept any attempt to open this app.",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = Color(0xFFFECDD3),
-                            textAlign = TextAlign.Center,
-                            lineHeight = 16.sp
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
+            Text(
+                text = "App blocked",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = block.appName,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = RegainLimePrimary,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Locked for 3 hours.",
+                fontSize = 14.sp,
+                color = Color(0xFFB9C4B9),
+                textAlign = TextAlign.Center,
+                lineHeight = 21.sp
+            )
+
+            Spacer(modifier = Modifier.height(26.dp))
+
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = accentRed),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth()
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = RegainLimePrimary,
+                    contentColor = NearBlack
+                ),
+                shape = RoundedCornerShape(50),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(50),
+                        spotColor = RegainLimePrimary.copy(alpha = 0.35f)
+                    ),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
             ) {
-                Text("Understood", fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    text = "Understood",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = NearBlack
+                )
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -302,69 +264,78 @@ fun AiStudyResolvedDialog(
     resolved: ActiveAiResolved,
     onDismiss: () -> Unit
 ) {
-    val dialogBg = androidx.compose.material3.MaterialTheme.colorScheme.surface
-    val accentGreen = if (androidx.compose.material3.MaterialTheme.colorScheme.background != com.example.ui.theme.RegainBgTop) Color(0xFF69F0AE) else Color(0xFF2E7D32)
-    val textPrimary = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-    val textSecondary = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = dialogBg,
-        shape = RoundedCornerShape(20.dp),
-        title = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(accentGreen.copy(alpha = 0.18f))
-                        .border(1.5.dp, accentGreen, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Resolved",
-                        tint = accentGreen,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Good — No Block Applied!",
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = accentGreen,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = resolved.appName,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = textSecondary
-                )
-            }
-        },
-        text = {
-            Text(
-                text = "You corrected course and returned to study focus in time. No restriction was placed on ${resolved.appName}. Great discipline!",
-                fontSize = 14.sp,
-                color = textPrimary,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .background(LinearDarkCardBg)
+                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(28.dp))
+                .padding(horizontal = 28.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            RegainMascotView(
+                width = 88.dp,
+                height = 112.dp,
+                pose = MascotPose.CELEBRATING
             )
-        },
-        confirmButton = {
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text(
+                text = "No block applied",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = resolved.appName,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = RegainLimePrimary,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Back on track. Keep going.",
+                fontSize = 14.sp,
+                color = Color(0xFFB9C4B9),
+                textAlign = TextAlign.Center,
+                lineHeight = 21.sp
+            )
+
+            Spacer(modifier = Modifier.height(26.dp))
+
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = accentGreen),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth()
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = RegainLimePrimary,
+                    contentColor = NearBlack
+                ),
+                shape = RoundedCornerShape(50),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(50),
+                        spotColor = RegainLimePrimary.copy(alpha = 0.35f)
+                    ),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
             ) {
-                Text("Keep Studying", fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    text = "Keep studying",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = NearBlack
+                )
             }
         }
-    )
+    }
 }

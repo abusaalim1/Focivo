@@ -1,21 +1,20 @@
 package com.example.ui.components
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -39,16 +38,18 @@ import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.isAppInDarkTheme
 
 /**
- * v1.1 — Donation popup.
+ * v1.2.2 — Donation popup, now live.
  *
- * Tasteful, professional dialog with the cute mascot. Shows at most once
- * every 3 days (triggered on app open or after a session completes, never
- * mid-timer). The Donate button opens the URL from remote config
- * (app_config key "donate_url"); if empty/unset, the Donate button is hidden.
+ * Owner spec: shows automatically after a session completes — right after a
+ * new user's FIRST completed session, and at most once every 7 days for
+ * everyone else (trigger lives in FocuslyViewModel's session-completion
+ * path, never in a composable). "Donate" opens the owner's UPI ID
+ * (aabu.x@fam) via an ACTION_VIEW chooser — the same proven intent pattern
+ * as SupportLockZenSheet. "Maybe Later" dismisses and stamps the 7-day
+ * timer (handled by the ViewModel's dismiss path).
  */
 @Composable
 fun DonationDialog(
-    donateUrl: String?,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -102,77 +103,60 @@ fun DonationDialog(
             )
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Buttons
-            if (!donateUrl.isNullOrBlank()) {
-                // Donate (primary, lime) + Maybe Later
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    androidx.compose.foundation.layout.Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(RegainLimePrimary)
-                            .pressFeedback()
-                            .clickable {
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW, donateUrl.toUri())
-                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    context.startActivity(intent)
-                                } catch (_: Exception) { }
-                                onDismiss()
-                            }
-                            .padding(vertical = 14.dp)
-                            .testTag("donation_donate_button"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Donate",
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = NearBlack
-                        )
-                    }
-                    androidx.compose.foundation.layout.Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .pressFeedback()
-                            .clickable(onClick = onDismiss)
-                            .padding(vertical = 12.dp)
-                            .testTag("donation_later_button"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Maybe Later",
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp,
-                            color = textSecondary
-                        )
-                    }
-                }
-            } else {
-                // No URL: only "Maybe Later" (never a dead button)
-                androidx.compose.foundation.layout.Box(
+            // Buttons: Donate (primary, lime) + Maybe Later
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(RegainLimePrimary)
                         .pressFeedback()
-                        .clickable(onClick = onDismiss)
+                        .clickable {
+                            try {
+                                val upiUri = "upi://pay?pa=aabu.x@fam&pn=Focivo&cu=INR"
+                                val intent = Intent(Intent.ACTION_VIEW, upiUri.toUri())
+                                val chooser = Intent.createChooser(intent, "Pay via UPI App")
+                                context.startActivity(chooser)
+                            } catch (_: Exception) {
+                                Toast.makeText(
+                                    context,
+                                    "No UPI app found. UPI ID: aabu.x@fam",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                            onDismiss()
+                        }
                         .padding(vertical = 14.dp)
+                        .testTag("donation_donate_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Donate",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = NearBlack
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .pressFeedback()
+                        .clickable(onClick = onDismiss)
+                        .padding(vertical = 12.dp)
                         .testTag("donation_later_button"),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "Maybe Later",
                         fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = NearBlack
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp,
+                        color = textSecondary
                     )
                 }
             }

@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.ComposeView
 import com.example.MainActivity
 import com.example.R
 import com.example.ui.components.BlockedAppOverlay
+import com.example.ui.components.ShortsBlockedOverlay
 import com.example.ui.overlay.OverlayLifecycleHost
 import com.example.ui.theme.FocuslyTheme
 
@@ -61,6 +62,13 @@ object BlockOverlayManager {
     private val durationState = mutableStateOf(0)
     private val reasonState = mutableStateOf<String?>(null)
     private val punishmentState = mutableStateOf(false)
+
+    // v1.2.2 (C): dedicated Shorts & Reels surface overlay — separate from the
+    // main block overlay so a surface lock never disturbs an active block UI.
+    private var shortsOverlayView: ComposeView? = null
+    private var shortsOverlayHost: OverlayLifecycleHost? = null
+    private var shortsOverlayWm: WindowManager? = null
+    private val shortsLabelState = mutableStateOf("Shorts")
 
     fun isShowing(): Boolean = overlayView != null
 
@@ -220,6 +228,9 @@ object BlockOverlayManager {
         reason: String? = null,
         isPunishment: Boolean = false
     ) {
+        // v1.2.2 (share screen): record every real intercept so the Session
+        // Complete "Shield" card can show the apps blocked during the session.
+        SessionBlockRecorder.record(context, blockedPackage, appName)
         if (showIfPermitted(context, blockedPackage, appName, durationSec, reason, isPunishment)) return
         try {
             val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
@@ -239,4 +250,164 @@ object BlockOverlayManager {
     /** True when any block UI (overlay or legacy Activity) is on screen. */
     fun isBlockUiShowing(): Boolean =
         isShowing() || com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing
+
+    // ------------------------------------------------------------------
+    // v1.2.2 (C): Shorts & Reels surface overlay.
+    //
+    // Standalone surface lock: shown when the Shorts & Reels toggle is on and
+    // ShortsSurfaceDetector finds a real Shorts/Reels surface. The
+    // accessibility service performs a back-press first, so "Return" simply
+    // dismisses the overlay back into the app (long-form stays watchable).
+    // Never touches the AI discipline flow.
+    // ------------------------------------------------------------------
+
+    /** True when the Shorts & Reels overlay is on screen. */
+    fun isShortsBlockShowing(): Boolean = shortsOverlayView != null
+
+    /**
+     * Shows the Shorts & Reels overlay. Returns true when it is (now)
+     * showing; false when the overlay permission is missing (the caller
+     * still performed the back-press, so the surface is gone regardless).
+     */
+    fun showShortsBlock(context: Context, surfaceLabel: String): Boolean {
+        if (isShortsBlockShowing()) {
+            shortsLabelState.value = surfaceLabel
+            return true
+        }
+        if (!Settings.canDrawOverlays(context)) return false
+        val appContext = context.applicationContext
+        runOnMain {
+            if (shortsOverlayView != null) return@runOnMain
+            val host = OverlayLifecycleHost()
+            try {
+                shortsLabelState.value = surfaceLabel
+                val wm = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                val view = ComposeView(appContext).apply {
+                    host.installOn(this)
+                    setContent {
+                        FocuslyTheme {
+                            ShortsBlockedOverlay(
+                                surfaceLabel = shortsLabelState.value,
+                                onReturn = { hideShortsBlock() },
+                                onOpenFocivo = {
+                                    hideShortsBlock()
+                                    openFocivo(appContext)
+                                }
+                            )
+                        }
+                    }
+                    isFocusableInTouchMode = true
+                    setOnKeyListener { _, keyCode, event ->
+                        if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                            hideShortsBlock()
+                            true
+                        } else false
+                    }
+                }
+                host.show()
+                val params = WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    PixelFormat.TRANSLUCENT
+                ).apply {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        layoutInDisplayCutoutMode =
+                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                }
+                wm.addView(view, params)
+                shortsOverlayView = view
+                shortsOverlayHost = host
+                shortsOverlayWm = wm
+                Log.i(TAG, "Shorts & Reels overlay shown ($surfaceLabel)")
+            } catch (t: Throwable) {
+                Log.e(TAG, "Could not show Shorts overlay: ${t.message}")
+                runCatching { host.dismiss() }
+                shortsOverlayView = null
+                shortsOverlayHost = null
+                shortsOverlayWm = null
+            }
+        }
+        return isShortsBlockShowing()
+    }
+
+    /** Hide the Shorts & Reels overlay if visible. Safe to call any time, any thread. */
+    fun hideShortsBlock() {
+        runOnMain {
+            val view = shortsOverlayView ?: return@runOnMain
+            try {
+                shortsOverlayWm?.removeView(view)
+            } catch (_: Exception) { }
+            runCatching { shortsOverlayHost?.dismiss() }
+            shortsOverlayView = null
+            shortsOverlayHost = null
+            shortsOverlayWm = null
+        }
+    }
+}
+
+/**
+ * v1.2.2 (share screen) — per-session record of apps the shield actually
+ * intercepted. Written on every real block (intercept() choke point +
+ * Shorts & Reels surface intercepts), read by the Session Complete "Shield"
+ * card. SharedPreferences ring (cap 80, prune > 45 days). Real data only —
+ * never seeded with fake apps.
+ */
+object SessionBlockRecorder {
+    private const val TAG = "SessionBlockRec"
+    private const val PREFS = "focusly_local_data"
+    private const val KEY = "session_blocked_apps_json"
+    private const val CAP = 80
+    private const val PRUNE_MS = 45L * 24 * 3600 * 1000
+
+    data class BlockedApp(val packageName: String, val appName: String, val ts: Long)
+
+    fun record(context: Context, packageName: String, appName: String) {
+        try {
+            if (packageName.isBlank()) return
+            val prefs = context.applicationContext
+                .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val arr = org.json.JSONArray(prefs.getString(KEY, "[]") ?: "[]")
+            arr.put(
+                org.json.JSONObject()
+                    .put("ts", System.currentTimeMillis())
+                    .put("pkg", packageName)
+                    .put("name", appName.ifBlank { packageName })
+            )
+            val cutoff = System.currentTimeMillis() - PRUNE_MS
+            val kept = org.json.JSONArray()
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                if (o.optLong("ts", 0L) >= cutoff) kept.put(o)
+            }
+            while (kept.length() > CAP) kept.remove(0)
+            prefs.edit().putString(KEY, kept.toString()).apply()
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "record failed", e)
+        }
+    }
+
+    /** Apps blocked within [fromMs, toMs], deduplicated by package (first hit kept). */
+    fun forWindow(context: Context, fromMs: Long, toMs: Long): List<BlockedApp> {
+        try {
+            val prefs = context.applicationContext
+                .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val arr = org.json.JSONArray(prefs.getString(KEY, "[]") ?: "[]")
+            val seen = LinkedHashMap<String, BlockedApp>()
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val ts = o.optLong("ts", 0L)
+                if (ts < fromMs || ts > toMs) continue
+                val pkg = o.optString("pkg", "")
+                if (pkg.isBlank() || seen.containsKey(pkg)) continue
+                seen[pkg] = BlockedApp(pkg, o.optString("name", pkg), ts)
+            }
+            return seen.values.toList()
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "forWindow failed", e)
+            return emptyList()
+        }
+    }
 }

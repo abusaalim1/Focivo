@@ -68,6 +68,16 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
          * so process death can no longer shrink the recorded session to ~0.
          */
         const val KEY_SESSION_ORIGINAL_TARGET_SECS = "session_original_target_seconds"
+
+        /**
+         * v1.2.2: automatic donation popup (owner spec). Shown after a session
+         * completes: right after the FIRST completed session for new users,
+         * and at most once every 7 days for everyone else. The last-shown
+         * epoch millis are persisted here; "Maybe Later" also stamps it.
+         */
+        const val PREFS_DONATION_PROMPT = "focivo_donation_prompt"
+        const val KEY_DONATION_LAST_SHOWN_MS = "donation_last_shown_ms"
+        const val DONATION_PROMPT_INTERVAL_MS = 7L * 24L * 60L * 60L * 1000L
     }
 
     /**
@@ -284,6 +294,13 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     // Post-session donation prompt state (triggers after EVERY completed study session)
     private val _showSessionDonationPrompt = MutableStateFlow(false)
     val showSessionDonationPrompt: StateFlow<Boolean> = _showSessionDonationPrompt.asStateFlow()
+
+    // v1.2.2 — strict-mode uninstall attempt popup (triggered by MainActivity's
+    // uninstaller intercept intent; dialog content is StrictUninstallBlockedDialog).
+    private val _showStrictUninstallBlocked = MutableStateFlow(false)
+    val showStrictUninstallBlocked: StateFlow<Boolean> = _showStrictUninstallBlocked.asStateFlow()
+    fun triggerStrictUninstallBlocked() { _showStrictUninstallBlocked.value = true }
+    fun dismissStrictUninstallBlocked() { _showStrictUninstallBlocked.value = false }
 
     private val _lastCompletedSessionForPrompt = MutableStateFlow<FocusSessionEntity?>(null)
     val lastCompletedSessionForPrompt: StateFlow<FocusSessionEntity?> = _lastCompletedSessionForPrompt.asStateFlow()
@@ -3416,13 +3433,56 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * v1.2.2: automatic donation popup trigger (owner spec). Called from the
+     * ViewModel's session-completion path ([dismissCompletionScreen]) — never
+     * from a composable.
+     *
+     * Rules: new users see it right after their FIRST completed session;
+     * everyone else sees it at most once every 7 days (last-shown epoch
+     * millis persisted in SharedPreferences). The timer is stamped when the
+     * popup is shown and again on dismiss, so either button path satisfies
+     * the "at most every 7 days" rule.
+     */
     private fun checkAndTriggerSessionDonationPrompt(lastSession: FocusSessionEntity) {
-        // Automatic donation prompts permanently disabled
-        _showSessionDonationPrompt.value = false
-        _lastCompletedSessionForPrompt.value = null
+        viewModelScope.launch {
+            try {
+                val app = getApplication<Application>()
+                val prefs = app.getSharedPreferences(PREFS_DONATION_PROMPT, Context.MODE_PRIVATE)
+                val now = System.currentTimeMillis()
+                val lastShown = prefs.getLong(KEY_DONATION_LAST_SHOWN_MS, 0L)
+                // The just-completed session is already recorded, so a
+                // lifetime total of 1 means this was the user's first session.
+                val totalSessions = repository.allSessions.firstOrNull()?.size ?: 0
+                val isFirstSession = totalSessions <= 1
+                val dueBySchedule = now - lastShown >= DONATION_PROMPT_INTERVAL_MS
+                if (isFirstSession || dueBySchedule) {
+                    prefs.edit().putLong(KEY_DONATION_LAST_SHOWN_MS, now).apply()
+                    _lastCompletedSessionForPrompt.value = lastSession
+                    _showSessionDonationPrompt.value = true
+                    Log.i(
+                        "FocuslyViewModel",
+                        "Donation prompt shown (firstSession=$isFirstSession, totalSessions=$totalSessions)"
+                    )
+                }
+            } catch (t: Throwable) {
+                Log.w("FocuslyViewModel", "Donation prompt check failed: ${t.message}")
+                _showSessionDonationPrompt.value = false
+                _lastCompletedSessionForPrompt.value = null
+            }
+        }
     }
 
     fun dismissSessionDonationPrompt() {
+        // v1.2.2: "Maybe Later" (or Donate) stamps the 7-day timer.
+        try {
+            getApplication<Application>()
+                .getSharedPreferences(PREFS_DONATION_PROMPT, Context.MODE_PRIVATE)
+                .edit()
+                .putLong(KEY_DONATION_LAST_SHOWN_MS, System.currentTimeMillis())
+                .apply()
+        } catch (_: Exception) {
+        }
         _showSessionDonationPrompt.value = false
         _lastCompletedSessionForPrompt.value = null
     }

@@ -110,6 +110,9 @@ class MainActivity : ComponentActivity() {
         // the timer is already live in this process or no timer is persisted).
         activeViewModel?.restoreTimerStateIfNeeded()
         com.example.service.ScheduledBlockScheduler.evaluateAndReschedule(this)
+        // v1.2.2 — never let the launcher icon vanish as a side effect of a
+        // blocked strict-mode uninstall (launcher-side artifact on some ROMs).
+        com.example.util.StrictUninstallGuard.reassertLauncherEntryEnabled(this)
         // v1.5.0: the floating timer pill is only for out-of-app use — kill it on return.
         com.example.service.FloatingTimerPillManager.hide(this)
     }
@@ -145,6 +148,13 @@ class MainActivity : ComponentActivity() {
         handleAuthIntent(intent, viewModel)
         handleSundayRecapIntent(intent, viewModel)
         handleWidgetIntent(intent, viewModel)
+        handleStrictUninstallIntent(intent, viewModel)
+    }
+
+    private fun handleStrictUninstallIntent(intent: Intent?, viewModel: FocuslyViewModel) {
+        if (intent?.action == com.example.util.StrictUninstallGuard.ACTION_STRICT_UNINSTALL_BLOCKED) {
+            viewModel.triggerStrictUninstallBlocked()
+        }
     }
 
     private fun handleWidgetIntent(intent: Intent?, viewModel: FocuslyViewModel) {
@@ -777,6 +787,23 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     SessionCompleteScreen(
                         session = completedSessionSummary!!,
                         onDismiss = { viewModel.dismissCompletionScreen() }
+                    )
+                }
+
+                // v1.2.2 — automatic donation popup: triggered by the
+                // ViewModel's session-completion path (first session for new
+                // users, otherwise at most once every 7 days).
+                if (showSessionDonationPrompt) {
+                    com.example.ui.components.DonationDialog(
+                        onDismiss = { viewModel.dismissSessionDonationPrompt() }
+                    )
+                }
+
+                // v1.2.2 — strict-mode uninstall attempt popup (owner spec copy).
+                val showStrictUninstallBlocked by viewModel.showStrictUninstallBlocked.collectAsState()
+                if (showStrictUninstallBlocked) {
+                    com.example.ui.components.StrictUninstallBlockedDialog(
+                        onDismiss = { viewModel.dismissStrictUninstallBlocked() }
                     )
                 }
 
