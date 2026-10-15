@@ -117,9 +117,16 @@ object StrictModeManager {
     /**
      * Determines whether uninstallation, settings opening, and package management
      * must be strictly guarded right now.
+     *
+     * Owner rule (v1.2.2 clarification): uninstall is blocked ONLY while BOTH
+     * Strict Mode is ON and a study session/timer is actively running. Strict
+     * Mode off OR no active session -> uninstall proceeds completely normally
+     * (no message, no intercept, no popup). The Deep Focus "Uninstall
+     * protection" toggle remains as an opt-out inside strict mode.
      */
     fun shouldBlockUninstallation(context: Context): Boolean {
-        if (!isStrictModeEnabled(context) && !isUninstallProtectionEnabled(context)) return false
+        if (!isStrictModeEnabled(context)) return false
+        if (!isUninstallProtectionEnabled(context)) return false
         // Only block uninstallation when an active scheduled focus session or manual study timer is genuinely running
         return AiStudyGuardManager.isStudyPeriodActive(context)
     }
