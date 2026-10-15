@@ -82,8 +82,6 @@ import androidx.core.view.drawToBitmap
 import androidx.core.view.doOnLayout
 import com.example.data.model.FocusSessionEntity
 import com.example.ui.components.GlassButton
-import com.example.ui.components.MascotPose
-import com.example.ui.components.RegainMascotView
 import com.example.ui.theme.LavenderSoft
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -190,11 +188,9 @@ fun SessionCompleteScreen(
                     }
                 }
 
-                // Center Celebrating Mascot (new celebrate art)
-                RegainMascotView(
-                    pose = MascotPose.CELEBRATE_NEW,
-                    width = 180.dp,
-                    height = 240.dp
+                // Center Celebrating Mascot — equipped outfit set (never undressed).
+                CelebrateBuddyMascot(
+                    modifier = Modifier.size(180.dp)
                 )
             }
 
