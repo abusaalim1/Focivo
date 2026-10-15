@@ -266,6 +266,8 @@ fun SessionCompleteScreen(
 
                     Text(
                         text = if (session.distractionsCount == 0) "0 Distractions" else "${session.distractionsCount} Distractions",
+                        maxLines = 1,
+                        softWrap = false,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             color = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight,
                             fontSize = 13.sp
