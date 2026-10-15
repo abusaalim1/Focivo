@@ -442,7 +442,8 @@ class FocusShieldService : Service() {
                 }
 
                 // Check foreground app
-                if (usageStatsManager != null && !com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing && System.currentTimeMillis() - lastInterceptTime > 1500L) {
+                // v1.2.1: any block UI (overlay or Activity) suppresses re-intercept.
+                if (usageStatsManager != null && !BlockOverlayManager.isBlockUiShowing() && System.currentTimeMillis() - lastInterceptTime > 1500L) {
                     // NEVER block if phone call is active or ringing!
                     if (isPhoneCallInProgress()) {
                         continue
@@ -561,26 +562,24 @@ class FocusShieldService : Service() {
         reason: String? = null
     ) {
         val now = System.currentTimeMillis()
-        if (com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing || (blockedPackage == lastInterceptPkg && (now - lastInterceptTimestamp) < 2500L)) {
+        // v1.2.1: any block UI showing suppresses re-intercept.
+        if (BlockOverlayManager.isBlockUiShowing() || (blockedPackage == lastInterceptPkg && (now - lastInterceptTimestamp) < 2500L)) {
             return
         }
         lastInterceptPkg = blockedPackage
         lastInterceptTimestamp = now
 
         val friendlyName = friendlyAppName(this, blockedPackage)
-        val interceptIntent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+        // v1.2.1: overlay-first intercept — covers freeform/floating windows
+        // (the legacy Activity can't z-order above them on vivo).
+        BlockOverlayManager.intercept(
             context = this,
-            packageName = blockedPackage,
+            blockedPackage = blockedPackage,
             appName = friendlyName,
             durationSec = remainingSec,
             reason = reason,
             isPunishment = isPunishment
         )
-        try {
-            startActivity(interceptIntent)
-        } catch (e: Exception) {
-            Log.e("FocusShieldService", "Failed to launch BlockedAppLockActivity: ${e.message}")
-        }
     }
 
     private fun onShieldTimerComplete() {
@@ -661,10 +660,15 @@ class FocusShieldService : Service() {
             val manager = getSystemService(NotificationManager::class.java)
             manager?.cancel(NOTIFICATION_ID)
         } catch (_: Exception) {}
+
+        // v1.2.1: the block overlay must never outlive the shield.
+        try { BlockOverlayManager.hide(this) } catch (_: Exception) {}
     }
 
     override fun onDestroy() {
         super.onDestroy()
         stopShield()
+        // v1.2.1: never leave the block overlay up after the shield dies.
+        try { BlockOverlayManager.hide(this) } catch (_: Exception) {}
     }
 }

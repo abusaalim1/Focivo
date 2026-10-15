@@ -26,9 +26,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +40,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -80,13 +84,20 @@ fun MascotScreen(
     val lime = Color(0xFF8FD400)
 
     val savedSetId by MascotWardrobe.equipped.collectAsState()
+    // v1.2.1 re-lock: the equipped set can never be a locked one.
+    LaunchedEffect(focusPoints) {
+        MascotWardrobe.ensureEquippedUnlocked(focusPoints)
+    }
     // Pending set — local to this screen until Save is tapped.
     var pendingSetId by remember(savedSetId) { mutableStateOf(savedSetId) }
     var justSaved by remember { mutableStateOf(false) }
+    // Locked-set info dialog (tap a locked card -> how many points are needed).
+    var lockedInfoSet by remember { mutableStateOf<MascotOutfitSet?>(null) }
 
     val hasChanges = pendingSetId != savedSetId
     val pendingSet: MascotOutfitSet =
         outfitSetById(pendingSetId) ?: MascotWardrobe.currentSet()
+    val pendingUnlocked = pendingSet.isUnlocked(focusPoints)
 
     Column(
         modifier = Modifier
@@ -164,14 +175,15 @@ fun MascotScreen(
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(14.dp))
-                    // Save outfit
+                    // Save outfit (v1.2.1: only for unlocked sets)
+                    val canSave = hasChanges && pendingUnlocked
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(18.dp))
-                            .background(if (hasChanges) lime else cardBorder.copy(alpha = 0.6f))
+                            .background(if (canSave) lime else cardBorder.copy(alpha = 0.6f))
                             .pressFeedback()
-                            .clickable(enabled = hasChanges) {
+                            .clickable(enabled = canSave) {
                                 MascotWardrobe.saveSet(pendingSetId)
                                 justSaved = true
                             }
@@ -180,6 +192,7 @@ fun MascotScreen(
                     ) {
                         Text(
                             text = when {
+                                !pendingUnlocked -> "Locked — earn ${"%,d".format(pendingSet.unlockPoints)} pts"
                                 justSaved && !hasChanges -> "Outfit saved"
                                 hasChanges -> "Save outfit"
                                 else -> "Outfit saved"
@@ -187,7 +200,7 @@ fun MascotScreen(
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
-                            color = if (hasChanges) NearBlack else textSecondary
+                            color = if (canSave) NearBlack else textSecondary
                         )
                     }
                     if (hasChanges) {
@@ -220,9 +233,12 @@ fun MascotScreen(
                 }
             }
 
-            // Set grid
+            // Set grid (v1.2.1: locked sets show a lock badge + required
+            // points; tapping one explains the gap and never changes the
+            // preview/equipped set).
             items(OUTFIT_SETS, key = { it.id }) { set ->
                 val isEquipped = pendingSetId == set.id
+                val isLocked = !set.isUnlocked(focusPoints)
                 Column(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
@@ -235,9 +251,14 @@ fun MascotScreen(
                         .pressFeedback()
                         .clickable {
                             justSaved = false
-                            pendingSetId = set.id
+                            if (isLocked) {
+                                lockedInfoSet = set
+                            } else {
+                                pendingSetId = set.id
+                            }
                         }
-                        .padding(12.dp),
+                        .padding(12.dp)
+                        .testTag("mascot_set_card_${set.id}"),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(contentAlignment = Alignment.TopEnd) {
@@ -248,8 +269,25 @@ fun MascotScreen(
                             modifier = Modifier
                                 .height(120.dp)
                                 .aspectRatio(1408f / 1760f)
+                                .graphicsLayer { alpha = if (isLocked) 0.45f else 1f }
                         )
-                        if (isEquipped) {
+                        if (isLocked) {
+                            Box(
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xCC1A221B))
+                                    .border(1.dp, Color(0xFFFFD54F), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Locked",
+                                    tint = Color(0xFFFFD54F),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        } else if (isEquipped) {
                             Box(
                                 modifier = Modifier
                                     .size(24.dp)
@@ -279,10 +317,14 @@ fun MascotScreen(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (isEquipped) "Wearing" else "Tap to try",
+                        text = when {
+                            isLocked -> "${"%,d".format(set.unlockPoints)} pts to unlock"
+                            isEquipped -> "Wearing"
+                            else -> "Tap to try"
+                        },
                         fontFamily = PoppinsFontFamily,
                         fontSize = 10.5.sp,
-                        color = textSecondary,
+                        color = if (isLocked) Color(0xFFFFD54F) else textSecondary,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -290,6 +332,74 @@ fun MascotScreen(
 
             item(span = { GridItemSpan(2) }) {
                 Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+
+    // v1.2.1: locked-set tap -> how many more Focus Points are needed.
+    // Dismissing changes nothing (preview + equipped set untouched).
+    lockedInfoSet?.let { locked ->
+        val needed = (locked.unlockPoints - focusPoints).coerceAtLeast(0)
+        androidx.compose.ui.window.Dialog(onDismissRequest = { lockedInfoSet = null }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(cardBg)
+                    .border(1.dp, cardBorder, RoundedCornerShape(24.dp))
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFFD54F).copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD54F),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = locked.name,
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = textPrimary,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Earn ${"%,d".format(needed)} more Focus Points to unlock this outfit (1 pt per focused minute). Your current outfit stays on.",
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 13.sp,
+                    color = textSecondary,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 19.sp
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(lime)
+                        .clickable { lockedInfoSet = null }
+                        .padding(vertical = 13.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Got it",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = NearBlack
+                    )
+                }
             }
         }
     }

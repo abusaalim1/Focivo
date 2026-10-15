@@ -3,6 +3,7 @@ package com.example.ui.screens
 import android.Manifest
 import android.app.admin.DevicePolicyManager
 import android.content.Context
+import android.widget.Toast
 import android.content.Intent
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1378,40 +1379,39 @@ fun OnboardingFlowScreen(
         permTick++
     }
 
+    // v1.2.1: Allow/Continue ALWAYS fires the step's request (defensive —
+    // a failed intent surfaces a toast instead of silently doing nothing).
+    // Shared implementation with the Start-Study permission gate.
     fun firePermissionIntent(spec: PermissionSpec) {
-        when (spec.id) {
-            "notifications" -> {
-                markNotificationsDecided()
+        if (spec.id == "notifications") {
+            markNotificationsDecided()
+            val ok = try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    true
                 } else {
-                    PermissionUtils.openAppNotificationSettings(context)
+                    PermissionUtils.fireFocusPermissionIntent(context, spec.id)
                 }
-                permTick++
+            } catch (_: Exception) { false }
+            if (!ok) {
+                Toast.makeText(
+                    context,
+                    "Couldn't open the permission prompt — please allow notifications in Settings.",
+                    Toast.LENGTH_LONG
+                ).show()
             }
-            "usage" -> PermissionUtils.openUsageStatsSettings(context)
-            "overlay" -> PermissionUtils.openOverlaySettings(context)
-            "battery" -> PermissionUtils.openBatteryOptimizationSettings(context)
-            "exact_alarm" -> PermissionUtils.openExactAlarmSettings(context)
-            "accessibility" -> AiStudyGuardManager.openAccessibilitySettings(context)
-            "device_admin" -> {
-                try {
-                    val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
-                        putExtra(
-                            DevicePolicyManager.EXTRA_DEVICE_ADMIN,
-                            FocivoDeviceAdminReceiver.getComponentName(context)
-                        )
-                        putExtra(
-                            DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                            "Prevents uninstalling Focivo during strict focus sessions."
-                        )
-                    }
-                    context.startActivity(intent)
-                } catch (_: Exception) {
-                    PermissionUtils.openAppSettings(context)
-                }
-            }
+            permTick++
+            return
         }
+        val ok = PermissionUtils.fireFocusPermissionIntent(context, spec.id)
+        if (!ok) {
+            Toast.makeText(
+                context,
+                "Couldn't open Settings — please grant \"${spec.rowLabel}\" manually.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+        permTick++
     }
 
     fun requestPermission(spec: PermissionSpec) {

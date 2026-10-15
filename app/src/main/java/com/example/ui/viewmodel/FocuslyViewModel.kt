@@ -62,6 +62,29 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
          * ViewModel tick, the service ticker, and the cold-start restore race.
          */
         const val KEY_LAST_COMPLETED_END_TIME_MS = "last_completed_end_time_ms"
+        /**
+         * v1.2.1: the session's ORIGINAL target seconds, written at startTimer.
+         * Cold-start restores read THIS — never the remaining-seconds key —
+         * so process death can no longer shrink the recorded session to ~0.
+         */
+        const val KEY_SESSION_ORIGINAL_TARGET_SECS = "session_original_target_seconds"
+    }
+
+    /**
+     * v1.2.1: resolves the session's original target seconds for restores.
+     * Fallback chain: explicit original target → the timer service's
+     * target_seconds key → derive from remaining (never below remSec).
+     */
+    private fun resolveOriginalTargetSecs(
+        prefs: android.content.SharedPreferences,
+        tPrefs: android.content.SharedPreferences,
+        remSec: Int
+    ): Int {
+        val explicit = prefs.getInt(KEY_SESSION_ORIGINAL_TARGET_SECS, 0)
+        if (explicit > 0) return explicit.coerceAtLeast(remSec)
+        val serviceTarget = tPrefs.getInt("target_seconds", 0)
+        if (serviceTarget > 0) return serviceTarget.coerceAtLeast(remSec)
+        return remSec.coerceAtLeast(60)
     }
 
     val authManager = FirebaseAuthManager.getInstance(application)
@@ -2026,9 +2049,28 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     private val _showPreStudyBlockSheet = MutableStateFlow(false)
     val showPreStudyBlockSheet: StateFlow<Boolean> = _showPreStudyBlockSheet.asStateFlow()
 
+    // v1.2.1 — Start-Study permission gate. When non-empty, the UI must show
+    // the permission gate sheet (grant the missing ones) instead of starting.
+    private val _permissionGateMissing = MutableStateFlow<List<String>>(emptyList())
+    val permissionGateMissing: StateFlow<List<String>> = _permissionGateMissing.asStateFlow()
+
+    fun dismissPermissionGate() {
+        _permissionGateMissing.value = emptyList()
+    }
+
     fun requestStudySessionStart() {
         if (_isTimerRunning.value) {
             pauseTimer()
+            return
+        }
+        // v1.2.1 — study must not start without the 7 focus permissions.
+        // Route into the in-app permission request flow; never start silently.
+        val missing = try {
+            com.example.util.PermissionUtils.missingFocusPermissionIds(getApplication())
+        } catch (_: Exception) { emptyList() }
+        if (missing.isNotEmpty()) {
+            _permissionGateMissing.value = missing
+            Log.i(TAG, "Start Study blocked: missing focus permissions: $missing")
             return
         }
         val prefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
@@ -2197,6 +2239,11 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             prefs.edit()
                 .putBoolean("is_manual_timer_running", true)
                 .putLong("manual_timer_end_time_ms", endTime)
+                // v1.2.1: the ORIGINAL session target — the single source of
+                // truth for completion accounting. Restores must never derive
+                // the target from the remaining-seconds key (that shrank the
+                // recorded duration to ~0 on process-death restores).
+                .putInt(KEY_SESSION_ORIGINAL_TARGET_SECS, _targetSeconds.value)
                 .apply()
             com.example.util.StrictModeManager.setSessionActive(app, true)
 
@@ -2429,14 +2476,17 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         val endTime = prefs.getLong("manual_timer_end_time_ms", 0L)
         val now = System.currentTimeMillis()
         val storedTitle = tPrefs.getString("current_task_title", "") ?: ""
-        val storedTarget = tPrefs.getInt("remaining_seconds", 25 * 60).coerceAtLeast(60)
+        // v1.2.1: the session target is the ORIGINAL target — reading the
+        // "remaining_seconds" key here shrank every restored session toward
+        // the remaining-at-kill time (root cause of 0-minute summaries).
+        val originalTarget = resolveOriginalTargetSecs(prefs, tPrefs, 60)
 
         if (endTime > now) {
             // Timer still running: restore the running UI state.
             val remSec = ((endTime - now) / 1000L).toInt().coerceIn(1, 4 * 3600)
             _isTimerRunning.value = true
             _remainingSeconds.value = remSec
-            _targetSeconds.value = storedTarget.coerceAtLeast(remSec)
+            _targetSeconds.value = originalTarget.coerceAtLeast(remSec)
             if (storedTitle.isNotBlank()) _currentTaskTitle.value = storedTitle
             sessionStartTimeMs = now
             accumulatedSessionElapsedSecs = 0
@@ -2474,7 +2524,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 .putLong(KEY_LAST_COMPLETED_END_TIME_MS, endTime)
                 .commit()
             tPrefs.edit().putBoolean("is_timer_running", false).apply()
-            _targetSeconds.value = storedTarget
+            _targetSeconds.value = originalTarget
             _remainingSeconds.value = 0
             if (storedTitle.isNotBlank()) _currentTaskTitle.value = storedTitle
             accumulatedSessionElapsedSecs = 0
@@ -2580,7 +2630,12 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             val app = getApplication<Application>()
             val endTime = System.currentTimeMillis() + (_remainingSeconds.value * 1000L)
             val prefs = app.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
-            prefs.edit().putLong("manual_timer_end_time_ms", endTime).apply()
+            // v1.2.1: +5 min extends the session — keep the original-target
+            // marker in sync so completion accounting stays honest.
+            prefs.edit()
+                .putLong("manual_timer_end_time_ms", endTime)
+                .putInt(KEY_SESSION_ORIGINAL_TARGET_SECS, _targetSeconds.value)
+                .apply()
             val timerIntent = Intent(app, com.example.service.FocusTimerService::class.java).apply {
                 action = com.example.service.FocusTimerService.ACTION_START_TIMER
                 putExtra(com.example.service.FocusTimerService.EXTRA_END_TIME_MS, endTime)
@@ -2615,6 +2670,10 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     private fun discardActiveSession() {
         pauseTimer()
         _remainingSeconds.value = _targetSeconds.value
+        try {
+            getApplication<Application>().getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
+                .edit().remove(KEY_SESSION_ORIGINAL_TARGET_SECS).apply()
+        } catch (_: Exception) {}
         accumulatedSessionElapsedSecs = 0
         sessionStartTimeMs = 0L
         _distractionsCount.value = 0
@@ -2876,6 +2935,11 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         _distractionsCount.value = 0
         _loggedDistractions.value = emptyList()
         _sessionNotes.value = ""
+        // v1.2.1: the original-target marker belongs to the finished session.
+        try {
+            getApplication<Application>().getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
+                .edit().remove(KEY_SESSION_ORIGINAL_TARGET_SECS).apply()
+        } catch (_: Exception) {}
 
         try {
             val tPrefs = getApplication<Application>().getSharedPreferences("focusly_timer_state", Context.MODE_PRIVATE)
