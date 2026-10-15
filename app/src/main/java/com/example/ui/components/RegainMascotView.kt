@@ -101,15 +101,44 @@ fun RegainMascotView(
     val actualWidth = width ?: size
     val actualHeight = height ?: size
 
+    // v1.2.1: the active-session STUDYING visual is the EQUIPPED outfit set's
+    // study render (owner: "jaisa kapde uske pas hai waisa hi") with a gentle
+    // breathing/bob idle animation so it still feels alive. The old generic
+    // mascot video art is never used in the study flow anymore.
     if (pose == MascotPose.STUDYING) {
+        val studyingTransition = rememberInfiniteTransition(label = "studying_idle")
+        val bobOffset by studyingTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = -4f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2600, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "bob"
+        )
+        val breatheScale by studyingTransition.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.025f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2600, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "breathe"
+        )
         Box(
             modifier = modifier
                 .width(actualWidth)
-                .height(actualHeight),
+                .height(actualHeight)
+                .graphicsLayer {
+                    translationY = bobOffset
+                    scaleX = breatheScale
+                    scaleY = breatheScale
+                },
             contentAlignment = Alignment.Center
         ) {
-            MascotVideoPlayer(
-                modifier = Modifier.fillMaxSize()
+            com.example.ui.components.BuddyMascot(
+                modifier = Modifier.fillMaxSize(),
+                pose = com.example.util.MascotPose.STUDY
             )
         }
         return

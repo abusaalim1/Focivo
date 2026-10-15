@@ -715,6 +715,20 @@ fun TimerThemePicker(
                                 )
                             }
                         }
+                        // v1.2.1: the theme's mascot/logo on every picker card
+                        // (owner: theme logo was not showing on device).
+                        // Same art as the themed timer (theme.mascotPose).
+                        Box(
+                            modifier = Modifier.align(Alignment.Center),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            RegainMascotView(
+                                pose = theme.mascotPose,
+                                size = 64.dp,
+                                animate = false,
+                                modifier = Modifier.testTag("theme_card_mascot_${theme.id}")
+                            )
+                        }
                         // Name strip on a scrim so it reads on any artwork.
                         Box(
                             modifier = Modifier

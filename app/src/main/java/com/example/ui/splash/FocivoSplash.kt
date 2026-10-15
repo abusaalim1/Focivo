@@ -63,23 +63,33 @@ private fun seg(p: Float, a: Float, b: Float) = eo(cl((p - a) / (b - a)))
 /** NEW_USER -> onFinished(true)  => Auth screen "Create Account" tab pe kholo
  *  RETURNING -> onFinished(false) => Home */
 @Composable
-fun FocivoSplash(variant: SplashVariant, onFinished: (openCreateAccount: Boolean) -> Unit) {
+fun FocivoSplash(
+    variant: SplashVariant,
+    /**
+     * v1.2.1 screenshot-test seam: when non-null the clock animation is
+     * skipped and the scene renders at this fixed progress (0..1).
+     * Production callers leave it null. Kept BEFORE onFinished so existing
+     * trailing-lambda call sites keep compiling unchanged.
+     */
+    testProgress: Float? = null,
+    onFinished: (openCreateAccount: Boolean) -> Unit
+) {
     val progress = remember { Animatable(0f) }
-    LaunchedEffect(variant) {
-        progress.animateTo(1f, tween(variant.totalMs, easing = LinearEasing))
-        onFinished(variant == SplashVariant.NEW_USER)
+    LaunchedEffect(variant, testProgress) {
+        if (testProgress == null) {
+            progress.animateTo(1f, tween(variant.totalMs, easing = LinearEasing))
+            onFinished(variant == SplashVariant.NEW_USER)
+        } else {
+            progress.snapTo(testProgress.coerceIn(0f, 1f))
+        }
     }
     val p = progress.value
 
     BoxWithConstraints(Modifier.fillMaxSize().background(BgDark)) {
         val W = maxWidth
         val cy = maxHeight * 0.43f
-        Canvas(Modifier.fillMaxSize()) {
-            drawCircle(
-                Brush.radialGradient(listOf(Lime.copy(alpha = .11f), Color.Transparent),
-                    Offset(size.width / 2, size.height * .43f), size.width * .9f)
-            )
-        }
+        // v1.2.1: the lime radial background glow is removed (owner) — the
+        // backdrop is the plain dark #0D110E. Animation timing/scenes unchanged.
         if (variant == SplashVariant.NEW_USER) NewUserScene(p, W, cy) else ReturningScene(p, W, cy)
     }
 }
@@ -140,7 +150,9 @@ private fun BoxWithConstraintsScope.NewUserScene(p: Float, W: Dp, cy: Dp) {
         val ro = seg(p, .2f, .3f) * out
         if (ro > 0f) {
             val c = Offset(size.width / 2, cy.toPx()); val rr = r.dp.toPx() * lerp(.85f, 1f, seg(p, .2f, .3f)) * lerp(.92f, 1f, out)
-            drawCircle(Brush.radialGradient(listOf(Color(0xFF1B211C), Color(0xFF090C0A)), c, rr), rr, c, alpha = ro)
+            // v1.2.1: the extra filled backdrop circle behind the radar disc is
+            // removed (owner) — the disc rings + sweep draw straight on the
+            // plain dark background.
             val st = Stroke(1.dp.toPx())
             drawCircle(Lime.copy(alpha = .15f * ro), rr, c, style = st)
             drawCircle(Lime.copy(alpha = .07f * ro), rr * .66f, c, style = st)

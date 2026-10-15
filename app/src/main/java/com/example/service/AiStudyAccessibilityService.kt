@@ -151,15 +151,16 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     val mode = if (isFloating) "floating window" else "split-screen"
                     Log.w(TAG, "[MultiWindow] Blocked app ($pkg) in $mode during focus — intercepting.")
                     val friendlyName = try { FocusShieldService.friendlyAppName(ctx, pkg) } catch (_: Exception) { pkg }
-                    val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+                    // v1.2.1: overlay-first intercept — the overlay covers
+                    // floating windows too; Activity is the no-overlay fallback.
+                    BlockOverlayManager.intercept(
                         context = ctx,
-                        packageName = pkg,
+                        blockedPackage = pkg,
                         appName = friendlyName,
                         durationSec = try { FocusShieldService.getRemainingSeconds(ctx) } catch (_: Exception) { 0 },
                         reason = "$friendlyName is locked during your active focus session ($mode windows are blocked during focus).",
                         isPunishment = false
                     )
-                    try { ctx.startActivity(intent) } catch (_: Exception) {}
                 }
                 return
             }
@@ -205,7 +206,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
         reason: String,
         isGeminiIntercept: Boolean = true
     ) {
-        if (com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing) return
+        // v1.2.1: any block UI (overlay or legacy Activity) suppresses re-intercept.
+        if (BlockOverlayManager.isBlockUiShowing()) return
 
         try {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -218,19 +220,15 @@ class AiStudyAccessibilityService : AccessibilityService() {
         }
 
         val remainingSec = FocusShieldService.getRemainingSeconds(context)
-        val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+        // v1.2.1: overlay-first intercept (covers freeform windows).
+        BlockOverlayManager.intercept(
             context = context,
-            packageName = blockedPackage,
+            blockedPackage = blockedPackage,
             appName = appName,
             durationSec = remainingSec,
             reason = reason,
             isPunishment = false
         )
-        try {
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start BlockedAppLockActivity: ${e.message}")
-        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -259,19 +257,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     lastHomeScreenInterceptMs = nowHome
                     lastHomeInterceptedPkg = pkg
                     Log.w(TAG, "[Deep Focus] Home screen blocked during deep-focus session.")
-                    val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+                    BlockOverlayManager.intercept(
                         context = applicationContext,
-                        packageName = pkg,
+                        blockedPackage = pkg,
                         appName = "Home Screen",
                         durationSec = FocusShieldService.getRemainingSeconds(applicationContext),
                         reason = "Deep Focus is on — the home screen stays blocked until your session ends. Get back in there!",
                         isPunishment = false
                     )
-                    try {
-                        applicationContext.startActivity(intent)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to start home-screen block overlay: ${e.message}")
-                    }
                 }
                 return
             }
@@ -321,17 +314,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     lastGeneralAppInterceptTimeMs = nowTime
                     lastGeneralInterceptedPkg = pkg
                     Log.w(TAG, "[Strict Mode Anti-Uninstall] Intercepted Package Installer ($pkg) during active study!")
-                    val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+                    BlockOverlayManager.intercept(
                         context = applicationContext,
-                        packageName = pkg,
+                        blockedPackage = pkg,
                         appName = "App Installer",
                         durationSec = FocusShieldService.getRemainingSeconds(applicationContext),
                         reason = "Strict Mode Active: App Uninstallation is protected during your active study session.",
                         isPunishment = false
                     )
-                    try {
-                        applicationContext.startActivity(intent)
-                    } catch (_: Exception) {}
                 }
                 return
             }
@@ -344,17 +334,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     Log.w(TAG, "[AI Punishment Lock] Attempted to open punished app ($pkg) during active 3-hour lockout!")
                     val remainingSec = AiStudyGuardManager.getPunishmentRemainingSeconds(applicationContext, pkg)
                     val friendlyName = FocusShieldService.friendlyAppName(applicationContext, pkg)
-                    val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+                    BlockOverlayManager.intercept(
                         context = applicationContext,
-                        packageName = pkg,
+                        blockedPackage = pkg,
                         appName = friendlyName,
                         durationSec = remainingSec,
                         reason = "3-Hour Penalty: $friendlyName is locked for non-study conversation.",
                         isPunishment = true
                     )
-                    try {
-                        applicationContext.startActivity(intent)
-                    } catch (_: Exception) {}
                 }
                 return
             }
@@ -363,23 +350,21 @@ class AiStudyAccessibilityService : AccessibilityService() {
             if (isWindowStateChanged && isStudyPeriod && !isMonitoredYouTube) {
                 val blockedList = FocusShieldService.getActiveBlockedPackages(applicationContext)
                 if (blockedList.any { blocked -> pkg.equals(blocked, ignoreCase = true) || pkg.startsWith(blocked, ignoreCase = true) }) {
-                    if (!com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing || (nowTime - lastGeneralAppInterceptTimeMs > 1000L) || lastGeneralInterceptedPkg != pkg) {
+                    // v1.2.1: any block UI (overlay or Activity) suppresses re-intercept.
+                    if (!BlockOverlayManager.isBlockUiShowing() || (nowTime - lastGeneralAppInterceptTimeMs > 1000L) || lastGeneralInterceptedPkg != pkg) {
                         lastGeneralAppInterceptTimeMs = nowTime
                         lastGeneralInterceptedPkg = pkg
                         Log.w(TAG, "[Focus Shield Lock] Opening blocked app ($pkg) during active study!")
                         val friendlyName = FocusShieldService.friendlyAppName(applicationContext, pkg)
                         val remainingSec = FocusShieldService.getRemainingSeconds(applicationContext)
-                        val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+                        BlockOverlayManager.intercept(
                             context = applicationContext,
-                            packageName = pkg,
+                            blockedPackage = pkg,
                             appName = friendlyName,
                             durationSec = remainingSec,
                             reason = "$friendlyName is locked during your active focus session.",
                             isPunishment = false
                         )
-                        try {
-                            applicationContext.startActivity(intent)
-                        } catch (_: Exception) {}
                     }
                     return
                 }
@@ -396,17 +381,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
             if (isWindowStateChanged && com.example.util.AppDailyLimitsManager.isDailyLimitExceeded(applicationContext, pkg)) {
                 Log.w(TAG, "[Daily Limit Lock] Daily limit reached for $pkg")
                 val friendlyName = FocusShieldService.friendlyAppName(applicationContext, pkg)
-                val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+                BlockOverlayManager.intercept(
                     context = applicationContext,
-                    packageName = pkg,
+                    blockedPackage = pkg,
                     appName = friendlyName,
                     durationSec = 0,
                     reason = "Daily screen time limit reached today for $friendlyName.",
                     isPunishment = false
                 )
-                try {
-                    applicationContext.startActivity(intent)
-                } catch (_: Exception) {}
                 return
             }
 

@@ -1,12 +1,14 @@
 package com.example.ui.screens
 
 import android.app.Activity
+import android.content.ClipData
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
+import android.util.Log
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -34,6 +36,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -75,12 +79,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.core.view.drawToBitmap
 import androidx.core.view.doOnLayout
 import com.example.data.model.FocusSessionEntity
 import com.example.ui.components.GlassButton
-import com.example.ui.components.MascotPose
-import com.example.ui.components.RegainMascotView
 import com.example.ui.theme.LavenderSoft
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -92,6 +95,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -186,11 +190,9 @@ fun SessionCompleteScreen(
                     }
                 }
 
-                // Center Celebrating Mascot (new celebrate art)
-                RegainMascotView(
-                    pose = MascotPose.CELEBRATE_NEW,
-                    width = 180.dp,
-                    height = 240.dp
+                // Center Celebrating Mascot — equipped outfit set (never undressed).
+                CelebrateBuddyMascot(
+                    modifier = Modifier.size(180.dp)
                 )
             }
 
@@ -218,9 +220,10 @@ fun SessionCompleteScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Points & Distractions Glass Capsule
+            // Points & Distractions Glass Capsule (requiredWidth: never clip mid-word)
             Box(
                 modifier = Modifier
+                    .requiredWidth(IntrinsicSize.Max)
                     .shadow(
                         elevation = 8.dp,
                         shape = RoundedCornerShape(24.dp),
@@ -266,6 +269,8 @@ fun SessionCompleteScreen(
 
                     Text(
                         text = if (session.distractionsCount == 0) "0 Distractions" else "${session.distractionsCount} Distractions",
+                        maxLines = 1,
+                        softWrap = false,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             color = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight,
                             fontSize = 13.sp
@@ -376,15 +381,11 @@ private fun ShareSessionCard(minutesSpent: Int, distractionsCount: Int, quote: S
         }
     }
 
-    // Shares the card image (saved to gallery first) + text; falls back to text-only.
+    // v1.2.1: shares the card PNG via FileProvider through the system sheet
+    // (WhatsApp/Instagram/every installed app); text-only fallback on failure.
     fun shareWithImage(toWhatsApp: Boolean) {
         scope.launch {
-            val imageUri = saveShareCardImage(context, minutesSpent, streakDays, dateLine)
-            if (imageUri != null) {
-                shareImageAndText(context, imageUri, shareText, toWhatsApp)
-            } else {
-                if (toWhatsApp) shareToWhatsApp(context, shareText) else shareGeneric(context, shareText)
-            }
+            shareCardImageViaSystem(context, minutesSpent, streakDays, dateLine, shareText, toWhatsApp)
         }
     }
 
@@ -666,7 +667,61 @@ private suspend fun captureShareCardBitmap(
 }
 
 /**
- * Renders the card and saves the PNG to the gallery.
+ * v1.2.1 — capture with a watchdog. The old path could suspend forever when
+ * the invisible ComposeView never laid out (both Share and Download then
+ * looked "broken" with zero feedback). Now a missed frame fails loud with
+ * a toast instead of hanging.
+ */
+private suspend fun captureShareCardBitmapGuarded(
+    context: Context,
+    minutes: Int,
+    streakDays: Int,
+    dateLine: String
+): Bitmap? {
+    val bitmap = withTimeoutOrNull(8000L) {
+        captureShareCardBitmap(context, minutes, streakDays, dateLine)
+    }
+    if (bitmap == null) {
+        Log.e("ShareCard", "Card capture failed or timed out (8s)")
+    }
+    return bitmap
+}
+
+/**
+ * v1.2.1 — SHARE path: writes the card PNG to the app cache and exposes it
+ * through FileProvider (ACTION_SEND, image/png, FLAG_GRANT_READ_URI_PERMISSION
+ * with explicit ClipData so the grant survives the chooser on vivo/OEM ROMs).
+ *
+ * ROOT CAUSE of broken sharing: the old path attached a MediaStore
+ * collection URI to the share intent. On several OEM ROMs (vivo's Funtouch
+ * included) the read-permission grant for MediaStore URIs does not survive
+ * the system chooser, so target apps received an unreadable stream and the
+ * share silently failed. FileProvider cache URIs with an explicit ClipData
+ * grant are the reliable mechanism.
+ */
+private suspend fun writeShareCardToCache(context: Context, bitmap: Bitmap): Uri? =
+    withContext(Dispatchers.IO) {
+        try {
+            val dir = java.io.File(context.cacheDir, "recap_shares").apply { mkdirs() }
+            // Prune older share files so the cache never grows.
+            dir.listFiles()?.sortedByDescending { it.lastModified() }?.drop(4)
+                ?.forEach { runCatching { it.delete() } }
+            val file = java.io.File(dir, "focivo-share-${System.currentTimeMillis()}.png")
+            var ok = false
+            file.outputStream().use { out -> ok = bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
+            if (!ok) {
+                runCatching { file.delete() }
+                return@withContext null
+            }
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        } catch (e: Exception) {
+            Log.e("ShareCard", "Cache write failed: ${e.message}")
+            null
+        }
+    }
+
+/**
+ * Renders the card and saves the PNG to the gallery (Pictures/Focivo).
  * @return the MediaStore Uri of the saved image, or null on failure.
  */
 private suspend fun saveShareCardImage(
@@ -675,7 +730,7 @@ private suspend fun saveShareCardImage(
     streakDays: Int,
     dateLine: String
 ): Uri? {
-    val bitmap = captureShareCardBitmap(context, minutes, streakDays, dateLine) ?: return null
+    val bitmap = captureShareCardBitmapGuarded(context, minutes, streakDays, dateLine) ?: return null
     return withContext(Dispatchers.IO) {
         try {
             val filename = "Focivo-Focus-${System.currentTimeMillis()}.png"
@@ -705,6 +760,7 @@ private suspend fun saveShareCardImage(
             if (!bitmap.isRecycled) bitmap.recycle()
             uri
         } catch (e: Exception) {
+            Log.e("ShareCard", "Gallery save failed: ${e.message}")
             null
         }
     }
@@ -726,21 +782,62 @@ private suspend fun saveShareCard(
     }
 }
 
-/** Shares the card image together with the share text (WhatsApp direct, or system chooser). */
-private fun shareImageAndText(context: Context, imageUri: Uri, text: String, toWhatsApp: Boolean) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "image/png"
-        putExtra(Intent.EXTRA_STREAM, imageUri)
-        putExtra(Intent.EXTRA_TEXT, text)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        if (toWhatsApp) setPackage("com.whatsapp")
+/** v1.2.1 — shares the card PNG via FileProvider through the system chooser
+ * (WhatsApp, Instagram and every installed app appear automatically). */
+private suspend fun shareCardViaSystemSheet(context: Context, text: String, toWhatsApp: Boolean, imageUri: Uri) {
+    withContext(Dispatchers.Main) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, imageUri)
+            putExtra(Intent.EXTRA_TEXT, text)
+            // Explicit ClipData: the read grant reliably reaches the target
+            // chosen in the system sheet (MediaStore-URI grants were dropped
+            // on some OEM ROMs — the old failure mode).
+            clipData = ClipData.newUri(context.contentResolver, "Focivo share card", imageUri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            if (toWhatsApp) setPackage("com.whatsapp")
+        }
+        val launch = if (toWhatsApp) intent else Intent.createChooser(intent, "Share your focus session")
+        if (context !is Activity) launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(launch)
+        } catch (e: Exception) {
+            Log.e("ShareCard", "Share sheet failed: ${e.message}")
+            Toast.makeText(context, "No app available to share.", Toast.LENGTH_SHORT).show()
+            // WhatsApp missing — fall back to the generic sheet / text.
+            if (toWhatsApp) shareToWhatsApp(context, text)
+        }
     }
-    val launch = if (toWhatsApp) intent else Intent.createChooser(intent, "Share your focus session")
-    if (context !is Activity) launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    try {
-        context.startActivity(launch)
-    } catch (e: Exception) {
-        // WhatsApp missing / no app handles image share — fall back to text-only.
+}
+
+/**
+ * v1.2.1 — Share entry point: capture -> FileProvider cache PNG -> system
+ * share sheet. Text-only fallback with a toast when the image can't be made.
+ */
+private suspend fun shareCardImageViaSystem(
+    context: Context,
+    minutes: Int,
+    streakDays: Int,
+    dateLine: String,
+    text: String,
+    toWhatsApp: Boolean
+) {
+    val bitmap = captureShareCardBitmapGuarded(context, minutes, streakDays, dateLine)
+    if (bitmap == null) {
+        withContext(Dispatchers.Main) {
+            Toast.makeText(context, "Couldn't render the card — sharing text instead.", Toast.LENGTH_SHORT).show()
+        }
         if (toWhatsApp) shareToWhatsApp(context, text) else shareGeneric(context, text)
+        return
     }
+    val uri = writeShareCardToCache(context, bitmap)
+    if (!bitmap.isRecycled) bitmap.recycle()
+    if (uri == null) {
+        withContext(Dispatchers.Main) {
+            Toast.makeText(context, "Couldn't prepare the image — sharing text instead.", Toast.LENGTH_SHORT).show()
+        }
+        if (toWhatsApp) shareToWhatsApp(context, text) else shareGeneric(context, text)
+        return
+    }
+    shareCardViaSystemSheet(context, text, toWhatsApp, uri)
 }

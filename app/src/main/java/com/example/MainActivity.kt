@@ -780,6 +780,16 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     )
                 }
 
+                // v1.2.1 — Start-Study permission gate: missing focus
+                // permissions route here instead of starting the session.
+                val permissionGateMissing by viewModel.permissionGateMissing.collectAsState()
+                if (permissionGateMissing.isNotEmpty()) {
+                    com.example.ui.components.PermissionGateSheet(
+                        missingIds = permissionGateMissing,
+                        onDismiss = { viewModel.dismissPermissionGate() }
+                    )
+                }
+
                 // Weekly Review (Sunday Recap) Glassmorphism Dialog
                 val currentWeeklyReview = viewModel.weeklyReviewSummary.collectAsStateWithLifecycle().value
                 currentWeeklyReview?.let { review ->
