@@ -73,10 +73,16 @@ import com.example.ui.theme.backdropTitleShadow
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.ui.theme.themedCardBackground
 import com.example.util.PomodoroConfig
+import com.example.util.PomodoroPhase
 import com.example.util.PomodoroState
+import com.example.util.PomodoroStyleManager
 import com.example.util.TimerFaceManager
 import com.example.util.TimerThemeManager
+import com.example.util.nextPomodoroPhase
 import com.example.util.phaseDisplayLabel
+import com.example.ui.timer.FocivoPomodoro
+import com.example.ui.timer.PomodoroUiState
+import com.example.ui.timer.PomoPhase as UiPomoPhase
 
 /**
  * v1.5.0 — ONE-BUTTON HUB redesign.
@@ -128,6 +134,11 @@ fun FocusScreen(
     pomodoroState: PomodoroState? = null,
     // v1.1: starts a pomodoro run through the normal session-start gate.
     onStartPomodoro: (PomodoroConfig) -> Unit = {},
+    // v1.2.3: pomodoro-run controls for the FocivoPomodoro slot —
+    // stop clears the run (discards like finishing early); skip on a focus
+    // phase discards the phase without recording, then advances.
+    onStopPomodoro: () -> Unit = {},
+    onSkipPomodoroFocus: () -> Unit = {},
     // v1.1: blocked-apps list (dedicated destination from the hub).
     onRemoveBlockedApp: (String) -> Unit = {},
     onSaveBlockedApps: (Set<String>) -> Unit = {},
@@ -423,6 +434,43 @@ fun FocusScreen(
                                 alpha = 0.35f
                             )
                         }
+                        // v1.2.3: an active pomodoro run renders the FocivoPomodoro
+                        // UI, constrained to the timer slot — the surrounding
+                        // app chrome (swipe-up gesture, phase pill, controls
+                        // below) is untouched. Classic flow
+                        // (pomodoroState == null) is completely unchanged.
+                        val pomoStyle by PomodoroStyleManager.selectedStyle.collectAsState()
+                        val pomoUiState = remember(pomodoroState, remainingSeconds, targetSeconds, isRunning) {
+                            pomodoroState?.let {
+                                buildPomodoroUiState(it, remainingSeconds, targetSeconds, isRunning)
+                            }
+                        }
+                        if (pomoUiState != null && pomodoroState != null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(660.dp)
+                                    .clip(RoundedCornerShape(28.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                FocivoPomodoro(
+                                    state = pomoUiState,
+                                    style = pomoStyle,
+                                    onToggle = {
+                                        if (isRunning) onPauseTimer() else onResumeTimer()
+                                    },
+                                    onSkip = {
+                                        if (pomodoroState.phase == PomodoroPhase.FOCUS) {
+                                            onSkipPomodoroFocus()
+                                        } else {
+                                            onSkipBreak()
+                                        }
+                                    },
+                                    onReset = onStopPomodoro,
+                                    modifier = Modifier.testTag("pomodoro_timer_component")
+                                )
+                            }
+                        } else {
                         TimerFaceHost(
                             faceId = selectedFace.id,
                             params = TimerFaceParams(
@@ -467,6 +515,7 @@ fun FocusScreen(
                             ),
                             modifier = Modifier.testTag("aurora_timer_component")
                         )
+                        } // else: classic timer face
                     }
                 }
 
@@ -641,4 +690,47 @@ fun FocusScreen(
             )
         }
     }
+}
+
+/**
+ * v1.2.3 — builds the Pomodoro UI state from the live engine state.
+ * remaining/total are the active phase timer's real values (the same ones
+ * the timer slot already passes to TimerFaceHost). sessionIndex follows the
+ * "current session" convention: during a break it points at the session the
+ * break belongs to (so the cycle track shows it complete).
+ */
+private fun buildPomodoroUiState(
+    pomo: PomodoroState,
+    remainingSeconds: Int,
+    targetSeconds: Int,
+    isRunning: Boolean
+): PomodoroUiState {
+    val phase = when (pomo.phase) {
+        PomodoroPhase.FOCUS -> UiPomoPhase.FOCUS
+        PomodoroPhase.SHORT_BREAK -> UiPomoPhase.SHORT
+        PomodoroPhase.LONG_BREAK -> UiPomoPhase.LONG
+    }
+    val cycles = pomo.config.cycles.coerceAtLeast(1)
+    val sessionIndex = when (pomo.phase) {
+        PomodoroPhase.FOCUS -> pomo.focusCompleted
+        else -> pomo.focusCompleted - 1
+    }.coerceIn(0, cycles - 1)
+    // Pure lookahead for the "up next" row; null-safe fallback.
+    val next = nextPomodoroPhase(pomo)
+    val nextPhase = when (next?.phase) {
+        PomodoroPhase.FOCUS -> UiPomoPhase.FOCUS
+        PomodoroPhase.SHORT_BREAK -> UiPomoPhase.SHORT
+        PomodoroPhase.LONG_BREAK -> UiPomoPhase.LONG
+        null -> UiPomoPhase.SHORT
+    }
+    return PomodoroUiState(
+        phase = phase,
+        remainingSec = remainingSeconds,
+        totalSec = targetSeconds,
+        sessionIndex = sessionIndex,
+        sessions = cycles,
+        running = isRunning,
+        nextPhase = nextPhase,
+        nextMinutes = next?.phaseMinutes() ?: pomo.config.shortBreakMinutes
+    )
 }

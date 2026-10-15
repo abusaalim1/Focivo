@@ -700,6 +700,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         // v1.1: Pomodoro engine.
                                         pomodoroState = pomodoroState,
                                         onStartPomodoro = { config -> viewModel.requestPomodoroStart(config) },
+                                        // v1.2.3: pomodoro-run slot controls.
+                                        onStopPomodoro = { viewModel.stopPomodoro() },
+                                        onSkipPomodoroFocus = { viewModel.skipPomodoroFocusPhase() },
                                         // v1.1: dedicated blocked-apps list.
                                         onRemoveBlockedApp = { pkg -> viewModel.removeBlockedApp(pkg) },
                                         onSaveBlockedApps = { pkgs -> viewModel.updateBlockedAppsList(pkgs) }

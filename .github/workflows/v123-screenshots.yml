@@ -46,9 +46,9 @@ jobs:
         if: always()
         run: |
           echo "=== V123 screenshot dir ==="
-          find app/src/test/screenshots/v122 -type f 2>/dev/null | head -40
+          find app/src/test/screenshots/v123 -type f 2>/dev/null | head -40
           echo "=== PNG count ==="
-          find app/src/test/screenshots/v122 -name '*.png' 2>/dev/null | wc -l
+          find app/src/test/screenshots/v123 -name '*.png' 2>/dev/null | wc -l
 
       - name: Upload screenshots
         if: always()

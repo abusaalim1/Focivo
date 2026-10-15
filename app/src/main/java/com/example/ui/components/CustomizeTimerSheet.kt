@@ -59,6 +59,7 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.util.PomodoroConfig
+import com.example.util.PomodoroStyleManager
 import com.example.util.TimerFaceManager
 import com.example.util.TimerTheme
 import com.example.util.TimerThemeManager
@@ -451,6 +452,21 @@ fun CustomizeTimerSheet(
                                 TimerFaceManager.trySelectFace(context, face.id, focusPoints)
                             }
                         },
+                        textPrimary = textPrimary,
+                        cardBorder = cardBorder
+                    )
+                }
+
+                // v1.2.3: Pomodoro design — four free designs with live
+                // previews, persisted as the enum name (TICK_RING default).
+                // Applies to the Focus screen while a pomodoro run is active.
+                item {
+                    CustomizeSectionLabel(text = "Pomodoro design", textSecondary = textSecondary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val pomoDesign by PomodoroStyleManager.selectedStyle.collectAsState()
+                    PomodoroDesignPicker(
+                        selectedStyle = pomoDesign,
+                        onStyleTap = { PomodoroStyleManager.selectStyle(context, it) },
                         textPrimary = textPrimary,
                         cardBorder = cardBorder
                     )

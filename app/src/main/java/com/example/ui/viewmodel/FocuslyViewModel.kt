@@ -2707,6 +2707,21 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         setMode(_currentMode.value, _targetSeconds.value / 60)
     }
 
+    /**
+     * v1.2.3 — skip the current FOCUS phase of an active pomodoro run.
+     * The in-progress focus phase is DISCARDED exactly like finishing a
+     * session early (no record, no points, no streak change, no completion
+     * screen — the owner's standing rule), then the run advances to the
+     * next phase through the existing phase engine. Break-phase skips keep
+     * using skipBreak(). No new accounting logic: this only chains the two
+     * existing paths.
+     */
+    fun skipPomodoroFocusPhase() {
+        if (_pomodoroState.value?.phase != com.example.util.PomodoroPhase.FOCUS) return
+        discardActiveSession()
+        advancePomodoroPhase()
+    }
+
     private fun calculateConsecutiveStreak(sessions: List<FocusSessionEntity>): Pair<Int, Int> {
         if (sessions.isEmpty()) return Pair(0, 0)
 

@@ -33,6 +33,12 @@ class FocuslyApplication : Application() {
         } catch (e: Throwable) {
             Log.e("FocuslyApplication", "Failed to initialize TimerFaceManager: ${e.message}", e)
         }
+        // v1.2.3: pomodoro design picker — same init pattern.
+        try {
+            com.example.util.PomodoroStyleManager.init(this)
+        } catch (e: Throwable) {
+            Log.e("FocuslyApplication", "Failed to initialize PomodoroStyleManager: ${e.message}", e)
+        }
         try {
             com.example.util.MascotWardrobe.init(this)
         } catch (e: Throwable) {

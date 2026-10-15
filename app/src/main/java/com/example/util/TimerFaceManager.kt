@@ -60,6 +60,63 @@ object TimerFaceManager {
             name = "Editorial",
             tagline = "Oversized numerals, thin line",
             unlockPoints = 3500
+        ),
+        // v1.2.3 — nine new clock styles (FocivoClock). Ids are prefixed
+        // because "editorial" is already taken above. Locks follow the
+        // same threshold model: Liquid 150, Breathe 200, Horizon 250.
+        TimerFace(
+            id = "clock_orbit",
+            name = "Orbit",
+            tagline = "Thin ring, glowing orbiting dot",
+            unlockPoints = 0
+        ),
+        TimerFace(
+            id = "clock_flip",
+            name = "Flip",
+            tagline = "Soft flip-clock cards",
+            unlockPoints = 0
+        ),
+        TimerFace(
+            id = "clock_liquid",
+            name = "Liquid",
+            tagline = "Water level slowly drains",
+            unlockPoints = 150
+        ),
+        TimerFace(
+            id = "clock_editorial",
+            name = "Editorial Clock",
+            tagline = "Huge serif, hairline progress",
+            unlockPoints = 0
+        ),
+        TimerFace(
+            id = "clock_dial",
+            name = "Dial",
+            tagline = "Sweeping dial with live wedge",
+            unlockPoints = 0
+        ),
+        TimerFace(
+            id = "clock_horizon",
+            name = "Horizon",
+            tagline = "Sun travels across a calm arc",
+            unlockPoints = 250
+        ),
+        TimerFace(
+            id = "clock_stack",
+            name = "Stack",
+            tagline = "Minutes over seconds, vertical meter",
+            unlockPoints = 0
+        ),
+        TimerFace(
+            id = "clock_breathe",
+            name = "Breathe",
+            tagline = "Soft glowing orb that breathes",
+            unlockPoints = 200
+        ),
+        TimerFace(
+            id = "clock_bars",
+            name = "Bars",
+            tagline = "Quiet equalizer bars fill up",
+            unlockPoints = 0
         )
     )
 
