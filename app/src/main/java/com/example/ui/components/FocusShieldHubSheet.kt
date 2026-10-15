@@ -1,5 +1,11 @@
 package com.example.ui.components
 
+// v1.2.3 (2026-10-16) — Focus Shield rebuilt to the owner's exact clean-redesign
+// HTML (Focus_Shield___Clean_Redesign_4_c28b.html): full-page layout, same
+// section order, card/chip/toggle language, #0A0A0B + #B6F13A palette, Poppins
+// body + Instrument Serif italic for the page headline. Every control is wired
+// to the same real setting/feature as before — visual rebuild only.
+
 import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
@@ -7,62 +13,46 @@ import android.net.Uri
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material3.Surface
-import androidx.compose.material.icons.filled.Coffee
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Games
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -78,28 +68,27 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.example.data.SupabaseScheduledBlockDto
-import com.example.data.SupabasePunishmentLogDto
 import com.example.R
-import com.example.ui.components.FeatureIcon
-import com.example.ui.components.GlassCard
-import com.example.ui.components.LiquidGlassCard
-import com.example.ui.theme.MutedBorderLight
+import com.example.data.SupabasePunishmentLogDto
+import com.example.data.SupabaseScheduledBlockDto
+import com.example.service.ScheduledBlockScheduler
+import com.example.ui.screens.StudyChannelsScreen
 import com.example.ui.theme.NearBlack
-import com.example.ui.theme.RegainLimeDeepText
-import com.example.ui.theme.RegainLimePrimary
-import com.example.ui.theme.SecondaryTextLight
-import com.example.ui.theme.isAppInDarkTheme
+import com.example.ui.theme.PoppinsFontFamily
+import com.example.util.AiStudyGuardManager
 import com.example.util.AppIconView
 import com.example.util.DeviceAppInfo
-import com.example.service.ScheduledBlockScheduler
-import com.example.util.AiStudyGuardManager
 
 object FocusShieldPermissions {
     fun hasUsageStatsPermission(context: Context): Boolean {
@@ -198,7 +187,145 @@ data class BlockableAppItem(
     val isBlocked: Boolean
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ---------------------------------------------------------------------------
+// Design tokens — exact values from the owner's Focus Shield clean-redesign.
+// ---------------------------------------------------------------------------
+private val ShieldBg = Color(0xFF0A0A0B)
+private val ShieldSurface = Color(0xFF131315)
+private val ShieldLine = Color(0xFF1F1F22)
+private val ShieldText = Color(0xFFF4F4F5)
+private val ShieldMuted = Color(0xFF76767C)
+private val ShieldAccent = Color(0xFFB6F13A)
+private val ShieldSoft = Color(0x1EB6F13A)
+private val ShieldBorderAccent = Color(0x2EB6F13A)
+private val ShieldCoral = Color(0xFFFF6B6B)
+private val ShieldAmber = Color(0xFFF5A524)
+private val ShieldGreen = Color(0xFF10B981)
+private val ShieldTrackOff = Color(0xFF26262B)
+private val ShieldThumbOff = Color(0xFF8B8B92)
+private val ShieldChipBorder = Color(0xFF2C2C31)
+
+private val ShieldSerifItalic = FontFamily(
+    Font(R.font.instrument_serif_italic, FontWeight.Normal, FontStyle.Italic)
+)
+
+private fun shieldBody(size: Int, weight: FontWeight = FontWeight.Normal, color: Color = ShieldText) =
+    TextStyle(fontFamily = PoppinsFontFamily, fontSize = size.sp, fontWeight = weight, color = color)
+
+/** The exact toggle from the design: 48x28, dark track / grey thumb, lime when on. */
+@Composable
+private fun ShieldToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true
+) {
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        enabled = enabled,
+        modifier = Modifier.size(width = 48.dp, height = 28.dp),
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = ShieldBg,
+            checkedTrackColor = ShieldAccent,
+            uncheckedThumbColor = ShieldThumbOff,
+            uncheckedTrackColor = ShieldTrackOff,
+            uncheckedBorderColor = Color.Transparent,
+            checkedBorderColor = Color.Transparent,
+            disabledCheckedThumbColor = ShieldBg.copy(alpha = 0.7f),
+            disabledCheckedTrackColor = ShieldAccent.copy(alpha = 0.5f)
+        )
+    )
+}
+
+/** Uppercase section eyebrow, optionally with an action on the right. */
+@Composable
+private fun ShieldEyebrow(
+    title: String,
+    action: @Composable (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title.uppercase(),
+            style = shieldBody(11, FontWeight.SemiBold, ShieldMuted).copy(letterSpacing = 1.76.sp)
+        )
+        action?.invoke()
+    }
+}
+
+/** One row inside a grouped list card. */
+@Composable
+private fun ShieldGroupRow(
+    title: String,
+    subtitle: String? = null,
+    showDivider: Boolean = true,
+    tag: (@Composable () -> Unit)? = null,
+    trailing: @Composable () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(text = title, style = shieldBody(14, FontWeight.SemiBold))
+                    tag?.invoke()
+                }
+                if (subtitle != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(text = subtitle, style = shieldBody(12, FontWeight.Normal, ShieldMuted).copy(lineHeight = 17.4.sp))
+                }
+            }
+            trailing()
+        }
+        if (showDivider) {
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(ShieldLine))
+        }
+    }
+}
+
+/** Small tag pill, e.g. "Optional" or "Active". */
+@Composable
+private fun ShieldTag(text: String, active: Boolean) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(99.dp))
+            .background(if (active) ShieldSoft else Color.Transparent)
+            .border(1.dp, if (active) ShieldBorderAccent else ShieldChipBorder, RoundedCornerShape(99.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = text.uppercase(),
+            style = shieldBody(9, FontWeight.SemiBold, if (active) ShieldAccent else ShieldMuted).copy(letterSpacing = 0.72.sp)
+        )
+    }
+}
+
+@Composable
+private fun PulsingDot() {
+    val alpha by rememberInfiniteTransition(label = "shieldPulse").animateFloat(
+        initialValue = 1f, targetValue = 0.45f,
+        animationSpec = infiniteRepeatable(animation = tween(900), repeatMode = RepeatMode.Reverse),
+        label = "pulseAlpha"
+    )
+    Box(
+        modifier = Modifier
+            .size(7.dp)
+            .clip(CircleShape)
+            .background(ShieldAccent.copy(alpha = alpha))
+    )
+}
+
 @Composable
 fun FocusShieldHubSheet(
     isShieldEnabled: Boolean,
@@ -224,13 +351,10 @@ fun FocusShieldHubSheet(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val lifecycleOwner = LocalLifecycleOwner.current
 
     var editingSchedule by remember { mutableStateOf<SupabaseScheduledBlockDto?>(null) }
     var showScheduleEditSheet by remember { mutableStateOf(false) }
 
-    // Live real-time permission tracking with onResume updates
     var hasUsagePermission by remember {
         mutableStateOf(FocusShieldPermissions.hasUsageStatsPermission(context))
     }
@@ -254,20 +378,13 @@ fun FocusShieldHubSheet(
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryTab by remember { mutableStateOf("All") }
-
-    val isAllPermissionsGranted = hasUsagePermission && hasOverlayPermission && hasAccessibilityPermission
-    val isStrictModeEnabled by com.example.util.StrictModeManager.isStrictModeState.collectAsState()
-    val isBlockSplitScreen by com.example.util.StrictModeManager.blockSplitScreenState.collectAsState()
-    val isBlockFloatingWindow by com.example.util.StrictModeManager.blockFloatingWindowState.collectAsState()
-    val isDeepFocusEnabled by com.example.util.DeepFocusManager.isDeepFocusEnabledState.collectAsState()
-    val isShortsLockEnabled by com.example.util.ShortsLockManager.isShortsLockState.collectAsState()
-    val isReelsLockEnabled by com.example.util.ShortsLockManager.isReelsLockState.collectAsState()
-    val isYouTubeFilterEnabled by com.example.util.YouTubeStudyGuardManager.isFilterEnabledState.collectAsState()
-    val youtubeBlockedCount by com.example.util.YouTubeStudyGuardManager.blockedVideosCountState.collectAsState()
+    var activityExpanded by remember { mutableStateOf(false) }
+    var showFilterTester by remember { mutableStateOf(false) }
 
     var testYouTubeQuery by remember { mutableStateOf("") }
     var testYouTubeResult by remember { mutableStateOf<com.example.util.YouTubeVideoClassifier.VideoVerdict?>(null) }
 
+    val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -279,7 +396,6 @@ fun FocusShieldHubSheet(
                 com.example.util.ShortsLockManager.init(context)
                 com.example.util.YouTubeStudyGuardManager.init(context)
                 com.example.util.DeepFocusManager.init(context)
-                // Complete a queued enable-action once the user returns with accessibility granted
                 if (hasAccessibilityPermission) {
                     val queued = pendingAction
                     if (queued != null) {
@@ -296,6 +412,22 @@ fun FocusShieldHubSheet(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
+    }
+
+    val isStrictModeEnabled by com.example.util.StrictModeManager.isStrictModeState.collectAsState()
+    val isBlockSplitScreen by com.example.util.StrictModeManager.blockSplitScreenState.collectAsState()
+    val isBlockFloatingWindow by com.example.util.StrictModeManager.blockFloatingWindowState.collectAsState()
+    val isDeepFocusEnabled by com.example.util.DeepFocusManager.isDeepFocusEnabledState.collectAsState()
+    val isShortsLockEnabled by com.example.util.ShortsLockManager.isShortsLockState.collectAsState()
+    val isReelsLockEnabled by com.example.util.ShortsLockManager.isReelsLockState.collectAsState()
+    val isYouTubeFilterEnabled by com.example.util.YouTubeStudyGuardManager.isFilterEnabledState.collectAsState()
+
+    val isAllPermissionsGranted = hasUsagePermission && hasOverlayPermission && hasAccessibilityPermission
+    val masterArmed = isShieldEnabled && isAllPermissionsGranted
+
+    fun enableWithGate(enable: () -> Unit) {
+        pendingAction = { enable() }
+        showPermissionSheet = true
     }
 
     val defaultApps = remember(blockedPackages) {
@@ -336,7 +468,6 @@ fun FocusShieldHubSheet(
                 "Games" -> item.category.contains("Game", ignoreCase = true)
                 "Entertainment" -> item.category.contains("Entertainment", ignoreCase = true) || item.category.contains("Video", ignoreCase = true)
                 "Messaging" -> item.category.contains("Messaging", ignoreCase = true) || item.category.contains("Chat", ignoreCase = true)
-                "Blocked" -> item.isBlocked
                 else -> true
             }
 
@@ -344,510 +475,429 @@ fun FocusShieldHubSheet(
         }
     }
 
-    // Dynamic theme palette referencing semantic MaterialTheme color tokens
-    val isDark = isAppInDarkTheme()
-    val sheetBackground = if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)
-    val cardBackground = if (isDark) Color(0xFF1B221B) else Color(0xFFFFFFFF)
-    val cardBorderColor = if (isDark) Color(0x358CE000) else Color(0xFFE2EBD6)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val textMuted = textSecondary.copy(alpha = 0.7f)
-    val accentLime = if (isDark) RegainLimePrimary else RegainLimeDeepText
-    val accentGreen = if (isDark) Color(0xFF69F0AE) else Color(0xFF2E7D32)
-    val accentAmber = if (isDark) Color(0xFFFFB74D) else Color(0xFFD97706)
-    val accentCoral = if (isDark) Color(0xFFFF5252) else Color(0xFFD32F2F)
-    val accentCyan = if (isDark) Color(0xFF00E5FF) else Color(0xFF0284C7)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = sheetBackground,
-        dragHandle = null,
-        modifier = modifier.testTag("focus_shield_hub_sheet")
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(ShieldBg)
+            .testTag("focus_shield_hub_sheet")
     ) {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 22.dp)
-                .padding(top = 6.dp, bottom = 36.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.fillMaxSize().testTag("focus_shield_list"),
+            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 60.dp)
         ) {
-            item { SheetDragHandle() }
-            // Header Row
+            // ---------------------------------------------------------------
+            // Header — matches the design's .top
+            // ---------------------------------------------------------------
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        FeatureIcon(
-                            drawableRes = R.drawable.ic3d_shield,
-                            contentDescription = "Focus Shield",
-                            size = 46.dp
-                        )
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column {
-                            Text(
-                                text = "Focus Shield",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 21.sp,
-                                    color = textPrimary
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Distraction Blocker & App Interceptor",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = accentLime,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            )
-                        }
-                    }
-
-                    IconButton(
-                        onClick = onDismiss,
+                    Box(
                         modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(ShieldSoft),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
+                        androidx.compose.material3.Icon(
+                            imageVector = Icons.Filled.Shield,
+                            contentDescription = "Focus Shield",
+                            tint = ShieldAccent,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Focus Shield",
+                            style = TextStyle(
+                                fontFamily = ShieldSerifItalic,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ShieldText,
+                                letterSpacing = (-0.44).sp,
+                                lineHeight = 26.sp
+                            )
+                        )
+                        Text(text = "Distraction blocker", style = shieldBody(12, FontWeight.Normal, ShieldMuted))
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(ShieldSurface)
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = Icons.Filled.Close,
                             contentDescription = "Close",
-                            tint = textPrimary,
+                            tint = ShieldMuted,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                 }
             }
 
-            // Master Toggle Card
+            // ---------------------------------------------------------------
+            // Hero — "Shield is armed" + master switch
+            // ---------------------------------------------------------------
             item {
-                LiquidGlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    accentBorder = isShieldEnabled && isAllPermissionsGranted
+                Spacer(modifier = Modifier.height(26.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(26.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0x24B6F13A), Color(0x08B6F13A), ShieldSurface)
+                            )
+                        )
+                        .border(1.dp, ShieldBorderAccent, RoundedCornerShape(26.dp))
+                        .padding(22.dp)
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Distraction Blocker Master Switch",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 16.sp,
-                                    color = textPrimary
-                                )
+                                text = if (masterArmed) "Shield is armed" else "Shield is off",
+                                style = shieldBody(17, FontWeight.SemiBold)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = if (isShieldTimerRunning) {
-                                    "Strict Lock Active · Master switch locked until timer ends"
-                                } else if (!isAllPermissionsGranted) {
-                                    "Permissions Needed · Tap switch to grant permissions"
-                                } else if (isShieldEnabled) {
-                                    "Armed · Distracting apps will be blocked during focus"
-                                } else {
-                                    "Disabled · Distracting apps will remain open"
-                                },
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = if (isShieldTimerRunning) Color(0xFFFF8A80) else if (!isAllPermissionsGranted) accentAmber else if (isShieldEnabled) accentGreen else textSecondary,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isShieldTimerRunning || (isShieldEnabled && isAllPermissionsGranted) || !isAllPermissionsGranted) FontWeight.Medium else FontWeight.Normal
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(7.dp)
+                            ) {
+                                if (masterArmed) PulsingDot()
+                                Text(
+                                    text = if (isShieldTimerRunning) {
+                                        "Lock active · apps blocked until timer ends"
+                                    } else if (!isAllPermissionsGranted) {
+                                        "Grant permissions to arm the shield"
+                                    } else if (masterArmed) {
+                                        "Distracting apps blocked during focus"
+                                    } else {
+                                        "Distracting apps stay open"
+                                    },
+                                    style = shieldBody(12, FontWeight.Medium, ShieldAccent)
                                 )
-                            )
+                            }
+                            if (blockedAttemptsCount > 0) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(99.dp))
+                                        .background(ShieldSoft)
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "$blockedAttemptsCount intercepted",
+                                        style = shieldBody(10, FontWeight.SemiBold, ShieldAccent).copy(letterSpacing = 0.4.sp)
+                                    )
+                                }
+                            }
                         }
-
-                        Switch(
-                            checked = isShieldEnabled && isAllPermissionsGranted,
+                        ShieldToggle(
+                            checked = masterArmed,
                             enabled = !isShieldTimerRunning,
                             onCheckedChange = { isChecked ->
                                 if (isChecked && !isAllPermissionsGranted) {
-                                    pendingAction = { onToggleMasterShield(true) }
-                                    showPermissionSheet = true
+                                    enableWithGate { onToggleMasterShield(true) }
                                 } else {
                                     onToggleMasterShield(isChecked)
                                 }
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = NearBlack,
-                                checkedTrackColor = accentLime,
-                                uncheckedTrackColor = if (isDark) Color(0xFF374151) else Color(0xFFD1D5DB),
-                                uncheckedThumbColor = if (isDark) Color(0xFF9CA3AF) else Color(0xFF6B7280),
-                                disabledCheckedThumbColor = NearBlack.copy(alpha = 0.7f),
-                                disabledCheckedTrackColor = accentLime.copy(alpha = 0.5f)
-                            )
+                            }
                         )
                     }
                 }
             }
 
-            // Per-App Daily Time Limits Section Card
+            // ---------------------------------------------------------------
+            // Quick lock
+            // ---------------------------------------------------------------
             item {
-                GlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            onDismiss()
-                            onOpenAppLimits()
-                        }
-                        .testTag("open_app_limits_card"),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                Spacer(modifier = Modifier.height(34.dp))
+                ShieldEyebrow(title = "Quick lock")
+                Spacer(modifier = Modifier.height(12.dp))
+                if (isShieldTimerRunning) {
+                    val mins = remainingSeconds / 60
+                    val secs = remainingSeconds % 60
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .clip(CircleShape)
-                                    .background(accentLime.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Timer,
-                                    contentDescription = null,
-                                    tint = accentLime,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = "Per-App Daily Time Limits",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp,
-                                        color = textPrimary
-                                    )
-                                )
-                                Text(
-                                    text = "Set continuous daily time budgets per app",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = textSecondary,
-                                        fontSize = 12.sp
-                                    )
-                                )
-                            }
-                        }
-
-                        Surface(
-                            color = accentLime,
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Text(
-                                text = "Configure",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = NearBlack
-                                ),
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Scheduled Study Blocking Section (Dynamic list from Supabase/Local)
-            item {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "Study Blocking Schedules",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = textPrimary
-                                )
-                            )
-                            Text(
-                                text = "Automatic time-based distraction blocking",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = textSecondary,
-                                    fontSize = 12.sp
-                                )
-                            )
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                editingSchedule = null
-                                showScheduleEditSheet = true
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = accentLime),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(
-                                brush = androidx.compose.ui.graphics.SolidColor(accentLime)
-                            )
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Add", modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Add", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            if (scheduledBlocks.isEmpty()) {
-                item {
-                    GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            RegainMascotView(
-                                width = 130.dp,
-                                height = 150.dp,
-                                pose = MascotPose.EMPTY_STATE
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "No Schedules Created Yet",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = textPrimary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Tap '+ Add' to set your study hours, break windows, active days, and custom blocked apps.",
-                                fontSize = 12.sp,
-                                color = textSecondary,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                    }
-                }
-            } else {
-                items(scheduledBlocks) { block ->
-                    GlassCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                editingSchedule = block
-                                showScheduleEditSheet = true
-                            },
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(18.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = block.label,
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                            color = textPrimary
-                                        )
-                                    )
-                                    if (!block.subject.isNullOrBlank()) {
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "Subject: ${block.subject.trim()}",
-                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                color = textSecondary,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.AccessTime,
-                                            contentDescription = null,
-                                            tint = accentLime,
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "${ScheduledBlockScheduler.formatDisplayTime(block.start_time)} – ${ScheduledBlockScheduler.formatDisplayTime(block.end_time)}",
-                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                color = accentLime,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        )
-                                    }
-                                }
-
-                                Switch(
-                                    checked = block.is_enabled,
-                                    onCheckedChange = { isEnabled ->
-                                        onToggleSchedule(block.id, isEnabled)
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = NearBlack,
-                                        checkedTrackColor = accentLime,
-                                        uncheckedTrackColor = if (isDark) Color(0xFF374151) else Color(0xFFD1D5DB),
-                                        uncheckedThumbColor = if (isDark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
-                                    )
-                                )
-                            }
-
-                            if (!block.break_start_time.isNullOrBlank() && !block.break_end_time.isNullOrBlank()) {
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Coffee,
-                                        contentDescription = null,
-                                        tint = Color(0xFFF59E0B),
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Break: ${ScheduledBlockScheduler.formatDisplayTime(block.break_start_time)} – ${ScheduledBlockScheduler.formatDisplayTime(block.break_end_time)}",
-                                        fontSize = 11.sp,
-                                        color = Color(0xFFFCD34D),
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Days: ${block.days_active}",
-                                    fontSize = 11.sp,
-                                    color = textSecondary
-                                )
-
-                                val appCount = if (block.blocked_apps_list.isBlank()) {
-                                    0
-                                } else {
-                                    block.blocked_apps_list.split(",").filter { it.isNotBlank() }.size
-                                }
-                                Text(
-                                    text = "$appCount apps blocked",
-                                    fontSize = 11.sp,
-                                    color = accentLime,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // AI Study Guard Card (ChatGPT & Claude)
-            item {
-                LiquidGlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    accentBorder = isAiGuardEnabled
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(ShieldSurface)
+                            .border(1.dp, ShieldLine, RoundedCornerShape(24.dp))
+                            .padding(20.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                FeatureIcon(
-                                    drawableRes = R.drawable.ic3d_shield,
-                                    contentDescription = "Shield",
-                                    size = 44.dp
+                            Column {
+                                Text(
+                                    text = "Lock active",
+                                    style = shieldBody(15, FontWeight.SemiBold)
                                 )
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                Column {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = String.format("%02d:%02d", mins, secs),
+                                    style = TextStyle(
+                                        fontFamily = PoppinsFontFamily,
+                                        fontSize = 32.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ShieldText
+                                    )
+                                )
+                                Text(
+                                    text = "Unlocks strictly at 00:00",
+                                    style = shieldBody(12, FontWeight.Normal, ShieldMuted)
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(99.dp))
+                                    .background(ShieldSoft)
+                                    .border(1.dp, ShieldBorderAccent, RoundedCornerShape(99.dp))
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = "Locked",
+                                    style = shieldBody(12, FontWeight.Bold, ShieldAccent)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(ShieldSurface)
+                            .padding(20.dp)
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(text = "Lock selected apps", style = shieldBody(15, FontWeight.SemiBold))
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Strictly block for a custom duration",
+                                style = shieldBody(12, FontWeight.Normal, ShieldMuted)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(99.dp))
+                                    .background(ShieldBg)
+                                    .padding(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(0.dp)
+                            ) {
+                                listOf(15, 25, 45, 60).forEach { mins ->
+                                    val selected = selectedDurationMinutes == mins
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(99.dp))
+                                            .background(if (selected) ShieldAccent else Color.Transparent)
+                                            .clickable { selectedDurationMinutes = mins }
+                                            .padding(vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = "AI Study Guard",
-                                            style = MaterialTheme.typography.titleMedium.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 15.sp,
-                                                color = textPrimary
+                                            text = "${mins}m",
+                                            style = shieldBody(
+                                                13,
+                                                if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                                if (selected) ShieldBg else ShieldMuted
                                             )
                                         )
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(if (hasAccessibilityPermission) Color(0x354CAF50) else Color(0x35E53935))
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = if (hasAccessibilityPermission) "ACTIVE" else "PERMISSION NEEDED",
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (hasAccessibilityPermission) accentGreen else accentCoral
-                                                )
-                                            )
-                                        }
                                     }
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "ChatGPT & Claude Academic Sentinel",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = accentLime,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    )
                                 }
                             }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(99.dp))
+                                    .background(ShieldAccent)
+                                    .clickable {
+                                        if (!isAllPermissionsGranted) {
+                                            enableWithGate { onStartStandaloneShield(selectedDurationMinutes) }
+                                        } else {
+                                            onStartStandaloneShield(selectedDurationMinutes)
+                                        }
+                                    }
+                                    .padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Start ${selectedDurationMinutes}m lock",
+                                    style = shieldBody(15, FontWeight.Bold, ShieldBg)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
-                            Spacer(modifier = Modifier.width(8.dp))
+            // ---------------------------------------------------------------
+            // Protection
+            // ---------------------------------------------------------------
+            item {
+                Spacer(modifier = Modifier.height(34.dp))
+                ShieldEyebrow(title = "Protection")
+                Spacer(modifier = Modifier.height(12.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(ShieldSurface)
+                        .padding(horizontal = 20.dp, vertical = 4.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        ShieldGroupRow(
+                            title = "Strict focus",
+                            subtitle = "Keeps apps locked until your session ends",
+                            trailing = {
+                                ShieldToggle(
+                                    checked = isStrictModeEnabled,
+                                    onCheckedChange = { isChecked ->
+                                        if (isChecked && !isAllPermissionsGranted) {
+                                            enableWithGate {
+                                                com.example.util.StrictModeManager.setStrictModeEnabled(context, true)
+                                            }
+                                        } else {
+                                            com.example.util.StrictModeManager.setStrictModeEnabled(context, isChecked)
+                                        }
+                                    }
+                                )
+                            }
+                        )
+                        ShieldGroupRow(
+                            title = "Block split screen",
+                            subtitle = "Blocked apps can't open in split-screen",
+                            trailing = {
+                                ShieldToggle(
+                                    checked = isBlockSplitScreen,
+                                    onCheckedChange = {
+                                        com.example.util.StrictModeManager.setBlockSplitScreenEnabled(context, it)
+                                    }
+                                )
+                            }
+                        )
+                        ShieldGroupRow(
+                            title = "Block floating window",
+                            subtitle = "Blocked apps can't open as floating windows",
+                            trailing = {
+                                ShieldToggle(
+                                    checked = isBlockFloatingWindow,
+                                    onCheckedChange = {
+                                        com.example.util.StrictModeManager.setBlockFloatingWindowEnabled(context, it)
+                                    }
+                                )
+                            }
+                        )
+                        ShieldGroupRow(
+                            title = "Deep focus",
+                            subtitle = "Prevent switching to other apps while studying",
+                            tag = { ShieldTag(text = "Optional", active = false) },
+                            trailing = {
+                                ShieldToggle(
+                                    checked = isDeepFocusEnabled,
+                                    onCheckedChange = {
+                                        com.example.util.DeepFocusManager.setDeepFocusEnabled(context, it)
+                                    }
+                                )
+                            }
+                        )
+                        ShieldGroupRow(
+                            title = "YouTube Shorts",
+                            subtitle = "Full lectures allowed, Shorts locked",
+                            trailing = {
+                                ShieldToggle(
+                                    checked = isShortsLockEnabled,
+                                    onCheckedChange = { isChecked ->
+                                        if (isChecked && !isAllPermissionsGranted) {
+                                            enableWithGate {
+                                                com.example.util.ShortsLockManager.setShortsLockEnabled(context, true)
+                                            }
+                                        } else {
+                                            com.example.util.ShortsLockManager.setShortsLockEnabled(context, isChecked)
+                                        }
+                                    }
+                                )
+                            }
+                        )
+                        ShieldGroupRow(
+                            title = "Instagram Reels",
+                            subtitle = "Intercepts the Reels tab and viewer",
+                            showDivider = false,
+                            trailing = {
+                                ShieldToggle(
+                                    checked = isReelsLockEnabled,
+                                    onCheckedChange = { isChecked ->
+                                        if (isChecked && !isAllPermissionsGranted) {
+                                            enableWithGate {
+                                                com.example.util.ShortsLockManager.setReelsLockEnabled(context, true)
+                                            }
+                                        } else {
+                                            com.example.util.ShortsLockManager.setReelsLockEnabled(context, isChecked)
+                                        }
+                                    }
+                                )
+                            }
+                        )
+                    }
+                }
+            }
 
-                            Switch(
+            // ---------------------------------------------------------------
+            // AI protection
+            // ---------------------------------------------------------------
+            item {
+                Spacer(modifier = Modifier.height(34.dp))
+                ShieldEyebrow(title = "AI protection")
+                Spacer(modifier = Modifier.height(12.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(ShieldSurface)
+                        .padding(horizontal = 20.dp)
+                        .padding(top = 16.dp, bottom = 4.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(text = "AI Study Guard", style = shieldBody(14, FontWeight.SemiBold))
+                                    ShieldTag(
+                                        text = if (isAiGuardEnabled && hasAccessibilityPermission) "Active" else "Off",
+                                        active = isAiGuardEnabled && hasAccessibilityPermission
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "ChatGPT & Claude academic sentinel",
+                                    style = shieldBody(12, FontWeight.Normal, ShieldMuted).copy(lineHeight = 17.4.sp)
+                                )
+                            }
+                            ShieldToggle(
                                 checked = isAiGuardEnabled,
                                 onCheckedChange = { isEnabled ->
                                     if (isEnabled && !hasAccessibilityPermission) {
-                                        // Queue the enable intent: after the user grants accessibility
-                                        // and returns, the ON_RESUME observer applies it automatically
                                         pendingAction = {
                                             AiStudyGuardManager.setAiGuardEnabled(context, true)
                                             isAiGuardEnabled = true
@@ -857,1408 +907,649 @@ fun FocusShieldHubSheet(
                                         AiStudyGuardManager.setAiGuardEnabled(context, isEnabled)
                                         isAiGuardEnabled = isEnabled
                                     }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = NearBlack,
-                                    checkedTrackColor = accentLime,
-                                    uncheckedTrackColor = if (isDark) Color(0xFF374151) else Color(0xFFD1D5DB),
-                                    uncheckedThumbColor = if (isDark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
-                                )
+                                }
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Clean Structured 3-Stage Workflow
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .border(1.dp, Color(0x18FFFFFF), RoundedCornerShape(14.dp))
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Stage 1
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color(0x30F59E0B))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        // The 3-stage discipline timeline, per the design
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            listOf(
+                                Triple("Warning", "3-minute grace window", ShieldAmber),
+                                Triple("Lockout", "3 hours if casual chatter continues", ShieldCoral),
+                                Triple("Resolved", "Instantly when you return to study", ShieldAccent)
+                            ).forEachIndexed { index, (title, sub, dot) ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
-                                    Text(
-                                        text = "Stage 1",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFF59E0B)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Warning Alert with 3-minute grace window",
-                                    fontSize = 11.sp,
-                                    color = textPrimary,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-
-                            // Stage 2
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color(0x30EF4444))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "Stage 2",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFEF4444)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "3-Hour Lockout if casual chatter continues",
-                                    fontSize = 11.sp,
-                                    color = textPrimary,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-
-                            // Stage 3
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color(0x3010B981))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "Stage 3",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF10B981)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Instant Resolution upon returning to study",
-                                    fontSize = 11.sp,
-                                    color = textPrimary,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-
-                        if (!hasAccessibilityPermission) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(accentLime)
-                                    .clickable {
-                                        showAiAccessibilityOptInDialog = true
-                                    }
-                                    .padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Enable Accessibility for AI Study Guard",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        color = NearBlack,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // AI Discipline & Penalty History Card
-            item {
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp)
-                    ) {
-                        Text(
-                            text = "AI Discipline & Punishment History",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp,
-                                color = textPrimary
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Audit trail of warnings, resolutions, and penalties synced to Supabase",
-                            fontSize = 11.sp,
-                            color = textSecondary
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        if (punishmentLogs.isEmpty()) {
-                            Text(
-                                text = "No discipline violations recorded. Your AI study record is spotless!",
-                                fontSize = 12.sp,
-                                color = accentGreen,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-                        } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                punishmentLogs.take(10).forEach { log ->
-                                    val (statusBg, statusFg, statusLabel) = when (log.status) {
-                                        "blocked" -> Triple(Color(0x35E53935), Color(0xFFEF4444), "BLOCKED (3h)")
-                                        "warned_resolved" -> Triple(Color(0x354CAF50), Color(0xFF10B981), "RESOLVED")
-                                        else -> Triple(Color(0x35FFA000), Color(0xFFF59E0B), "WARNED")
-                                    }
-                                    val friendlyApp = when (log.app_package) {
-                                        "com.openai.chatgpt" -> "ChatGPT"
-                                        "com.anthropic.claude" -> "Claude"
-                                        else -> log.app_package.substringAfterLast('.')
-                                    }
-
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                                            .padding(10.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = friendlyApp,
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = textPrimary
-                                            )
-                                            Text(
-                                                text = log.reason,
-                                                fontSize = 11.sp,
-                                                color = textSecondary,
-                                                maxLines = 2
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.width(8.dp))
-
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(statusBg)
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                                        ) {
-                                            Text(
-                                                text = statusLabel,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = statusFg
+                                                .size(11.dp)
+                                                .clip(CircleShape)
+                                                .background(dot)
+                                        )
+                                        if (index < 2) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(1.dp)
+                                                    .height(16.dp)
+                                                    .background(ShieldLine)
                                             )
                                         }
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Active Timer Card OR Standalone Lock Timer Configuration
-            item {
-                if (isShieldTimerRunning) {
-                    val mins = remainingSeconds / 60
-                    val secs = remainingSeconds % 60
-                    val timeStr = String.format("%02d:%02d", mins, secs)
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(22.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(Color(0x45E53935), Color(0x407C4DFF))
-                                )
-                            )
-                            .border(1.2.dp, Color(0x70E53935), RoundedCornerShape(22.dp))
-                            .padding(18.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(CircleShape)
-                                            .background(accentCoral)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "STRICT LOCK ACTIVE",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            color = Color(0xFFFF8A80),
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = 1.4.sp,
-                                            fontSize = 11.sp
-                                        )
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = timeStr,
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 34.sp,
-                                        color = Color.White
-                                    )
-                                )
-                                Text(
-                                    text = "Unlocks strictly at 00:00 · Cannot be bypassed",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = Color.White.copy(alpha = 0.85f),
-                                        fontSize = 11.sp
-                                    )
-                                )
-                            }
-
-                            // Strict Lock Indicator (Per user instruction: NO off/end button while timer runs)
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(Color(0x35E53935))
-                                    .border(1.dp, Color(0x60E53935), RoundedCornerShape(16.dp))
-                                    .padding(horizontal = 14.dp, vertical = 10.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Lock,
-                                        contentDescription = null,
-                                        tint = Color(0xFFFF8A80),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Locked",
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            color = Color(0xFFFF8A80),
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(18.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "STANDALONE APP LOCK TIMER",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = accentLime,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 1.4.sp,
-                                        fontSize = 11.sp
-                                    )
-                                )
-                                if (blockedAttemptsCount > 0) {
-                                    Text(
-                                        text = "$blockedAttemptsCount Intercepted",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            color = accentCoral,
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 10.sp
-                                        )
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Strictly lock selected apps for custom duration:",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = textSecondary,
-                                    fontSize = 12.sp
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Duration Chips (15m, 25m, 45m, 60m)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                listOf(15, 25, 45, 60).forEach { mins ->
-                                    val isSelected = selectedDurationMinutes == mins
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(
-                                                if (isSelected) {
-                                                    accentLime
-                                                } else {
-                                                    MaterialTheme.colorScheme.surfaceVariant
-                                                }
-                                            )
-                                            .border(
-                                                1.dp,
-                                                if (isSelected) accentLime else MaterialTheme.colorScheme.outline,
-                                                RoundedCornerShape(14.dp)
-                                            )
-                                            .clickable { selectedDurationMinutes = mins }
-                                            .padding(vertical = 10.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "${mins}m",
-                                            style = MaterialTheme.typography.labelLarge.copy(
-                                                color = if (isSelected) NearBlack else textPrimary,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                fontSize = 13.sp
-                                            )
-                                        )
+                                    Column(modifier = Modifier.padding(bottom = if (index < 2) 14.dp else 0.dp)) {
+                                        Text(text = title, style = shieldBody(13, FontWeight.SemiBold))
+                                        Text(text = sub, style = shieldBody(12, FontWeight.Normal, ShieldMuted))
                                     }
                                 }
                             }
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(ShieldLine))
 
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(accentLime)
-                                    .clickable {
-                                        if (!isAllPermissionsGranted) {
-                                            pendingAction = { onStartStandaloneShield(selectedDurationMinutes) }
-                                            showPermissionSheet = true
+                        ShieldGroupRow(
+                            title = "YouTube content filter",
+                            subtitle = "Only educational lectures & coding tutorials. Blocks songs, movies, gaming and vlogs.",
+                            trailing = {
+                                ShieldToggle(
+                                    checked = isYouTubeFilterEnabled,
+                                    onCheckedChange = { isChecked ->
+                                        if (isChecked && !isAllPermissionsGranted) {
+                                            enableWithGate {
+                                                com.example.util.YouTubeStudyGuardManager.setFilterEnabled(context, true)
+                                            }
                                         } else {
-                                            onStartStandaloneShield(selectedDurationMinutes)
+                                            com.example.util.YouTubeStudyGuardManager.setFilterEnabled(context, isChecked)
                                         }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Start ${selectedDurationMinutes}m App Lock",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        color = NearBlack,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp
-                                    )
+                                    }
                                 )
                             }
-                        }
-                    }
-                }
-            }
-
-            // Real-time Test Simulation and Live Verification
-            item {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "INSTANT TEST SIMULATION",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = accentLime,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.4.sp,
-                                fontSize = 11.sp
-                            )
                         )
-                        Text(
-                            text = "Verify Interception",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = textSecondary,
-                                fontSize = 11.sp
-                            )
-                        )
-                    }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        GlassCard(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable {
-                                    if (!isAllPermissionsGranted) {
-                                        pendingAction = { onTriggerTestIntercept("Instagram & Reels") }
-                                        showPermissionSheet = true
-                                    } else {
-                                        onTriggerTestIntercept("Instagram & Reels")
-                                    }
-                                },
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Lock,
-                                    contentDescription = null,
-                                    tint = accentCoral,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "Test Instagram Lock",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 12.sp,
-                                        color = textPrimary
-                                    )
-                                )
-                                Text(
-                                    text = if (isAllPermissionsGranted) "Preview Shield Overlay" else "Requires Permission",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = if (isAllPermissionsGranted) textSecondary else Color(0xFFFFB74D),
-                                        fontSize = 10.sp
-                                    )
-                                )
-                            }
-                        }
-
-                        GlassCard(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable {
-                                    if (!isAllPermissionsGranted) {
-                                        pendingAction = { onTriggerTestIntercept("YouTube & Shorts") }
-                                        showPermissionSheet = true
-                                    } else {
-                                        onTriggerTestIntercept("YouTube & Shorts")
-                                    }
-                                },
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Videocam,
-                                    contentDescription = null,
-                                    tint = accentLime,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "Test Shorts Lock",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 12.sp,
-                                        color = textPrimary
-                                    )
-                                )
-                                Text(
-                                    text = if (isAllPermissionsGranted) "Preview Shield Overlay" else "Requires Permission",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = if (isAllPermissionsGranted) textSecondary else Color(0xFFFFB74D),
-                                        fontSize = 10.sp
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Strict Mode (Anti-Uninstall Protection) Card
-            item {
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                FeatureIcon(
-                                    drawableRes = R.drawable.ic3d_lock,
-                                    contentDescription = null,
-                                    size = 38.dp
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Strict Focus Protection",
-                                        style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.5.sp,
-                                            color = textPrimary
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "Keeps distracting apps securely locked until your study session completes.",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = textSecondary,
-                                            fontSize = 11.5.sp
-                                        )
-                                    )
-                                }
-                            }
-
-                            Switch(
-                                checked = isStrictModeEnabled,
-                                onCheckedChange = { isChecked ->
-                                    if (isChecked && !isAllPermissionsGranted) {
-                                        pendingAction = { com.example.util.StrictModeManager.setStrictModeEnabled(context, true) }
-                                        showPermissionSheet = true
-                                    } else {
-                                        com.example.util.StrictModeManager.setStrictModeEnabled(context, isChecked)
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = NearBlack,
-                                    checkedTrackColor = Color(0xFFFF5252),
-                                    uncheckedTrackColor = if (isDark) Color(0xFF374151) else Color(0xFFD1D5DB)
-                                )
-                            )
-                        }
-
-                        // v1.3.0: multi-window protections (compact sub-rows)
-                        Spacer(modifier = Modifier.height(10.dp))
+                        // Live classifier tester, kept from the previous UI in design language
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(1.dp)
-                                .background(if (isDark) Color(0x18FFFFFF) else Color(0x11000000))
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        MultiWindowProtectionRow(
-                            title = "Block split screen",
-                            subtitle = "Blocked apps cannot open in split-screen during focus.",
-                            checked = isBlockSplitScreen,
-                            onCheckedChange = { com.example.util.StrictModeManager.setBlockSplitScreenEnabled(context, it) },
-                            isDark = isDark,
-                            textPrimary = textPrimary,
-                            textSecondary = textSecondary
-                        )
-                        MultiWindowProtectionRow(
-                            title = "Block floating window",
-                            subtitle = "Blocked apps cannot open in a floating window during focus.",
-                            checked = isBlockFloatingWindow,
-                            onCheckedChange = { com.example.util.StrictModeManager.setBlockFloatingWindowEnabled(context, it) },
-                            isDark = isDark,
-                            textPrimary = textPrimary,
-                            textSecondary = textSecondary
-                        )
-                    }
-                }
-            }
-
-            // Deep Focus Task Lock & Screen Pinning Card
-            item {
-                DeepFocusToggleCard(
-                    isEnabled = isDeepFocusEnabled,
-                    onToggle = { isChecked ->
-                        com.example.util.DeepFocusManager.setDeepFocusEnabled(context, isChecked)
-                    },
-                    isSessionActive = com.example.util.DeepFocusManager.isDeepFocusSessionActive(context)
-                )
-            }
-
-            // YouTube Shorts & Instagram Reels Blocker Card
-            item {
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .clickable { showFilterTester = !showFilterTester }
+                                .padding(vertical = 12.dp)
                         ) {
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(accentLime.copy(alpha = 0.2f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Videocam,
-                                        contentDescription = null,
-                                        tint = accentLime,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Block YouTube Shorts",
-                                        style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.5.sp,
-                                            color = textPrimary
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "Allows full YouTube videos/lectures, but strictly locks addictive Shorts.",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = textSecondary,
-                                            fontSize = 11.5.sp
-                                        )
-                                    )
-                                }
-                            }
-
-                            Switch(
-                                checked = isShortsLockEnabled,
-                                onCheckedChange = { isChecked ->
-                                    if (isChecked && !hasAccessibilityPermission) {
-                                        pendingAction = { com.example.util.ShortsLockManager.setShortsLockEnabled(context, true) }
-                                        showPermissionSheet = true
-                                    } else {
-                                        com.example.util.ShortsLockManager.setShortsLockEnabled(context, isChecked)
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = NearBlack,
-                                    checkedTrackColor = accentLime,
-                                    uncheckedTrackColor = if (isDark) Color(0xFF374151) else Color(0xFFD1D5DB)
-                                )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(accentCoral.copy(alpha = 0.2f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Lock,
-                                        contentDescription = null,
-                                        tint = accentCoral,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Block Instagram Reels",
-                                        style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.5.sp,
-                                            color = textPrimary
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "Intercepts the Reels tab and viewer to protect study focus.",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = textSecondary,
-                                            fontSize = 11.5.sp
-                                        )
-                                    )
-                                }
-                            }
-
-                            Switch(
-                                checked = isReelsLockEnabled,
-                                onCheckedChange = { isChecked ->
-                                    if (isChecked && !hasAccessibilityPermission) {
-                                        pendingAction = { com.example.util.ShortsLockManager.setReelsLockEnabled(context, true) }
-                                        showPermissionSheet = true
-                                    } else {
-                                        com.example.util.ShortsLockManager.setReelsLockEnabled(context, isChecked)
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = NearBlack,
-                                    checkedTrackColor = accentCoral,
-                                    uncheckedTrackColor = if (isDark) Color(0xFF374151) else Color(0xFFD1D5DB)
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-
-            // YouTube Intelligent AI Content Filter Card
-            item {
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                FeatureIcon(
-                                    drawableRes = R.drawable.ic3d_shield,
-                                    contentDescription = null,
-                                    size = 40.dp
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "YouTube AI Content Filter",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                            color = textPrimary
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.height(3.dp))
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Surface(
-                                            color = if (hasAccessibilityPermission && isYouTubeFilterEnabled) Color(0x354CAF50) else if (!hasAccessibilityPermission && isYouTubeFilterEnabled) Color(0x35E53935) else accentCyan.copy(alpha = 0.2f),
-                                            shape = RoundedCornerShape(6.dp)
-                                        ) {
-                                            Text(
-                                                text = if (!hasAccessibilityPermission && isYouTubeFilterEnabled) "PERMISSION NEEDED" else if (isYouTubeFilterEnabled) "ACTIVE" else "AI ACCESSIBILITY",
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    color = if (!hasAccessibilityPermission && isYouTubeFilterEnabled) accentCoral else if (isYouTubeFilterEnabled) accentGreen else accentCyan,
-                                                    fontSize = 8.5.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                ),
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                        Text(
-                                            text = "Educational Whitelist",
-                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                color = accentCyan,
-                                                fontSize = 11.5.sp,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Only allows educational lectures & coding tutorials. Automatically blocks songs, movies, gaming & entertainment vlogs.",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = textSecondary,
-                                            fontSize = 11.5.sp,
-                                            lineHeight = 15.sp
-                                        )
-                                    )
-                                    // v1.2.3: honest state — the filter defaults OFF (owner order:
-                                    // never judge apps the user didn't ask to guard). When OFF,
-                                    // YouTube videos are not content-checked at all.
-                                    if (!isYouTubeFilterEnabled) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "Currently OFF — YouTube videos are not content-checked. Turn on to let the AI guard judge videos during study.",
-                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                color = accentCoral,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                lineHeight = 14.sp
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-
-                            Switch(
-                                checked = isYouTubeFilterEnabled,
-                                onCheckedChange = { isChecked ->
-                                    if (isChecked && !hasAccessibilityPermission) {
-                                        pendingAction = { com.example.util.YouTubeStudyGuardManager.setFilterEnabled(context, true) }
-                                        showPermissionSheet = true
-                                    } else {
-                                        com.example.util.YouTubeStudyGuardManager.setFilterEnabled(context, isChecked)
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = NearBlack,
-                                    checkedTrackColor = accentCyan,
-                                    uncheckedTrackColor = if (isDark) Color(0xFF374151) else Color(0xFFD1D5DB)
-                                )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Live AI Classifier Tester
-                        Surface(
-                            color = if (isDark) Color(0xFF131B26) else Color(0xFFF1F5F9),
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = "Test YouTube AI Classifier",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = accentCyan,
-                                        fontSize = 11.sp
-                                    )
+                                    text = "Test the content filter",
+                                    style = shieldBody(12, FontWeight.Medium, ShieldMuted)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                // Sample Quick Chips
-                                val sampleQueries = listOf(
+                                androidx.compose.material3.Icon(
+                                    imageVector = Icons.Filled.ChevronRight,
+                                    contentDescription = null,
+                                    tint = ShieldMuted,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        if (showFilterTester) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(ShieldBg)
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf(
                                     "Physics Class 12 — Electrostatics Full Chapter",
                                     "Arijit Singh Latest Song",
                                     "JEE Main 2027 Physics Preparation",
                                     "Funny College Vlog"
-                                )
-
-                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    sampleQueries.forEach { sample ->
-                                        Surface(
-                                            color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0),
-                                            shape = RoundedCornerShape(8.dp),
-                                            onClick = {
+                                ).forEach { sample ->
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .border(1.dp, ShieldLine, RoundedCornerShape(10.dp))
+                                            .clickable {
                                                 testYouTubeQuery = sample
                                                 testYouTubeResult = com.example.util.YouTubeVideoClassifier.evaluate(sample)
-                                            },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = sample,
-                                                    style = MaterialTheme.typography.bodySmall.copy(
-                                                        fontSize = 11.sp,
-                                                        color = textPrimary
-                                                    ),
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                                Text(
-                                                    text = "Test",
-                                                    style = MaterialTheme.typography.labelSmall.copy(
-                                                        color = accentCyan,
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontSize = 10.sp
-                                                    )
-                                                )
                                             }
-                                        }
+                                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                                    ) {
+                                        Text(text = sample, style = shieldBody(12, FontWeight.Normal, ShieldText))
                                     }
                                 }
-
                                 if (testYouTubeResult != null) {
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    val isEdu = testYouTubeResult!!.isEducational
-                                    val badgeColor = if (isEdu) accentLime else accentCoral
-                                    val badgeBg = if (isEdu) accentLime.copy(alpha = 0.15f) else accentCoral.copy(alpha = 0.15f)
-
-                                    Surface(
-                                        color = badgeBg,
-                                        shape = RoundedCornerShape(10.dp),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, badgeColor.copy(alpha = 0.4f)),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Column(modifier = Modifier.padding(10.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = if (isEdu) "UNLOCKED (Study Content)" else "LOCKED (Distraction)",
-                                                    style = MaterialTheme.typography.titleSmall.copy(
-                                                        color = badgeColor,
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontSize = 12.5.sp
-                                                    )
-                                                )
-                                                Text(
-                                                    text = "Confidence: ${(testYouTubeResult!!.confidence * 100).toInt()}%",
-                                                    style = MaterialTheme.typography.labelSmall.copy(
-                                                        color = textSecondary,
-                                                        fontSize = 10.sp
-                                                    )
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(
-                                                text = "Category: ${testYouTubeResult!!.category}",
-                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                    color = textPrimary,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.SemiBold
-                                                )
-                                            )
-                                            Text(
-                                                text = "Reason: ${testYouTubeResult!!.reason}",
-                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                    color = textSecondary,
-                                                    fontSize = 10.5.sp
-                                                )
-                                            )
-                                        }
-                                    }
+                                    val res = testYouTubeResult!!
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = if (res.isEducational) "Study content" else "Non-study content",
+                                        style = shieldBody(13, FontWeight.SemiBold, if (res.isEducational) ShieldGreen else ShieldCoral)
+                                    )
+                                    Text(
+                                        text = "Confidence: ${(res.confidence * 100).toInt()}%",
+                                        style = shieldBody(11, FontWeight.Normal, ShieldMuted)
+                                    )
+                                    Text(
+                                        text = "Category: ${res.category}",
+                                        style = shieldBody(11, FontWeight.Normal, ShieldMuted)
+                                    )
+                                    Text(
+                                        text = "Reason: ${res.reason}",
+                                        style = shieldBody(11, FontWeight.Normal, ShieldMuted)
+                                    )
                                 }
                             }
+                            Spacer(modifier = Modifier.height(12.dp))
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // v1.3.0: Study channels allowlist entry
-                        Surface(
-                            color = accentCyan.copy(alpha = 0.12f),
-                            shape = RoundedCornerShape(12.dp),
-                            onClick = { showStudyChannels = true },
-                            modifier = Modifier.fillMaxWidth()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showStudyChannels = true }
+                                .padding(vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Study channels",
-                                        style = MaterialTheme.typography.titleSmall.copy(
-                                            color = textPrimary,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.5.sp
-                                        )
-                                    )
-                                    Text(
-                                        text = "Videos from allowlisted channels are always treated as study content.",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = textSecondary,
-                                            fontSize = 10.5.sp
-                                        )
-                                    )
-                                }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = "Study channels", style = shieldBody(14, FontWeight.SemiBold))
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Manage >",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = accentCyan,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
-                                    )
+                                    text = "Allowlisted channels always count as study",
+                                    style = shieldBody(12, FontWeight.Normal, ShieldMuted).copy(lineHeight = 17.4.sp)
                                 )
                             }
-                        }
-                    }
-                }
-            }
-
-            // Blocked Apps List Section Header
-            item {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "SELECT APPS TO BLOCK",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = accentLime,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.4.sp,
-                                fontSize = 11.sp
-                            )
-                        )
-                        Text(
-                            text = "${displayApps.count { it.isBlocked }} Protected",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = accentGreen,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 11.sp
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Search input for device installed apps
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = {
-                            Text(
-                                "Search installed apps...",
-                                color = textSecondary.copy(alpha = 0.6f),
-                                fontSize = 13.sp
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = null,
-                                tint = textSecondary,
+                            androidx.compose.material3.Icon(
+                                imageVector = Icons.Filled.ChevronRight,
+                                contentDescription = "Open",
+                                tint = ShieldMuted,
                                 modifier = Modifier.size(18.dp)
                             )
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedContainerColor = cardBackground,
-                            unfocusedContainerColor = cardBackground,
-                            focusedBorderColor = accentLime,
-                            unfocusedBorderColor = cardBorderColor
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("app_search_input")
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Category filter chips
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf("All", "Social", "Games", "Entertainment", "Messaging", "Blocked").forEach { cat ->
-                            val isSelected = selectedCategoryTab == cat
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        if (isSelected) accentLime else MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) accentLime else MaterialTheme.colorScheme.outline,
-                                        RoundedCornerShape(12.dp)
-                                    )
-                                    .clickable { selectedCategoryTab = cat }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = cat,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = if (isSelected) Color.White else textPrimary,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        fontSize = 11.sp
-                                    )
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Bulk action buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0x1DE53935))
-                                .border(1.dp, Color(0x60E53935), RoundedCornerShape(12.dp))
-                                .clickable { onBlockAllSocial() }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Block All Social",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = accentCoral,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.sp
-                                )
-                            )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
-                                .clickable { onUnblockAll() }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Unblock All",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    color = textPrimary,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.sp
-                                )
-                            )
                         }
                     }
                 }
             }
 
-            // Apps List
-            if (displayApps.isEmpty()) {
-                item {
+            // ---------------------------------------------------------------
+            // Schedules
+            // ---------------------------------------------------------------
+            item {
+                Spacer(modifier = Modifier.height(34.dp))
+                ShieldEyebrow(
+                    title = "Schedules",
+                    action = {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(99.dp))
+                                .background(ShieldSoft)
+                                .clickable {
+                                    editingSchedule = null
+                                    showScheduleEditSheet = true
+                                }
+                                .padding(horizontal = 14.dp, vertical = 7.dp)
+                        ) {
+                            Text(text = "+ Add", style = shieldBody(12, FontWeight.SemiBold, ShieldAccent))
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                if (scheduledBlocks.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(ShieldSurface)
+                            .padding(horizontal = 20.dp, vertical = 30.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(ShieldSoft),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                androidx.compose.material3.Icon(
+                                    imageVector = Icons.Filled.Schedule,
+                                    contentDescription = null,
+                                    tint = ShieldAccent,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(text = "No schedules yet", style = shieldBody(14, FontWeight.SemiBold))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Set study hours, break windows and active days to block distractions automatically.",
+                                style = shieldBody(12, FontWeight.Normal, ShieldMuted).copy(
+                                    textAlign = TextAlign.Center, lineHeight = 18.sp
+                                )
+                            )
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(ShieldSurface)
+                            .padding(horizontal = 20.dp, vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            scheduledBlocks.forEachIndexed { index, block ->
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            editingSchedule = block
+                                            showScheduleEditSheet = true
+                                        }
+                                        .padding(vertical = 16.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(text = block.label, style = shieldBody(14, FontWeight.SemiBold))
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "${ScheduledBlockScheduler.formatDisplayTime(block.start_time)} – ${ScheduledBlockScheduler.formatDisplayTime(block.end_time)} · ${block.days_active}",
+                                                style = shieldBody(12, FontWeight.Normal, ShieldMuted)
+                                            )
+                                            if (isScheduledBlockActive) {
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                ShieldTag(text = "Active now", active = true)
+                                            }
+                                        }
+                                        ShieldToggle(
+                                            checked = block.is_enabled,
+                                            onCheckedChange = { onToggleSchedule(block.id, it) }
+                                        )
+                                    }
+                                }
+                                if (index < scheduledBlocks.size - 1) {
+                                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(ShieldLine))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Per-app daily limits row, same card language
+                Spacer(modifier = Modifier.height(12.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(ShieldSurface)
+                        .clickable {
+                            onDismiss()
+                            onOpenAppLimits()
+                        }
+                        .testTag("open_app_limits_card")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Per-app daily limits", style = shieldBody(14, FontWeight.SemiBold))
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Set a time budget for each app",
+                                style = shieldBody(12, FontWeight.Normal, ShieldMuted)
+                            )
+                        }
+                        androidx.compose.material3.Icon(
+                            imageVector = Icons.Filled.ChevronRight,
+                            contentDescription = "Open",
+                            tint = ShieldMuted,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------------
+            // Apps to block
+            // ---------------------------------------------------------------
+            item {
+                Spacer(modifier = Modifier.height(34.dp))
+                val protectedCount = displayApps.count { it.isBlocked }
+                ShieldEyebrow(
+                    title = "Apps to block",
+                    action = {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(99.dp))
+                                .background(ShieldSoft)
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "$protectedCount protected",
+                                style = shieldBody(10, FontWeight.SemiBold, ShieldAccent).copy(letterSpacing = 0.4.sp)
+                            )
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Search
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(99.dp))
+                        .background(ShieldSurface)
+                        .padding(horizontal = 18.dp, vertical = 13.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = ShieldMuted,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            singleLine = true,
+                            textStyle = shieldBody(13, FontWeight.Normal, ShieldText),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("app_search_input"),
+                            decorationBox = { inner ->
+                                if (searchQuery.isEmpty()) {
+                                    Text(text = "Search installed apps", style = shieldBody(13, FontWeight.Normal, ShieldMuted))
+                                }
+                                inner()
+                            }
+                        )
+                    }
+                }
+
+                // Category chips — exactly the design's five
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("All", "Social", "Games", "Entertainment", "Messaging").forEach { cat ->
+                        val selected = selectedCategoryTab == cat
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(99.dp))
+                                .background(if (selected) ShieldAccent else ShieldSurface)
+                                .clickable { selectedCategoryTab = cat }
+                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = cat,
+                                style = shieldBody(
+                                    12,
+                                    if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                    if (selected) ShieldBg else ShieldMuted
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // Bulk actions
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 2.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Block all social",
+                        style = shieldBody(12, FontWeight.SemiBold, ShieldCoral),
+                        modifier = Modifier.clickable { onBlockAllSocial() }
+                    )
+                    Text(
+                        text = "Unblock all",
+                        style = shieldBody(12, FontWeight.SemiBold, ShieldMuted),
+                        modifier = Modifier.clickable { onUnblockAll() }
+                    )
+                }
+
+                // App rows
+                if (displayApps.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "No matching apps found",
-                            color = textSecondary,
-                            fontSize = 13.sp
-                        )
+                        Text(text = "No matching apps found", style = shieldBody(13, FontWeight.Normal, ShieldMuted))
                     }
-                }
-            } else {
-                items(displayApps, key = { it.id }) { app ->
-                    GlassCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        accentBorder = app.isBlocked
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(
-                                            if (app.isBlocked) Color(0x35E53935) else Color(0x22FFFFFF)
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    val fallback = if (app.category.contains("Gaming") || app.category.contains("Game")) {
-                                        Icons.Default.Games
-                                    } else if (app.category.contains("Video") || app.category.contains("Media")) {
-                                        Icons.Default.Videocam
-                                    } else {
-                                        Icons.Default.Lock
-                                    }
-                                    AppIconView(
-                                        packageName = app.packageName,
-                                        contentDescription = app.name,
-                                        modifier = Modifier.size(26.dp),
-                                        fallbackVector = fallback,
-                                        fallbackTint = if (app.isBlocked) accentCoral else textSecondary
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = app.name,
-                                        style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 14.sp,
-                                            color = textPrimary
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = app.category,
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = textSecondary,
-                                            fontSize = 11.sp
-                                        )
-                                    )
-                                }
-                            }
-
-                            Switch(
-                                checked = app.isBlocked,
-                                onCheckedChange = { isChecked ->
-                                    if (isChecked && !isAllPermissionsGranted) {
-                                        pendingAction = { onToggleAppBlocked(app.packageName, true) }
-                                        showPermissionSheet = true
-                                    } else {
-                                        onToggleAppBlocked(app.packageName, isChecked)
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = NearBlack,
-                                    checkedTrackColor = accentLime,
-                                    uncheckedThumbColor = Color(0xFFB0BEC5),
-                                    uncheckedTrackColor = Color(0x35FFFFFF)
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-
-            // How Android App Blocking Works Explainer Card
-            item {
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp)
-                ) {
-                    Row(
+                } else {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.Top
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(ShieldSurface)
+                            .padding(horizontal = 20.dp, vertical = 4.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(accentLime.copy(alpha = 0.25f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
-                                tint = accentLime,
-                                modifier = Modifier.size(20.dp)
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            displayApps.forEachIndexed { index, app ->
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 16.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(ShieldBg),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            val fallback = if (app.category.contains("Game", ignoreCase = true)) {
+                                                Icons.Filled.Games
+                                            } else if (app.category.contains("Video", ignoreCase = true) || app.category.contains("Media", ignoreCase = true)) {
+                                                Icons.Filled.Videocam
+                                            } else {
+                                                Icons.Filled.Lock
+                                            }
+                                            AppIconView(
+                                                packageName = app.packageName,
+                                                contentDescription = app.name,
+                                                modifier = Modifier.size(28.dp),
+                                                fallbackVector = fallback,
+                                                fallbackTint = ShieldMuted
+                                            )
+                                        }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(text = app.name, style = shieldBody(14, FontWeight.SemiBold))
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(text = app.category, style = shieldBody(12, FontWeight.Normal, ShieldMuted))
+                                        }
+                                        ShieldToggle(
+                                            checked = app.isBlocked,
+                                            onCheckedChange = { isChecked ->
+                                                if (isChecked && !isAllPermissionsGranted) {
+                                                    enableWithGate { onToggleAppBlocked(app.packageName, true) }
+                                                } else {
+                                                    onToggleAppBlocked(app.packageName, isChecked)
+                                                }
+                                            }
+                                        )
+                                    }
+                                    if (index < displayApps.size - 1) {
+                                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(ShieldLine))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------------
+            // Activity
+            // ---------------------------------------------------------------
+            item {
+                Spacer(modifier = Modifier.height(34.dp))
+                ShieldEyebrow(
+                    title = "Activity",
+                    action = {
+                        if (punishmentLogs.size > 2) {
+                            Text(
+                                text = if (activityExpanded) "Show less" else "View all",
+                                style = shieldBody(12, FontWeight.SemiBold, ShieldAccent).copy(letterSpacing = 0.48.sp),
+                                modifier = Modifier.clickable { activityExpanded = !activityExpanded }
                             )
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "How Does Android App Blocking Work?",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp,
-                                    color = textPrimary
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Focus Shield runs a lightweight background monitor using Android's official Usage Access API. When a blacklisted package enters the foreground during an active focus timer, Focus Shield instantly launches the full-screen lock overlay, preventing mindless scrolling until the session finishes.",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = textSecondary,
-                                    fontSize = 11.sp,
-                                    lineHeight = 16.sp
-                                )
-                            )
+                    }
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                val shownLogs = if (activityExpanded) punishmentLogs else punishmentLogs.take(2)
+                if (shownLogs.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(ShieldSurface)
+                            .padding(20.dp)
+                    ) {
+                        Text(
+                            text = "No guard activity yet. Warnings and resolutions will appear here.",
+                            style = shieldBody(12, FontWeight.Normal, ShieldMuted)
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(ShieldSurface)
+                            .padding(horizontal = 20.dp, vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            shownLogs.forEachIndexed { index, log ->
+                                val (statusFg, statusLabel) = when (log.status) {
+                                    "blocked" -> Pair(ShieldCoral, "BLOCKED (3h)")
+                                    "warned_resolved" -> Pair(ShieldGreen, "RESOLVED")
+                                    else -> Pair(ShieldAmber, "WARNED")
+                                }
+                                val friendlyApp = when (log.app_package) {
+                                    "com.openai.chatgpt" -> "ChatGPT"
+                                    "com.anthropic.claude" -> "Claude"
+                                    else -> log.app_package.substringAfterLast('.')
+                                }
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 16.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(text = friendlyApp, style = shieldBody(14, FontWeight.SemiBold))
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = log.reason,
+                                                style = shieldBody(12, FontWeight.Normal, ShieldMuted),
+                                                maxLines = 2
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(99.dp))
+                                                .background(ShieldSoft)
+                                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = statusLabel,
+                                                style = shieldBody(10, FontWeight.SemiBold, statusFg).copy(letterSpacing = 0.4.sp)
+                                            )
+                                        }
+                                    }
+                                    if (index < shownLogs.size - 1) {
+                                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(ShieldLine))
+                                    }
+                                }
+                            }
                         }
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------------
+            // Test shield
+            // ---------------------------------------------------------------
+            item {
+                Spacer(modifier = Modifier.height(34.dp))
+                ShieldEyebrow(title = "Test shield")
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(99.dp))
+                            .border(1.dp, ShieldChipBorder.copy(alpha = 0.6f), RoundedCornerShape(99.dp))
+                            .clickable {
+                                if (!isAllPermissionsGranted) {
+                                    enableWithGate { onTriggerTestIntercept("Instagram & Reels") }
+                                } else {
+                                    onTriggerTestIntercept("Instagram & Reels")
+                                }
+                            }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "Test Instagram lock", style = shieldBody(12, FontWeight.Medium, ShieldText))
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(99.dp))
+                            .border(1.dp, ShieldChipBorder.copy(alpha = 0.6f), RoundedCornerShape(99.dp))
+                            .clickable {
+                                if (!isAllPermissionsGranted) {
+                                    enableWithGate { onTriggerTestIntercept("YouTube & Shorts") }
+                                } else {
+                                    onTriggerTestIntercept("YouTube & Shorts")
+                                }
+                            }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "Test Shorts lock", style = shieldBody(12, FontWeight.Medium, ShieldText))
                     }
                 }
             }
         }
 
-        if (showPermissionSheet) {
-            FocusShieldPermissionSheet(
-                onDismiss = {
-                    showPermissionSheet = false
-                    pendingAction = null
-                },
-                onAllGranted = {
-                    showPermissionSheet = false
-                    pendingAction?.invoke()
-                    pendingAction = null
-                }
-            )
-        }
-
-        // v1.3.0: Study channels allowlist (full-screen overlay)
+        // ---------------------------------------------------------------
+        // Nested overlays — unchanged behaviour
+        // ---------------------------------------------------------------
         if (showStudyChannels) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(if (isDark) Color(0xFF121511) else Color(0xFFF5FAFB))
-            ) {
-                com.example.ui.screens.StudyChannelsScreen(
-                    onBack = { showStudyChannels = false }
-                )
+            Box(modifier = Modifier.fillMaxSize().background(ShieldBg)) {
+                StudyChannelsScreen(onBack = { showStudyChannels = false })
             }
         }
 
@@ -2290,57 +1581,19 @@ fun FocusShieldHubSheet(
                 }
             )
         }
-    }
-}
 
-/**
- * v1.3.0 — compact toggle row for the multi-window protections
- * (Block split screen / Block floating window) inside the Strict Mode card.
- */
-@Composable
-private fun MultiWindowProtectionRow(
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    isDark: Boolean,
-    textPrimary: Color,
-    textSecondary: Color
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.5.sp,
-                    color = textPrimary
-                )
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    color = textSecondary,
-                    fontSize = 11.sp
-                )
+        if (showPermissionSheet) {
+            FocusShieldPermissionSheet(
+                onDismiss = {
+                    showPermissionSheet = false
+                    pendingAction = null
+                },
+                onAllGranted = {
+                    showPermissionSheet = false
+                    pendingAction?.invoke()
+                    pendingAction = null
+                }
             )
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = NearBlack,
-                checkedTrackColor = Color(0xFFFF5252),
-                uncheckedTrackColor = if (isDark) Color(0xFF374151) else Color(0xFFD1D5DB)
-            )
-        )
     }
 }
