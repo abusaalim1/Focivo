@@ -1,6 +1,7 @@
 package com.example.screenshots.v123
 
 import android.content.Context
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -9,9 +10,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.runBlocking
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.CustomizeTimerSheet
 import com.example.ui.components.ThemedScreenBackground
@@ -167,6 +168,11 @@ class V123ScreenshotsTest {
     fun v123_customize_timer_new_faces() {
         initManagers()
         TimerThemeManager.selectTheme(context, "aurora")
+        // Pre-scroll the Timer Style picker row to the new clock faces
+        // (touch injection is unreliable under Robolectric, so the row
+        // exposes a test-hook ScrollState). Fresh prefs carry 0 Focus
+        // Points, so Horizon (250 pts) shows locked.
+        val pickerScroll = ScrollState(0)
         themed(dark = true) {
             CustomizeTimerSheet(
                 onDismiss = {},
@@ -175,13 +181,14 @@ class V123ScreenshotsTest {
                 ambientSound = "Rain",
                 onSelectAmbientSound = {},
                 onSelectMode = { _, _ -> },
-                onUpdateSubject = {}
+                onUpdateSubject = {},
+                timerFaceScrollState = pickerScroll
             )
         }
-        // Scroll the Timer Style picker row to the new clock faces. Fresh
-        // prefs carry 0 Focus Points, so Horizon (250 pts) shows locked.
-        val picker = composeTestRule.onNodeWithTag("timer_face_picker_row", useUnmergedTree = true)
-        repeat(4) { picker.performTouchInput { swipeLeft() } }
+        composeTestRule.waitForIdle()
+        // Cards are 104dp wide + 12dp spacing; Horizon is index 10.
+        val targetPx = with(composeTestRule.density) { (10 * 116).dp.roundToPx() }
+        runBlocking { pickerScroll.scrollTo(targetPx) }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("customize_timer_sheet", useUnmergedTree = true)
             .captureRoboImage("src/test/screenshots/v123/v123_customize_timer_new_faces.png")

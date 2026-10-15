@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -112,7 +113,9 @@ fun CustomizeTimerSheet(
     // v1.1: starts a pomodoro run (goes through the same session-start gate
     // as the classic timer — pre-study block sheet included).
     onStartPomodoro: (PomodoroConfig) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // v1.2.3: test hook — screenshot tests pre-scroll the Timer Style row.
+    timerFaceScrollState: ScrollState? = null
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -453,7 +456,8 @@ fun CustomizeTimerSheet(
                             }
                         },
                         textPrimary = textPrimary,
-                        cardBorder = cardBorder
+                        cardBorder = cardBorder,
+                        scrollState = timerFaceScrollState ?: rememberScrollState()
                     )
                 }
 

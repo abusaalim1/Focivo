@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
@@ -1060,7 +1061,9 @@ fun TimerFacePicker(
     onFaceTap: (face: TimerFace, isLocked: Boolean) -> Unit,
     modifier: Modifier = Modifier,
     textPrimary: Color,
-    cardBorder: Color
+    cardBorder: Color,
+    // v1.2.3: test hook — lets screenshot tests pre-scroll the row.
+    scrollState: ScrollState = rememberScrollState()
 ) {
     val isDark = isAppInDarkTheme()
     Column(modifier = modifier.fillMaxWidth()) {
@@ -1089,7 +1092,7 @@ fun TimerFacePicker(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
+                .horizontalScroll(scrollState)
                 .testTag("timer_face_picker_row"),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
