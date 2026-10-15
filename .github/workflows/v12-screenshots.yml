@@ -1,0 +1,60 @@
+name: v12 Screenshots
+
+# v1.2 verify round: runs the Robolectric/Roborazzi screenshot tests on the
+# feat/v12-round branch and uploads the PNGs as an artifact. The owner
+# reviews these before ANY merge or release.
+#
+# Trigger: push to THIS branch only. Nothing touches main.
+# Note: this repo has no gradle wrapper committed, so we provision Gradle
+# via gradle/actions/setup-gradle like the debug build workflow does.
+#
+# CRITICAL: --rerun-tasks --no-configuration-cache forces REAL renders.
+# Without them the gradle cache can fake-pass in ~20s with zero PNGs.
+
+on:
+  push:
+    branches: [feat/v12-round]
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Run v12 screenshot tests (record mode, forced real renders)
+        run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.v12.*" --rerun-tasks --no-configuration-cache --stacktrace
+
+      - name: Dump test failure stacks
+        if: always()
+        run: python3 -c "import glob,xml.etree.ElementTree as ET;[print(chr(61)*70,tc.get('classname'),'::',tc.get('name'),'MESSAGE:',(fl.get('message')or '')[:800],'STACK:',(fl.text or '')[:4000]) for f in glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml') for tc in ET.parse(f).getroot().iter('testcase') for fl in list(tc.iter('failure'))+list(tc.iter('error'))]"
+
+      - name: Locate generated PNGs
+        if: always()
+        run: |
+          echo "=== v12 screenshot dir ==="
+          find app/src/test/screenshots/v12 -type f 2>/dev/null | head -40
+          echo "=== PNG count ==="
+          find app/src/test/screenshots/v12 -name '*.png' 2>/dev/null | wc -l
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v12-screenshots
+          path: |
+            app/src/test/screenshots/v12/
+          if-no-files-found: error

@@ -20,7 +20,9 @@ data class TimerFace(
     val tagline: String,
     val unlockPoints: Int = 0
 ) {
-    fun isUnlocked(userPoints: Int): Boolean = userPoints >= unlockPoints
+    // v1.2 test build: ALL_CONTENT_UNLOCKED frees every timer face.
+    fun isUnlocked(userPoints: Int): Boolean =
+        ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
 }
 
 object TimerFaceManager {

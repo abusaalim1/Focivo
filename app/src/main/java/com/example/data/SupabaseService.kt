@@ -14,6 +14,10 @@ import kotlinx.serialization.json.put
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** v1.2: single-column read holder for the avatar null-wipe guard. */
+@kotlinx.serialization.Serializable
+private data class AvatarUrlRow(val avatar_url: String? = null)
+
 class SupabaseService {
     // Shared OkHttpClient: constructing one per call leaked threads/pools.
     private val sharedOkHttpClient = okhttp3.OkHttpClient()
@@ -1098,6 +1102,11 @@ class SupabaseService {
             Log.e(TAG, "[AvatarPersistence] BEFORE UPDATE ERROR: userId is blank!")
             return@withContext Result.failure(IllegalArgumentException("userId is blank"))
         }
+        // v1.2: never write a blank avatar — a blank write would wipe the stored one.
+        if (avatarUrl.isBlank()) {
+            Log.w(TAG, "[AvatarPersistence] Refusing to write blank avatar_url for user $userId")
+            return@withContext Result.success(false)
+        }
 
         Log.i(TAG, "[AvatarPersistence] BEFORE UPDATE: Executing UPSERT public.users & public.study_leaderboard SET avatar_url = '${avatarUrl.take(60)}...' WHERE id = '$userId'")
         try {
@@ -1133,24 +1142,11 @@ class SupabaseService {
             val usersCode = usersResponse.code
             Log.i(TAG, "[AvatarPersistence] AFTER UPSERT (users): REST POST code=$usersCode, body=$usersBody")
 
-            // 3. Perform REST UPSERT into public.study_leaderboard
-            val lbUpsertJson = org.json.JSONObject().apply {
-                put("user_id", userId)
-                put("avatar_url", avatarUrl)
-            }
-            val lbPostUrl = "${SupabaseManager.SUPABASE_URL}/rest/v1/study_leaderboard"
-            val lbRequest = okhttp3.Request.Builder()
-                .url(lbPostUrl)
-                .addHeader("apikey", SupabaseManager.SUPABASE_KEY)
-                .addHeader("Authorization", "Bearer $token")
-                .addHeader("Content-Type", "application/json")
-                .addHeader("Prefer", "resolution=merge-duplicates,return=representation")
-                .post(lbUpsertJson.toString().toRequestBody(mediaType))
-                .build()
-
-            val lbResponse = sharedOkHttpClient.newCall(lbRequest).execute()
-            val lbBody = lbResponse.body?.string().orEmpty()
-            Log.i(TAG, "[AvatarPersistence] AFTER UPSERT (study_leaderboard): REST POST code=${lbResponse.code}, body=$lbBody")
+            // 3. Best-effort targeted avatar write on public.study_leaderboard.
+            // v1.2: routed through updateLeaderboardAvatarUrl so a missing
+            // avatar_url column (proven absent on the live DB 2026-10-15) is
+            // caught and logged instead of failing this whole call.
+            updateLeaderboardAvatarUrl(userId, avatarUrl)
 
             Log.i(TAG, "[AvatarPersistence] SUCCESS: Successfully persisted avatar_url for user $userId to Supabase")
             Result.success(true)
@@ -1161,10 +1157,60 @@ class SupabaseService {
     }
 
     /**
+     * v1.2: targeted avatar write for public.study_leaderboard — ONLY the
+     * avatar_url column, and ONLY when non-blank. Never null-wipes.
+     *
+     * Proven live 2026-10-15: the avatar_url column does NOT exist on the
+     * study_leaderboard table (PostgREST 42703) and the 'avatars' storage
+     * bucket is missing, so remote leaderboard avatars currently cannot
+     * persist. This write is therefore best-effort: a missing column is
+     * caught and logged, never propagated as a failure. Once the column is
+     * added server-side (ALTER TABLE study_leaderboard ADD COLUMN avatar_url
+     * text), avatars start syncing with no app update needed.
+     */
+    suspend fun updateLeaderboardAvatarUrl(userId: String, avatarUrl: String): Result<Boolean> =
+        withContext(Dispatchers.IO) {
+            if (userId.isBlank() || avatarUrl.isBlank()) return@withContext Result.success(false)
+            return@withContext try {
+                client.from("study_leaderboard").update(mapOf("avatar_url" to avatarUrl)) {
+                    filter { eq("user_id", userId) }
+                }
+                Log.i(TAG, "[LeaderboardAvatar] study_leaderboard avatar updated for user_id=$userId")
+                Result.success(true)
+            } catch (e: Exception) {
+                Log.w(
+                    TAG,
+                    "[LeaderboardAvatar] study_leaderboard avatar write failed " +
+                        "(column may not exist yet): ${e.message}"
+                )
+                Result.success(false)
+            }
+        }
+
+    /**
+     * v1.2: reads the currently stored users.avatar_url (null when the row
+     * is absent or unreadable, e.g. RLS). Used to refill the DTO before an
+     * SDK upsert so a null/blank incoming avatar never wipes the stored one.
+     */
+    private suspend fun fetchStoredAvatarUrl(userId: String): String? {
+        return try {
+            client.from("users").select(columns = Columns.list("avatar_url")) {
+                filter { eq("id", userId) }
+                limit(1)
+            }.decodeSingleOrNull<AvatarUrlRow>()?.avatar_url?.takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchStoredAvatarUrl failed: ${e.message}")
+            null
+        }
+    }
+
+    /**
      * Targeted column update (not an upsert). Only the given columns are written;
      * every other column keeps its server value. Use this instead of upsertUserProfile
-     * for partial updates — the PostgREST upsert serializes ALL DTO fields (including
-     * nulls/defaults) and would wipe unrelated columns like avatar_url.
+     * for partial updates — and for writing an explicit NULL (pass a null value,
+     * which becomes JsonNull here). The Postgrest serializer is configured with
+     * explicitNulls = false (v1.2), so DTO upserts omit null fields instead of
+     * null-wiping them.
      */
     suspend fun updateUserProfileColumns(userId: String, columns: Map<String, Any?>): Result<Boolean> =
         withContext(Dispatchers.IO) {
@@ -1196,7 +1242,17 @@ class SupabaseService {
         val userId = userDto.id
         if (userId.isBlank()) return@withContext Result.failure(IllegalArgumentException("user id is blank"))
         try {
-            client.from("users").upsert(userDto)
+            // v1.2: never null-wipe a stored avatar — when the incoming DTO
+            // carries no avatar, refill it from the existing row first. (The
+            // Postgrest serializer omits nulls (explicitNulls = false), but the
+            // refill keeps the avatar in the payload when it is actually known,
+            // and protects any future serializer change from erasing it.)
+            val dtoToWrite = if (userDto.avatar_url.isNullOrBlank()) {
+                userDto.copy(avatar_url = fetchStoredAvatarUrl(userId))
+            } else {
+                userDto
+            }
+            client.from("users").upsert(dtoToWrite)
             return@withContext Result.success(true)
         } catch (e: Exception) {
             Log.w(TAG, "upsertUserProfile SDK failed: ${e.message}. Trying REST POST fallback...")
@@ -1296,15 +1352,40 @@ class SupabaseService {
         }
 
         Log.i(TAG, "[LeaderboardSync] BEFORE WRITE: Executing UPDATE/UPSERT public.study_leaderboard SET display_name='${leaderboardDto.display_name}', study_seconds=${leaderboardDto.study_seconds}, streak=${leaderboardDto.streak} WHERE user_id='$userId'")
-        try {
-            client.from("study_leaderboard").upsert(leaderboardDto)
+
+        // v1.2 avatar-robustness: the stats write NEVER carries avatar_url.
+        // Proven live 2026-10-15 — the avatar_url column does not exist on
+        // study_leaderboard, so any payload containing it fails the whole
+        // sync; and an explicit null would wipe a previously stored avatar.
+        // The avatar is synced separately, only when non-blank (best-effort).
+        val statsOnly = leaderboardDto.copy(avatar_url = null)
+        val statsResult: Result<Boolean> = try {
+            client.from("study_leaderboard").upsert(statsOnly)
             Log.i(TAG, "[LeaderboardSync] SDK upsert succeeded for user_id=$userId")
-            return@withContext Result.success(true)
+            Result.success(true)
         } catch (e: Exception) {
             Log.w(TAG, "[LeaderboardSync] SDK upsert failed: ${e.message}. Attempting REST POST fallback...")
+            restUpsertLeaderboardStats(leaderboardDto)
         }
 
-        try {
+        // Best-effort avatar sync — never fails the overall result.
+        val avatarToSync = leaderboardDto.avatar_url
+        if (!avatarToSync.isNullOrBlank()) {
+            updateLeaderboardAvatarUrl(userId, avatarToSync)
+        }
+        return@withContext statsResult
+    }
+
+    /**
+     * v1.2: REST fallback for the stats-only leaderboard write. The payload
+     * contains NO avatar key at all, so a missing avatar_url column can
+     * never fail it and no stored avatar can be wiped.
+     */
+    private suspend fun restUpsertLeaderboardStats(
+        leaderboardDto: SupabaseStudyLeaderboardDto
+    ): Result<Boolean> {
+        return try {
+            val userId = leaderboardDto.user_id
             val token = getAuthToken() ?: SupabaseManager.SUPABASE_KEY
             val postUrl = "${SupabaseManager.SUPABASE_URL}/rest/v1/study_leaderboard"
             val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
@@ -1317,7 +1398,6 @@ class SupabaseService {
                 leaderboardDto.current_week_start?.let { put("current_week_start", it) }
                 put("streak", leaderboardDto.streak)
                 put("subject_tag", leaderboardDto.subject_tag)
-                leaderboardDto.avatar_url?.takeIf { it.isNotBlank() }?.let { put("avatar_url", it) }
             }
 
             val requestBody = json.toString().toRequestBody(mediaType)

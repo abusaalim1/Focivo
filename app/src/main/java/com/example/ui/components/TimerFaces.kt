@@ -137,6 +137,33 @@ fun TimerFaceHost(
     }
 }
 
+/**
+ * v1.2: the generic "study" illustration (old standalone art) is never shown on
+ * the timer — the equipped outfit set renders instead. Themed mascots and all
+ * other poses keep their standalone art.
+ */
+@Composable
+private fun TimerFaceMascot(
+    pose: MascotPose,
+    size: Dp,
+    animate: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (pose == MascotPose.STUDY_HAPPY) {
+        BuddyMascot(
+            modifier = Modifier.width(size),
+            pose = com.example.util.MascotPose.STUDY
+        )
+    } else {
+        RegainMascotView(
+            size = size,
+            pose = pose,
+            animate = animate,
+            modifier = modifier
+        )
+    }
+}
+
 /** Shared session/subject chip — lime for focus, mint shift for breaks. */
 @Composable
 private fun FacePhasePill(
@@ -364,7 +391,7 @@ private fun MinimalDigitsFace(
             )
         }
         Spacer(modifier = Modifier.height(22.dp))
-        RegainMascotView(
+        TimerFaceMascot(
             size = 84.dp,
             pose = params.mascotPose,
             animate = params.isRunning
@@ -463,7 +490,7 @@ private fun GlassCardFace(
                     horizontalArrangement = Arrangement.Center,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    RegainMascotView(
+                    TimerFaceMascot(
                         size = 64.dp,
                         pose = params.mascotPose,
                         animate = params.isRunning
@@ -581,7 +608,7 @@ private fun HalfArcFace(
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
-        RegainMascotView(
+        TimerFaceMascot(
             size = 72.dp,
             pose = params.mascotPose,
             animate = params.isRunning
@@ -679,7 +706,7 @@ private fun EditorialFace(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
-            RegainMascotView(
+            TimerFaceMascot(
                 size = 76.dp,
                 pose = params.mascotPose,
                 animate = params.isRunning

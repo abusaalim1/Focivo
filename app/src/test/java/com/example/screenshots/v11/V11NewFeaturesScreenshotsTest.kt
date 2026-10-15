@@ -27,8 +27,6 @@ import com.example.util.PomodoroPhase
 import com.example.util.PomodoroState
 import com.example.util.TimerFaceManager
 import com.example.util.TimerThemeManager
-import com.example.util.WardrobeCategory
-import com.example.util.wardrobeItemById
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -175,13 +173,7 @@ class V11NewFeaturesScreenshotsTest {
     fun v11_study_timer_dressed_buddy() {
         initManagers()
         // Equip a full outfit for the buddy.
-        MascotWardrobe.saveOutfit(
-            mapOf(
-                WardrobeCategory.CAPS to "cap_lime",
-                WardrobeCategory.TOPS to "top_sweatshirt",
-                WardrobeCategory.EXTRAS to "extra_glasses"
-            )
-        )
+        MascotWardrobe.saveSet("set04")
         themed(dark = true) {
             FocusScreen(
                 remainingSeconds = 1500,
@@ -246,7 +238,7 @@ class V11NewFeaturesScreenshotsTest {
     @Test
     fun v11_mascot_screen_default() {
         initManagers()
-        MascotWardrobe.saveOutfit(emptyMap())
+        MascotWardrobe.saveSet("set02")
         themed(dark = true) {
             MascotScreen(focusPoints = 1250, onBack = {})
         }
@@ -256,15 +248,7 @@ class V11NewFeaturesScreenshotsTest {
     @Test
     fun v11_mascot_screen_dressed() {
         initManagers()
-        MascotWardrobe.saveOutfit(
-            mapOf(
-                WardrobeCategory.CAPS to "cap_scholar",
-                WardrobeCategory.TOPS to "top_jacket_denim",
-                WardrobeCategory.BOTTOMS to "bottom_shorts_black",
-                WardrobeCategory.SHOES to "shoes_black",
-                WardrobeCategory.EXTRAS to "extra_glasses"
-            )
-        )
+        MascotWardrobe.saveSet("set04")
         themed(dark = true) {
             MascotScreen(focusPoints = 5200, onBack = {})
         }
@@ -274,15 +258,7 @@ class V11NewFeaturesScreenshotsTest {
     @Test
     fun v11_buddy_mascot_closeup() {
         initManagers()
-        MascotWardrobe.saveOutfit(
-            mapOf(
-                WardrobeCategory.CAPS to "cap_lime",
-                WardrobeCategory.TOPS to "top_sweatshirt",
-                WardrobeCategory.BOTTOMS to "bottom_shorts_navy",
-                WardrobeCategory.SHOES to "shoes_lime",
-                WardrobeCategory.EXTRAS to "extra_badge"
-            )
-        )
+        MascotWardrobe.saveSet("set06")
         themed(dark = true) {
             Box(
                 modifier = Modifier.fillMaxSize(),

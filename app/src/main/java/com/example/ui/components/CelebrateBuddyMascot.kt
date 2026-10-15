@@ -3,22 +3,20 @@ package com.example.ui.components
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.example.util.MascotPose
-import com.example.util.WardrobeCategory
-import com.example.util.WardrobeItem
 
 /**
- * v1.1 — Celebration-pose dressed buddy for the share card.
+ * v1.2 — Celebration-pose buddy for the share card.
  *
- * Delegates to [BuddyMascot] with [MascotPose.CELEBRATE]: the same equipped
- * wardrobe items, composited onto the celebration pose base with per-pose
- * fitted overlays. This keeps the ONE buddy identity consistent: the dressed
- * buddy the user sees on Study/Home/Profile/Mascot screen is the same buddy
- * on the share card, just in a different pose.
+ * Delegates to [BuddyMascot] with [MascotPose.CELEBRATE]: the equipped outfit
+ * set's full fitted render (never bald — the set wears the hood-style
+ * graduation cap). This keeps the ONE buddy identity consistent: the buddy
+ * the user sees on Study/Home/Profile/Mascot screen is the same buddy on
+ * the share card, just in a different pose.
  */
 @Composable
 fun CelebrateBuddyMascot(
     modifier: Modifier = Modifier,
-    pendingOutfit: Map<WardrobeCategory, WardrobeItem>? = null
+    pendingOutfit: String? = null
 ) {
     BuddyMascot(
         modifier = modifier,

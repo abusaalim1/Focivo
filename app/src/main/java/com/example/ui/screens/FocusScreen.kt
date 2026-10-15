@@ -60,6 +60,7 @@ import com.example.ui.components.DeepFocusSettingsSheet
 import com.example.ui.components.DistractionDialog
 import com.example.ui.components.MascotPose
 import com.example.ui.components.PreStudyAppBlockSheet
+import com.example.util.MascotPose as BuddyMascotPose
 import com.example.ui.components.StudyHubSheet
 import com.example.ui.components.TimerFaceHost
 import com.example.ui.components.TimerFaceParams
@@ -344,7 +345,6 @@ fun FocusScreen(
                         isRunning -> MascotPose.STUDYING
                         else -> selectedTheme.mascotPose
                     }
-                    val isDefaultTheme = selectedTheme.id == "aurora"
                     val selectedFace by TimerFaceManager.selectedFace.collectAsState()
                     val density = LocalDensity.current
                     val swipeThresholdPx = remember(density) {
@@ -453,12 +453,17 @@ fun FocusScreen(
                                 onTimeClick = if (!isRunning) {
                                     { showCustomizeTimer = true }
                                 } else null,
-                                // v1.1: dressed buddy on the default theme (tap
-                                // opens the Mascot screen); themed mascots stay.
-                                mascotContent = if (isDefaultTheme) {
-                                    { BuddyMascot(modifier = Modifier.width(108.dp)) }
-                                } else null,
-                                onMascotClick = if (isDefaultTheme) onOpenMascot else null
+                                // v1.2: the equipped outfit set IS the mascot everywhere —
+                                // the dressed buddy renders in the timer ring on every
+                                // theme (no standalone illustrations, no book in hands);
+                                // tap opens the Mascot screen.
+                                mascotContent = {
+                                    BuddyMascot(
+                                        modifier = Modifier.width(108.dp),
+                                        pose = BuddyMascotPose.STUDY
+                                    )
+                                },
+                                onMascotClick = onOpenMascot
                             ),
                             modifier = Modifier.testTag("aurora_timer_component")
                         )

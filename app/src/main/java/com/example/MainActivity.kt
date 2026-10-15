@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.service.FocusShieldService
+import com.example.data.AndroidPreferenceSessionManager
 import com.example.ui.components.CrashReportDialog
 import com.example.FocuslyApplication
 import com.example.ui.components.AlarmHubSheet
@@ -77,7 +78,9 @@ import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.QuestionnaireScreen
 import com.example.ui.screens.SessionCompleteScreen
 import com.example.ui.screens.SettingsScreen
-import com.example.ui.screens.SplashScreen
+import com.example.ui.screens.AuthMode
+import com.example.ui.splash.FocivoSplash
+import com.example.ui.splash.SplashVariant
 import com.example.ui.theme.FocuslyTheme
 import com.example.ui.viewmodel.FocuslyViewModel
 
@@ -292,6 +295,18 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val isSigningOut by viewModel.isSigningOut.collectAsState()
 
     val context = LocalContext.current
+    // v1.2 (owner-ordered): guest accounts NEVER see onboarding — they go
+    // straight into the app. Treat survey/onboarding as completed for guests
+    // and persist it so the skip survives relaunch.
+    val isGuestSession = remember(currentUser) {
+        AndroidPreferenceSessionManager.isGuestSession(context) ||
+            viewModel.isGuestUser(currentUser)
+    }
+    LaunchedEffect(isGuestSession, currentUser?.id) {
+        if (isGuestSession && currentUser != null) {
+            viewModel.skipOnboardingForGuest()
+        }
+    }
     var isNetworkConnected by remember { mutableStateOf(com.example.util.NetworkUtils.isInternetAvailable(context)) }
     var allowOfflineSession by rememberSaveable { mutableStateOf(false) }
     var hasCheckedNotificationPermissionOnStartup by rememberSaveable(currentUser?.id) { mutableStateOf(false) }
@@ -372,10 +387,17 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
 
     // Screen navigation states
     var isSplashFinished by remember { mutableStateOf(false) }
+    // v1.2: owner-supplied animated splash (ui.splash.FocivoSplash, used as-is).
+    // The variant is decided ONCE per cold start, after the session restore
+    // finishes: an existing session (signed-in OR guest) -> short RETURNING
+    // animation; no session -> full NEW_USER animation, whose finish preselects
+    // the Create Account tab on the auth screen.
+    var splashVariant by remember { mutableStateOf<SplashVariant?>(null) }
+    var splashWantsCreateAccount by remember { mutableStateOf(false) }
 
-    LaunchedEffect(currentUser, authError) {
-        if (currentUser != null || !authError.isNullOrBlank()) {
-            isSplashFinished = true
+    LaunchedEffect(isAuthChecking, currentUser) {
+        if (!isAuthChecking && splashVariant == null) {
+            splashVariant = if (currentUser != null) SplashVariant.RETURNING else SplashVariant.NEW_USER
         }
     }
     var isSettingsOpen by remember { mutableStateOf(false) }
@@ -412,13 +434,21 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     viewModel.signInAsGuest()
                 }
             )
-        } else if (!isSplashFinished || isAuthChecking) {
-            SplashScreen(
-                onSplashFinished = { isSplashFinished = true }
+        } else if (!isSplashFinished || isAuthChecking || splashVariant == null) {
+            // v1.2: NEW_USER -> Auth with Create Account preselected;
+            // RETURNING -> falls through to the existing routing below
+            // (onboarding checks / guest skip / main shell — untouched).
+            FocivoSplash(
+                variant = splashVariant ?: SplashVariant.NEW_USER,
+                onFinished = { openCreateAccount ->
+                    splashWantsCreateAccount = openCreateAccount
+                    isSplashFinished = true
+                }
             )
         } else if (currentUser == null) {
             // Firebase Authentication Screen with Google Sign-In (Private Background Backend)
             AuthScreen(
+                initialMode = if (splashWantsCreateAccount) AuthMode.CreateAccount else AuthMode.SignIn,
                 isLoading = isAuthLoading,
                 errorMessage = authError,
                 verificationMessage = verificationMessage,
@@ -434,11 +464,12 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 onClearPasswordReset = { viewModel.clearPasswordReset() },
                 onSetNewPassword = { password -> viewModel.completePasswordRecovery(password) }
             )
-        // v1.4.0: first-launch onboarding runs for guests too (same survey;
-        // answers persist via the local repository / guest storage).
+        // v1.4.0: first-launch onboarding ran for guests too — v1.2 REVERSED
+        // this (owner-ordered): guest sessions skip onboarding entirely and
+        // go straight into the app. Non-guest flow is unchanged.
         // v1.5.0: rebuilt flow — intro animation -> questions -> mascot showcase
         // -> group step -> permissions (one per screen, last).
-        } else if (showQuestionnaire || userPreferences?.hasCompletedIntakeSurvey == false || userPreferences?.hasCompletedOnboarding == false) {
+        } else if (!isGuestSession && (showQuestionnaire || userPreferences?.hasCompletedIntakeSurvey == false || userPreferences?.hasCompletedOnboarding == false)) {
             OnboardingFlowScreen(
                 initialUserName = currentUser?.fullName ?: userPreferences?.currentUserName ?: "",
                 leaderboardUsers = leaderboardUsers,
