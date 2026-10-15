@@ -43,16 +43,28 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.RegainLimeDeepText
-import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.util.StudyChannelsManager
+
+// v1.2.3 design-unification — owner's clean-redesign language:
+// #0A0A0B bg, #131315 cards, #1F1F22 lines, #B6F13A lime, #76767C muted,
+// Poppins body + Instrument Serif italic for the page headline.
+private val ChannelsLime = Color(0xFFB6F13A)
+
+private val ChannelsSerifItalic = FontFamily(
+    Font(R.font.instrument_serif_italic, FontWeight.Normal, FontStyle.Italic)
+)
 
 /**
  * v1.3.0 — "Study channels" screen (Regain's "Watch only study channels",
@@ -86,12 +98,12 @@ fun StudyChannelsScreen(
         }
     }
 
-    val bg = if (isDark) Color(0xFF121511) else Color(0xFFF5FAFB)
-    val cardBg = if (isDark) Color(0xFF1D221C) else Color.White
-    val cardBorder = if (isDark) Color(0x358CE000) else Color(0xFFDCE6D2)
-    val titleColor = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val bodyColor = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val accentText = if (isDark) RegainLimePrimary else RegainLimeDeepText
+    val bg = if (isDark) Color(0xFF0A0A0B) else Color(0xFFF5FAFB)
+    val cardBg = if (isDark) Color(0xFF131315) else Color.White
+    val cardBorder = if (isDark) Color(0xFF1F1F22) else Color(0xFFDCE6D2)
+    val titleColor = if (isDark) Color(0xFFF4F4F5) else NearBlack
+    val bodyColor = if (isDark) Color(0xFF76767C) else SecondaryTextLight
+    val accentText = if (isDark) ChannelsLime else RegainLimeDeepText
 
     Column(
         modifier = Modifier
@@ -122,9 +134,10 @@ fun StudyChannelsScreen(
                 Text(
                     text = "Study channels",
                     style = MaterialTheme.typography.titleLarge.copy(
+                        fontFamily = ChannelsSerifItalic,
                         fontWeight = FontWeight.Bold,
                         color = titleColor,
-                        fontSize = 20.sp
+                        fontSize = 22.sp
                     )
                 )
                 Text(
@@ -170,7 +183,7 @@ fun StudyChannelsScreen(
                 modifier = Modifier
                     .size(52.dp)
                     .clip(CircleShape)
-                    .background(RegainLimePrimary)
+                    .background(ChannelsLime)
                     .clickable(onClick = { submit() }),
                 contentAlignment = Alignment.Center
             ) {
@@ -230,7 +243,7 @@ fun StudyChannelsScreen(
                         )
                         if (entry.isCustom) {
                             Surface(
-                                color = RegainLimePrimary.copy(alpha = 0.18f),
+                                color = ChannelsLime.copy(alpha = 0.18f),
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(

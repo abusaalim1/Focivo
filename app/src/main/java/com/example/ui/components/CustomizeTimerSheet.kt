@@ -78,7 +78,8 @@ import com.example.util.loadPomodoroConfig
  * / "Long Break" mode drives the timer's break presentation (phase pill +
  * ring color shift); the user starts it with the normal Start button.
  */
-private val CustomizeAccent = Color(0xFF8FD400)
+// v1.2.3 design-unification — owner clean-redesign accent (#B6F13A).
+private val CustomizeAccent = Color(0xFFB6F13A)
 
 private val CustomizeSounds = listOf("Silent", "Rain", "White noise", "Cafe", "Forest", "Ocean")
 
@@ -121,12 +122,14 @@ fun CustomizeTimerSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val isDark = isAppInDarkTheme()
-    val sheetBackground = if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val cardBg = if (isDark) Color(0xFF1D221C) else Color.White
-    val cardBorder = if (isDark) Color(0x228CE000) else Color(0xFFDCE6D2)
-    val selectedBg = if (isDark) Color(0xFF2A331F) else Color(0xFFF1F8E4)
+    // v1.2.3 design-unification: dark surfaces follow the owner
+    // clean-redesign tokens (#0A0A0B bg / #131315 cards / #1F1F22 lines).
+    val sheetBackground = if (isDark) Color(0xFF0A0A0B) else Color(0xFFFAFBF7)
+    val textPrimary = if (isDark) Color(0xFFF4F4F5) else NearBlack
+    val textSecondary = if (isDark) Color(0xFF76767C) else SecondaryTextLight
+    val cardBg = if (isDark) Color(0xFF131315) else Color.White
+    val cardBorder = if (isDark) Color(0xFF1F1F22) else Color(0xFFDCE6D2)
+    val selectedBg = if (isDark) Color(0x1EB6F13A) else Color(0xFFF1F8E4)
 
     var selectedSubject by remember { mutableStateOf(currentSubject.ifBlank { "Deep Study" }) }
     var customSubjectInput by remember { mutableStateOf("") }
@@ -387,7 +390,7 @@ fun CustomizeTimerSheet(
                                     Icon(
                                         imageVector = Icons.Default.Lock,
                                         contentDescription = "Locked",
-                                        tint = Color(0xFFFFD54F),
+                                        tint = Color(0xFFF5A524),
                                         modifier = Modifier.size(13.dp)
                                     )
                                 } else {
@@ -412,7 +415,7 @@ fun CustomizeTimerSheet(
                                         text = "${theme.unlockPoints}",
                                         fontFamily = PoppinsFontFamily,
                                         fontSize = 10.sp,
-                                        color = Color(0xFFFFD54F)
+                                        color = Color(0xFFF5A524)
                                     )
                                 }
                             }
@@ -557,12 +560,14 @@ fun CustomizeTimerSheet(
 
 @Composable
 private fun CustomizeSectionLabel(text: String, textSecondary: Color) {
+    // v1.2.3 design-unification: same eyebrow rhythm as Focus Shield —
+    // 11sp semibold uppercase, 1.76sp tracking, muted.
     Text(
         text = text.uppercase(),
         fontFamily = PoppinsFontFamily,
-        fontWeight = FontWeight.Bold,
-        fontSize = 10.sp,
-        letterSpacing = 1.5.sp,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 11.sp,
+        letterSpacing = 1.76.sp,
         color = textSecondary,
         modifier = Modifier.padding(start = 4.dp)
     )

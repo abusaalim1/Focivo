@@ -58,6 +58,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -90,13 +93,22 @@ import com.example.ui.theme.themedCardBackground
 import com.example.ui.theme.backdropContentColor
 import com.example.ui.theme.backdropTitleShadow
 import com.example.util.TimerThemeManager
-import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
+// v1.2.3 design-unification — owner's clean-redesign language:
+// Poppins body, Instrument Serif italic for the big display headline,
+// lime accent #B6F13A, muted #76767C.
+private val HomeLime = Color(0xFFB6F13A)
+private val HomeMuted = Color(0xFF76767C)
+
+private val HomeSerifItalic = FontFamily(
+    Font(R.font.instrument_serif_italic, FontWeight.Normal, FontStyle.Italic)
+)
 
 @Composable
 fun HomeScreen(
@@ -274,7 +286,7 @@ fun HomeScreen(
                             Text(
                                 text = displayGreeting,
                                 style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontFamily = PoppinsFontFamily,
+                                    fontFamily = HomeSerifItalic,
                                     fontWeight = FontWeight.Bold,
                                     color = headerTitleColor,
                                     shadow = titleShadow,
@@ -353,7 +365,7 @@ fun HomeScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(26.dp))
-                        .background(Color(0xFF141716))
+                        .background(Color(0xFF131315))
                         .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(26.dp))
                         .padding(22.dp)
                         .testTag("home_today_hero_card")
@@ -369,9 +381,9 @@ fun HomeScreen(
                                     text = "TODAY'S FOCUS",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF9AA79B),
-                                        letterSpacing = 1.6.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = HomeMuted,
+                                        letterSpacing = 1.76.sp,
                                         fontSize = 11.sp
                                     )
                                 )
@@ -390,7 +402,7 @@ fun HomeScreen(
                                     text = "Time focused",
                                     style = MaterialTheme.typography.bodyMedium.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        color = Color(0xFF9AA79B),
+                                        color = HomeMuted,
                                         fontSize = 13.sp
                                     )
                                 )
@@ -407,7 +419,7 @@ fun HomeScreen(
                                         style = MaterialTheme.typography.labelMedium.copy(
                                             fontFamily = PoppinsFontFamily,
                                             fontWeight = FontWeight.Bold,
-                                            color = RegainLimePrimary,
+                                            color = HomeLime,
                                             fontSize = 12.sp
                                         )
                                     )
@@ -434,10 +446,10 @@ fun HomeScreen(
                                 text = "DAILY GOAL",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontFamily = PoppinsFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF9AA79B),
-                                    letterSpacing = 1.4.sp,
-                                    fontSize = 10.5.sp
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = HomeMuted,
+                                    letterSpacing = 1.76.sp,
+                                    fontSize = 11.sp
                                 )
                             )
                             Text(
@@ -464,7 +476,7 @@ fun HomeScreen(
                                         .fillMaxWidth(animatedDailyProgress)
                                         .height(8.dp)
                                         .clip(RoundedCornerShape(4.dp))
-                                        .background(RegainLimePrimary)
+                                        .background(HomeLime)
                                 )
                             }
                         }
@@ -477,7 +489,7 @@ fun HomeScreen(
                                 .fillMaxWidth()
                                 .height(56.dp)
                                 .clip(CircleShape)
-                                .background(Color.White)
+                                .background(HomeLime)
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
@@ -517,7 +529,7 @@ fun HomeScreen(
                                     style = MaterialTheme.typography.titleSmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFF9AA79B),
+                                        color = HomeMuted,
                                         fontSize = 13.sp
                                     )
                                 )

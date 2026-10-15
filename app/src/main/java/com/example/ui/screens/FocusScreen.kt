@@ -149,8 +149,9 @@ fun FocusScreen(
 ) {
     val isDark = isAppInDarkTheme()
     val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
-    // v1.5.0: the hub redesign uses one accent lime.
-    val hubAccent = Color(0xFF8FD400)
+    // v1.5.0: the hub redesign uses one accent lime (owner clean-redesign
+    // #B6F13A, aligned with Focus Shield in v1.2.3 design-unification).
+    val hubAccent = Color(0xFFB6F13A)
     val cardBg = themedCardBackground()
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
 
@@ -198,7 +199,7 @@ fun FocusScreen(
                         modifier = Modifier
                             .clip(CircleShape)
                             .background(if (isDark) Color(0x28FFFFFF) else Color(0x10000000))
-                            .border(1.dp, if (isDark) Color(0x358FD400) else Color(0x208FD400), CircleShape)
+                            .border(1.dp, if (isDark) Color(0x35B6F13A) else Color(0x20B6F13A), CircleShape)
                             .padding(horizontal = 10.dp, vertical = 5.dp)
                             .testTag("focus_streak_pill")
                     ) {

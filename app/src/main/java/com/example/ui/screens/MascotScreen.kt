@@ -44,10 +44,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.components.BuddyMascot
 import com.example.ui.components.pressFeedback
 import com.example.ui.theme.NearBlack
@@ -58,6 +62,16 @@ import com.example.util.MascotOutfitSet
 import com.example.util.MascotWardrobe
 import com.example.util.OUTFIT_SETS
 import com.example.util.outfitSetById
+
+// v1.2.3 design-unification — owner's clean-redesign language:
+// #0A0A0B bg, #131315 cards, #1F1F22 lines, #B6F13A lime, #76767C muted,
+// Poppins body + Instrument Serif italic for the page headline.
+private val MascotLime = Color(0xFFB6F13A)
+private val MascotGold = Color(0xFFF5A524)
+
+private val MascotSerifItalic = FontFamily(
+    Font(R.font.instrument_serif_italic, FontWeight.Normal, FontStyle.Italic)
+)
 
 /**
  * v1.2 — Mascot Buddy screen, OUTFIT SETS edition.
@@ -76,12 +90,12 @@ fun MascotScreen(
     onBack: () -> Unit
 ) {
     val isDark = isAppInDarkTheme()
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val cardBg = if (isDark) Color(0xFF1D221C) else Color.White
-    val cardBorder = if (isDark) Color(0x228CE000) else Color(0xFFE4E9DE)
-    val screenBg = if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)
-    val lime = Color(0xFF8FD400)
+    val textPrimary = if (isDark) Color(0xFFF4F4F5) else NearBlack
+    val textSecondary = if (isDark) Color(0xFF76767C) else SecondaryTextLight
+    val cardBg = if (isDark) Color(0xFF131315) else Color.White
+    val cardBorder = if (isDark) Color(0xFF1F1F22) else Color(0xFFE4E9DE)
+    val screenBg = if (isDark) Color(0xFF0A0A0B) else Color(0xFFFAFBF7)
+    val lime = MascotLime
 
     val savedSetId by MascotWardrobe.equipped.collectAsState()
     // v1.2.1 re-lock: the equipped set can never be a locked one.
@@ -127,9 +141,9 @@ fun MascotScreen(
             }
             Text(
                 text = "Mascot Buddy",
-                fontFamily = PoppinsFontFamily,
+                fontFamily = MascotSerifItalic,
                 fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
+                fontSize = 22.sp,
                 color = textPrimary,
                 modifier = Modifier.weight(1f)
             )
@@ -223,9 +237,9 @@ fun MascotScreen(
                     Text(
                         text = "OUTFITS",
                         fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         fontSize = 11.sp,
-                        letterSpacing = 1.5.sp,
+                        letterSpacing = 1.76.sp,
                         color = textSecondary,
                         modifier = Modifier.padding(start = 4.dp)
                     )
@@ -277,13 +291,13 @@ fun MascotScreen(
                                     .size(26.dp)
                                     .clip(CircleShape)
                                     .background(Color(0xCC1A221B))
-                                    .border(1.dp, Color(0xFFFFD54F), CircleShape),
+                                    .border(1.dp, MascotGold, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Lock,
                                     contentDescription = "Locked",
-                                    tint = Color(0xFFFFD54F),
+                                    tint = MascotGold,
                                     modifier = Modifier.size(13.dp)
                                 )
                             }
@@ -324,7 +338,7 @@ fun MascotScreen(
                         },
                         fontFamily = PoppinsFontFamily,
                         fontSize = 10.5.sp,
-                        color = if (isLocked) Color(0xFFFFD54F) else textSecondary,
+                        color = if (isLocked) MascotGold else textSecondary,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -354,13 +368,13 @@ fun MascotScreen(
                     modifier = Modifier
                         .size(52.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFFFD54F).copy(alpha = 0.15f)),
+                        .background(MascotGold.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Lock,
                         contentDescription = null,
-                        tint = Color(0xFFFFD54F),
+                        tint = MascotGold,
                         modifier = Modifier.size(24.dp)
                     )
                 }

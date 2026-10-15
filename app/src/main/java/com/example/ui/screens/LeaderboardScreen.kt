@@ -54,6 +54,9 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -75,10 +78,22 @@ import com.example.ui.theme.themedCardBackground
 import com.example.ui.theme.backdropContentColor
 import com.example.ui.theme.backdropTitleShadow
 import com.example.util.TimerThemeManager
-import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import java.util.Calendar
+
+// v1.2.3 design-unification — owner's clean-redesign language:
+// Poppins body, Instrument Serif italic for the page headline,
+// lime accent #B6F13A, #131315 surfaces, #1F1F22 lines, #76767C muted.
+private val BoardLime = Color(0xFFB6F13A)
+private val BoardSurface = Color(0xFF131315)
+private val BoardLine = Color(0xFF1F1F22)
+private val BoardMuted = Color(0xFF76767C)
+private val BoardText = Color(0xFFF4F4F5)
+
+private val BoardSerifItalic = FontFamily(
+    Font(R.font.instrument_serif_italic, FontWeight.Normal, FontStyle.Italic)
+)
 
 @Composable
 fun LeaderboardAvatar(
@@ -163,9 +178,9 @@ fun LeaderboardScreen(
     val isDark = isAppInDarkTheme()
     val appAccent = LocalAppAccent.current // v1.4.0-round2 theme accent
     val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
-    val cardBorder = if (isDark) Color(0x358CE000) else Color(0xFFDCE6D2)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val cardBorder = if (isDark) BoardLine else Color(0xFFDCE6D2)
+    val textPrimary = if (isDark) BoardText else NearBlack
+    val textSecondary = if (isDark) BoardMuted else SecondaryTextLight
     // v1.4.2: header text sits directly on the full-bleed theme backdrop, so it
     // follows the selected theme (not the app dark/light mode).
     val theme by TimerThemeManager.selectedTheme.collectAsState()
@@ -287,7 +302,7 @@ fun LeaderboardScreen(
                     Text(
                         text = "Leaderboard",
                         style = MaterialTheme.typography.headlineSmall.copy(
-                            fontFamily = PoppinsFontFamily,
+                            fontFamily = BoardSerifItalic,
                             fontWeight = FontWeight.Bold,
                             // v1.1: title uses fixed light text — theme onBackdropContent
                             // resolves dark against this screen's dark surface (contrast fix).
@@ -341,17 +356,17 @@ fun LeaderboardScreen(
                     val pillBg = if (isSelected) {
                         appAccent
                     } else {
-                        if (isDark) Color(0xFF1D241C) else Color(0xFFEFF5EA)
+                        if (isDark) BoardSurface else Color(0xFFEFF5EA)
                     }
                     val pillBorder = if (isSelected) {
                         appAccent
                     } else {
-                        if (isDark) Color(0x358CE000) else Color(0xFFD6E2CB)
+                        if (isDark) BoardLine else Color(0xFFD6E2CB)
                     }
                     val pillTextColor = if (isSelected) {
                         Color(0xFF0D1B05)
                     } else {
-                        if (isDark) Color(0xFFA0A89E) else Color(0xFF4A5546)
+                        if (isDark) BoardMuted else Color(0xFF4A5546)
                     }
 
                     Box(
@@ -407,9 +422,9 @@ fun LeaderboardScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(14.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = if (isDark) Color(0xFF1F271D) else Color(0xFFF2F8EC)
+                                    containerColor = if (isDark) BoardSurface else Color(0xFFF2F8EC)
                                 ),
-                                border = BorderStroke(1.dp, if (isDark) Color(0x408CE000) else Color(0xFFD4E7C3))
+                                border = BorderStroke(1.dp, if (isDark) Color(0x2EB6F13A) else Color(0xFFD4E7C3))
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -446,8 +461,8 @@ fun LeaderboardScreen(
                                 fontFamily = PoppinsFontFamily,
                                 // v1.1: fixed muted light text (contrast fix, see header title).
                                 color = textSecondary,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.4.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.76.sp,
                                 fontSize = 11.sp
                             )
                         )
@@ -560,13 +575,13 @@ private fun PodiumColumn(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textPrimary = if (isDark) BoardText else NearBlack
+    val textSecondary = if (isDark) BoardMuted else SecondaryTextLight
     // v1.4.2: podium names sit on the theme backdrop — follow the theme.
     val podiumTheme by TimerThemeManager.selectedTheme.collectAsState()
     val podiumOnBackdrop = podiumTheme.onBackdropContent
     val podiumShadow = backdropTitleShadow(podiumOnBackdrop)
-    val podiumTimeColor = if (podiumOnBackdrop.luminance() < 0.5f) RegainLimePrimary else Color(0xFF2E6300)
+    val podiumTimeColor = if (podiumOnBackdrop.luminance() < 0.5f) BoardLime else Color(0xFF2E6300)
 
     // Celebratory badge for current week's leader while week is in progress
     val isLeadingThisWeek = selectedFilter == "This Week" && rank == 1 && displaySeconds > 0
@@ -600,7 +615,7 @@ private fun PodiumColumn(
                         else -> Brush.linearGradient(listOf(Color(0xFFFFCC80), Color(0xFFE65100)))
                     }
                 )
-                .border(2.dp, if (isDark) Color(0xFF1B221B) else Color.White, CircleShape),
+                .border(2.dp, if (isDark) BoardSurface else Color.White, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             LeaderboardAvatar(
@@ -687,17 +702,17 @@ private fun PodiumColumn(
         // Distinct Podium Pedestal with High-Contrast Finish
         val pedestalGradient = when (rank) {
             1 -> if (isDark) {
-                Brush.verticalGradient(listOf(Color(0x40FFD54F), Color(0xFF1E251D)))
+                Brush.verticalGradient(listOf(Color(0x40FFD54F), BoardSurface))
             } else {
                 Brush.verticalGradient(listOf(Color(0xFFFFF7DB), Color(0xFFFFECC0)))
             }
             2 -> if (isDark) {
-                Brush.verticalGradient(listOf(Color(0x35CFD8DC), Color(0xFF1E251D)))
+                Brush.verticalGradient(listOf(Color(0x35CFD8DC), BoardSurface))
             } else {
                 Brush.verticalGradient(listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0)))
             }
             else -> if (isDark) {
-                Brush.verticalGradient(listOf(Color(0x35FFCC80), Color(0xFF1E251D)))
+                Brush.verticalGradient(listOf(Color(0x35FFCC80), BoardSurface))
             } else {
                 Brush.verticalGradient(listOf(Color(0xFFFFF0DC), Color(0xFFFFDFC0)))
             }
@@ -774,29 +789,29 @@ private fun LeaderboardUserRow(
     val isDark = isAppInDarkTheme()
 
     val rowBg = if (isCurrentUser) {
-        if (isDark) Color(0xFF1D2A1B) else Color(0xFFF3FBE8)
+        if (isDark) BoardSurface else Color(0xFFF3FBE8)
     } else {
-        if (isDark) Color(0xFF1B221B) else Color(0xFFFFFFFF)
+        if (isDark) BoardSurface else Color(0xFFFFFFFF)
     }
 
     val rowBorderColor = if (isCurrentUser) {
-        if (isDark) RegainLimePrimary else Color(0xFF76C400)
+        if (isDark) BoardLime else Color(0xFF76C400)
     } else {
-        if (isDark) Color(0x30FFFFFF) else Color(0xFFE0EAD4)
+        if (isDark) BoardLine else Color(0xFFE0EAD4)
     }
 
     val rankTextColor = if (isCurrentUser) {
-        if (isDark) RegainLimePrimary else Color(0xFF2E6300)
+        if (isDark) BoardLime else Color(0xFF2E6300)
     } else {
-        if (isDark) Color(0xFFA0A89E) else Color(0xFF556050)
+        if (isDark) BoardMuted else Color(0xFF556050)
     }
 
-    val nameTextColor = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val subjectTextColor = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val nameTextColor = if (isDark) BoardText else NearBlack
+    val subjectTextColor = if (isDark) BoardMuted else SecondaryTextLight
     val timeTextColor = if (isCurrentUser) {
-        if (isDark) RegainLimePrimary else Color(0xFF2E6300)
+        if (isDark) BoardLime else Color(0xFF2E6300)
     } else {
-        if (isDark) Color(0xFFF0F4ED) else NearBlack
+        if (isDark) BoardText else NearBlack
     }
 
     Card(
@@ -841,9 +856,9 @@ private fun LeaderboardUserRow(
                         .clip(CircleShape)
                         .background(
                             if (isCurrentUser) {
-                                RegainLimePrimary
+                                BoardLime
                             } else {
-                                if (isDark) Color(0xFF2B3628) else Color(0xFFE8EFE2)
+                                if (isDark) BoardLine else Color(0xFFE8EFE2)
                             }
                         ),
                     contentAlignment = Alignment.Center

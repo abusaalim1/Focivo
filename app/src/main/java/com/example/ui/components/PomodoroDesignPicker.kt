@@ -98,7 +98,8 @@ fun PomodoroDesignPicker(
                             .fillMaxSize()
                             .border(
                                 if (isSelected) 2.5.dp else 1.dp,
-                                if (isSelected) Color(0xFF8CE000) else cardBorder,
+                                // v1.2.3 design-unification: owner clean-redesign accent.
+                                if (isSelected) Color(0xFFB6F13A) else cardBorder,
                                 RoundedCornerShape(16.dp)
                             )
                     )

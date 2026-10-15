@@ -179,7 +179,8 @@ fun SessionCompleteScreen(
                     Icon(
                         imageVector = Icons.Default.NotificationsOff,
                         contentDescription = null,
-                        tint = Color(0xFF8CE000),
+                        // v1.2.3 design-unification: owner clean-redesign lime.
+                        tint = Color(0xFFB6F13A),
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -187,7 +188,7 @@ fun SessionCompleteScreen(
                         text = "${suppressedNotifs.size} ${if (suppressedNotifs.size == 1) "notification" else "notifications"} held during session (tap to view)",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF8CE000),
+                            color = Color(0xFFB6F13A),
                             fontSize = 12.sp
                         )
                     )

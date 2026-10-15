@@ -80,6 +80,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -93,7 +96,6 @@ import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
-import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.themedCardBackground
 import com.example.ui.theme.backdropContentColor
 import com.example.ui.theme.backdropTitleShadow
@@ -110,6 +112,17 @@ import com.example.ui.theme.isAppInDarkTheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+// v1.2.3 design-unification — owner's clean-redesign language:
+// Poppins body, Instrument Serif italic for the page headline,
+// lime accent #B6F13A, #131315 surfaces, #1F1F22 lines.
+private val ProfileLime = Color(0xFFB6F13A)
+private val ProfileSurface = Color(0xFF131315)
+private val ProfileLine = Color(0xFF1F1F22)
+
+private val ProfileSerifItalic = FontFamily(
+    Font(R.font.instrument_serif_italic, FontWeight.Normal, FontStyle.Italic)
+)
 
 @Composable
 fun ProfileAvatarImage(
@@ -383,16 +396,16 @@ fun ProfileScreen(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontFamily = PoppinsFontFamily,
                                 color = onBackdrop.copy(alpha = 0.7f),
-                                letterSpacing = 2.sp,
+                                letterSpacing = 1.76.sp,
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Profile",
                             style = MaterialTheme.typography.headlineMedium.copy(
-                                fontFamily = PoppinsFontFamily,
+                                fontFamily = ProfileSerifItalic,
                                 fontWeight = FontWeight.Bold,
                                 color = onBackdrop,
                                 shadow = titleShadow,
@@ -507,7 +520,7 @@ fun ProfileScreen(
                             ) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(24.dp),
-                                    color = RegainLimePrimary,
+                                    color = ProfileLime,
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -570,7 +583,7 @@ fun ProfileScreen(
                                         modifier = Modifier
                                             .size(58.dp)
                                             .clip(CircleShape)
-                                            .background(RegainLimePrimary)
+                                            .background(ProfileLime)
                                             .clickable { showEditProfileDialog = true },
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -646,7 +659,7 @@ fun ProfileScreen(
                                             .fillMaxWidth(dailyProgress.coerceAtLeast(0.08f))
                                             .fillMaxHeight()
                                             .clip(CircleShape)
-                                            .background(RegainLimePrimary)
+                                            .background(ProfileLime)
                                     )
                                 }
                             }
@@ -854,11 +867,11 @@ fun ProfileScreen(
                                     .size(52.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (isDark) Color(0xFF1E251D) else Color(0xFFF0F4EC)
+                                        if (isDark) ProfileSurface else Color(0xFFF0F4EC)
                                     )
                                     .border(
                                         1.dp,
-                                        RegainLimePrimary.copy(alpha = 0.4f),
+                                        ProfileLime.copy(alpha = 0.4f),
                                         CircleShape
                                     ),
                                 contentAlignment = Alignment.Center
@@ -885,7 +898,7 @@ fun ProfileScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(Color(0xFF8FD400))
+                                            .background(ProfileLime)
                                             .padding(horizontal = 8.dp, vertical = 2.dp)
                                     ) {
                                         Text(
@@ -1047,7 +1060,7 @@ fun ProfileScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(if (isTodaySunday) RegainLimeContainer else Color(0xFF2A342B))
+                                            .background(if (isTodaySunday) RegainLimeContainer else ProfileLine)
                                             .padding(horizontal = 7.dp, vertical = 2.dp)
                                     ) {
                                         Text(
@@ -1481,7 +1494,7 @@ fun ProfileScreen(
                         modifier = Modifier
                             .size(80.dp)
                             .clip(CircleShape)
-                            .background(RegainLimePrimary)
+                            .background(ProfileLime)
                             .clickable {
                                 photoPickerLauncher.launch(
                                     androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -1641,7 +1654,7 @@ private fun BadgeGridItem(
                                 .offset(x = 4.dp, y = 4.dp)
                                 .size(20.dp)
                                 .clip(CircleShape)
-                                .background(if (isDark) Color(0xFF2A2A2E) else Color(0xFFE8EDE4))
+                                .background(if (isDark) ProfileSurface else Color(0xFFE8EDE4))
                                 .border(1.dp, cardBorder, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1755,7 +1768,7 @@ private fun AchievementDetailDialog(
                             .fillMaxWidth()
                             .height(8.dp)
                             .clip(RoundedCornerShape(4.dp)),
-                        color = RegainLimePrimary,
+                        color = ProfileLime,
                         trackColor = if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -1765,7 +1778,7 @@ private fun AchievementDetailDialog(
                     fontFamily = PoppinsFontFamily,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (badge.isUnlocked) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary
+                    color = if (badge.isUnlocked) (if (isDark) ProfileLime else RegainLimeDeepText) else textSecondary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -1773,11 +1786,11 @@ private fun AchievementDetailDialog(
                     fontFamily = PoppinsFontFamily,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (badge.isUnlocked) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary,
+                    color = if (badge.isUnlocked) (if (isDark) ProfileLime else RegainLimeDeepText) else textSecondary,
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .background(
-                            if (badge.isUnlocked) RegainLimePrimary.copy(alpha = 0.16f)
+                            if (badge.isUnlocked) ProfileLime.copy(alpha = 0.16f)
                             else (if (isDark) Color(0x20FFFFFF) else Color(0xFFF0F4EC))
                         )
                         .padding(horizontal = 12.dp, vertical = 5.dp)
