@@ -593,7 +593,7 @@ private fun CardShell(
     scale: Float,
     background: Brush,
     borderColor: Color? = null,
-    content: @Composable () -> Unit
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
     val s = scale
     Box(
@@ -698,8 +698,8 @@ private fun ShareRingCard(data: ShareScreenData, scale: Float) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val cx = size.width / 2f
                         val cy = size.height / 2f
-                        val r = (68 * s).toPx()
-                        val sw = (8 * s).toPx()
+                        val r = (68 * s).dp.toPx()
+                        val sw = (8 * s).dp.toPx()
                         // track
                         drawCircle(
                             color = lime.copy(alpha = 0.14f),
@@ -722,10 +722,10 @@ private fun ShareRingCard(data: ShareScreenData, scale: Float) {
                         val dx = r * kotlin.math.sin(a)
                         val dy = -r * kotlin.math.cos(a)
                         val dotC = Offset(cx + dx, cy + dy)
-                        drawCircle(color = lime, radius = (7 * s).toPx(), center = dotC)
+                        drawCircle(color = lime, radius = (7 * s).dp.toPx(), center = dotC)
                         drawCircle(
-                            color = ShareInk, radius = (7 * s).toPx(), center = dotC,
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = (3 * s).toPx())
+                            color = ShareInk, radius = (7 * s).dp.toPx(), center = dotC,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = (3 * s).dp.toPx())
                         )
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
