@@ -78,7 +78,9 @@ import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.QuestionnaireScreen
 import com.example.ui.screens.SessionCompleteScreen
 import com.example.ui.screens.SettingsScreen
-import com.example.ui.screens.SplashScreen
+import com.example.ui.screens.AuthMode
+import com.example.ui.splash.FocivoSplash
+import com.example.ui.splash.SplashVariant
 import com.example.ui.theme.FocuslyTheme
 import com.example.ui.viewmodel.FocuslyViewModel
 
@@ -385,10 +387,17 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
 
     // Screen navigation states
     var isSplashFinished by remember { mutableStateOf(false) }
+    // v1.2: owner-supplied animated splash (ui.splash.FocivoSplash, used as-is).
+    // The variant is decided ONCE per cold start, after the session restore
+    // finishes: an existing session (signed-in OR guest) -> short RETURNING
+    // animation; no session -> full NEW_USER animation, whose finish preselects
+    // the Create Account tab on the auth screen.
+    var splashVariant by remember { mutableStateOf<SplashVariant?>(null) }
+    var splashWantsCreateAccount by remember { mutableStateOf(false) }
 
-    LaunchedEffect(currentUser, authError) {
-        if (currentUser != null || !authError.isNullOrBlank()) {
-            isSplashFinished = true
+    LaunchedEffect(isAuthChecking, currentUser) {
+        if (!isAuthChecking && splashVariant == null) {
+            splashVariant = if (currentUser != null) SplashVariant.RETURNING else SplashVariant.NEW_USER
         }
     }
     var isSettingsOpen by remember { mutableStateOf(false) }
@@ -425,13 +434,21 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     viewModel.signInAsGuest()
                 }
             )
-        } else if (!isSplashFinished || isAuthChecking) {
-            SplashScreen(
-                onSplashFinished = { isSplashFinished = true }
+        } else if (!isSplashFinished || isAuthChecking || splashVariant == null) {
+            // v1.2: NEW_USER -> Auth with Create Account preselected;
+            // RETURNING -> falls through to the existing routing below
+            // (onboarding checks / guest skip / main shell — untouched).
+            FocivoSplash(
+                variant = splashVariant ?: SplashVariant.NEW_USER,
+                onFinished = { openCreateAccount ->
+                    splashWantsCreateAccount = openCreateAccount
+                    isSplashFinished = true
+                }
             )
         } else if (currentUser == null) {
             // Firebase Authentication Screen with Google Sign-In (Private Background Backend)
             AuthScreen(
+                initialMode = if (splashWantsCreateAccount) AuthMode.CreateAccount else AuthMode.SignIn,
                 isLoading = isAuthLoading,
                 errorMessage = authError,
                 verificationMessage = verificationMessage,

@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -81,7 +83,10 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -90,8 +95,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.ui.components.AuroraBackground
-import com.example.ui.components.GlassCard
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.MutedTextLight
 import com.example.ui.theme.NearBlack
@@ -105,9 +108,27 @@ import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 
+/** v1.2: which tab the auth screen opens on — set by the splash flow. */
+enum class AuthMode { SignIn, CreateAccount }
+
+/** v1.2: live privacy page, opened in the browser from the auth screen. */
+private const val PRIVACY_POLICY_URL = "https://focivoapp.vercel.app/privacy.html"
+
+private fun openUrlInBrowser(context: Context, url: String) {
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        // best-effort: no browser available
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthScreen(
+    initialMode: AuthMode = AuthMode.SignIn,
     isLoading: Boolean,
     errorMessage: String?,
     verificationMessage: String? = null,
@@ -130,7 +151,7 @@ fun AuthScreen(
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
 
-    var isRegisterMode by remember { mutableStateOf(false) }
+    var isRegisterMode by remember(initialMode) { mutableStateOf(initialMode == AuthMode.CreateAccount) }
     var nameInput by remember { mutableStateOf("") }
     var emailInput by remember { mutableStateOf("") }
     var passwordInput by remember { mutableStateOf("") }
@@ -192,20 +213,38 @@ fun AuthScreen(
         }
     }
 
-    val isDark = isAppInDarkTheme()
-    val textColorPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textColorSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val fieldBgColor = if (isDark) Color(0xFF1B221B) else Color(0xFFFFFFFF)
-    val fieldBorderColor = if (isDark) Color(0x358CE000) else Color(0xFFD2DEC4)
+    // v1.2: always dark for continuity with the splash animation
+    // (BgDark #0D110E + Lime #8CE000, same as FocivoSplash).
+    val isDark = true
+    val authBg = Color(0xFF0D110E)
+    val authLime = Color(0xFF8CE000)
+    val textColorPrimary = Color(0xFFF2F7EE)
+    val textColorSecondary = Color(0xFFA5B2A2)
+    val fieldBgColor = Color(0xFF182218)
+    val fieldBorderColor = Color(0xFF2E4028)
 
-    AuroraBackground(
+    Box(
         modifier = modifier
             .fillMaxSize()
+            .background(authBg)
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()
             .testTag("auth_screen")
     ) {
+        // v1.2: soft lime glow at the top — continuity with the splash animation.
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val glowCenter = Offset(size.width / 2f, size.height * 0.28f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(authLime.copy(alpha = 0.12f), Color.Transparent),
+                    center = glowCenter,
+                    radius = size.width * 0.85f
+                ),
+                radius = size.width * 0.85f,
+                center = glowCenter
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -215,11 +254,15 @@ fun AuthScreen(
         ) {
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Aperture / Logo Badge
-            FocuslyApertureBadge(
+            // v1.2: Focivo logo — the same mark shown in the splash animation.
+            Image(
+                painter = painterResource(id = R.drawable.focivo_logo),
+                contentDescription = "Focivo logo",
                 modifier = Modifier
                     .padding(vertical = 12.dp)
-                    .testTag("aperture_badge")
+                    .size(84.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .testTag("auth_logo")
             )
 
             // Headline block
@@ -242,13 +285,14 @@ fun AuthScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = if (isRegisterMode) "Create an account" else "Sign in to Focivo",
+                    text = if (isRegisterMode) "Start your focus" else "Welcome back",
                     style = TextStyle(
-                        fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 28.sp,
-                        lineHeight = 34.sp,
-                        color = textColorPrimary,
+                        fontFamily = FontFamily.Serif,
+                        fontStyle = FontStyle.Italic,
+                        fontWeight = FontWeight.Normal,
+                        fontSize = 32.sp,
+                        lineHeight = 38.sp,
+                        color = Color.White,
                         textAlign = TextAlign.Center
                     ),
                     modifier = Modifier.testTag("auth_headline")
@@ -867,6 +911,49 @@ fun AuthScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // v1.2: privacy consent line (Create Account mode) — opens the live page.
+            AnimatedVisibility(
+                visible = isRegisterMode,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                val consentLink = buildAnnotatedString {
+                    withStyle(
+                        style = SpanStyle(
+                            color = textColorSecondary,
+                            fontFamily = PoppinsFontFamily,
+                            fontSize = 12.5.sp
+                        )
+                    ) {
+                        append("By creating an account you agree to our ")
+                    }
+                    pushStringAnnotation(tag = "PRIVACY_PAGE", annotation = PRIVACY_POLICY_URL)
+                    withStyle(
+                        style = SpanStyle(
+                            color = authLime,
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.5.sp
+                        )
+                    ) {
+                        append("Privacy Policy")
+                    }
+                    pop()
+                }
+                ClickableText(
+                    text = consentLink,
+                    style = TextStyle(textAlign = TextAlign.Center),
+                    onClick = { offset ->
+                        consentLink.getStringAnnotations(tag = "PRIVACY_PAGE", start = offset, end = offset)
+                            .firstOrNull()?.let { openUrlInBrowser(context, it.item) }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .testTag("privacy_policy_page_link")
+                )
+            }
+
             // Footer Switcher Links
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -918,6 +1005,23 @@ fun AuthScreen(
                         fontWeight = FontWeight.Medium,
                         color = textColorSecondary,
                         textAlign = TextAlign.Center
+                    )
+                )
+            }
+
+            // v1.2: privacy page link (both modes) — opens the live page.
+            TextButton(
+                onClick = { openUrlInBrowser(context, PRIVACY_POLICY_URL) },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.testTag("privacy_policy_page_link_footer")
+            ) {
+                Text(
+                    text = "Privacy Policy",
+                    style = TextStyle(
+                        fontFamily = PoppinsFontFamily,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = textColorSecondary
                     )
                 )
             }
