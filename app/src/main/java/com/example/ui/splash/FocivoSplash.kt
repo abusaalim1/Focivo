@@ -123,7 +123,7 @@ private fun BoxWithConstraintsScope.NewUserScene(p: Float, W: Dp, cy: Dp) {
     val li = cl(p / .14f)
     val shr = seg(p, .2f, .3f)
     val ls = lerp(.34f, .2f, shr) * W.value
-    val R = .78f * W.value; val r = R / 2
+    val radarR = .78f * W.value; val r = radarR / 2
     val out = 1f - seg(p, .82f, .92f)
     val fin = 1f - seg(p, .9f, 1f)
     val sf = cl((p - .26f) / .54f) * 2f
@@ -187,7 +187,7 @@ private fun BoxWithConstraintsScope.NewUserScene(p: Float, W: Dp, cy: Dp) {
 @Composable
 private fun BoxWithConstraintsScope.ReturningScene(p: Float, W: Dp, cy: Dp) {
     val li = cl(p / .22f); val ex = 1f - seg(p, .88f, 1f)
-    val ls = .24f * W.value; val R = .38f * W.value; val ly = -.04f * W.value
+    val ls = .24f * W.value; val radarR = .38f * W.value; val ly = -.04f * W.value
 
     Canvas(Modifier.fillMaxSize()) {
         val c = Offset(size.width / 2, cy.toPx() + ly.dp.toPx())
@@ -205,7 +205,7 @@ private fun BoxWithConstraintsScope.ReturningScene(p: Float, W: Dp, cy: Dp) {
     dots.take(6).forEachIndexed { i, d ->
         val rv = seg(p, .12f + i * .04f, .3f + i * .04f); val bl = cl((p - .3f - i * .05f) / .15f)
         val q = (i * 60f + p * 120f) * PI.toFloat() / 180f
-        Spot((R * sin(q)).dp, (ly - R * cos(q)).dp, (.09f * W.value).dp, lerp(.4f, 1f, rv), rv * (1f - .3f * bl) * ex, cy) {
+        Spot((radarR * sin(q)).dp, (ly - radarR * cos(q)).dp, (.09f * W.value).dp, lerp(.4f, 1f, rv), rv * (1f - .3f * bl) * ex, cy) {
             AppDotView(d, (.09f * W.value).dp, rv, bl)
         }
     }
