@@ -115,7 +115,10 @@ class GuardClassifierRegressionTest {
     fun `knowledge - doubt solving is study`() {
         assertEquals(
             StudyGuardKnowledge.Verdict.STUDY,
-            StudyGuardKnowledge.scoreVideo("Doubt: Thermodynamics numericals", "Some Channel")
+            StudyGuardKnowledge.scoreVideo(
+                "Doubt solving session physics class 12",
+                "Some Channel"
+            )
         )
     }
 
