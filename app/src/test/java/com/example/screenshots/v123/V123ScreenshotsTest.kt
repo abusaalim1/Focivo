@@ -52,6 +52,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.Calendar
 
 /**
  * v1.2.3 splash verify (branch feat/v123-splash, NEVER merged blindly):
