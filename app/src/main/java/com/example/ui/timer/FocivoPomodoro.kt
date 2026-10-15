@@ -94,7 +94,7 @@ private fun Header(s: PomodoroUiState, c: Color) = Row(horizontalArrangement = A
 }
 
 @Composable
-private fun PhaseTitle(s: PomodoroUiState, size: Int = 40) = Crossfade(s.phase, tween(600), label = "title") { p ->
+private fun PhaseTitle(s: PomodoroUiState, size: Int = 40) = Crossfade(targetState = s.phase, animationSpec = tween(600), label = "title") { p ->
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         FtT(p.title, size, family = FtFDisplay, italic = true)
         Spacer(Modifier.height(4.dp)); FtT(p.sub, 13, Color.White.copy(.55f))
@@ -224,7 +224,7 @@ private fun SessionStackStyle(s: PomodoroUiState, c: Color) = Column(Modifier.pa
 /* ================= 4) TYPOGRAPHIC (editorial, super minimal) ================= */
 @Composable
 private fun TypographicStyle(s: PomodoroUiState, c: Color) = Column(horizontalAlignment = Alignment.CenterHorizontally) {
-    Crossfade(s.phase, tween(600), label = "big") { p ->
+    Crossfade(targetState = s.phase, animationSpec = tween(600), label = "big") { p ->
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             FtT(p.title + ".", 62, family = FtFDisplay, italic = true, color = Color.White); Spacer(Modifier.height(6.dp)); FtT(p.sub, 14, Color.White.copy(.55f))
         }
