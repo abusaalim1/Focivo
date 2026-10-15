@@ -1330,6 +1330,14 @@ fun OnboardingFlowScreen(
 
     var stepPos by remember { mutableIntStateOf(0) }
     var permTick by remember { mutableIntStateOf(0) }
+
+    // v1.2.3: system Back moves to the previous onboarding step instead of
+    // killing the app mid-flow. On the first step the handler is disabled so
+    // the system default (exit) still applies — same as the in-step UI,
+    // which only offers a Back button when stepPos > 0.
+    androidx.activity.compose.BackHandler(enabled = stepPos > 0) {
+        stepPos--
+    }
     // v1.1 final: trust explainer card for sensitive permissions (Accessibility,
     // Device Admin) — shown before the system prompt.
     var explainerFor by remember { mutableStateOf<PermissionSpec?>(null) }
