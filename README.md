@@ -10,7 +10,7 @@ A free study-focus app built for students — Pomodoro timer, app blocker, sched
 
 <br/>
 
-![Version](https://img.shields.io/badge/version-1.2-limegreen?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.2.1-limegreen?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Android-3DDC84?style=for-the-badge&logo=android)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)
 ![Free](https://img.shields.io/badge/price-free_forever-gold?style=for-the-badge)
