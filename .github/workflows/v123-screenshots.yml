@@ -35,6 +35,9 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
+      - name: Run guard regression unit tests (v1.2.3)
+        run: gradle :app:testDebugUnitTest --tests "com.example.GuardClassifierRegressionTest" --tests "com.example.OnDeviceStudyClassifierTest" --rerun-tasks --no-configuration-cache --stacktrace
+
       - name: Run V123 screenshot tests (record mode, forced real renders)
         run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.v123.*" --rerun-tasks --no-configuration-cache --stacktrace
 
