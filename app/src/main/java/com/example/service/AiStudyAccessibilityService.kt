@@ -44,6 +44,17 @@ class AiStudyAccessibilityService : AccessibilityService() {
         var isServiceConnected: Boolean = false
             private set
 
+        /**
+         * v1.2.3 — live service instance for the window-proof block overlay.
+         * Set on connect, cleared on unbind/destroy. BlockOverlayManager
+         * routes overlay show/hide through it when non-null (the
+         * TYPE_ACCESSIBILITY_OVERLAY path); null means the service is not
+         * running and the legacy app-overlay / Activity fallbacks apply.
+         */
+        @Volatile
+        var connectedInstance: AiStudyAccessibilityService? = null
+            private set
+
         private var lastShortsInterceptTimeMs: Long = 0L
         private var lastYouTubeAiInterceptTimeMs: Long = 0L
         private var lastScreenAiInterceptTimeMs: Long = 0L
@@ -68,17 +79,257 @@ class AiStudyAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         isServiceConnected = true
+        connectedInstance = this
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
         isServiceConnected = false
+        connectedInstance = null
+        // v1.2.3: never leave a system-level block overlay orphaned when the
+        // service goes away.
+        runCatching { hideA11yBlockOverlay() }
+        runCatching { hideA11yShortsOverlay() }
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
         isServiceConnected = false
+        connectedInstance = null
+        runCatching { hideA11yBlockOverlay() }
+        runCatching { hideA11yShortsOverlay() }
         super.onDestroy()
         serviceScope.cancel()
+    }
+
+    // ------------------------------------------------------------------
+    // v1.2.3 — window-proof block overlay via TYPE_ACCESSIBILITY_OVERLAY.
+    //
+    // ROOT CAUSE (owner's vivo V2403, 1.2.1/1.2.2): the block screen was a
+    // TYPE_APPLICATION_OVERLAY window added from the app process. On
+    // vivo/OriginOS the freeform "small window" container is composited by
+    // the OEM window manager at a layer that can sit ABOVE third-party
+    // application overlays, and getWindows() may not even report the
+    // freeform window — so the block screen rendered underneath (or never
+    // fired for) the floating/split app. "Small window lock nhi hota hai."
+    //
+    // FIX: render the SAME block UI through the accessibility service with
+    // WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY. This layer is
+    // reserved for accessibility services and is composited above every app
+    // window on every OEM — fullscreen, split-screen AND freeform/small
+    // windows. It needs no SYSTEM_ALERT_WINDOW permission: the overlay works
+    // exactly when the detection that triggers it works (the service itself).
+    //
+    // The 1.1 crash class (ViewTreeLifecycleOwner on a bare ComposeView) is
+    // avoided with the same OverlayLifecycleHost pattern that fixed it.
+    // ------------------------------------------------------------------
+
+    private val a11yMainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var a11yBlockView: androidx.compose.ui.platform.ComposeView? = null
+    private var a11yBlockHost: com.example.ui.overlay.OverlayLifecycleHost? = null
+    private var a11yBlockWm: WindowManager? = null
+    private val a11yBlockedPackage = androidx.compose.runtime.mutableStateOf("")
+    private val a11yAppName = androidx.compose.runtime.mutableStateOf("")
+    private val a11yDurationSec = androidx.compose.runtime.mutableStateOf(0)
+    private val a11yReason = androidx.compose.runtime.mutableStateOf<String?>(null)
+    private val a11yPunishment = androidx.compose.runtime.mutableStateOf(false)
+
+    private var a11yShortsView: androidx.compose.ui.platform.ComposeView? = null
+    private var a11yShortsHost: com.example.ui.overlay.OverlayLifecycleHost? = null
+    private var a11yShortsWm: WindowManager? = null
+    private val a11yShortsLabel = androidx.compose.runtime.mutableStateOf("Shorts")
+
+    /** True when the accessibility-layer block overlay is on screen. */
+    fun isA11yBlockOverlayShowing(): Boolean = a11yBlockView != null
+
+    /** True when the accessibility-layer Shorts overlay is on screen. */
+    fun isA11yShortsOverlayShowing(): Boolean = a11yShortsView != null
+
+    private fun runOnA11yMain(action: () -> Unit) {
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) action()
+        else a11yMainHandler.post(action)
+    }
+
+    private fun a11yOverlayParams(): WindowManager.LayoutParams {
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            // Renders above ALL app windows (incl. OEM freeform layers) —
+            // the strongest layer a third-party app can use.
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            android.graphics.PixelFormat.TRANSLUCENT
+        ).apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+    }
+
+    /**
+     * Shows the block overlay on the accessibility layer. Must be called on
+     * the main thread (BlockOverlayManager routes here via Handler).
+     * Returns true when the overlay is (now) showing.
+     */
+    fun showA11yBlockOverlay(
+        blockedPackage: String,
+        appName: String,
+        durationSec: Int = 0,
+        reason: String? = null,
+        isPunishment: Boolean = false
+    ): Boolean {
+        if (a11yBlockView != null) {
+            a11yBlockedPackage.value = blockedPackage
+            a11yAppName.value = appName
+            a11yDurationSec.value = durationSec
+            a11yReason.value = reason
+            a11yPunishment.value = isPunishment
+            return true
+        }
+        val host = com.example.ui.overlay.OverlayLifecycleHost()
+        return try {
+            a11yBlockedPackage.value = blockedPackage
+            a11yAppName.value = appName
+            a11yDurationSec.value = durationSec
+            a11yReason.value = reason
+            a11yPunishment.value = isPunishment
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val view = androidx.compose.ui.platform.ComposeView(this).apply {
+                host.installOn(this)
+                setContent {
+                    com.example.ui.theme.FocuslyTheme {
+                        com.example.ui.components.BlockedAppOverlay(
+                            appName = a11yAppName.value,
+                            blockedPackage = a11yBlockedPackage.value,
+                            initialDurationSec = a11yDurationSec.value,
+                            reason = a11yReason.value,
+                            isPunishment = a11yPunishment.value,
+                            mascotRes = com.example.R.drawable.mascot_blocked,
+                            onExitApp = { a11yExitToHome() },
+                            onOpenFocusly = { a11yOpenFocivo() }
+                        )
+                    }
+                }
+                isFocusableInTouchMode = true
+                setOnKeyListener { _, keyCode, event ->
+                    if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                        a11yExitToHome()
+                        true
+                    } else false
+                }
+            }
+            host.show()
+            wm.addView(view, a11yOverlayParams())
+            a11yBlockView = view
+            a11yBlockHost = host
+            a11yBlockWm = wm
+            Log.i(TAG, "A11y block overlay shown for $blockedPackage (TYPE_ACCESSIBILITY_OVERLAY)")
+            true
+        } catch (t: Throwable) {
+            Log.e(TAG, "A11y block overlay failed: ${t.message}")
+            runCatching { host.dismiss() }
+            a11yBlockView = null
+            a11yBlockHost = null
+            a11yBlockWm = null
+            false
+        }
+    }
+
+    /** Hide the accessibility-layer block overlay if visible. Main thread. */
+    fun hideA11yBlockOverlay() {
+        runOnA11yMain {
+            val view = a11yBlockView ?: return@runOnA11yMain
+            try { a11yBlockWm?.removeView(view) } catch (_: Exception) { }
+            runCatching { a11yBlockHost?.dismiss() }
+            a11yBlockView = null
+            a11yBlockHost = null
+            a11yBlockWm = null
+        }
+    }
+
+    /**
+     * Shows the Shorts & Reels overlay on the accessibility layer.
+     * Returns true when it is (now) showing.
+     */
+    fun showA11yShortsOverlay(surfaceLabel: String): Boolean {
+        if (a11yShortsView != null) {
+            a11yShortsLabel.value = surfaceLabel
+            return true
+        }
+        val host = com.example.ui.overlay.OverlayLifecycleHost()
+        return try {
+            a11yShortsLabel.value = surfaceLabel
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val view = androidx.compose.ui.platform.ComposeView(this).apply {
+                host.installOn(this)
+                setContent {
+                    com.example.ui.theme.FocuslyTheme {
+                        com.example.ui.components.ShortsBlockedOverlay(
+                            surfaceLabel = a11yShortsLabel.value,
+                            onReturn = { hideA11yShortsOverlay() },
+                            onOpenFocivo = {
+                                hideA11yShortsOverlay()
+                                a11yOpenFocivo()
+                            }
+                        )
+                    }
+                }
+                isFocusableInTouchMode = true
+                setOnKeyListener { _, keyCode, event ->
+                    if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                        hideA11yShortsOverlay()
+                        true
+                    } else false
+                }
+            }
+            host.show()
+            wm.addView(view, a11yOverlayParams())
+            a11yShortsView = view
+            a11yShortsHost = host
+            a11yShortsWm = wm
+            Log.i(TAG, "A11y Shorts overlay shown ($surfaceLabel)")
+            true
+        } catch (t: Throwable) {
+            Log.e(TAG, "A11y Shorts overlay failed: ${t.message}")
+            runCatching { host.dismiss() }
+            a11yShortsView = null
+            a11yShortsHost = null
+            a11yShortsWm = null
+            false
+        }
+    }
+
+    /** Hide the accessibility-layer Shorts overlay if visible. Main thread. */
+    fun hideA11yShortsOverlay() {
+        runOnA11yMain {
+            val view = a11yShortsView ?: return@runOnA11yMain
+            try { a11yShortsWm?.removeView(view) } catch (_: Exception) { }
+            runCatching { a11yShortsHost?.dismiss() }
+            a11yShortsView = null
+            a11yShortsHost = null
+            a11yShortsWm = null
+        }
+    }
+
+    private fun a11yExitToHome() {
+        hideA11yBlockOverlay()
+        try {
+            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(homeIntent)
+        } catch (_: Exception) { }
+    }
+
+    private fun a11yOpenFocivo() {
+        hideA11yBlockOverlay()
+        try {
+            val mainIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            startActivity(mainIntent)
+        } catch (_: Exception) { }
     }
 
     private fun isSettingsOrPackageInstallerApp(pkg: String): Boolean {

@@ -21,36 +21,65 @@ import com.example.ui.overlay.OverlayLifecycleHost
 import com.example.ui.theme.FocuslyTheme
 
 /**
- * v1.2.1 — the freeform/floating-window block overlay (fix #5).
+ * Block overlay manager — the single choke point for every block-screen
+ * intercept. History:
+ * - v1.2.1 (fix #5): replaced the fullscreen Activity with a
+ *   TYPE_APPLICATION_OVERLAY window. Worked on stock Android, but on the
+ *   owner's vivo V2403 the OEM freeform layer can sit ABOVE app overlays —
+ *   small-window locks still failed.
  *
- * ROOT CAUSE: the block screen was a plain fullscreen Activity
- * (BlockedAppLockActivity). On vivo (and stock Android freeform), a blocked
- * app opened in a FLOATING window z-orders ABOVE the fullscreen activity
- * stack, so the app stayed fully visible and interactive on top of the
- * "Stay in Focus" card (owner screenshot, 2026-10-15).
- *
- * FIX: intercept with a full-screen TYPE_APPLICATION_OVERLAY window instead.
- * System overlay windows z-order above every app window — fullscreen,
- * split-screen AND freeform/floating — on Android 14–16 including vivo's
- * small-window implementation. The overlay hosts the SAME BlockedAppOverlay
- * UI as the Activity (consistent copy, mascot, Open Focivo / Stay in Focus
- * actions) and consumes all touches, so the floating window underneath is
- * neither visible nor interactive.
+ * v1.2.3 — window-proof path (owner's vivo V2403, "small window lock nhi
+ * hota hai"): the accessibility service now renders the SAME block UI on
+ * TYPE_ACCESSIBILITY_OVERLAY, a layer reserved for accessibility services
+ * that the system composites above every app window on every OEM —
+ * fullscreen, split-screen AND freeform/small windows. It needs no
+ * "Display over other apps" permission. Path priority: A11Y (service
+ * connected) → APP (overlay permission) → legacy Activity.
  *
  * HONEST LIMITS (see report):
- * - Requires the overlay ("Display over other apps") permission, which is
- *   part of the 7-permission Start-Study gate — without it we fall back to
- *   the legacy Activity (fullscreen/split still covered, freeform not).
  * - Detection of the floating window itself still rides the accessibility
  *   service's interactive-window scan (flagRetrieveInteractiveWindows);
  *   without the accessibility permission the usage-stats poll is the
- *   fallback and a freeform resume can be missed.
- * - OEMs can always change freeform z-ordering; this is the strongest
- *   mechanism the public Android APIs offer. Device-test required.
+ *   fallback and a freeform resume can be missed. Some OEMs restrict
+ *   getWindows() data — a window the service cannot see cannot be
+ *   intercepted; the scan logs what it finds.
+ * - Every intercept writes its render path (a11y/app/activity) to the
+ *   Guard Hub activity feed so the layer is verifiable on-device.
  */
 object BlockOverlayManager {
 
     private const val TAG = "BlockOverlay"
+
+    /**
+     * v1.2.3 — overlay path priority (strongest first).
+     *
+     * A11Y: TYPE_ACCESSIBILITY_OVERLAY hosted by AiStudyAccessibilityService.
+     *   Reserved layer, composited above every app window on every OEM —
+     *   fullscreen, split-screen AND freeform/small windows (this is what
+     *   serious blockers use). Needs no overlay permission: it works exactly
+     *   when the detection that triggers it works (the a11y service itself).
+     * APP:  TYPE_APPLICATION_OVERLAY from the app process (v1.2.1 path).
+     *   Needs the "Display over other apps" permission; on some OEMs
+     *   (vivo freeform) the OEM's small-window layer can sit above it.
+     * ACTIVITY: legacy fullscreen BlockedAppLockActivity (no overlay at all).
+     */
+    enum class OverlayPath { A11Y, APP, ACTIVITY }
+
+    /** Pure decision function — unit-testable. */
+    fun resolveOverlayPath(a11yServiceConnected: Boolean, canDrawOverlays: Boolean): OverlayPath {
+        return when {
+            a11yServiceConnected -> OverlayPath.A11Y
+            canDrawOverlays -> OverlayPath.APP
+            else -> OverlayPath.ACTIVITY
+        }
+    }
+
+    private fun resolveOverlayPath(context: Context): OverlayPath =
+        resolveOverlayPath(
+            AiStudyAccessibilityService.isServiceConnected &&
+                AiStudyAccessibilityService.connectedInstance != null,
+            Settings.canDrawOverlays(context)
+        )
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var overlayView: ComposeView? = null
@@ -70,7 +99,60 @@ object BlockOverlayManager {
     private var shortsOverlayWm: WindowManager? = null
     private val shortsLabelState = mutableStateOf("Shorts")
 
-    fun isShowing(): Boolean = overlayView != null
+    fun isShowing(): Boolean =
+        overlayView != null ||
+            AiStudyAccessibilityService.connectedInstance?.isA11yBlockOverlayShowing() == true
+
+    /**
+     * v1.2.3 — show through the accessibility service's overlay layer.
+     * Synchronous boolean on any thread: the service's view work always runs
+     * on the main thread; background callers wait briefly on a latch.
+     */
+    private fun showViaA11y(
+        blockedPackage: String,
+        appName: String,
+        durationSec: Int,
+        reason: String?,
+        isPunishment: Boolean
+    ): Boolean {
+        val svc = AiStudyAccessibilityService.connectedInstance ?: return false
+        if (svc.isA11yBlockOverlayShowing()) return true
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment)
+        }
+        val result = java.util.concurrent.atomic.AtomicBoolean(false)
+        val latch = java.util.concurrent.CountDownLatch(1)
+        mainHandler.post {
+            try {
+                result.set(
+                    svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment)
+                )
+            } finally {
+                latch.countDown()
+            }
+        }
+        latch.await(4, java.util.concurrent.TimeUnit.SECONDS)
+        return result.get()
+    }
+
+    private fun showShortsViaA11y(surfaceLabel: String): Boolean {
+        val svc = AiStudyAccessibilityService.connectedInstance ?: return false
+        if (svc.isA11yShortsOverlayShowing()) return true
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return svc.showA11yShortsOverlay(surfaceLabel)
+        }
+        val result = java.util.concurrent.atomic.AtomicBoolean(false)
+        val latch = java.util.concurrent.CountDownLatch(1)
+        mainHandler.post {
+            try {
+                result.set(svc.showA11yShortsOverlay(surfaceLabel))
+            } finally {
+                latch.countDown()
+            }
+        }
+        latch.await(4, java.util.concurrent.TimeUnit.SECONDS)
+        return result.get()
+    }
 
     private fun runOnMain(action: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) action()
@@ -78,6 +160,7 @@ object BlockOverlayManager {
     }
 
     /**
+     * v1.2.3: this is the APP-layer path (TYPE_APPLICATION_OVERLAY).
      * Shows the block overlay if the overlay permission is granted.
      * Returns true when the overlay is (now) showing; false when the caller
      * must use the legacy Activity fallback instead.
@@ -179,8 +262,10 @@ object BlockOverlayManager {
         }
     }
 
-    /** Hide the overlay if visible. Safe to call any time, any thread. */
+    /** Hide the overlay if visible (both layers). Safe to call any time, any thread. */
     fun hide(context: Context) {
+        // v1.2.3: the accessibility-layer overlay lives in the service.
+        AiStudyAccessibilityService.connectedInstance?.hideA11yBlockOverlay()
         runOnMain {
             val view = overlayView ?: return@runOnMain
             try {
@@ -215,10 +300,11 @@ object BlockOverlayManager {
     }
 
     /**
-     * v1.2.1 — single choke point for every block-screen intercept.
-     * Prefers the overlay (covers fullscreen, split-screen AND freeform);
-     * falls back to the legacy fullscreen Activity when the overlay
-     * permission is missing.
+     * v1.2.3 — single choke point for every block-screen intercept.
+     * Path priority: accessibility-layer overlay (window-proof on every OEM,
+     * incl. freeform/small windows and split-screen) → app-process overlay →
+     * legacy fullscreen Activity. The path actually used is logged to the
+     * Guard Hub activity feed so it is visible on-device which layer ran.
      */
     fun intercept(
         context: Context,
@@ -231,7 +317,22 @@ object BlockOverlayManager {
         // v1.2.2 (share screen): record every real intercept so the Session
         // Complete "Shield" card can show the apps blocked during the session.
         SessionBlockRecorder.record(context, blockedPackage, appName)
-        if (showIfPermitted(context, blockedPackage, appName, durationSec, reason, isPunishment)) return
+        val path = resolveOverlayPath(context)
+        val shown = when (path) {
+            OverlayPath.A11Y -> showViaA11y(blockedPackage, appName, durationSec, reason, isPunishment)
+            OverlayPath.APP -> showIfPermitted(context, blockedPackage, appName, durationSec, reason, isPunishment)
+            OverlayPath.ACTIVITY -> false
+        }
+        // v1.2.3 diagnostic: honest, on-device evidence of which render layer
+        // actually blocked the app (owner device-test aid).
+        try {
+            com.example.util.AiStudyGuardManager.logGuardActivity(
+                context, appName, "overlay-path",
+                if (shown) "shown" else "fallback",
+                "path=" + path.name.lowercase()
+            )
+        } catch (_: Exception) { }
+        if (shown) return
         try {
             val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
                 context = context,
@@ -261,17 +362,30 @@ object BlockOverlayManager {
     // Never touches the AI discipline flow.
     // ------------------------------------------------------------------
 
-    /** True when the Shorts & Reels overlay is on screen. */
-    fun isShortsBlockShowing(): Boolean = shortsOverlayView != null
+    /** True when the Shorts & Reels overlay is on screen (either layer). */
+    fun isShortsBlockShowing(): Boolean =
+        shortsOverlayView != null ||
+            AiStudyAccessibilityService.connectedInstance?.isA11yShortsOverlayShowing() == true
 
     /**
-     * Shows the Shorts & Reels overlay. Returns true when it is (now)
-     * showing; false when the overlay permission is missing (the caller
-     * still performed the back-press, so the surface is gone regardless).
+     * Shows the Shorts & Reels overlay. Prefers the accessibility layer
+     * (v1.2.3, window-proof); then the app overlay; false when neither is
+     * available (the caller still performed the back-press, so the surface
+     * is gone regardless).
      */
     fun showShortsBlock(context: Context, surfaceLabel: String): Boolean {
         if (isShortsBlockShowing()) {
             shortsLabelState.value = surfaceLabel
+            return true
+        }
+        // v1.2.3: accessibility layer first — same window-proofing as the
+        // main block overlay.
+        if (showShortsViaA11y(surfaceLabel)) {
+            try {
+                com.example.util.AiStudyGuardManager.logGuardActivity(
+                    context, surfaceLabel, "overlay-path", "shown", "path=a11y"
+                )
+            } catch (_: Exception) { }
             return true
         }
         if (!Settings.canDrawOverlays(context)) return false
@@ -333,8 +447,9 @@ object BlockOverlayManager {
         return isShortsBlockShowing()
     }
 
-    /** Hide the Shorts & Reels overlay if visible. Safe to call any time, any thread. */
+    /** Hide the Shorts & Reels overlay if visible (both layers). Safe to call any time, any thread. */
     fun hideShortsBlock() {
+        AiStudyAccessibilityService.connectedInstance?.hideA11yShortsOverlay()
         runOnMain {
             val view = shortsOverlayView ?: return@runOnMain
             try {

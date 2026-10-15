@@ -1732,6 +1732,21 @@ fun FocusShieldHubSheet(
                                             lineHeight = 15.sp
                                         )
                                     )
+                                    // v1.2.3: honest state — the filter defaults OFF (owner order:
+                                    // never judge apps the user didn't ask to guard). When OFF,
+                                    // YouTube videos are not content-checked at all.
+                                    if (!isYouTubeFilterEnabled) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Currently OFF — YouTube videos are not content-checked. Turn on to let the AI guard judge videos during study.",
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                color = accentCoral,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                lineHeight = 14.sp
+                                            )
+                                        )
+                                    }
                                 }
                             }
 
