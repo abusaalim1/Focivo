@@ -2,19 +2,31 @@ package com.example.screenshots.v123
 
 import android.content.Context
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.test.core.app.ApplicationProvider
+import com.example.ui.components.TimerFacePicker
+import com.example.ui.theme.PoppinsFontFamily
 import kotlinx.coroutines.runBlocking
 import com.example.data.model.UserPreferencesEntity
-import com.example.ui.components.CustomizeTimerSheet
 import com.example.ui.components.ThemedScreenBackground
 import com.example.ui.screens.FocusScreen
 import com.example.ui.splash.FocivoSplash
@@ -168,29 +180,47 @@ class V123ScreenshotsTest {
     fun v123_customize_timer_new_faces() {
         initManagers()
         TimerThemeManager.selectTheme(context, "aurora")
-        // Pre-scroll the Timer Style picker row to the new clock faces
-        // (touch injection is unreliable under Robolectric, so the row
-        // exposes a test-hook ScrollState). Fresh prefs carry 0 Focus
-        // Points, so Horizon (250 pts) shows locked.
+        // The real TimerFacePicker from the Customize Timer sheet, pre-
+        // scrolled to the nine new clock faces (touch injection is
+        // unreliable under Robolectric, so the row exposes a test-hook
+        // ScrollState). Fresh prefs carry 0 Focus Points, so Horizon
+        // (250 pts) renders with the gold lock + price.
         val pickerScroll = ScrollState(0)
+        val textPrimary = Color(0xFFF0F4ED)
+        val cardBorder = Color(0x228CE000)
         themed(dark = true) {
-            CustomizeTimerSheet(
-                onDismiss = {},
-                currentFocusMinutes = 25,
-                currentSubject = "Physics",
-                ambientSound = "Rain",
-                onSelectAmbientSound = {},
-                onSelectMode = { _, _ -> },
-                onUpdateSubject = {},
-                timerFaceScrollState = pickerScroll
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF0F1410))
+                    .padding(20.dp)
+                    .testTag("timer_style_section")
+            ) {
+                Text(
+                    text = "TIMER STYLE",
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp,
+                    letterSpacing = 1.5.sp,
+                    color = Color(0xFFA0A89E)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                TimerFacePicker(
+                    focusPoints = 0,
+                    selectedFaceId = "clock_flip",
+                    onFaceTap = { _, _ -> },
+                    textPrimary = textPrimary,
+                    cardBorder = cardBorder,
+                    scrollState = pickerScroll
+                )
+            }
         }
         composeTestRule.waitForIdle()
         // Cards are 104dp wide + 12dp spacing; Horizon is index 10.
         val targetPx = with(composeTestRule.density) { (10 * 116).dp.roundToPx() }
         runBlocking { pickerScroll.scrollTo(targetPx) }
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("customize_timer_sheet", useUnmergedTree = true)
+        composeTestRule.onNodeWithTag("timer_style_section", useUnmergedTree = true)
             .captureRoboImage("src/test/screenshots/v123/v123_customize_timer_new_faces.png")
     }
 
