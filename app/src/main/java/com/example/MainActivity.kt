@@ -86,8 +86,6 @@ import com.example.ui.viewmodel.FocuslyViewModel
 
 class MainActivity : ComponentActivity() {
     private var activeViewModel: FocuslyViewModel? = null
-    // v1.2.2 — strict-mode uninstall attempt flag (set from the uninstaller intercept path).
-    private val strictUninstallBlockedFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -150,12 +148,12 @@ class MainActivity : ComponentActivity() {
         handleAuthIntent(intent, viewModel)
         handleSundayRecapIntent(intent, viewModel)
         handleWidgetIntent(intent, viewModel)
-        handleStrictUninstallIntent(intent)
+        handleStrictUninstallIntent(intent, viewModel)
     }
 
-    private fun handleStrictUninstallIntent(intent: Intent?) {
+    private fun handleStrictUninstallIntent(intent: Intent?, viewModel: FocuslyViewModel) {
         if (intent?.action == com.example.util.StrictUninstallGuard.ACTION_STRICT_UNINSTALL_BLOCKED) {
-            strictUninstallBlockedFlow.value = true
+            viewModel.triggerStrictUninstallBlocked()
         }
     }
 
@@ -802,10 +800,10 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 }
 
                 // v1.2.2 — strict-mode uninstall attempt popup (owner spec copy).
-                val showStrictUninstallBlocked by strictUninstallBlockedFlow.collectAsState()
+                val showStrictUninstallBlocked by viewModel.showStrictUninstallBlocked.collectAsState()
                 if (showStrictUninstallBlocked) {
                     com.example.ui.components.StrictUninstallBlockedDialog(
-                        onDismiss = { strictUninstallBlockedFlow.value = false }
+                        onDismiss = { viewModel.dismissStrictUninstallBlocked() }
                     )
                 }
 
