@@ -357,34 +357,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
         // Deep Focus Active: Back gesture intercepted to keep student inside session
     }
 
-    // v1.2.3 — ROOT CAUSE of "Back closes the whole app": navigation is
-    // state-driven (boolean flags + selectedTab) with no back stack, and
-    // most full-screen layers registered no BackHandler — so system Back
-    // fell through to Activity.finish() from Settings, Mascot, App Limits,
-    // the hubs, Session Complete, or any non-Home tab.
-    //
-    // One centralized handler, topmost layer first. Dialog()/ModalBottomSheet
-    // layers handle Back natively (their callbacks register later, so they
-    // win over this one); this covers everything they don't. The app exits
-    // via system Back ONLY from the root Home state — never mid-flow and
-    // never during an active session. Deep Focus keeps its own lock above.
-    val deepFocusBackLocked = isTimerRunning && isDeepFocusSessionActive
-    val backAction: (() -> Unit)? = when {
-        showCompletionScreen && completedSessionSummary != null ->
-            ({ viewModel.dismissCompletionScreen() })
-        isSessionLogOpen -> ({ isSessionLogOpen = false })
-        isAutoScheduleOpen -> ({ isAutoScheduleOpen = false })
-        isAppLimitsOpen -> ({ isAppLimitsOpen = false })
-        isAiGuardHubOpen -> ({ viewModel.closeAiGuardHub() })
-        isShieldHubOpen -> ({ viewModel.closeShieldHub() })
-        isSettingsOpen -> ({ isSettingsOpen = false })
-        isMascotOpen -> ({ isMascotOpen = false })
-        selectedTab != NavTab.HOME -> ({ selectedTab = NavTab.HOME })
-        else -> null
-    }
-    androidx.activity.compose.BackHandler(enabled = backAction != null && !deepFocusBackLocked) {
-        backAction?.invoke()
-    }
+
 
     val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
@@ -461,6 +434,37 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val alarmHubSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val shieldHubSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val supportLockZenSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // v1.2.3 — ROOT CAUSE of "Back closes the whole app": navigation is
+    // state-driven (boolean flags + selectedTab) with no back stack, and
+    // most full-screen layers registered no BackHandler — so system Back
+    // fell through to Activity.finish() from Settings, Mascot, App Limits,
+    // the hubs, Session Complete, or any non-Home tab.
+    //
+    // One centralized handler, topmost layer first. Dialog()/ModalBottomSheet
+    // layers handle Back natively (their callbacks register later, so they
+    // win over this one); this covers everything they don't. The app exits
+    // via system Back ONLY from the root Home state — never mid-flow and
+    // never during an active session. Deep Focus keeps its own lock above
+    // (this handler disables itself while that lock is engaged).
+    // Placed AFTER all navigation-state declarations (used below).
+    val deepFocusBackLocked = isTimerRunning && isDeepFocusSessionActive
+    val backAction: (() -> Unit)? = when {
+        showCompletionScreen && completedSessionSummary != null ->
+            ({ viewModel.dismissCompletionScreen() })
+        isSessionLogOpen -> ({ isSessionLogOpen = false })
+        isAutoScheduleOpen -> ({ isAutoScheduleOpen = false })
+        isAppLimitsOpen -> ({ isAppLimitsOpen = false })
+        isAiGuardHubOpen -> ({ viewModel.closeAiGuardHub() })
+        isShieldHubOpen -> ({ viewModel.closeShieldHub() })
+        isSettingsOpen -> ({ isSettingsOpen = false })
+        isMascotOpen -> ({ isMascotOpen = false })
+        selectedTab != NavTab.HOME -> ({ selectedTab = NavTab.HOME })
+        else -> null
+    }
+    androidx.activity.compose.BackHandler(enabled = backAction != null && !deepFocusBackLocked) {
+        backAction?.invoke()
+    }
 
     // Dark theme resolution based on user preferences
     val isSystemDark = isSystemInDarkTheme()
