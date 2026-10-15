@@ -122,10 +122,12 @@ object AiStudyGuardManager {
     fun setAiGuardEnabled(context: Context, enabled: Boolean) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putBoolean(KEY_AI_GUARD_ENABLED, enabled).apply()
-        // MERGED: YouTube AI content detection is part of the master AI Study
-        // Guard — one option instead of two. Drive the YouTube filter state
-        // from the master switch so they can never disagree.
-        YouTubeStudyGuardManager.setFilterEnabled(context, enabled)
+        // v1.2.2 (B1): the master switch NO LONGER force-drives the YouTube AI
+        // filter. Guard verdicts apply only to blocklisted or explicitly
+        // guard-enabled apps — YouTube's filter is its own explicit toggle in
+        // the Guard Hub (default off). The old merge meant turning the master
+        // guard on silently started verdict-scoring YouTube, which the owner
+        // never blocklisted or enabled.
         updateGuardStatusNotification(context)
     }
 
@@ -303,6 +305,15 @@ object AiStudyGuardManager {
             return
         }
 
+        // v1.2.2 (B5): the discipline flow fires ONLY on a genuine NON_STUDY
+        // verdict with real extracted content. A blank message AND a blank
+        // reason means there is no evidence — refuse to warn/block.
+        if (messageText.isBlank() && reason.isBlank()) {
+            Log.w(TAG, "[AiGuard] Refusing discipline flow for $packageName: zero evidence.")
+            logGuardActivity(context, packageName, "outcome", "SKIPPED", "no-evidence")
+            return
+        }
+
         val appName = when {
             packageName.contains("claude") -> "Claude"
             packageName.contains("chatgpt") || packageName.contains("openai") -> "ChatGPT"
@@ -392,7 +403,7 @@ object AiStudyGuardManager {
                 packageName = packageName,
                 appName = appName,
                 durationSec = GRACE_PERIOD_SECONDS,
-                reason = "Study Warning: Non-study content detected in $appName.\n\nPlease avoid non-study content and stay focused on your studies!\n\nKeep your questions study & exam-related, or $appName will be locked for 3 hours.",
+                reason = "Non-study activity detected in $appName. Return to study within 3 minutes or the app locks for 3 hours.",
                 isPunishment = false,
                 guardVariant = com.example.ui.screens.BlockedAppLockActivity.GUARD_VARIANT_WARNING
             )
@@ -650,11 +661,11 @@ object AiStudyGuardManager {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
             .setSmallIcon(R.drawable.ic_notification_small)
             .setLargeIcon(largeIcon)
-            .setContentTitle("Study Discipline Warning: ${warning.appName}")
-            .setContentText("Casual/non-study activity detected. Return to studying within 3 min or this app locks for 3 hours!")
+            .setContentTitle("Study warning: ${warning.appName}")
+            .setContentText("Non-study activity detected. Return to study within 3 min or this app locks for 3 hours.")
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("Non-study usage detected in ${warning.appName}.\n\nReason: ${warning.reason}\n\nContinuing off-topic activity will trigger an immediate 3-HOUR LOCKOUT on ${warning.appName}. Return to your study goals now!")
+                    .bigText("Non-study activity detected in ${warning.appName}. Return to study within 3 minutes or ${warning.appName} locks for 3 hours.")
             )
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setDefaults(NotificationCompat.DEFAULT_ALL)

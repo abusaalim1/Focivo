@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.ComposeView
 import com.example.MainActivity
 import com.example.R
 import com.example.ui.components.BlockedAppOverlay
+import com.example.ui.components.ShortsBlockedOverlay
 import com.example.ui.overlay.OverlayLifecycleHost
 import com.example.ui.theme.FocuslyTheme
 
@@ -61,6 +62,13 @@ object BlockOverlayManager {
     private val durationState = mutableStateOf(0)
     private val reasonState = mutableStateOf<String?>(null)
     private val punishmentState = mutableStateOf(false)
+
+    // v1.2.2 (C): dedicated Shorts & Reels surface overlay — separate from the
+    // main block overlay so a surface lock never disturbs an active block UI.
+    private var shortsOverlayView: ComposeView? = null
+    private var shortsOverlayHost: OverlayLifecycleHost? = null
+    private var shortsOverlayWm: WindowManager? = null
+    private val shortsLabelState = mutableStateOf("Shorts")
 
     fun isShowing(): Boolean = overlayView != null
 
@@ -239,4 +247,100 @@ object BlockOverlayManager {
     /** True when any block UI (overlay or legacy Activity) is on screen. */
     fun isBlockUiShowing(): Boolean =
         isShowing() || com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing
+
+    // ------------------------------------------------------------------
+    // v1.2.2 (C): Shorts & Reels surface overlay.
+    //
+    // Standalone surface lock: shown when the Shorts & Reels toggle is on and
+    // ShortsSurfaceDetector finds a real Shorts/Reels surface. The
+    // accessibility service performs a back-press first, so "Return" simply
+    // dismisses the overlay back into the app (long-form stays watchable).
+    // Never touches the AI discipline flow.
+    // ------------------------------------------------------------------
+
+    /** True when the Shorts & Reels overlay is on screen. */
+    fun isShortsBlockShowing(): Boolean = shortsOverlayView != null
+
+    /**
+     * Shows the Shorts & Reels overlay. Returns true when it is (now)
+     * showing; false when the overlay permission is missing (the caller
+     * still performed the back-press, so the surface is gone regardless).
+     */
+    fun showShortsBlock(context: Context, surfaceLabel: String): Boolean {
+        if (isShortsBlockShowing()) {
+            shortsLabelState.value = surfaceLabel
+            return true
+        }
+        if (!Settings.canDrawOverlays(context)) return false
+        val appContext = context.applicationContext
+        runOnMain {
+            if (shortsOverlayView != null) return@runOnMain
+            val host = OverlayLifecycleHost()
+            try {
+                shortsLabelState.value = surfaceLabel
+                val wm = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                val view = ComposeView(appContext).apply {
+                    host.installOn(this)
+                    setContent {
+                        FocuslyTheme {
+                            ShortsBlockedOverlay(
+                                surfaceLabel = shortsLabelState.value,
+                                onReturn = { hideShortsBlock() },
+                                onOpenFocivo = {
+                                    hideShortsBlock()
+                                    openFocivo(appContext)
+                                }
+                            )
+                        }
+                    }
+                    isFocusableInTouchMode = true
+                    setOnKeyListener { _, keyCode, event ->
+                        if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                            hideShortsBlock()
+                            true
+                        } else false
+                    }
+                }
+                host.show()
+                val params = WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    PixelFormat.TRANSLUCENT
+                ).apply {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        layoutInDisplayCutoutMode =
+                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                }
+                wm.addView(view, params)
+                shortsOverlayView = view
+                shortsOverlayHost = host
+                shortsOverlayWm = wm
+                Log.i(TAG, "Shorts & Reels overlay shown ($surfaceLabel)")
+            } catch (t: Throwable) {
+                Log.e(TAG, "Could not show Shorts overlay: ${t.message}")
+                runCatching { host.dismiss() }
+                shortsOverlayView = null
+                shortsOverlayHost = null
+                shortsOverlayWm = null
+            }
+        }
+        return isShortsBlockShowing()
+    }
+
+    /** Hide the Shorts & Reels overlay if visible. Safe to call any time, any thread. */
+    fun hideShortsBlock() {
+        runOnMain {
+            val view = shortsOverlayView ?: return@runOnMain
+            try {
+                shortsOverlayWm?.removeView(view)
+            } catch (_: Exception) { }
+            runCatching { shortsOverlayHost?.dismiss() }
+            shortsOverlayView = null
+            shortsOverlayHost = null
+            shortsOverlayWm = null
+        }
+    }
 }

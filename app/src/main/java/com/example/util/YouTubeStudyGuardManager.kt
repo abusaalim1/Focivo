@@ -27,7 +27,10 @@ object YouTubeStudyGuardManager {
     fun init(context: Context) {
         val prefs = getPrefs(context)
         val hasPerm = AiStudyGuardManager.isAccessibilityPermissionGranted(context)
-        val enabled = hasPerm && prefs.getBoolean(KEY_FILTER_ENABLED, true)
+        // v1.2.2 (B1): default OFF — the filter verdict-scores YouTube, which
+        // is essential-protected and can never be blocklisted, so it must be
+        // explicitly enabled by the user (Guard Hub toggle).
+        val enabled = hasPerm && prefs.getBoolean(KEY_FILTER_ENABLED, false)
         val count = prefs.getInt(KEY_BLOCKED_COUNT, 0)
         _isFilterEnabledState.value = enabled
         _blockedVideosCountState.value = count
@@ -38,7 +41,8 @@ object YouTubeStudyGuardManager {
         if (!hasPerm) return false
         if (!AiStudyGuardManager.isStudyPeriodActive(context)) return false
         val prefs = getPrefs(context)
-        return prefs.getBoolean(KEY_FILTER_ENABLED, true)
+        // v1.2.2 (B1): default OFF — explicit user enable required.
+        return prefs.getBoolean(KEY_FILTER_ENABLED, false)
     }
 
     fun setFilterEnabled(context: Context, enabled: Boolean) {

@@ -28,12 +28,27 @@ object GeminiContentClassifier {
     private const val FALLBACK_MODEL_NAME = "gemini-3.8-flash"
     private const val SECOND_FALLBACK_MODEL_NAME = "gemini-3.5-flash"
 
+    /**
+     * v1.2.2 (B3): where a verdict actually came from. The Guard Hub activity
+     * log is honest only if callers can tell a real Gemini verdict apart from
+     * an on-device fallback or an AI-unavailable fail-open.
+     */
+    enum class VerdictSource {
+        /** Decided by on-device heuristics / curated knowledge (real evidence). */
+        ON_DEVICE,
+        /** Decided by a live Gemini HTTP call. */
+        GEMINI,
+        /** Gemini could not run (no key / network failure) — fail-open ALLOW. */
+        AI_UNAVAILABLE
+    }
+
     data class ContentVerdict(
         val isStudyAllowed: Boolean,
         val isAdult: Boolean,
         val category: String,
         val reason: String,
-        val confidence: Float = 0.95f
+        val confidence: Float = 0.95f,
+        val source: VerdictSource = VerdictSource.ON_DEVICE
     )
 
     data class ScreenContentVerdict(
@@ -42,7 +57,8 @@ object GeminiContentClassifier {
         val isAdult: Boolean,
         val category: String,
         val reason: String,
-        val confidence: Float = 0.95f
+        val confidence: Float = 0.95f,
+        val source: VerdictSource = VerdictSource.ON_DEVICE
     )
 
     // Ultra-fast memory cache for evaluated content (1500 entries)
@@ -77,6 +93,42 @@ object GeminiContentClassifier {
         return null
     }
 
+    /**
+     * v1.2.2 (B3): single place that decides whether Gemini can actually run.
+     * The release APK ships GEMINI_API_KEY=<redacted> (see .env.example — AI
+     * Studio only injects a real key into its own preview builds), so on a
+     * real device this is almost always unconfigured. Returns "" when Gemini
+     * cannot run; callers must FAIL OPEN in that case.
+     */
+    private fun resolveApiKey(): String {
+        val key = try {
+            BuildConfig.GEMINI_API_KEY
+        } catch (_: Throwable) {
+            ""
+        }
+        return if (key.isBlank() || key == "MY_GEMINI_API_KEY" || key == "<redacted>") "" else key
+    }
+
+    /** v1.2.2 (B3): fail-open verdict — used whenever Gemini cannot run or fails. Never cached. */
+    private fun aiUnavailableAllow(): ContentVerdict = ContentVerdict(
+        isStudyAllowed = true,
+        isAdult = false,
+        category = "AI_UNAVAILABLE",
+        reason = "AI check unavailable — allowed",
+        confidence = 0.0f,
+        source = VerdictSource.AI_UNAVAILABLE
+    )
+
+    /** v1.2.2 (B3): fail-open screen verdict — used whenever Gemini cannot run or fails. Never cached. */
+    private fun aiUnavailableScreenAllow(): ScreenContentVerdict = ScreenContentVerdict(
+        isStudyAllowed = true,
+        isDistraction = false,
+        isAdult = false,
+        category = "AI_UNAVAILABLE",
+        reason = "AI check unavailable — allowed",
+        confidence = 0.0f,
+        source = VerdictSource.AI_UNAVAILABLE
+    )
     // Known pure entertainment / social media packages that are strictly distractions during study
     private val KNOWN_DISTRACTION_PACKAGES = mapOf(
         "com.zhiliaoapp.musically" to "TikTok",
@@ -253,16 +305,11 @@ object GeminiContentClassifier {
             return@withContext quick
         }
 
-        val apiKey = try {
-            BuildConfig.GEMINI_API_KEY
-        } catch (_: Throwable) {
-            ""
-        }
-
-        if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY" || apiKey == "<redacted>") {
-            Log.d(TAG, "Gemini API key is placeholder or blank. Using on-device screen classifier.")
-            screenCache.put(cacheKey, quick)
-            return@withContext quick
+        // v1.2.2 (B3): Gemini unavailable -> FAIL OPEN, never cached.
+        val apiKey = resolveApiKey()
+        if (apiKey.isEmpty()) {
+            Log.w(TAG, "Gemini API key missing/placeholder — AI screen check unavailable, failing open (ALLOW).")
+            return@withContext aiUnavailableScreenAllow()
         }
 
         try {
@@ -352,7 +399,8 @@ object GeminiContentClassifier {
                         isAdult = isAdult,
                         category = category,
                         reason = reason,
-                        confidence = 0.98f
+                        confidence = 0.98f,
+                        source = VerdictSource.GEMINI
                     )
                     screenCache.put(cacheKey, verdict)
                     Log.i(TAG, "[Gemini Screen Verdict] App: $appName -> Distraction=${verdict.isDistraction} ($reason)")
@@ -365,8 +413,10 @@ object GeminiContentClassifier {
             Log.w(TAG, "Gemini API screen evaluation exception: ${e.message}")
         }
 
-        screenCache.put(cacheKey, quick)
-        return@withContext quick
+        // v1.2.2 (B3): Gemini errored/timed out -> FAIL OPEN (ALLOW).
+        // Deliberately not cached.
+        Log.w(TAG, "Gemini screen check unavailable for $appName — failing open (ALLOW).")
+        return@withContext aiUnavailableScreenAllow()
     }
 
     /**
@@ -385,21 +435,20 @@ object GeminiContentClassifier {
 
         // First, check instant high-confidence local rules (e.g. 18+ keyword matches or verified education channels)
         val quick = quickEvaluate(title, channel, metadata)
-        if (quick.isAdult || (quick.isStudyAllowed && quick.confidence >= 0.95f)) {
+        // v1.2.2 (B2/B3): confident on-device verdicts (either direction) act
+        // directly — they are real extracted-content evidence and never needed
+        // Gemini. Only uncertain cases consult Gemini.
+        if (quick.isAdult || quick.confidence >= 0.90f) {
             classificationCache.put(cacheKey, quick)
             return@withContext quick
         }
 
-        val apiKey = try {
-            BuildConfig.GEMINI_API_KEY
-        } catch (_: Throwable) {
-            ""
-        }
-
-        if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY" || apiKey == "<redacted>") {
-            Log.d(TAG, "Gemini API key is placeholder or blank. Using on-device classifier.")
-            classificationCache.put(cacheKey, quick)
-            return@withContext quick
+        // v1.2.2 (B3): Gemini unavailable -> FAIL OPEN, never cached (a later
+        // call must retry once the key/network is back).
+        val apiKey = resolveApiKey()
+        if (apiKey.isEmpty()) {
+            Log.w(TAG, "Gemini API key missing/placeholder — AI check unavailable, failing open (ALLOW).")
+            return@withContext aiUnavailableAllow()
         }
 
         try {
@@ -462,7 +511,8 @@ object GeminiContentClassifier {
                         isAdult = isAdult,
                         category = category,
                         reason = reason,
-                        confidence = 0.98f
+                        confidence = 0.98f,
+                        source = VerdictSource.GEMINI
                     )
                     classificationCache.put(cacheKey, geminiVerdict)
                     Log.i(TAG, "[Gemini AI Verdict] Title: '$title' -> Allowed=$isStudy, Adult=$isAdult ($reason)")
@@ -475,8 +525,10 @@ object GeminiContentClassifier {
             Log.w(TAG, "Gemini API classification exception: ${e.message}")
         }
 
-        classificationCache.put(cacheKey, quick)
-        return@withContext quick
+        // v1.2.2 (B3): Gemini errored/timed out -> FAIL OPEN (ALLOW), not the
+        // uncertain on-device verdict. Deliberately not cached.
+        Log.w(TAG, "Gemini unavailable for '$title' — failing open (ALLOW).")
+        return@withContext aiUnavailableAllow()
     }
 
     /**
@@ -495,25 +547,16 @@ object GeminiContentClassifier {
             return@withContext cached
         }
 
-        val apiKey = try {
-            BuildConfig.GEMINI_API_KEY
-        } catch (_: Throwable) {
-            ""
-        }
+        val apiKey = resolveApiKey()
 
-        if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY" || apiKey == "<redacted>") {
-            Log.w(TAG, "Gemini API key unavailable; failing CLOSED for chat message (review required).")
-            // v1.3.1: fail closed — an uncertain message with no AI verifier must NOT
-            // silently pass. The guard's staged flow (warning first, resolvable) handles it.
+        if (apiKey.isEmpty()) {
+            // v1.2.2 (B3): FAIL OPEN. The old code failed CLOSED here — every
+            // ambiguous chat message was treated as NON_STUDY ("AI verification
+            // unavailable — treated as non-study") even though no AI ever looked
+            // at it. Uncertain + no AI verifier = benefit of the doubt = ALLOW.
             // Deliberately NOT cached: a later successful call must re-evaluate.
-            val fallback = ContentVerdict(
-                isStudyAllowed = false,
-                isAdult = false,
-                category = "REVIEW_REQUIRED",
-                reason = "AI verification unavailable (no API key) — treated as non-study until verified",
-                confidence = 0.0f
-            )
-            return@withContext fallback
+            Log.w(TAG, "Gemini API key unavailable; failing OPEN for chat message (allowed, not verified).")
+            return@withContext aiUnavailableAllow()
         }
 
         try {
@@ -580,7 +623,8 @@ object GeminiContentClassifier {
                         isAdult = isAdult,
                         category = category,
                         reason = reason,
-                        confidence = 0.95f
+                        confidence = 0.95f,
+                        source = VerdictSource.GEMINI
                     )
                     classificationCache.put(cacheKey, verdict)
                     Log.i(TAG, "[Gemini Chat Verdict] App: $appName -> Allowed=$isStudy ($reason)")
@@ -593,17 +637,11 @@ object GeminiContentClassifier {
             Log.w(TAG, "Gemini chat classification exception: ${e.message}")
         }
 
-        // Offline / fallback: evaluate using on-device intelligence
-        val onDevice = OnDeviceStudyClassifier.evaluateContent(message)
-        val fallback = ContentVerdict(
-            isStudyAllowed = !onDevice.isCasual,
-            isAdult = onDevice.reason.contains("18+") || onDevice.reason.contains("Adult"),
-            category = if (onDevice.isCasual) "NON_STUDY_CHAT" else "ACADEMIC_STUDY",
-            reason = onDevice.reason,
-            confidence = onDevice.confidence
-        )
-        classificationCache.put(cacheKey, fallback)
-        return@withContext fallback
+        // v1.2.2 (B3): Gemini errored/timed out -> FAIL OPEN (ALLOW). Gemini is
+        // the tie-breaker here; with no tie-breaker the message gets the
+        // benefit of the doubt. Deliberately not cached.
+        Log.w(TAG, "Gemini chat check failed for $appName — failing open (ALLOW).")
+        return@withContext aiUnavailableAllow()
     }
 
     private fun buildCacheKey(title: String, channel: String?): String {

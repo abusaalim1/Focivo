@@ -98,6 +98,10 @@ object StudyGuardKnowledge {
         "professor", "exam preparation", "revision series", "rapid revision",
         "ncert solutions", "rd sharma", "hc verma", "dc pandey",
         "marathon", "mock drill",
+        // v1.2.2 (B4): high-signal additions — doubt-solving, exam-prep formats
+        "doubt", "numerical", "exemplar", "ncert exemplar", "olympiad",
+        "most expected", "expected questions", "rapid fire",
+        "lab manual", "practical file", "viva",
         // Devanagari set
         "पढ़ाई", "गणित", "विज्ञान", "भौतिकी", "रसायन", "जीव विज्ञान",
         "इतिहास", "भूगोल", "परीक्षा", "कक्षा", "अध्याय", "एनसीईआरटी",
@@ -111,16 +115,16 @@ object StudyGuardKnowledge {
     // ------------------------------------------------------------------
     private val RAW_BLOCK: List<String> = listOf(
         "vlog", "prank", "roast", "meme", "try not to laugh", "gameplay",
-        "gaming", "walkthrough", "speedrun", "bgmi", "pubg", "free fire",
+        "gaming", "bgmi", "pubg", "free fire",
         "valorant", "gta", "minecraft", "roblox", "fortnite", "call of duty",
-        "esports", "mod apk", "full movie", "movie", "film", "trailer",
+        "esports", "mod apk", "full movie", "movie", "trailer",
         "teaser", "web series", "big boss", "kapil sharma", "music video",
         "lyrical video", "dj remix", "slowed and reverb", "8d audio",
         "dance cover", "mukbang", "asmr", "unboxing", "haul", "day in my life",
         "grwm", "get ready with me", "outfit of the day", "storytime",
-        "exposed", "gossip", "diss track", "trolling", "epic fails",
+        "gossip", "diss track", "trolling", "epic fails",
         "viral video", "trending now", "24 hour challenge", "hide and seek",
-        "last to leave", "100 layers", "reaction", "reacting to", "challenge",
+        "last to leave", "100 layers", "reacting to",
         "skit", "stand up comedy", "comedy video", "bloopers",
         "fail compilation", "funny moments", "satisfying video",
         "oddly satisfying", "slime", "room tour", "house tour",
@@ -138,8 +142,8 @@ object StudyGuardKnowledge {
         "movie explained in hindi", "full episode", "latest episode",
         "tv serial", "daily soap", "dance deewane", "indian idol",
         "splitsvilla", "roadies", "film gossip", "actor interview",
-        "cricket highlights", "vlogs", "gamer", "games", "gaming video", "stream",
-        "live stream", "kaise ho", "kya chal rha", "kya chal raha", "aur batao", "aur bata",
+        "cricket highlights", "vlogs", "gaming video",
+        "kaise ho", "kya chal rha", "kya chal raha", "aur batao", "aur bata",
         "kya kar rahe ho", "kya kr rhe ho", "kuch sunao", "timepass", "chitchat", "roast me"
     )
 

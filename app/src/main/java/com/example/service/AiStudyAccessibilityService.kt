@@ -20,7 +20,9 @@ import com.example.util.EssentialAppsGuard
 import com.example.util.GeminiContentClassifier
 import com.example.util.OnDeviceStudyClassifier
 import com.example.util.ShortsLockManager
+import com.example.util.ShortsSurfaceDetector
 import com.example.util.StrictModeManager
+import com.example.util.StudyAllowlistManager
 import com.example.util.StudyGuardKnowledge
 import com.example.util.YouTubeStudyGuardManager
 import com.example.util.YouTubeVideoClassifier
@@ -196,6 +198,39 @@ class AiStudyAccessibilityService : AccessibilityService() {
     }
 
     /**
+     * v1.2.2 (C) — Shorts & Reels surface intercept.
+     *
+     * Standalone surface lock: back-press out of the Shorts/Reels player,
+     * pause media, then the dedicated "blocked during focus" overlay with a
+     * Return button. Deliberately does NOT call onNonStudyDetected — a shorts
+     * surface is not a content verdict and must never feed the AI discipline
+     * (warning / 3-hour punishment) flow. Works with ONLY the Shorts & Reels
+     * toggle on: no AI Guard, no blocklist entry required.
+     */
+    private fun interceptShortsSurface(
+        blockedPackage: String,
+        surface: ShortsSurfaceDetector.ShortsSurface,
+        surfaceLabel: String
+    ) {
+        // The main block UI always wins if it is already showing.
+        if (BlockOverlayManager.isBlockUiShowing()) return
+
+        pauseMediaPlayback()
+        try {
+            performGlobalAction(GLOBAL_ACTION_BACK)
+        } catch (_: Exception) { }
+
+        AiStudyGuardManager.logGuardActivity(
+            applicationContext, surfaceLabel, "shorts-block", "BLOCKED",
+            "shorts-reels-toggle", surface.name
+        )
+        val shown = BlockOverlayManager.showShortsBlock(applicationContext, surfaceLabel)
+        if (!shown) {
+            Log.w(TAG, "[Shorts Lock] Overlay permission missing — back-press only for $surfaceLabel.")
+        }
+    }
+
+    /**
      * Immediately pauses active media/audio, then triggers the BlockedAppLockActivity overlay
      * showing the mascot, lock icon, and time remaining without redirecting to Focivo main app.
      */
@@ -314,6 +349,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     lastGeneralAppInterceptTimeMs = nowTime
                     lastGeneralInterceptedPkg = pkg
                     Log.w(TAG, "[Strict Mode Anti-Uninstall] Intercepted Package Installer ($pkg) during active study!")
+                    // v1.2.2 cross-workstream hook: also surface the in-app
+                    // strict-uninstall-blocked notice (MainActivity handles the intent).
+                    com.example.util.StrictUninstallGuard.notifyStrictUninstallBlocked(applicationContext)
                     BlockOverlayManager.intercept(
                         context = applicationContext,
                         blockedPackage = pkg,
@@ -405,40 +443,55 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     val rootNode = rootInActiveWindow
                     if (rootNode != null) {
                         try {
-                            // 7A. Shorts Lock (Blocks Shorts viewer & shelf)
-                            if (isShortsLockOn && isYouTubeShortsScreen(rootNode)) {
-                                val now = System.currentTimeMillis()
-                                if (now - lastShortsInterceptTimeMs > 2000L) {
-                                    lastShortsInterceptTimeMs = now
-                                    Log.w(TAG, "[Shorts Lock] YouTube Shorts detected on screen! Intercepting...")
-                                    pauseMediaPlayback()
-                                    AiStudyGuardManager.onNonStudyDetected(
-                                        context = applicationContext,
-                                        packageName = "com.google.android.youtube",
-                                        messageText = "YouTube Shorts",
-                                        reason = "YouTube Shorts are locked during active study sessions."
-                                    )
+                            // 7A. Shorts Lock (v1.2.2 C): dedicated surface block.
+                            // Detects the REAL Shorts player/feed surface via
+                            // ShortsSurfaceDetector, then back-press + overlay.
+                            // Fully decoupled from the AI discipline flow — this
+                            // is a surface lock, not a content verdict. Long-form
+                            // videos stay watchable.
+                            if (isShortsLockOn) {
+                                val shortsSurface = ShortsSurfaceDetector.detectYouTubeShorts(rootNode)
+                                if (shortsSurface != null) {
+                                    val now = System.currentTimeMillis()
+                                    if (now - lastShortsInterceptTimeMs > 2000L) {
+                                        lastShortsInterceptTimeMs = now
+                                        Log.w(TAG, "[Shorts Lock] YouTube Shorts surface detected ($shortsSurface) — intercepting.")
+                                        interceptShortsSurface(
+                                            blockedPackage = "com.google.android.youtube",
+                                            surface = shortsSurface,
+                                            surfaceLabel = "YouTube Shorts"
+                                        )
+                                    }
+                                    return
                                 }
-                                return
                             }
 
                             // 7B. Intelligent YouTube AI Content Filter (Analyzes active video title & channel with Gemini AI)
                             if (isYouTubeAiFilterOn) {
-                                val activeVideo = extractPlayingYouTubeVideo(rootNode)
-                                if (activeVideo != null && activeVideo.title.isNotBlank() && activeVideo.title.length >= 4) {
-                                    val blocked = processYouTubeVideoTitle(activeVideo.title, activeVideo.channel, activeVideo.metadata)
-                                    if (blocked) return
+                                // v1.2.2 (B2): evidence gate — the filter evaluates
+                                // ONLY a video that is actually playing. Opening
+                                // YouTube (home feed, search) can never produce a
+                                // verdict, no matter what the recommendations say.
+                                if (!ShortsSurfaceDetector.isYouTubeVideoPlayerSurface(rootNode)) {
+                                    // v1.1.9 diagnostic
+                                    AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-title", "no-player-evidence")
                                 } else {
-                                    // v1.1.6 fallback: title view-ids not exposed (e.g. fullscreen/custom player).
-                                    // Scan prominent on-screen text instead of silently skipping detection.
-                                    val fallbackTitle = extractFallbackVideoTitle(rootNode)
-                                    if (!fallbackTitle.isNullOrBlank()) {
-                                        Log.d(TAG, "[YouTube AI Guard] Primary title extraction missed; using fallback title: '$fallbackTitle'")
-                                        val blocked = processYouTubeVideoTitle(fallbackTitle, null, "fallback_title_scan")
+                                    val activeVideo = extractPlayingYouTubeVideo(rootNode)
+                                    if (activeVideo != null && activeVideo.title.isNotBlank() && activeVideo.title.length >= 4) {
+                                        val blocked = processYouTubeVideoTitle(activeVideo.title, activeVideo.channel, activeVideo.metadata)
                                         if (blocked) return
                                     } else {
-                                        // v1.1.9 diagnostic: nothing title-like on screen.
-                                        AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-title", "title-null")
+                                        // v1.1.6 fallback: title view-ids not exposed (e.g. fullscreen/custom player).
+                                        // Scan prominent on-screen text instead of silently skipping detection.
+                                        val fallbackTitle = extractFallbackVideoTitle(rootNode)
+                                        if (!fallbackTitle.isNullOrBlank()) {
+                                            Log.d(TAG, "[YouTube AI Guard] Primary title extraction missed; using fallback title: '$fallbackTitle'")
+                                            val blocked = processYouTubeVideoTitle(fallbackTitle, null, "fallback_title_scan")
+                                            if (blocked) return
+                                        } else {
+                                            // v1.1.9 diagnostic: nothing title-like on screen.
+                                            AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-title", "title-null")
+                                        }
                                     }
                                 }
                             } else {
@@ -473,21 +526,22 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     return
                 }
 
+                // v1.2.2 (C): dedicated Reels surface block — back-press + overlay,
+                // decoupled from the AI discipline flow. Feed/DMs stay usable.
                 if (ShortsLockManager.isReelsLockEnabled(applicationContext)) {
                     val rootNode = rootInActiveWindow
                     if (rootNode != null) {
                         try {
-                            if (isInstagramReelsScreen(rootNode)) {
+                            val reelsSurface = ShortsSurfaceDetector.detectInstagramReels(rootNode)
+                            if (reelsSurface != null) {
                                 val now = System.currentTimeMillis()
                                 if (now - lastShortsInterceptTimeMs > 2000L) {
                                     lastShortsInterceptTimeMs = now
-                                    Log.w(TAG, "[Reels Lock] Instagram Reels detected! Intercepting...")
-                                    forceStopMediaAndDismissToFocivo(
-                                        context = applicationContext,
-                                        blockedPackage = "com.instagram.android.reels",
-                                        appName = "Instagram Reels",
-                                        reason = "Instagram Reels are locked during active study sessions.",
-                                        isGeminiIntercept = true
+                                    Log.w(TAG, "[Reels Lock] Instagram Reels surface detected ($reelsSurface) — intercepting.")
+                                    interceptShortsSurface(
+                                        blockedPackage = pkg,
+                                        surface = reelsSurface,
+                                        surfaceLabel = "Instagram Reels"
                                     )
                                 }
                                 return
@@ -621,7 +675,12 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                                             message = msgCopy,
                                                             appName = pkg
                                                         )
-                                                        if (!gv.isStudyAllowed || gv.isAdult) {
+                                                        // v1.2.2 (B3): AI_UNAVAILABLE = Gemini never ran.
+                                                        // Fail open with an honest log entry; do NOT feed
+                                                        // the sticky cache a verdict that was never made.
+                                                        if (gv.source == GeminiContentClassifier.VerdictSource.AI_UNAVAILABLE) {
+                                                            AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-gemini", "STUDY", "AI check unavailable — allowed", msgCopy)
+                                                        } else if (!gv.isStudyAllowed || gv.isAdult) {
                                                             Log.w(TAG, "[Gemini Chat Guard] Non-study message in $pkg: '$msgCopy' -> ${gv.reason}")
                                                             StudyGuardKnowledge.noteExternalChatVerdict(pkg, StudyGuardKnowledge.Verdict.NON_STUDY)
                                                             // v1.1.9 diagnostic
@@ -639,8 +698,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                                         }
                                                     } catch (t: Throwable) {
                                                         Log.w(TAG, "Gemini chat evaluation failed: ${t.message}")
-                                                        // v1.1.9 diagnostic
-                                                        AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-gemini", "UNCERTAIN", "gemini-error", msgCopy)
+                                                        // v1.1.9 diagnostic — v1.2.2 (B3): an exception
+                                                        // means no verdict exists; fail open, honestly.
+                                                        AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-gemini", "STUDY", "AI check unavailable — allowed", msgCopy)
                                                     }
                                                 }
                                             } else {
@@ -740,7 +800,11 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                                 visibleSnippets = extraction.textSnippets,
                                                 metadata = extraction.urlOrContext
                                             )
-                                            if (gv.isDistraction || !gv.isStudyAllowed) {
+                                            // v1.2.2 (B3): AI_UNAVAILABLE = Gemini never ran —
+                                            // fail open with an honest log entry.
+                                            if (gv.source == GeminiContentClassifier.VerdictSource.AI_UNAVAILABLE) {
+                                                AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-gemini", "STUDY", "AI check unavailable — allowed", urlOrTitle)
+                                            } else if (gv.isDistraction || !gv.isStudyAllowed) {
                                                 Log.w(TAG, "[Gemini Screen Guard] Distraction confirmed in $browserLabel: ${gv.reason}")
                                                 AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-gemini", "NON_STUDY", gv.reason.take(64), urlOrTitle)
                                                 AiStudyGuardManager.onNonStudyDetected(
@@ -759,6 +823,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                             }
                                         } catch (t: Throwable) {
                                             Log.w(TAG, "Gemini screen analysis exception: ${t.message}")
+                                            // v1.2.2 (B3): exception = no verdict; fail open, honestly.
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-gemini", "STUDY", "AI check unavailable — allowed", urlOrTitle)
                                         }
                                     }
                                 }
@@ -775,83 +841,6 @@ class AiStudyAccessibilityService : AccessibilityService() {
         } catch (t: Throwable) {
             Log.e(TAG, "Error in onAccessibilityEvent: ${t.message}", t)
         }
-    }
-
-    /**
-     * Inspects accessibility nodes to check if current screen inside YouTube is Shorts.
-     */
-    private fun isYouTubeShortsScreen(node: AccessibilityNodeInfo, depth: Int = 0): Boolean {
-        if (depth > 12) return false
-
-        val viewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
-        if (viewId.contains("reel_player") ||
-            viewId.contains("reel_recycler") ||
-            viewId.contains("reel_watch_fragment") ||
-            viewId.contains("shorts_player") ||
-            viewId.contains("shorts_container") ||
-            viewId.contains("pivot_shorts") ||
-            viewId.contains("reel_viewer") ||
-            viewId.contains("reel_item_layout") ||
-            viewId.contains("shorts_sound_metadata") ||
-            viewId.contains("shorts_chip")
-        ) {
-            return true
-        }
-
-        val text = node.text?.toString()?.lowercase(Locale.ROOT) ?: ""
-        val desc = node.contentDescription?.toString()?.lowercase(Locale.ROOT) ?: ""
-
-        if (text.contains("remix with this audio") ||
-            text.contains("dislike this short") ||
-            text.contains("like this short") ||
-            text.contains("#shorts") ||
-            desc.contains("shorts player") ||
-            desc.contains("dislike this short") ||
-            desc.contains("like this short") ||
-            desc.contains("remix this short") ||
-            desc.contains("shorts, selected")
-        ) {
-            return true
-        }
-
-        val count = node.childCount
-        for (i in 0 until count) {
-            val child = node.getChild(i) ?: continue
-            val found = isYouTubeShortsScreen(child, depth + 1)
-            try { child.recycle() } catch (_: Exception) {}
-            if (found) return true
-        }
-        return false
-    }
-
-    /**
-     * Inspects accessibility nodes to check if current screen inside Instagram is Reels.
-     */
-    private fun isInstagramReelsScreen(node: AccessibilityNodeInfo, depth: Int = 0): Boolean {
-        if (depth > 10) return false
-
-        val viewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
-        if (viewId.contains("clips_video_container") ||
-            viewId.contains("reel_viewer_container") ||
-            viewId.contains("clips_viewer_container") ||
-            viewId.contains("clips_tab")
-        ) {
-            return true
-        }
-
-        val desc = node.contentDescription?.toString()?.lowercase(Locale.ROOT) ?: ""
-        if (desc.contains("reels viewer") || desc.contains("reels tab") || desc == "reels, selected") {
-            return true
-        }
-
-        val count = node.childCount
-        for (i in 0 until count) {
-            val child = node.getChild(i) ?: continue
-            val found = isInstagramReelsScreen(child, depth + 1)
-            try { child.recycle() } catch (_: Exception) {}
-            if (found) return true
-        }
-        return false
     }
 
     private val evaluatedMessages = LinkedHashMap<String, Long>()
@@ -990,6 +979,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
     }
 
     private fun processYouTubeVideoTitle(title: String, channel: String?, metadata: String?): Boolean {
+        // v1.2.2 (B1): the user's own study-channel allowlist always wins —
+        // a channel they explicitly trust is never verdict-scored.
+        if (StudyAllowlistManager.isStudyChannel(applicationContext, channel)) {
+            AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-allowlist", "STUDY", "allowlisted-channel", title)
+            return false
+        }
+
         // v1.1.8: curated offline knowledge first — instant (<1ms), zero network.
         // Confident verdicts are used directly; UNCERTAIN falls through to the
         // existing quickEvaluate -> Gemini flow unchanged.
@@ -1034,7 +1030,15 @@ class AiStudyAccessibilityService : AccessibilityService() {
             metadata = metadata
         )
 
-        if (!quickVerdict.isStudyAllowed || quickVerdict.isAdult) {
+        // v1.2.2 (B2): a quick on-device block needs a CONFIDENT verdict
+        // (confidence >= 0.90 — real extracted-content evidence). Uncertain
+        // verdicts (e.g. "Uncertain / Review Required") never block by
+        // themselves — they fall through to the Gemini check below, and if
+        // Gemini is unavailable the result is FAIL-OPEN (allow).
+        val isConfidentQuickBlock = (!quickVerdict.isStudyAllowed || quickVerdict.isAdult) &&
+                quickVerdict.confidence >= 0.90f
+
+        if (isConfidentQuickBlock) {
             // v1.1.9 diagnostic (log every evaluation, before the action throttle)
             AiStudyGuardManager.logGuardActivity(
                 applicationContext, "YouTube", "youtube-quick", "NON_STUDY",
@@ -1069,10 +1073,22 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     channel = channel,
                     metadata = metadata
                 )
-                if (!geminiVerdict.isStudyAllowed || geminiVerdict.isAdult) {
-                    // v1.1.9 diagnostic
+                // v1.2.2 (B3): honest source handling. AI_UNAVAILABLE means
+                // Gemini never ran — fail open with an honest log entry, and
+                // NEVER treat it as a block.
+                if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.AI_UNAVAILABLE) {
                     AiStudyGuardManager.logGuardActivity(
-                        applicationContext, "YouTube", "youtube-gemini", "NON_STUDY",
+                        applicationContext, "YouTube", "youtube-gemini", "STUDY",
+                        "AI check unavailable — allowed", title
+                    )
+                    return@launch
+                }
+                if (!geminiVerdict.isStudyAllowed || geminiVerdict.isAdult) {
+                    // v1.1.9 diagnostic — v1.2.2: stage label follows the real
+                    // source (a confident on-device verdict never needed Gemini).
+                    val gemStage = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) "youtube-gemini" else "youtube-quick"
+                    AiStudyGuardManager.logGuardActivity(
+                        applicationContext, "YouTube", gemStage, "NON_STUDY",
                         geminiVerdict.category.ifBlank { "gemini" }, title
                     )
                     val now = System.currentTimeMillis()
@@ -1094,8 +1110,10 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         )
                     }
                 } else {
-                    // v1.1.9 diagnostic
-                    AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-gemini", "STUDY", "gemini-allow", title)
+                    // v1.1.9 diagnostic — v1.2.2: honest source label.
+                    val allowStage = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) "youtube-gemini" else "youtube-quick"
+                    val allowReason = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) "gemini-allow" else "quick-allow"
+                    AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", allowStage, "STUDY", allowReason, title)
                 }
             }
             return false
