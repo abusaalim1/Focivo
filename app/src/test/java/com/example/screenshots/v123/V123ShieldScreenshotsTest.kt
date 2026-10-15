@@ -100,4 +100,11 @@ class V123ShieldScreenshotsTest {
         composeTestRule.onNodeWithTag("focus_shield_list").performScrollToIndex(6)
         composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v123/v123_focus_shield_scrolled.png")
     }
+
+    @Test
+    fun v123_focus_shield_ai_section() {
+        renderShield()
+        composeTestRule.onNodeWithTag("focus_shield_list").performScrollToIndex(4)
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v123/v123_focus_shield_ai_section.png")
+    }
 }
