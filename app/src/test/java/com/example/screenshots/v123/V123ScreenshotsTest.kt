@@ -26,9 +26,11 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.ui.components.TimerFacePicker
 import com.example.ui.theme.PoppinsFontFamily
 import kotlinx.coroutines.runBlocking
+import com.example.data.model.FocusSessionEntity
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.ThemedScreenBackground
 import com.example.ui.screens.FocusScreen
+import com.example.ui.screens.InsightsScreen
 import com.example.ui.splash.FocivoSplash
 import com.example.ui.splash.SplashVariant
 import com.example.ui.splash.WelcomeInfo
@@ -286,5 +288,89 @@ class V123ScreenshotsTest {
             currentMode = "Short Break"
         )
         composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v123/v123_pomodoro_short_activityrings.png")
+    }
+
+    // ------------------------------------------------------------------
+    // v1.2.3 Insights redesign (branch feat/v123-splash, NEVER merged blindly):
+    //  - Supplied Claude design (Header/Hero ring/WeekCard/StatsRow/Peak row/
+    //    Session history/By subject/TimeOfDay) rebuilt on the app font pair:
+    //    Poppins body, Instrument Serif italic highlight text only.
+    //  - All numbers come from REAL aggregates via buildInsightsState()
+    //    (seeded FocusSessionEntity list below).
+    //  - FloatingNav is intentionally NOT rendered (app keeps its own nav).
+    // PNGs land in app/src/test/screenshots/v123/.
+    // ------------------------------------------------------------------
+
+    private fun seedInsightsSessions(): List<FocusSessionEntity> {
+        val cal = Calendar.getInstance()
+        val dow = cal.get(Calendar.DAY_OF_WEEK)
+        val daysFromMonday = if (dow == Calendar.SUNDAY) 6 else (dow - Calendar.MONDAY)
+        val dayMs = 24L * 3600 * 1000
+        val todayStart = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val weekStart = todayStart - daysFromMonday * dayMs
+        val prevWeekStart = weekStart - 7 * dayMs
+
+        fun mk(dayIdx: Int, hour: Int, minutes: Int, mode: String, title: String, base: Long = weekStart): FocusSessionEntity {
+            val end = base + dayIdx * dayMs + hour * 3600_000L + 30 * 60_000L
+            return FocusSessionEntity(
+                id = base / 1000 + dayIdx * 100 + hour,
+                taskTitle = title,
+                durationSeconds = minutes * 60,
+                targetDurationSeconds = 25 * 60,
+                mode = mode,
+                startTime = end - minutes * 60_000L,
+                endTime = end,
+                completedAt = end,
+                dayOfWeek = dayIdx + 1,
+                hourOfDay = hour,
+            )
+        }
+        val sessions = mutableListOf(
+            mk(0, 9, 50, "Deep Work", "Physics"),
+            mk(0, 19, 25, "Classic", "Math"),
+            mk(1, 10, 45, "Deep Work", "Physics"),
+            mk(2, 8, 30, "Classic", "Chemistry"),
+            mk(3, 14, 40, "Deep Work", "Math"),
+            mk(3, 21, 55, "Deep Work", "Physics"),
+            mk(4, 7, 20, "Classic", "English"),
+            mk(5, 11, 60, "Deep Work", "Physics"),
+            // Previous week (smaller, so "vs last week" shows a real gain)
+            mk(1, 10, 30, "Deep Work", "Physics", prevWeekStart),
+            mk(4, 15, 20, "Classic", "Math", prevWeekStart),
+        )
+        // Today always has two real sessions no matter which weekday CI runs on
+        sessions += mk(daysFromMonday, 9, 35, "Deep Work", "Physics")
+        sessions += mk(daysFromMonday, 20, 25, "Classic", "Math")
+        return sessions
+    }
+
+    private fun insightsContent(initialScroll: Int) {
+        themed(dark = true) {
+            InsightsScreen(
+                sessions = seedInsightsSessions(),
+                reflections = emptyList(),
+                userPreferences = focusPrefs(),
+                onSaveReflection = {},
+                onOpenSessionHistory = {},
+                testInitialScroll = initialScroll,
+            )
+        }
+    }
+
+    @Test
+    fun v123_insights_top() {
+        insightsContent(initialScroll = 0)
+        composeTestRule.waitForIdle()
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v123/v123_insights_top.png")
+    }
+
+    @Test
+    fun v123_insights_bottom() {
+        insightsContent(initialScroll = 700)
+        composeTestRule.waitForIdle()
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v123/v123_insights_bottom.png")
     }
 }
