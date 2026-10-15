@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -354,8 +355,8 @@ fun MascotScreen(
                     Box(contentAlignment = Alignment.TopEnd) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(84.dp),
+                                .height(92.dp)
+                                .aspectRatio(1408f / 1760f),
                             contentAlignment = Alignment.Center
                         ) {
                             // Thumbnail: the item worn on the plain buddy (mini stack),
