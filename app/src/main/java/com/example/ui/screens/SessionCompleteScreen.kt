@@ -194,7 +194,7 @@ fun SessionCompleteScreen(
                 }
             }
             Box(modifier = Modifier.weight(1f)) {
-                ShareExperienceScreen(
+                FocivoShareEntry(
                     data = shareData,
                     onWhatsApp = { shareCard(it, toWhatsApp = true) },
                     onMore = { shareCard(it, toWhatsApp = false) },
@@ -384,7 +384,7 @@ private suspend fun captureShareCardPng(
     cardIndex: Int,
     data: ShareScreenData
 ): Bitmap? = captureComposedBitmapGuarded(context, 1080, 1350) {
-    ShareCard(index = cardIndex, data = data, scale = 3f)
+    FocivoShareCardPng(index = cardIndex, data = data)
 }
 
 /**

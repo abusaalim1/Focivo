@@ -37,7 +37,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.ui.screens.ShareBlockedApp
-import com.example.ui.screens.ShareCard
+import com.example.ui.screens.FocivoShareCardPng
 import com.example.ui.screens.ShareScreenData
 import org.json.JSONArray
 import org.json.JSONObject
@@ -310,7 +310,7 @@ class V122ScreenshotsTest {
                         .size(360.dp, 450.dp)
                         .background(Color(0xFF0A0C0B))
                 ) {
-                    ShareCard(index = 0, data = data, scale = 1f)
+                    FocivoShareCardPng(index = 0, data = data)
                 }
             }
         }
@@ -327,7 +327,7 @@ class V122ScreenshotsTest {
                         .size(360.dp, 450.dp)
                         .background(Color(0xFF0A0C0B))
                 ) {
-                    ShareCard(index = 1, data = data, scale = 1f)
+                    FocivoShareCardPng(index = 1, data = data)
                 }
             }
         }
@@ -344,7 +344,7 @@ class V122ScreenshotsTest {
                         .size(360.dp, 450.dp)
                         .background(Color(0xFF0A0C0B))
                 ) {
-                    ShareCard(index = 3, data = data, scale = 1f)
+                    FocivoShareCardPng(index = 3, data = data)
                 }
             }
         }
