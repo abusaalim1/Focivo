@@ -86,6 +86,8 @@ import com.example.ui.viewmodel.FocuslyViewModel
 
 class MainActivity : ComponentActivity() {
     private var activeViewModel: FocuslyViewModel? = null
+    // v1.2.2 — strict-mode uninstall attempt flag (set from the uninstaller intercept path).
+    private val strictUninstallBlockedFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -110,6 +112,9 @@ class MainActivity : ComponentActivity() {
         // the timer is already live in this process or no timer is persisted).
         activeViewModel?.restoreTimerStateIfNeeded()
         com.example.service.ScheduledBlockScheduler.evaluateAndReschedule(this)
+        // v1.2.2 — never let the launcher icon vanish as a side effect of a
+        // blocked strict-mode uninstall (launcher-side artifact on some ROMs).
+        com.example.util.StrictUninstallGuard.reassertLauncherEntryEnabled(this)
         // v1.5.0: the floating timer pill is only for out-of-app use — kill it on return.
         com.example.service.FloatingTimerPillManager.hide(this)
     }
@@ -145,6 +150,13 @@ class MainActivity : ComponentActivity() {
         handleAuthIntent(intent, viewModel)
         handleSundayRecapIntent(intent, viewModel)
         handleWidgetIntent(intent, viewModel)
+        handleStrictUninstallIntent(intent)
+    }
+
+    private fun handleStrictUninstallIntent(intent: Intent?) {
+        if (intent?.action == com.example.util.StrictUninstallGuard.ACTION_STRICT_UNINSTALL_BLOCKED) {
+            strictUninstallBlockedFlow.value = true
+        }
     }
 
     private fun handleWidgetIntent(intent: Intent?, viewModel: FocuslyViewModel) {
@@ -786,6 +798,14 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 if (showSessionDonationPrompt) {
                     com.example.ui.components.DonationDialog(
                         onDismiss = { viewModel.dismissSessionDonationPrompt() }
+                    )
+                }
+
+                // v1.2.2 — strict-mode uninstall attempt popup (owner spec copy).
+                val showStrictUninstallBlocked by strictUninstallBlockedFlow.collectAsState()
+                if (showStrictUninstallBlocked) {
+                    com.example.ui.components.StrictUninstallBlockedDialog(
+                        onDismiss = { strictUninstallBlockedFlow.value = false }
                     )
                 }
 
