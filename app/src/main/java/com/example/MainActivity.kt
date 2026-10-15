@@ -80,6 +80,8 @@ import com.example.ui.screens.SessionCompleteScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.AuthMode
 import com.example.ui.splash.FocivoSplash
+import com.example.ui.splash.WelcomeInfo
+import com.example.ui.splash.loadSplashWelcomeInfo
 import com.example.ui.splash.SplashVariant
 import com.example.ui.theme.FocuslyTheme
 import com.example.ui.viewmodel.FocuslyViewModel
@@ -404,10 +406,18 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     // the Create Account tab on the auth screen.
     var splashVariant by remember { mutableStateOf<SplashVariant?>(null) }
     var splashWantsCreateAccount by remember { mutableStateOf(false) }
+    // v1.2.3: real user data for the WelcomeScene (name / streak / today's
+    // minutes), read from the same on-device stores the share cards use.
+    var splashWelcomeInfo by remember { mutableStateOf(WelcomeInfo()) }
 
     LaunchedEffect(isAuthChecking, currentUser) {
         if (!isAuthChecking && splashVariant == null) {
-            splashVariant = if (currentUser != null) SplashVariant.RETURNING else SplashVariant.NEW_USER
+            if (currentUser != null) {
+                splashVariant = SplashVariant.RETURNING
+                splashWelcomeInfo = loadSplashWelcomeInfo(context)
+            } else {
+                splashVariant = SplashVariant.NEW_USER
+            }
         }
     }
     var isSettingsOpen by remember { mutableStateOf(false) }
@@ -450,6 +460,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
             // (onboarding checks / guest skip / main shell — untouched).
             FocivoSplash(
                 variant = splashVariant ?: SplashVariant.NEW_USER,
+                welcome = splashWelcomeInfo,
                 onFinished = { openCreateAccount ->
                     splashWantsCreateAccount = openCreateAccount
                     isSplashFinished = true
