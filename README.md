@@ -10,7 +10,7 @@ A free study-focus app built for students — Pomodoro timer, app blocker, sched
 
 <br/>
 
-![Version](https://img.shields.io/badge/version-1.1-limegreen?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.2-limegreen?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Android-3DDC84?style=for-the-badge&logo=android)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)
 ![Free](https://img.shields.io/badge/price-free_forever-gold?style=for-the-badge)
@@ -66,13 +66,13 @@ Focivo is an Android-first focus companion for students who want to study deeper
 | | | |
 |:---:|:---:|:---:|
 | <img src="https://focivoapp.vercel.app/focivo-shot-1.jpg" width="220"/> | <img src="https://focivoapp.vercel.app/focivo-shot-2.jpg" width="220"/> | <img src="https://focivoapp.vercel.app/focivo-shot-3.jpg" width="220"/> |
-| *Deep Work Timer* | *Session History* | *Aurora Timer* |
+| *Home* | *Mascot Wardrobe* | *Focus Timer* |
 
 <br/>
 
 | | | |
 |:---:|:---:|:---:|
-| <img src="https://focivoapp.vercel.app/assets/home-screen-Bj7OhFNr.jpg" width="220"/> | <img src="https://focivoapp.vercel.app/assets/focus-timer-screen-DYqRLBwq.jpg" width="220"/> | <img src="https://focivoapp.vercel.app/assets/leaderboard-screen-BjpiWFKz.jpg" width="220"/> |
+| <img src="https://focivoapp.vercel.app/assets/home-screen-3VxEIZMr.jpg" width="220"/> | <img src="https://focivoapp.vercel.app/assets/focus-timer-screen-oMDcyi1p.jpg" width="220"/> | <img src="https://focivoapp.vercel.app/assets/leaderboard-screen-BVEYyiBB.jpg" width="220"/> |
 | *Home* | *Focus Timer* | *Leaderboard* |
 
 </div>
