@@ -16,6 +16,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -45,7 +46,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Share
@@ -54,6 +54,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,22 +73,25 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
-import androidx.core.view.drawToBitmap
-import androidx.core.view.doOnLayout
+import com.example.R
 import com.example.data.model.FocusSessionEntity
 import com.example.ui.components.GlassButton
 import com.example.ui.theme.LavenderSoft
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeDeepText
+import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
@@ -98,6 +102,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.random.Random
+
+private const val SHARE_CARD_TAG = "ShareCard"
+private const val CAPTURE_TIMEOUT_MS = 8000L
+private const val CAPTURE_POLL_MS = 120L
+private const val CAPTURE_POLL_MAX = 40 // ~4.8s of polling; the outer watchdog stays 8s
 
 @Composable
 fun SessionCompleteScreen(
@@ -109,6 +119,21 @@ fun SessionCompleteScreen(
 
     val suppressedNotifs by SessionNotificationDigestManager.digestList.collectAsState()
     var showDigestSheet by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // v1.2.2 — celebration moment: subtle one-shot confetti + completion chime.
+    // The chime call is isolated in playCelebrateChime(); runCatching keeps the
+    // screen alive even if the sound workstream ever throws at runtime.
+    var showConfetti by remember { mutableStateOf(true) }
+    val confettiProgress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        runCatching { playCelebrateChime(context) }
+        confettiProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 2400, easing = LinearEasing)
+        )
+        showConfetti = false
+    }
 
     if (showDigestSheet) {
         SessionNotificationDigestSheet(onDismiss = { showDigestSheet = false })
@@ -328,6 +353,12 @@ fun SessionCompleteScreen(
                 modifier = Modifier.fillMaxWidth(0.7f)
             )
         }
+
+        // v1.2.2 — subtle one-shot confetti over the completed screen.
+        // Pointer-transparent: no click handling, so it never blocks input.
+        if (showConfetti) {
+            CelebrationConfetti(progress = confettiProgress.value)
+        }
     }
 }
 
@@ -423,8 +454,7 @@ private fun ShareSessionCard(minutesSpent: Int, distractionsCount: Int, quote: S
         ) {
             ShareActionButton(
                 label = "WhatsApp",
-                icon = Icons.Default.Chat,
-                tint = Color(0xFF25D366),
+                brandIcon = painterResource(id = R.drawable.ic_whatsapp),
                 onClick = { shareWithImage(toWhatsApp = true) }
             )
             ShareActionButton(
@@ -454,8 +484,9 @@ private fun ShareSessionCard(minutesSpent: Int, distractionsCount: Int, quote: S
 @Composable
 private fun ShareActionButton(
     label: String,
-    icon: ImageVector,
-    tint: Color,
+    icon: ImageVector? = null,
+    tint: Color = Color.Unspecified,
+    brandIcon: Painter? = null,
     onClick: () -> Unit
 ) {
     val isDark = isAppInDarkTheme()
@@ -463,20 +494,32 @@ private fun ShareActionButton(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.clickable(onClick = onClick)
     ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(CircleShape)
-                .background(if (isDark) Color(0xFF1D221C) else Color.White)
-                .border(1.dp, if (isDark) Color(0x358CE000) else Color(0xFFDCE6D2), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
+        if (brandIcon != null) {
+            // v1.2.2 — real brand logo (WhatsApp): the drawable carries its own
+            // brand colors, rendered full-bleed in the same 52dp circular
+            // footprint as the other action buttons.
             Icon(
-                imageVector = icon,
+                painter = brandIcon,
                 contentDescription = label,
-                tint = tint,
-                modifier = Modifier.size(24.dp)
+                tint = Color.Unspecified,
+                modifier = Modifier.size(52.dp)
             )
+        } else if (icon != null) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(if (isDark) Color(0xFF1D221C) else Color.White)
+                    .border(1.dp, if (isDark) Color(0x358CE000) else Color(0xFFDCE6D2), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = tint,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -594,20 +637,23 @@ private fun shareGeneric(context: Context, text: String) {
 }
 
 /**
- * v1.1 FIX — renders the card IN-PROCESS by briefly attaching a ComposeView to
- * the Activity's decor view (INVISIBLE), awaiting one layout pass, then drawing
- * it to a bitmap.
+ * v1.2.2 — renders the card IN-PROCESS by briefly attaching a ComposeView to
+ * the Activity's decor view (INVISIBLE), then drawing it to a bitmap.
  *
- * ROOT CAUSE of the "app exits on Save" bug: the old path used
- * TYPE_APPLICATION_OVERLAY via WindowManager.addView(), which requires
- * SYSTEM_ALERT_WINDOW. On Android 16 (SDK 36), when the overlay permission is
- * missing/revoked — or when the OverlayLifecycleHost's lifecycle teardown
- * races the Activity's window token — addView/removeView throws or the host
- * teardown tears down MainActivity's window, killing the app on Save/Share.
+ * ROOT CAUSE of the 1.2.1 "still broken on vivo" failure (this function is the
+ * single upstream of BOTH Share and Save, so both failed together): the old
+ * code used a ONE-SHOT doOnLayout -> drawToBitmap(). That raced the
+ * ComposeView's FIRST composition against its FIRST layout pass — when the
+ * layout pass won (composition not yet run), the view measured 0 height and
+ * Bitmap.createBitmap(w, 0) threw IllegalArgumentException, which a bare
+ * catch swallowed with NO log, resuming null. The 1.2.1 FileProvider /
+ * MediaStore layer was correct; it never received a bitmap.
  *
- * New path: no overlay, no WindowManager, no lifecycle host. The ComposeView
- * inherits the Activity's lifecycle owner automatically, renders invisibly,
- * and is detached after capture. The Activity is never at risk.
+ * New path: attach, then poll on the main thread until the first composition
+ * has produced a real measured size (bounded retries + the 8s watchdog), and
+ * only then draw manually to a bitmap. Every failure logs the FULL exception
+ * (Log.e with throwable, never just e.message) and the UI toasts honestly —
+ * no silent hangs, no silent nulls.
  *
  * Must be called from a coroutine (suspends on Main until the frame is drawn).
  * Returns null when anything fails.
@@ -621,56 +667,89 @@ private suspend fun captureShareCardBitmap(
     suspendCancellableCoroutine { cont ->
         val activity = context as? Activity
         if (activity == null) {
+            Log.e(SHARE_CARD_TAG, "capture: context is not an Activity — cannot render card")
             if (!cont.isCompleted) cont.resume(null) {}
             return@suspendCancellableCoroutine
         }
-        var composeView: ComposeView? = null
+        val decor = activity.window?.decorView as? android.view.ViewGroup
+        if (decor == null) {
+            Log.e(SHARE_CARD_TAG, "capture: no decor view to attach the card to")
+            if (!cont.isCompleted) cont.resume(null) {}
+            return@suspendCancellableCoroutine
+        }
+        val composeView = ComposeView(activity).apply {
+            // INVISIBLE (not GONE): measures/layouts/composes, never flashes.
+            visibility = android.view.View.INVISIBLE
+            setContent { ShareCardContent(minutes, streakDays, dateLine) }
+        }
+        var attempts = 0
         fun cleanup() {
             try {
-                composeView?.let { v ->
-                    (v.parent as? android.view.ViewGroup)?.removeView(v)
-                }
-            } catch (_: Exception) { }
-            composeView = null
+                (composeView.parent as? android.view.ViewGroup)?.removeView(composeView)
+            } catch (e: Exception) {
+                Log.w(SHARE_CARD_TAG, "capture: detach failed", e)
+            }
         }
         cont.invokeOnCancellation { cleanup() }
-        try {
-            val decor = activity.window.decorView as android.view.ViewGroup
-            composeView = ComposeView(context).apply {
-                // INVISIBLE (not GONE): measures/layouts/composes, never flashes.
-                visibility = android.view.View.INVISIBLE
-                setContent { ShareCardContent(minutes, streakDays, dateLine) }
+        fun finish(value: Bitmap?) {
+            if (!cont.isCompleted) cont.resume(value) {}
+            cleanup()
+        }
+        // Polls on the main thread until the first composition has produced a
+        // real measured size, then draws. Bounded: the outer watchdog fails
+        // loud if composition never produces content.
+        fun attemptCapture() {
+            if (cont.isCompleted) return // timed out / cancelled — stop polling
+            val w = composeView.width
+            val h = composeView.height
+            if (w > 0 && h > 0) {
+                try {
+                    val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                    // Direct draw(): the 1-arg View.draw() ignores the view's
+                    // own INVISIBLE flag (visibility is only consulted by
+                    // parents), so the card renders into our bitmap.
+                    composeView.draw(android.graphics.Canvas(bmp))
+                    Log.d(SHARE_CARD_TAG, "capture: card bitmap ${w}x${h}")
+                    finish(bmp)
+                } catch (e: Exception) {
+                    Log.e(SHARE_CARD_TAG, "capture: draw failed (w=$w h=$h)", e)
+                    finish(null)
+                }
+                return
             }
-            val view = composeView!!
+            attempts++
+            if (attempts >= CAPTURE_POLL_MAX) {
+                Log.e(
+                    SHARE_CARD_TAG,
+                    "capture: view never measured after $attempts polls " +
+                        "(w=$w h=$h) — composition produced no content"
+                )
+                finish(null)
+                return
+            }
+            composeView.postDelayed({ attemptCapture() }, CAPTURE_POLL_MS)
+        }
+        try {
             decor.addView(
-                view,
+                composeView,
                 android.view.ViewGroup.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT
                 )
             )
-            view.doOnLayout {
-                try {
-                    val bmp = it.drawToBitmap()
-                    if (!cont.isCompleted) cont.resume(bmp) {}
-                } catch (e: Exception) {
-                    if (!cont.isCompleted) cont.resume(null) {}
-                } finally {
-                    cleanup()
-                }
-            }
+            // Kick off after attach; the poll loop waits for the composition.
+            composeView.post { attemptCapture() }
         } catch (e: Exception) {
-            cleanup()
-            if (!cont.isCompleted) cont.resume(null) {}
+            Log.e(SHARE_CARD_TAG, "capture: setup failed", e)
+            finish(null)
         }
     }
 }
 
 /**
- * v1.2.1 — capture with a watchdog. The old path could suspend forever when
- * the invisible ComposeView never laid out (both Share and Download then
- * looked "broken" with zero feedback). Now a missed frame fails loud with
- * a toast instead of hanging.
+ * v1.2.1 — capture with a watchdog. A missed frame fails loud with a toast
+ * instead of hanging. v1.2.2 — the timeout cause is now distinguishable in
+ * logcat from the per-step capture logs above.
  */
 private suspend fun captureShareCardBitmapGuarded(
     context: Context,
@@ -678,11 +757,15 @@ private suspend fun captureShareCardBitmapGuarded(
     streakDays: Int,
     dateLine: String
 ): Bitmap? {
-    val bitmap = withTimeoutOrNull(8000L) {
+    val bitmap = withTimeoutOrNull(CAPTURE_TIMEOUT_MS) {
         captureShareCardBitmap(context, minutes, streakDays, dateLine)
     }
     if (bitmap == null) {
-        Log.e("ShareCard", "Card capture failed or timed out (8s)")
+        Log.e(
+            SHARE_CARD_TAG,
+            "capture: FAILED — null bitmap after up to ${CAPTURE_TIMEOUT_MS}ms " +
+                "(see capture logs above for the step that failed)"
+        )
     }
     return bitmap
 }
@@ -702,20 +785,27 @@ private suspend fun captureShareCardBitmapGuarded(
 private suspend fun writeShareCardToCache(context: Context, bitmap: Bitmap): Uri? =
     withContext(Dispatchers.IO) {
         try {
-            val dir = java.io.File(context.cacheDir, "recap_shares").apply { mkdirs() }
+            val dir = java.io.File(context.cacheDir, "recap_shares")
+            if (!dir.isDirectory && !dir.mkdirs()) {
+                Log.e(SHARE_CARD_TAG, "share: cannot create cache dir ${dir.absolutePath}")
+                return@withContext null
+            }
             // Prune older share files so the cache never grows.
             dir.listFiles()?.sortedByDescending { it.lastModified() }?.drop(4)
                 ?.forEach { runCatching { it.delete() } }
             val file = java.io.File(dir, "focivo-share-${System.currentTimeMillis()}.png")
             var ok = false
             file.outputStream().use { out -> ok = bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
-            if (!ok) {
+            if (!ok || file.length() == 0L) {
+                Log.e(SHARE_CARD_TAG, "share: PNG compress failed (ok=$ok, bytes=${file.length()})")
                 runCatching { file.delete() }
                 return@withContext null
             }
             FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         } catch (e: Exception) {
-            Log.e("ShareCard", "Cache write failed: ${e.message}")
+            // getUriForFile throws IllegalArgumentException when the file is
+            // not under a configured <paths> root — that surfaces here too.
+            Log.e(SHARE_CARD_TAG, "share: cache write / FileProvider URI failed", e)
             null
         }
     }
@@ -730,8 +820,13 @@ private suspend fun saveShareCardImage(
     streakDays: Int,
     dateLine: String
 ): Uri? {
-    val bitmap = captureShareCardBitmapGuarded(context, minutes, streakDays, dateLine) ?: return null
+    val bitmap = captureShareCardBitmapGuarded(context, minutes, streakDays, dateLine)
+    if (bitmap == null) {
+        Log.e(SHARE_CARD_TAG, "save: capture returned null — nothing to save")
+        return null
+    }
     return withContext(Dispatchers.IO) {
+        var uri: Uri? = null
         try {
             val filename = "Focivo-Focus-${System.currentTimeMillis()}.png"
             val values = ContentValues().apply {
@@ -743,24 +838,34 @@ private suspend fun saveShareCardImage(
                 }
             }
             val resolver = context.contentResolver
-            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                ?: return@withContext null
+            uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            if (uri == null) {
+                Log.e(SHARE_CARD_TAG, "save: MediaStore insert returned null")
+                return@withContext null
+            }
+            val pendingUri = uri
             var ok = false
-            resolver.openOutputStream(uri)?.use { out ->
-                ok = bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            val stream = resolver.openOutputStream(pendingUri)
+            if (stream == null) {
+                Log.e(SHARE_CARD_TAG, "save: MediaStore openOutputStream returned null for $pendingUri")
+            } else {
+                stream.use { out -> ok = bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
             }
             if (!ok) {
-                runCatching { resolver.delete(uri, null, null) }
+                Log.e(SHARE_CARD_TAG, "save: PNG compress to MediaStore failed")
+                runCatching { resolver.delete(pendingUri, null, null) }
                 return@withContext null
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val done = ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }
-                resolver.update(uri, done, null, null)
+                val rows = resolver.update(pendingUri, done, null, null)
+                Log.d(SHARE_CARD_TAG, "save: IS_PENDING cleared (rows=$rows) -> $pendingUri")
             }
             if (!bitmap.isRecycled) bitmap.recycle()
-            uri
+            pendingUri
         } catch (e: Exception) {
-            Log.e("ShareCard", "Gallery save failed: ${e.message}")
+            Log.e(SHARE_CARD_TAG, "save: gallery save failed", e)
+            uri?.let { failed -> runCatching { context.contentResolver.delete(failed, null, null) } }
             null
         }
     }
@@ -802,7 +907,7 @@ private suspend fun shareCardViaSystemSheet(context: Context, text: String, toWh
         try {
             context.startActivity(launch)
         } catch (e: Exception) {
-            Log.e("ShareCard", "Share sheet failed: ${e.message}")
+            Log.e(SHARE_CARD_TAG, "share: share sheet failed", e)
             Toast.makeText(context, "No app available to share.", Toast.LENGTH_SHORT).show()
             // WhatsApp missing — fall back to the generic sheet / text.
             if (toWhatsApp) shareToWhatsApp(context, text)
@@ -840,4 +945,98 @@ private suspend fun shareCardImageViaSystem(
         return
     }
     shareCardViaSystemSheet(context, text, toWhatsApp, uri)
+}
+
+/**
+ * v1.2.2 — completion chime. util.SoundFx is owned by a parallel workstream
+ * (`object SoundFx { fun playComplete(context) }`); the call is isolated here
+ * so the integration point stays explicit. The call site wraps it in
+ * runCatching so the screen can never break on a sound failure.
+ */
+private fun playCelebrateChime(context: Context) {
+    com.example.util.SoundFx.playComplete(context)
+}
+
+private data class ConfettiPiece(
+    val x0: Float, // 0..1 across the width
+    val y0: Float, // start y as a fraction of height (negative = above the top)
+    val delay: Float, // 0..1 fraction of total progress before falling
+    val duration: Float, // fraction of total progress the fall takes
+    val drift: Float, // horizontal drift over the fall (fraction of width)
+    val sizeDp: Float,
+    val rot0: Float, // degrees
+    val spin: Float, // degrees over the fall
+    val swayAmpPx: Float,
+    val swayFreq: Float,
+    val phase: Float,
+    val color: Color,
+    val round: Boolean
+)
+
+/**
+ * v1.2.2 — tasteful one-shot confetti burst for the session-complete moment.
+ * Subtle by design: ~46 small lime/white/gold pieces (no blue, per visual
+ * taste), ~2.4s, fading out, then gone. Pointer-transparent — no click
+ * handling — so it never blocks input.
+ *
+ * @param progress 0..1 driven by the caller (Animatable in SessionCompleteScreen).
+ */
+@Composable
+private fun CelebrationConfetti(progress: Float) {
+    val pieces = remember {
+        val rnd = Random(20261015)
+        val palette = listOf(
+            RegainLimePrimary,
+            RegainLimeLight,
+            Color.White,
+            Color(0xFFE8B93E), // warm gold
+            Color(0xFFD9F79A) // pale lime
+        )
+        List(46) {
+            ConfettiPiece(
+                x0 = 0.04f + rnd.nextFloat() * 0.92f,
+                y0 = -0.06f - rnd.nextFloat() * 0.22f,
+                delay = rnd.nextFloat() * 0.30f,
+                duration = 0.55f + rnd.nextFloat() * 0.40f,
+                drift = (rnd.nextFloat() - 0.5f) * 0.22f,
+                sizeDp = 4f + rnd.nextFloat() * 6f,
+                rot0 = rnd.nextFloat() * 360f,
+                spin = (rnd.nextFloat() - 0.5f) * 540f,
+                swayAmpPx = 8f + rnd.nextFloat() * 22f,
+                swayFreq = 2f + rnd.nextFloat() * 4f,
+                phase = rnd.nextFloat() * 6.2832f,
+                color = palette[rnd.nextInt(palette.size)],
+                round = rnd.nextBoolean()
+            )
+        }
+    }
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        if (w <= 0f || h <= 0f) return@Canvas
+        for (p in pieces) {
+            val t = ((progress - p.delay) / p.duration).coerceIn(0f, 1f)
+            if (t <= 0f) continue
+            val alpha = (1f - t * t).coerceIn(0f, 1f)
+            if (alpha <= 0.01f) continue
+            val y = (p.y0 + t * (1.25f - p.y0)) * h
+            val x = (p.x0 + p.drift * t) * w + sin(t * p.swayFreq + p.phase) * p.swayAmpPx
+            val s = p.sizeDp.dp.toPx()
+            rotate(degrees = p.rot0 + p.spin * t, pivot = Offset(x, y)) {
+                if (p.round) {
+                    drawCircle(
+                        color = p.color.copy(alpha = alpha),
+                        radius = s / 2f,
+                        center = Offset(x, y)
+                    )
+                } else {
+                    drawRect(
+                        color = p.color.copy(alpha = alpha),
+                        topLeft = Offset(x - s / 2f, y - s * 0.3f),
+                        size = androidx.compose.ui.geometry.Size(s, s * 0.6f)
+                    )
+                }
+            }
+        }
+    }
 }
