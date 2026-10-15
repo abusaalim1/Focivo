@@ -29,6 +29,8 @@ import com.example.ui.components.BuddyMascot
 import com.example.ui.components.CustomizeTimerSheet
 import com.example.ui.components.ThemedScreenBackground
 import com.example.ui.components.TimerThemePicker
+import com.example.ui.screens.AuthMode
+import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.FocusScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.LeaderboardScreen
@@ -305,5 +307,21 @@ class V12ScreenshotsTest {
         }
         composeTestRule.onNodeWithTag("customize_timer_sheet", useUnmergedTree = true)
             .captureRoboImage("src/test/screenshots/v12/v12_customize_timer_templates_unlocked.png")
+    }
+
+    @Test
+    fun v12_auth_create_account() {
+        initManagers()
+        themed(dark = true) {
+            AuthScreen(
+                initialMode = AuthMode.CreateAccount,
+                isLoading = false,
+                errorMessage = null,
+                onLogin = { _, _ -> },
+                onRegister = { _, _, _ -> },
+                onClearError = {}
+            )
+        }
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v12/v12_auth_create_account.png")
     }
 }

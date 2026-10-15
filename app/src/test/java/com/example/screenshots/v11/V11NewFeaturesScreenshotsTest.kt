@@ -17,8 +17,6 @@ import com.example.ui.components.CustomizeTimerSheet
 import com.example.ui.components.MascotPose
 import com.example.ui.components.TimerFaceHost
 import com.example.ui.components.TimerFaceParams
-import com.example.ui.screens.AuthMode
-import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.FocusScreen
 import com.example.ui.screens.MascotScreen
 import com.example.ui.theme.FocuslyTheme
@@ -270,21 +268,5 @@ class V11NewFeaturesScreenshotsTest {
             }
         }
         composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/buddy_mascot_dressed_closeup.png")
-    }
-
-    @Test
-    fun v12_auth_create_account() {
-        initManagers()
-        themed(dark = true) {
-            AuthScreen(
-                initialMode = AuthMode.CreateAccount,
-                isLoading = false,
-                errorMessage = null,
-                onLogin = { _, _ -> },
-                onRegister = { _, _, _ -> },
-                onClearError = {}
-            )
-        }
-        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/auth_create_account.png")
     }
 }
