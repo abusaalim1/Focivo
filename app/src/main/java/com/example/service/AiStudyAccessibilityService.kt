@@ -15,6 +15,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.example.MainActivity
 import com.example.util.AiStudyGuardManager
+import com.example.util.BlockedChannelsManager
 import com.example.util.DeepFocusManager
 import com.example.util.EssentialAppsGuard
 import com.example.util.GeminiContentClassifier
