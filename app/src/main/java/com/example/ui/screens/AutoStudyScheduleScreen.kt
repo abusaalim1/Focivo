@@ -62,7 +62,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.SupabaseScheduledBlockDto
 import com.example.service.ScheduledBlockScheduler
-import com.example.ui.components.AuroraBackground
 import com.example.ui.components.GlassCard
 import com.example.ui.components.GlassSwitch
 import com.example.ui.components.MascotPose
@@ -149,10 +148,9 @@ fun AutoStudyScheduleScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(T.bg)
                 .padding(innerPadding)
         ) {
-            AuroraBackground(modifier = Modifier.fillMaxSize())
-
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()

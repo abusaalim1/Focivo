@@ -22,6 +22,7 @@ import com.example.ui.components.SupportLockZenSheet
 import com.example.ui.components.ThemedScreenBackground
 import com.example.ui.screens.AuthMode
 import com.example.ui.screens.AuthScreen
+import com.example.ui.screens.FocusSessionLogScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.LeaderboardScreen
 import com.example.ui.screens.ProfileScreen
@@ -360,6 +361,47 @@ class V123RedesignScreenshotsTest {
             ),
             onDismiss = {},
             animateEntrance = false
+        )
+    }
+
+    // ── Past Focus Sessions log (owner report 2026-10-16: was still old design)
+    @Test
+    fun v123_redesign_session_log_dark() = shot(true, "v123_redesign_session_log_dark") {
+        FocusSessionLogScreen(
+            sessions = fakeSessions(),
+            onBack = {},
+            onStartNewSession = {},
+            onDeleteSession = {}
+        )
+    }
+
+    @Test
+    fun v123_redesign_session_log_light() = shot(false, "v123_redesign_session_log_light") {
+        FocusSessionLogScreen(
+            sessions = fakeSessions(),
+            onBack = {},
+            onStartNewSession = {},
+            onDeleteSession = {}
+        )
+    }
+
+    @Test
+    fun v123_redesign_session_log_empty_dark() = shot(true, "v123_redesign_session_log_empty_dark") {
+        FocusSessionLogScreen(
+            sessions = emptyList(),
+            onBack = {},
+            onStartNewSession = {},
+            onDeleteSession = {}
+        )
+    }
+
+    @Test
+    fun v123_redesign_session_log_empty_light() = shot(false, "v123_redesign_session_log_empty_light") {
+        FocusSessionLogScreen(
+            sessions = emptyList(),
+            onBack = {},
+            onStartNewSession = {},
+            onDeleteSession = {}
         )
     }
 }
