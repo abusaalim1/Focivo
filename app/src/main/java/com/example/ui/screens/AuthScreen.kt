@@ -95,18 +95,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.ui.theme.T.line
-import com.example.ui.theme.T.muted
-import com.example.ui.theme.T.text
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SerifItalicFontFamily
 import com.example.ui.theme.focivoTokens
-import com.example.ui.theme.T.text
-import com.example.ui.theme.T.softAccent
-import com.example.ui.theme.T.accentText
-import com.example.ui.theme.T.accent
-import com.example.ui.theme.T.accent
-import com.example.ui.theme.T.muted
 import com.example.ui.theme.isAppInDarkTheme
 
 /** v1.2: which tab the auth screen opens on — set by the splash flow. */

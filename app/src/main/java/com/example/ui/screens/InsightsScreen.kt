@@ -331,6 +331,8 @@ private fun Hero(s: InsightsUiState) {
     val goalMin = s.goalHoursPerDay * 60f
     val target = (s.todayMinutes / goalMin).coerceIn(0f, 1f)
     val progress by animateFloatAsState(target, tween(1200), label = "ring")
+    val ringTrack = C.Line
+    val ringAccent = C.Accent
 
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(22.dp)) {
         Box(Modifier.size(128.dp), contentAlignment = Alignment.Center) {
@@ -338,9 +340,9 @@ private fun Hero(s: InsightsUiState) {
                 val stroke = 8.dp.toPx()
                 val topLeft = Offset(stroke / 2, stroke / 2)
                 val arc = Size(size.width - stroke, size.height - stroke)
-                drawArc(C.Line, 0f, 360f, false, topLeft, arc, style = Stroke(stroke, cap = StrokeCap.Round))
+                drawArc(ringTrack, 0f, 360f, false, topLeft, arc, style = Stroke(stroke, cap = StrokeCap.Round))
                 if (progress > 0f) {
-                    drawArc(C.Accent, -90f, 360f * progress, false, topLeft, arc, style = Stroke(stroke, cap = StrokeCap.Round))
+                    drawArc(ringAccent, -90f, 360f * progress, false, topLeft, arc, style = Stroke(stroke, cap = StrokeCap.Round))
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -381,6 +383,7 @@ private fun WeekCard(s: InsightsUiState) {
     val chartHeight = 110.dp
     val labels = listOf("M", "T", "W", "T", "F", "S", "S")
     val goalMin = s.goalHoursPerDay * 60f
+    val goalLineColor = C.GoalLine
 
     Column(
         Modifier
@@ -401,7 +404,7 @@ private fun WeekCard(s: InsightsUiState) {
         Box(Modifier.fillMaxWidth().height(chartHeight)) {
             Canvas(Modifier.fillMaxWidth().height(1.dp)) {
                 drawLine(
-                    C.GoalLine, Offset(0f, 0f), Offset(size.width, 0f),
+                    goalLineColor, Offset(0f, 0f), Offset(size.width, 0f),
                     strokeWidth = 1.dp.toPx(),
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f))
                 )

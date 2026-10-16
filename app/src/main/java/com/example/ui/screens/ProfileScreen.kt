@@ -86,13 +86,9 @@ import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.GlassCard
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.pressFeedback
-import com.example.ui.theme.T.line
-import com.example.ui.theme.T.text
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SerifItalicFontFamily
 import com.example.ui.theme.focivoTokens
-import com.example.ui.theme.T.softAccent
-import com.example.ui.theme.T.accentText
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.ui.draw.alpha
@@ -100,7 +96,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import com.example.R
 import com.example.ui.theme.BottomNavClearance
-import com.example.ui.theme.T.muted
 import com.example.ui.theme.isAppInDarkTheme
 import java.text.SimpleDateFormat
 import java.util.Date
