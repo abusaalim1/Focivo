@@ -1315,12 +1315,21 @@ class FocuslyRepository(private val context: Context) {
             Log.w(TAG, "Error clearing local cache components: ${e.message}")
         }
 
+        // v1.2.3 (guest-escape fix): belt-and-braces — clear the session prefs
+        // with the repository's own context. SupabaseService.clearCache() above
+        // silently no-ops when the Supabase app context was never set, which
+        // would leave a stale isGuest flag behind.
+        try {
+            com.example.data.AndroidPreferenceSessionManager.clearStoredSession(context)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error clearing stored session prefs: ${e.message}")
+        }
+
         // v1.2.3 (guest-escape fix): also wipe the guest_data directory
-        // (guest_profile.json). The prefs above are cleared by clearCache(), but
-        // WITHOUT this file, restoreAuthSessionStandalone() revives a phantom
-        // guest on the next launch (storedGuestProfile != null -> fabricated
-        // guest user -> RETURNING splash -> straight into the app) and the user
-        // can NEVER reach the Auth / Create Account screen again.
+        // (guest_profile.json). WITHOUT this file, restoreAuthSessionStandalone()
+        // revives a phantom guest on the next launch (storedGuestProfile != null
+        // -> fabricated guest user -> RETURNING splash -> straight into the app)
+        // and the user can NEVER reach the Auth / Create Account screen again.
         try {
             com.example.data.GuestDataStorageManager.getInstance(context).clearGuestData()
         } catch (e: Exception) {
