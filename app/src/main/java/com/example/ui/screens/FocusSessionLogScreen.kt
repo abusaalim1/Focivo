@@ -275,21 +275,24 @@ fun FocusSessionLogScreen(
                                     value = totalHoursFormatted,
                                     icon = Icons.Default.Schedule,
                                     iconTint = limeAccent,
-                                    labelColor = textSecondary
+                                    labelColor = textSecondary,
+                                    valueColor = textPrimary
                                 )
                                 SummaryStatItem(
                                     label = "Avg Session",
                                     value = "${avgMinutes}m",
                                     icon = Icons.Default.HourglassBottom,
                                     iconTint = limeAccent,
-                                    labelColor = textSecondary
+                                    labelColor = textSecondary,
+                                    valueColor = textPrimary
                                 )
                                 SummaryStatItem(
                                     label = "Focus Points",
                                     value = "+$totalPoints",
                                     icon = Icons.Default.Star,
                                     iconTint = T.warning,
-                                    labelColor = textSecondary
+                                    labelColor = textSecondary,
+                                    valueColor = textPrimary
                                 )
                             }
                         }
@@ -472,7 +475,8 @@ private fun SummaryStatItem(
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     iconTint: Color,
-    labelColor: Color
+    labelColor: Color,
+    valueColor: Color
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -497,6 +501,7 @@ private fun SummaryStatItem(
             style = MaterialTheme.typography.titleMedium.copy(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Bold,
+                color = valueColor,
                 fontSize = 15.sp
             )
         )

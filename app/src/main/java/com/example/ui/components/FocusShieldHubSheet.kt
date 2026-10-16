@@ -817,6 +817,16 @@ fun FocusShieldHubSheet(
                         ShieldGroupRow(
                             title = "YouTube Shorts",
                             subtitle = "Full lectures allowed, Shorts locked",
+                            // v1.2.3: honest arming state — the lock only fires
+                            // during an active study period (scope unchanged).
+                            tag = {
+                                val armed = isShortsLockEnabled
+                                val live = armed && com.example.util.AiStudyGuardManager.isStudyPeriodActive(context)
+                                if (armed) ShieldTag(
+                                    text = if (live) "Active now" else "Armed",
+                                    active = live
+                                )
+                            },
                             trailing = {
                                 ShieldToggle(
                                     checked = isShortsLockEnabled,
@@ -836,6 +846,16 @@ fun FocusShieldHubSheet(
                             title = "Instagram Reels",
                             subtitle = "Intercepts the Reels tab and viewer",
                             showDivider = false,
+                            // v1.2.3: honest arming state — the lock only fires
+                            // during an active study period (scope unchanged).
+                            tag = {
+                                val armed = isReelsLockEnabled
+                                val live = armed && com.example.util.AiStudyGuardManager.isStudyPeriodActive(context)
+                                if (armed) ShieldTag(
+                                    text = if (live) "Active now" else "Armed",
+                                    active = live
+                                )
+                            },
                             trailing = {
                                 ShieldToggle(
                                     checked = isReelsLockEnabled,
@@ -1056,7 +1076,7 @@ fun FocusShieldHubSheet(
                                 Text(text = "Study channels", style = shieldBody(14, FontWeight.SemiBold))
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Allowlisted channels always count as study",
+                                    text = "Allowlist + blocked channels",
                                     style = shieldBody(12, FontWeight.Normal, focivoTokens().muted).copy(lineHeight = 17.4.sp)
                                 )
                             }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
@@ -83,13 +84,20 @@ fun StudyChannelsScreen(
 
     LaunchedEffect(Unit) {
         StudyChannelsManager.init(context)
+        com.example.util.BlockedChannelsManager.init(context)
     }
     val channels by StudyChannelsManager.channelsState.collectAsState()
+    val blockedChannels by com.example.util.BlockedChannelsManager.channelsState.collectAsState()
+    var tab by remember { mutableStateOf(0) } // 0 = allowlist, 1 = blocklist
     var newChannel by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
 
     fun submit() {
-        val ok = StudyChannelsManager.addCustomChannel(context, newChannel)
+        val ok = if (tab == 0) {
+            StudyChannelsManager.addCustomChannel(context, newChannel)
+        } else {
+            com.example.util.BlockedChannelsManager.addChannel(context, newChannel)
+        }
         if (ok) {
             newChannel = ""
             showError = false
@@ -142,7 +150,8 @@ fun StudyChannelsScreen(
                     )
                 )
                 Text(
-                    text = "${channels.size} channels allowlisted",
+                    text = if (tab == 0) "${channels.size} channels allowlisted"
+                    else "${blockedChannels.size} channels blocked",
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = bodyColor,
                         fontSize = 12.sp
@@ -153,8 +162,46 @@ fun StudyChannelsScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // v1.2.3: allowlist / blocklist tabs.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(cardBg)
+                .border(1.dp, cardBorder, RoundedCornerShape(12.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            listOf("Allowlisted", "Blocked").forEachIndexed { index, label ->
+                val selected = tab == index
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (selected) ChannelsLime else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable { tab = index; newChannel = ""; showError = false }
+                        .padding(vertical = 9.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (selected) NearBlack else bodyColor,
+                            fontSize = 13.sp
+                        )
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         Text(
-            text = "Videos from these channels are always treated as study content by the AI guard.",
+            text = if (tab == 0)
+                "Videos from these channels are always treated as study content by the AI guard."
+            else
+                "Videos from these channels are blocked outright whenever they play during study.",
             style = MaterialTheme.typography.bodySmall.copy(
                 color = bodyColor,
                 fontSize = 13.sp,
@@ -209,69 +256,119 @@ fun StudyChannelsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Channel list
+        // Channel list (tab-aware)
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.weight(1f)
         ) {
-            items(channels, key = { it.name }) { entry ->
-                Surface(
-                    color = cardBg,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, cardBorder, RoundedCornerShape(14.dp))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            if (tab == 0) {
+                items(channels, key = { "a:${it.name}" }) { entry ->
+                    Surface(
+                        color = cardBg,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, cardBorder, RoundedCornerShape(14.dp))
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.School,
-                            contentDescription = null,
-                            tint = accentText,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = entry.name,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = titleColor,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium
-                            ),
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (entry.isCustom) {
-                            Surface(
-                                color = ChannelsLime.copy(alpha = 0.18f),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Text(
-                                    text = "CUSTOM",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = accentText,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .clickable { StudyChannelsManager.removeChannel(context, entry) },
-                            contentAlignment = Alignment.Center
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Remove channel",
-                                tint = bodyColor,
-                                modifier = Modifier.size(18.dp)
+                                imageVector = Icons.Default.School,
+                                contentDescription = null,
+                                tint = accentText,
+                                modifier = Modifier.size(20.dp)
                             )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = entry.name,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = titleColor,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (entry.isCustom) {
+                                Surface(
+                                    color = ChannelsLime.copy(alpha = 0.18f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "CUSTOM",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            color = accentText,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .clickable { StudyChannelsManager.removeChannel(context, entry) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove channel",
+                                    tint = bodyColor,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                items(blockedChannels, key = { "b:${it.name}" }) { entry ->
+                    Surface(
+                        color = cardBg,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, cardBorder, RoundedCornerShape(14.dp))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Block,
+                                contentDescription = null,
+                                tint = focivoTokens().danger,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = entry.name,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = titleColor,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        com.example.util.BlockedChannelsManager.removeChannel(context, entry)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove channel",
+                                    tint = bodyColor,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -280,22 +377,24 @@ fun StudyChannelsScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Reset
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { StudyChannelsManager.resetToDefaults(context) }
-                .padding(vertical = 8.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Reset to defaults",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = accentText,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
+        // Reset (allowlist tab only — the blocklist has no defaults)
+        if (tab == 0) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { StudyChannelsManager.resetToDefaults(context) }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Reset to defaults",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = accentText,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 )
-            )
+            }
         }
     }
 }

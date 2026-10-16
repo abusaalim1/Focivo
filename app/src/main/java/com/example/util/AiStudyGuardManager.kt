@@ -69,6 +69,8 @@ object AiStudyGuardManager {
     private const val KEY_AI_GUARD_ENABLED = "is_ai_study_guard_enabled"
     private const val KEY_PUNISHMENT_LOGS_JSON = "custom_punishment_logs_json"
     private const val KEY_PUNISHMENT_PREFIX = "punishment_lock_"
+    // v1.2.3: the trigger reason persisted alongside the lock end-time.
+    private const val KEY_PUNISHMENT_REASON_PREFIX = "punishment_reason_"
 
     const val CHANNEL_ID_ALERTS = "ai_study_guard_channel"
     private const val NOTIFICATION_ID_GUARD_STATUS = 8000
@@ -257,6 +259,29 @@ object AiStudyGuardManager {
         val endTime = prefs.getLong("$KEY_PUNISHMENT_PREFIX$packageName", 0L)
         val diff = (endTime - System.currentTimeMillis()) / 1000L
         return if (diff > 0) diff.toInt() else 0
+    }
+
+    /**
+     * v1.2.3: the persisted trigger reason for an active punishment lock
+     * (e.g. "Warning ignored: Non-study content detected on YouTube …").
+     * Empty when the lock predates reason persistence.
+     */
+    fun getPunishmentReason(context: Context, packageName: String): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString("$KEY_PUNISHMENT_REASON_PREFIX$packageName", "").orEmpty()
+    }
+
+    /** v1.2.3: lock-screen copy — names the real reason + expiry. */
+    fun punishmentLockReason(context: Context, packageName: String, appName: String): String {
+        val reason = getPunishmentReason(context, packageName)
+        val remainingSec = getPunishmentRemainingSeconds(context, packageName)
+        val mins = remainingSec / 60
+        val expiry = if (mins >= 60) "${mins / 60}h ${mins % 60}m" else "${mins}m"
+        return if (reason.isNotBlank()) {
+            "3-Hour Penalty: $appName locked ($reason) — unlocks in ~$expiry."
+        } else {
+            "3-Hour Penalty: $appName is locked for non-study activity — unlocks in ~$expiry."
+        }
     }
 
     private val nonStudyMessageCounts = ConcurrentHashMap<String, Int>()
@@ -471,6 +496,13 @@ object AiStudyGuardManager {
         // Enforce lock in preferences
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putLong("$KEY_PUNISHMENT_PREFIX${warning.packageName}", lockEndTime).apply()
+        // v1.2.3: persist the real trigger reason so the lock screen can name
+        // it (owner: "a lock screen shows where no lock should exist" — the
+        // screen must say WHY, with expiry).
+        prefs.edit().putString(
+            "$KEY_PUNISHMENT_REASON_PREFIX${warning.packageName}",
+            "Warning ignored: $repeatReason"
+        ).apply()
 
         // Kick user out of the blocked app immediately
         try {

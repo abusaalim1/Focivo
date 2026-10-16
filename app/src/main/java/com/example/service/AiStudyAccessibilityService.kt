@@ -491,6 +491,27 @@ class AiStudyAccessibilityService : AccessibilityService() {
         } catch (_: Exception) { }
     }
 
+    // v1.2.3 (C) — Shorts/Reels near-miss evidence (throttled per app): when
+    // the toggle is ON but no surface is detected, the hub shows exactly
+    // which signals were seen, so a "not blocking" report is debuggable.
+    private val lastShortsCheckLogMs = mutableMapOf<String, Long>()
+
+    private fun logShortsCheck(app: String, rootNode: AccessibilityNodeInfo) {
+        val now = System.currentTimeMillis()
+        if (now - (lastShortsCheckLogMs[app] ?: 0L) < 15_000L) return
+        lastShortsCheckLogMs[app] = now
+        try {
+            val signals = if (app == "instagram") {
+                com.example.util.ShortsSurfaceDetector.debugInstagramSignals(rootNode)
+            } else {
+                com.example.util.ShortsSurfaceDetector.debugYouTubeSignals(rootNode)
+            }
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, app, "shorts-check", "no-surface", signals
+            )
+        } catch (_: Exception) { }
+    }
+
     @Suppress("DEPRECATION")
     private fun getDisplaySizePx(): Pair<Int, Int> {
         return try {
@@ -704,7 +725,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         blockedPackage = pkg,
                         appName = friendlyName,
                         durationSec = remainingSec,
-                        reason = "3-Hour Penalty: $friendlyName is locked for non-study conversation.",
+                        // v1.2.3: names the real trigger reason + expiry (owner:
+                        // "a lock screen shows where no lock should exist").
+                        reason = AiStudyGuardManager.punishmentLockReason(applicationContext, pkg, friendlyName),
                         isPunishment = true
                     )
                 }
@@ -797,20 +820,38 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                         )
                                     }
                                     return
+                                } else {
+                                    // v1.2.3 near-miss evidence (throttled): proves the
+                                    // detector ran and shows exactly which signals
+                                    // were (not) seen on this YouTube screen.
+                                    logShortsCheck("youtube", rootNode)
                                 }
                             }
 
                             // 7B. Intelligent YouTube AI Content Filter (Analyzes active video title & channel with Gemini AI)
                             if (isYouTubeAiFilterOn) {
-                                // v1.2.2 (B2): evidence gate — the filter evaluates
-                                // ONLY a video that is actually playing. Opening
-                                // YouTube (home feed, search) can never produce a
-                                // verdict, no matter what the recommendations say.
-                                if (!ShortsSurfaceDetector.isYouTubeVideoPlayerSurface(rootNode)) {
+                                // v1.2.3 (A2): hardened evidence gate — ONLY actual
+                                // video playback (watch screen, miniplayer, Shorts
+                                // player, or a large inline player) is evaluated.
+                                // Home/feed/search surfaces and muted autoplay
+                                // previews can NEVER produce a verdict, no matter
+                                // what the recommendations say.
+                                val (dispW, _) = getDisplaySizePx()
+                                val watchScreen = ShortsSurfaceDetector.hasYouTubeWatchScreen(rootNode)
+                                if (!ShortsSurfaceDetector.isYouTubeVideoPlayerSurface(rootNode, dispW)) {
                                     // v1.1.9 diagnostic
                                     AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-title", "no-player-evidence")
                                 } else {
-                                    val activeVideo = extractPlayingYouTubeVideo(rootNode)
+                                    val activeVideo = extractPlayingYouTubeVideo(rootNode, watchScreen)
+                                    // v1.2.3 (B3): channel-extraction evidence for the hub.
+                                    try {
+                                        AiStudyGuardManager.logGuardActivity(
+                                            applicationContext, "YouTube", "youtube-channel",
+                                            if (activeVideo?.channel.isNullOrBlank()) "not-detected" else "seen",
+                                            "src=" + (activeVideo?.channelSrc ?: "no-pattern-matched"),
+                                            activeVideo?.channel ?: (activeVideo?.title ?: "")
+                                        )
+                                    } catch (_: Exception) { }
                                     if (activeVideo != null && activeVideo.title.isNotBlank() && activeVideo.title.length >= 4) {
                                         val blocked = processYouTubeVideoTitle(activeVideo.title, activeVideo.channel, activeVideo.metadata)
                                         if (blocked) return
@@ -879,6 +920,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                     )
                                 }
                                 return
+                            } else {
+                                // v1.2.3 near-miss evidence (throttled).
+                                logShortsCheck("instagram", rootNode)
                             }
                         } finally {
                             try { rootNode.recycle() } catch (_: Exception) {}
@@ -1282,7 +1326,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
     private data class YouTubeActiveVideoInfo(
         val title: String,
         val channel: String? = null,
-        val metadata: String? = null
+        val metadata: String? = null,
+        /** Which extraction pattern produced the channel (hub diagnostics). */
+        val channelSrc: String? = null
     )
 
     /**
@@ -1313,6 +1359,36 @@ class AiStudyAccessibilityService : AccessibilityService() {
     }
 
     private fun processYouTubeVideoTitle(title: String, channel: String?, metadata: String?): Boolean {
+        // v1.2.3 (B): the user's channel BLOCKLIST beats everything — an
+        // explicitly blocked channel is blocked outright whenever its video
+        // plays during study. Same semantics as the app blocklist: immediate,
+        // no warning flow. The lock screen names the real reason.
+        if (BlockedChannelsManager.isBlockedChannel(applicationContext, channel)) {
+            val now = System.currentTimeMillis()
+            if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
+                lastYouTubeAiInterceptTimeMs = now
+                val reason = "Blocked channel: ${channel?.trim()} is on your blocked-channels list."
+                Log.w(TAG, "[YouTube Guard] $reason Video: '$title'")
+                AiStudyGuardManager.logGuardActivity(
+                    applicationContext, "YouTube", "youtube-blocklist", "NON_STUDY",
+                    "channel-blocklist", "${channel?.trim()} | $title"
+                )
+                YouTubeStudyGuardManager.recordBlockedVideo(
+                    context = applicationContext, title = title, channel = channel, reason = reason
+                )
+                pauseMediaPlayback()
+                com.example.service.BlockOverlayManager.intercept(
+                    context = applicationContext,
+                    blockedPackage = "com.google.android.youtube",
+                    appName = "YouTube",
+                    durationSec = FocusShieldService.getRemainingSeconds(applicationContext),
+                    reason = reason,
+                    isPunishment = false
+                )
+            }
+            return true
+        }
+
         // v1.2.2 (B1): the user's own study-channel allowlist always wins —
         // a channel they explicitly trust is never verdict-scored.
         if (StudyAllowlistManager.isStudyChannel(applicationContext, channel)) {
@@ -1321,37 +1397,48 @@ class AiStudyAccessibilityService : AccessibilityService() {
         }
 
         // v1.1.8: curated offline knowledge first — instant (<1ms), zero network.
-        // Confident verdicts are used directly; UNCERTAIN falls through to the
-        // existing quickEvaluate -> Gemini flow unchanged.
-        when (StudyGuardKnowledge.scoreVideo(title, channel)) {
+        // v1.2.3 (A): the hard rule — a knowledge NON_STUDY only fires the
+        // discipline flow at HIGH confidence (score <= -4.0: a multi-word
+        // block phrase or 2+ hits). A weak single-word hit (score -2..-4)
+        // falls through to quick→Gemini instead of blocking on thin evidence.
+        val detailed = StudyGuardKnowledge.scoreVideoDetailed(title, channel)
+        when (detailed.verdict) {
             StudyGuardKnowledge.Verdict.STUDY -> {
-                Log.d(TAG, "[StudyGuardKnowledge] Study video allowed: '$title' ($channel)")
+                Log.d(TAG, "[StudyGuardKnowledge] Study video allowed: '$title' ($channel) [${detailed.evidence}]")
                 // v1.1.9 diagnostic
-                AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-knowledge", "STUDY", "knowledge", title)
+                AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-knowledge", "STUDY", detailed.evidence, title)
                 return false
             }
             StudyGuardKnowledge.Verdict.NON_STUDY -> {
-                // v1.1.9 diagnostic (log every evaluation, before the action throttle)
-                AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-knowledge", "NON_STUDY", "knowledge", title)
-                val now = System.currentTimeMillis()
-                if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
-                    lastYouTubeAiInterceptTimeMs = now
-                    Log.w(TAG, "[StudyGuardKnowledge] Non-study video: '$title' ($channel)")
-                    YouTubeStudyGuardManager.recordBlockedVideo(
-                        context = applicationContext,
-                        title = title,
-                        channel = channel,
-                        reason = "Non-study content detected: \"$title\""
+                if (detailed.score > -4.0) {
+                    // Weak signal — treat as UNCERTAIN, fall through.
+                    AiStudyGuardManager.logGuardActivity(
+                        applicationContext, "YouTube", "youtube-knowledge", "UNCERTAIN",
+                        "weak(${detailed.evidence})→quick", title
                     )
-                    pauseMediaPlayback()
-                    AiStudyGuardManager.onNonStudyDetected(
-                        context = applicationContext,
-                        packageName = "com.google.android.youtube",
-                        messageText = title,
-                        reason = "Non-study content detected on YouTube: \"$title\""
-                    )
+                } else {
+                    // v1.1.9 diagnostic (log every evaluation, before the action throttle)
+                    AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-knowledge", "NON_STUDY", detailed.evidence, title)
+                    val now = System.currentTimeMillis()
+                    if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
+                        lastYouTubeAiInterceptTimeMs = now
+                        Log.w(TAG, "[StudyGuardKnowledge] Non-study video: '$title' ($channel) [${detailed.evidence}]")
+                        YouTubeStudyGuardManager.recordBlockedVideo(
+                            context = applicationContext,
+                            title = title,
+                            channel = channel,
+                            reason = "Non-study content detected: \"$title\" [${detailed.evidence}]"
+                        )
+                        pauseMediaPlayback()
+                        AiStudyGuardManager.onNonStudyDetected(
+                            context = applicationContext,
+                            packageName = "com.google.android.youtube",
+                            messageText = title,
+                            reason = "Non-study content detected on YouTube: \"$title\" [${detailed.evidence}]"
+                        )
+                    }
+                    return true
                 }
-                return true
             }
             StudyGuardKnowledge.Verdict.UNCERTAIN -> {
                 // fall through to existing flow below
@@ -1376,7 +1463,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             // v1.1.9 diagnostic (log every evaluation, before the action throttle)
             AiStudyGuardManager.logGuardActivity(
                 applicationContext, "YouTube", "youtube-quick", "NON_STUDY",
-                quickVerdict.category.ifBlank { "quick" }, title
+                "conf=${quickVerdict.confidence} " + quickVerdict.category.ifBlank { "quick" }, title
             )
             val now = System.currentTimeMillis()
             if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
@@ -1423,7 +1510,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     val gemStage = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) "youtube-gemini" else "youtube-quick"
                     AiStudyGuardManager.logGuardActivity(
                         applicationContext, "YouTube", gemStage, "NON_STUDY",
-                        geminiVerdict.category.ifBlank { "gemini" }, title
+                        "conf=${geminiVerdict.confidence} " + geminiVerdict.category.ifBlank { "gemini" }, title
                     )
                     val now = System.currentTimeMillis()
                     if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
@@ -1484,19 +1571,54 @@ class AiStudyAccessibilityService : AccessibilityService() {
         return best
     }
 
-    private fun extractPlayingYouTubeVideo(rootNode: AccessibilityNodeInfo): YouTubeActiveVideoInfo? {
+    /**
+     * v1.2.3: scoped, multi-pattern extraction.
+     *
+     * SCOPE: on the dedicated watch screen (or a Shorts player — the whole
+     * screen is player context) the full tree is searched. Otherwise
+     * (miniplayer floating over a browse surface) ONLY the miniplayer subtree
+     * may contribute a title/channel — a home-feed recommendation card must
+     * never be verdict-scored as "the playing video" (owner false-block
+     * report 2026-10-16).
+     *
+     * CHANNEL (priority): viewId patterns → Subscribe-button sibling →
+     * description patterns (" by " split, @handle). The matched source is
+     * returned for Guard Hub evidence ("channel seen: X / not detected").
+     */
+    private fun extractPlayingYouTubeVideo(rootNode: AccessibilityNodeInfo, watchScreen: Boolean): YouTubeActiveVideoInfo? {
+        val scopeRoot: AccessibilityNodeInfo = if (watchScreen) {
+            rootNode
+        } else {
+            val mini = findMiniplayerRoot(rootNode)
+            if (mini != null) {
+                mini
+            } else {
+                val shortsPlayer = com.example.util.ShortsSurfaceDetector
+                    .detectYouTubeShorts(rootNode) ==
+                    com.example.util.ShortsSurfaceDetector.ShortsSurface.YOUTUBE_SHORTS_PLAYER
+                if (!shortsPlayer) return null
+                rootNode
+            }
+        }
+
         var foundTitle: String? = null
-        var foundChannel: String? = null
         var foundMeta: String? = null
+        var foundChannel: String? = null
+        var channelSrc: String? = null
+        fun setChannel(value: String?, src: String) {
+            if (foundChannel.isNullOrBlank() && !value.isNullOrBlank()) {
+                foundChannel = value!!.trim()
+                channelSrc = src
+            }
+        }
 
-        fun traverse(node: AccessibilityNodeInfo, depth: Int) {
-            if (depth > 12) return
-
+        // Pass 1 — title + channel viewId patterns.
+        fun traversePass1(node: AccessibilityNodeInfo, depth: Int) {
+            if (depth > 12 || (foundTitle != null && foundChannel != null)) return
             val viewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
             val text = node.text?.toString()?.trim()
             val desc = node.contentDescription?.toString()?.trim()
 
-            // 1. Direct watch view title / channel resource matching
             if (viewId.contains("title") || viewId.contains("video_title") || viewId.contains("watch_title") ||
                 viewId.contains("metadata") || viewId.contains("header") || viewId.contains("collapsed_title") ||
                 viewId.contains("expandable_title") || viewId.contains("player_title") || viewId.contains("item_title")) {
@@ -1513,62 +1635,149 @@ class AiStudyAccessibilityService : AccessibilityService() {
             if (viewId.contains("channel_name") || viewId.contains("owner_name") || viewId.contains("author") ||
                 viewId.contains("channel_title") || viewId.contains("byline")) {
                 if (!text.isNullOrBlank() && foundChannel == null) {
-                    foundChannel = text
+                    setChannel(text, "viewid")
                 }
             }
-
-            // 2. YouTube Accessibility Content Descriptions
-            if (foundTitle == null && !desc.isNullOrBlank() && desc.length >= 10) {
-                val lowerDesc = desc.lowercase(Locale.ROOT)
-                if (lowerDesc.contains(" by ") || lowerDesc.contains("views") || lowerDesc.contains("ago") || lowerDesc.contains("minutes") || lowerDesc.contains("hours")) {
-                    if (!lowerDesc.contains("button") && !lowerDesc.contains("tab") && !lowerDesc.contains("search")) {
-                        val parts = desc.split(" by ")
-                        if (parts.size >= 2) {
-                            foundTitle = parts[0].trim()
-                            // v1.3.1: only use the description-derived channel when we don't
-                            // already have one from a channel_name/author node (more reliable).
-                            // Never split the channel segment on digits — channels like
-                            // "3Blue1Brown" or "TED-Ed" must survive intact. Strip trailing
-                            // view-count / age metadata with targeted patterns instead.
-                            if (foundChannel.isNullOrBlank()) {
-                                val afterBy = parts[1].trim()
-                                val metaCut = afterBy.split(Regex("""\s*[•|]\s*""")).firstOrNull()?.trim() ?: afterBy
-                                val channelOnly = metaCut
-                                    .replace(Regex("""\s+\d[\d.,]*[KMB]?\s+views?$""", RegexOption.IGNORE_CASE), "")
-                                    .replace(Regex("""\s+\d+\s+(seconds?|minutes?|hours?|days?|weeks?|months?|years?)\s+ago$""", RegexOption.IGNORE_CASE), "")
-                                    .trim()
-                                if (channelOnly.isNotBlank()) {
-                                    foundChannel = channelOnly
-                                }
-                            }
-                            foundMeta = desc
-                        } else {
-                            foundTitle = desc
-                            foundMeta = desc
-                        }
-                    }
-                }
+            if (viewId.contains("channel_handle") && !text.isNullOrBlank()) {
+                setChannel(text, "handle")
             }
 
             val count = node.childCount
             for (i in 0 until count) {
                 val child = node.getChild(i) ?: continue
-                traverse(child, depth + 1)
+                traversePass1(child, depth + 1)
                 try { child.recycle() } catch (_: Exception) {}
             }
         }
+        traversePass1(scopeRoot, 0)
 
-        traverse(rootNode, 0)
+        // Pass 2 — Subscribe-button sibling: the channel name sits next to
+        // the Subscribe button on the watch screen.
+        if (foundChannel == null) {
+            fun traversePass2(node: AccessibilityNodeInfo, depth: Int) {
+                if (depth > 12 || foundChannel != null) return
+                val text = node.text?.toString()?.trim()?.lowercase(Locale.ROOT) ?: ""
+                val desc = node.contentDescription?.toString()?.trim()?.lowercase(Locale.ROOT) ?: ""
+                val isSubscribe = (text == "subscribe" || desc == "subscribe")
+                if (isSubscribe) {
+                    val parent = try { node.parent } catch (_: Exception) { null }
+                    if (parent != null) {
+                        val pc = parent.childCount
+                        for (i in 0 until pc) {
+                            val sib = try { parent.getChild(i) } catch (_: Exception) { null } ?: continue
+                            val st = sib.text?.toString()?.trim()
+                            if (!st.isNullOrBlank() && st.length in 2..60 &&
+                                !st.equals("subscribe", ignoreCase = true) &&
+                                !st.equals("subscribed", ignoreCase = true)
+                            ) {
+                                setChannel(st, "subscribe-sibling")
+                                try { sib.recycle() } catch (_: Exception) {}
+                                break
+                            }
+                            try { sib.recycle() } catch (_: Exception) {}
+                        }
+                        try { parent.recycle() } catch (_: Exception) {}
+                    }
+                    return
+                }
+                val count = node.childCount
+                for (i in 0 until count) {
+                    val child = node.getChild(i) ?: continue
+                    traversePass2(child, depth + 1)
+                    try { child.recycle() } catch (_: Exception) {}
+                }
+            }
+            traversePass2(scopeRoot, 0)
+        }
+
+        // Pass 3 — description patterns ("Title by Channel …", @handle).
+        if (foundTitle == null || foundChannel == null) {
+            fun traversePass3(node: AccessibilityNodeInfo, depth: Int) {
+                if (depth > 12) return
+                val desc = node.contentDescription?.toString()?.trim()
+                if (!desc.isNullOrBlank() && desc.length >= 10) {
+                    val lowerDesc = desc.lowercase(Locale.ROOT)
+                    if (lowerDesc.contains(" by ") || lowerDesc.contains("views") || lowerDesc.contains("ago") ||
+                        lowerDesc.contains("minutes") || lowerDesc.contains("hours")) {
+                        if (!lowerDesc.contains("button") && !lowerDesc.contains("tab") && !lowerDesc.contains("search")) {
+                            val parts = desc.split(" by ")
+                            if (parts.size >= 2) {
+                                if (foundTitle == null) foundTitle = parts[0].trim()
+                                // v1.3.1: only use the description-derived channel when we don't
+                                // already have one from a channel_name/author node (more reliable).
+                                // Never split the channel segment on digits — channels like
+                                // "3Blue1Brown" or "TED-Ed" must survive intact. Strip trailing
+                                // view-count / age metadata with targeted patterns instead.
+                                if (foundChannel.isNullOrBlank()) {
+                                    val afterBy = parts[1].trim()
+                                    val metaCut = afterBy.split(Regex("""\s*[•|]\s*""")).firstOrNull()?.trim() ?: afterBy
+                                    val channelOnly = metaCut
+                                        .replace(Regex("""\s+\d[\d.,]*[KMB]?\s+views?$""", RegexOption.IGNORE_CASE), "")
+                                        .replace(Regex("""\s+\d+\s+(seconds?|minutes?|hours?|days?|weeks?|months?|years?)\s+ago$""", RegexOption.IGNORE_CASE), "")
+                                        .trim()
+                                    if (channelOnly.isNotBlank()) {
+                                        setChannel(channelOnly, "desc-by-split")
+                                    }
+                                }
+                                if (foundMeta == null) foundMeta = desc
+                            } else {
+                                if (foundTitle == null) foundTitle = desc
+                                if (foundMeta == null) foundMeta = desc
+                            }
+                        }
+                    }
+                    // @handle in player context.
+                    if (foundChannel == null) {
+                        val handle = Regex("""@[\w.]{2,30}""").find(desc)?.value
+                        if (handle != null) setChannel(handle, "handle-desc")
+                    }
+                }
+                if (foundTitle != null && foundChannel != null) return
+                val count = node.childCount
+                for (i in 0 until count) {
+                    val child = node.getChild(i) ?: continue
+                    traversePass3(child, depth + 1)
+                    try { child.recycle() } catch (_: Exception) {}
+                }
+            }
+            traversePass3(scopeRoot, 0)
+        }
 
         return if (!foundTitle.isNullOrBlank()) {
             YouTubeActiveVideoInfo(
                 title = foundTitle!!,
                 channel = foundChannel,
-                metadata = foundMeta
+                metadata = foundMeta,
+                channelSrc = channelSrc
             )
         } else {
             null
         }
+    }
+
+    /** Finds the miniplayer subtree root (viewId contains miniplayer/watch_while). */
+    private fun findMiniplayerRoot(rootNode: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        var result: AccessibilityNodeInfo? = null
+        fun traverse(node: AccessibilityNodeInfo, depth: Int) {
+            if (result != null || depth > 10) return
+            val viewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
+            if (viewId.contains("miniplayer") || viewId.contains("watch_while") || viewId.contains("mini_player")) {
+                result = node
+                return
+            }
+            val count = node.childCount
+            for (i in 0 until count) {
+                val child = node.getChild(i) ?: continue
+                traverse(child, depth + 1)
+                // NOTE: do not recycle children here — the found subtree root
+                // must stay usable by the caller.
+                if (result == null) {
+                    try { child.recycle() } catch (_: Exception) {}
+                }
+            }
+        }
+        traverse(rootNode, 0)
+        return result
     }
 
     override fun onInterrupt() {

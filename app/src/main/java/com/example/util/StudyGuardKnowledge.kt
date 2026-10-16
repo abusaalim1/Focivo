@@ -221,15 +221,75 @@ object StudyGuardKnowledge {
     }
 
     /** YouTube entry point: channel allowlist short-circuits to STUDY. */
-    fun scoreVideo(title: String?, channel: String?): Verdict {
+    fun scoreVideo(title: String?, channel: String?): Verdict =
+        scoreVideoDetailed(title, channel).verdict
+
+    /**
+     * v1.2.3 — scored verdict WITH evidence for the Guard Hub. The service
+     * needs the exact firing rule/keyword/score for every YouTube block, so
+     * this returns which phrases moved the score.
+     */
+    data class ScoredVideo(val verdict: Verdict, val score: Double, val evidence: String)
+
+    fun scoreVideoDetailed(title: String?, channel: String?): ScoredVideo {
         val ch = normalize(channel.orEmpty())
         if (ch.isNotEmpty()) {
             val allowed = effectiveChannels()
-            if (allowed.any { ch.contains(it) }) {
-                return Verdict.STUDY
+            val hit = allowed.firstOrNull { ch.contains(it) }
+            if (hit != null) {
+                return ScoredVideo(Verdict.STUDY, 99.0, "allowlist-channel=$hit")
             }
         }
-        return scoreText(listOfNotNull(title, channel).joinToString(" ")).verdict
+        val (verdict, score, evidence) = scoreTextDetailed(
+            listOfNotNull(title, channel).joinToString(" ")
+        )
+        return ScoredVideo(verdict, score, evidence)
+    }
+
+    /**
+     * Core scorer with evidence. Same math as [scoreText]; additionally
+     * records which phrases/regex moved the score, e.g.
+     * "score=-4.0 hits=[block:movie trailer(-3.0)]".
+     */
+    fun scoreTextDetailed(rawText: String): Triple<Verdict, Double, String> {
+        val norm = normalize(rawText)
+        if (norm.isEmpty()) return Triple(Verdict.UNCERTAIN, 0.0, "score=0.0 hits=[]")
+        val padded = " $norm "
+        var score = 0.0
+        val hits = mutableListOf<String>()
+        for (p in ALLOW) {
+            if (padded.contains(" $p ")) {
+                val w = if (p.contains(' ')) 2.0 else 1.0
+                score += w
+                hits.add("allow:$p(+$w)")
+            }
+        }
+        for (p in BLOCK) {
+            if (padded.contains(" $p ")) {
+                val w = if (p.contains(' ')) 3.0 else 2.0
+                score -= w
+                hits.add("block:$p(-$w)")
+            }
+        }
+        var strongOverride = CLASS_CHAPTER_RE.containsMatchIn(padded)
+        if (!strongOverride) {
+            for (lit in OVERRIDE_LITERALS) {
+                if (padded.contains(" $lit ")) {
+                    strongOverride = true
+                    hits.add("override:$lit(+4.0)")
+                    break
+                }
+            }
+        } else {
+            hits.add("override:class-chapter-regex(+4.0)")
+        }
+        if (strongOverride) score += 4.0
+        val verdict = when {
+            score >= 3.0 -> Verdict.STUDY
+            score <= -2.0 -> Verdict.NON_STUDY
+            else -> Verdict.UNCERTAIN
+        }
+        return Triple(verdict, score, "score=$score hits=[${hits.joinToString(", ")}]")
     }
 
     // ------------------------------------------------------------------
