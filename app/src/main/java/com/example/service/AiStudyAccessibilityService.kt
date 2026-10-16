@@ -91,6 +91,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
             runCatching { LocalTitleClassifier.get(applicationContext) }
             runCatching { LocalTitleClassifier.getContent(applicationContext) }
         }
+        // v1.2.3-hotfix: start the real 5s multi-window sweep loop.
+        a11yMainHandler.removeCallbacks(mwSweepRunnable)
+        a11yMainHandler.postDelayed(mwSweepRunnable, 5000L)
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
@@ -100,6 +103,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
         // service goes away.
         runCatching { hideA11yBlockOverlay() }
         runCatching { hideA11yShortsOverlay() }
+        a11yMainHandler.removeCallbacks(mwSweepRunnable)
         return super.onUnbind(intent)
     }
 
@@ -108,6 +112,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
         connectedInstance = null
         runCatching { hideA11yBlockOverlay() }
         runCatching { hideA11yShortsOverlay() }
+        a11yMainHandler.removeCallbacks(mwSweepRunnable)
         super.onDestroy()
         serviceScope.cancel()
     }
@@ -135,6 +140,28 @@ class AiStudyAccessibilityService : AccessibilityService() {
     // ------------------------------------------------------------------
 
     private val a11yMainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /**
+     * v1.2.3-hotfix — REAL periodic multi-window sweep. The old "periodic"
+     * sweep was gated on accessibility EVENTS arriving: an idle blocked app
+     * sitting in a freeform/split window emits no events, so the sweep never
+     * ran and the app was never intercepted. This loop fires every 5s on the
+     * service's main thread for as long as the service is connected; the
+     * scan itself is study-period gated and 3s-throttled, so idle cost is
+     * one cheap windows-list read per 5s.
+     */
+    private val mwSweepRunnable = object : Runnable {
+        override fun run() {
+            try {
+                if (AiStudyGuardManager.isStudyPeriodActive(applicationContext)) {
+                    enforceMultiWindowProtections(
+                        System.currentTimeMillis(), "timer-sweep"
+                    )
+                }
+            } catch (_: Exception) { }
+            a11yMainHandler.postDelayed(this, 5000L)
+        }
+    }
     private var a11yBlockView: androidx.compose.ui.platform.ComposeView? = null
     private var a11yBlockHost: com.example.ui.overlay.OverlayLifecycleHost? = null
     private var a11yBlockWm: WindowManager? = null
@@ -494,27 +521,54 @@ class AiStudyAccessibilityService : AccessibilityService() {
      * period starts. Every skip writes a throttled Guard Hub entry so the
      * owner's next device test shows exactly which step saw what.
      */
+    // v1.2.3-hotfix: throttled scan-summary for the Guard Hub — the owner's
+    // device test needs to SEE "windows-seen count + packages on last
+    // checks", not just intercepts. Every scan exit below writes one.
+    private var lastMwSummaryLogMs = 0L
+    private fun logMwSummary(detail: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastMwSummaryLogMs < 30_000L) return
+        lastMwSummaryLogMs = now
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, "guard", "multiwindow-scan", "ok", detail
+            )
+        } catch (_: Exception) { }
+    }
+
     private fun enforceMultiWindowProtections(nowTime: Long, triggerSrc: String) {
         val ctx = applicationContext
         if (nowTime - lastMultiWindowScanMs < 3000L) return
         lastMultiWindowScanMs = nowTime
         try {
             val blockedList = FocusShieldService.getActiveBlockedPackages(ctx)
-            if (blockedList.isEmpty()) return
-            val wins = try { windows } catch (_: Exception) { null } ?: return
+            if (blockedList.isEmpty()) {
+                logMwSummary("trigger=$triggerSrc windows=? blocked=0 (no active blocked packages)")
+                return
+            }
+            val wins = try { windows } catch (_: Exception) { null }
+            if (wins == null) {
+                logMwSummary("trigger=$triggerSrc windows=? (windows list unavailable — OEM restricted or service not ready)")
+                return
+            }
             val appWins = wins.filter {
                 try { it.type == AccessibilityWindowInfo.TYPE_APPLICATION } catch (_: Exception) { false }
             }
-            if (appWins.isEmpty()) return
+            if (appWins.isEmpty()) {
+                logMwSummary("trigger=$triggerSrc windows=${wins.size} appWindows=0 (no application windows reported)")
+                return
+            }
             val (dispW, dispH) = getDisplaySizePx()
             if (dispW <= 0 || dispH <= 0) return
             val rect = Rect()
+            val seenPkgs = mutableListOf<String>()
             for (w in appWins) {
                 val pkg = try { w.root?.packageName?.toString() } catch (_: Exception) { null }
                 if (pkg == null) {
                     logMwSkip("root-null")
                     continue
                 }
+                seenPkgs.add(pkg)
                 if (pkg.equals(ctx.packageName, ignoreCase = true)) continue
                 val isBlocked = blockedList.any { b ->
                     pkg.equals(b, ignoreCase = true) || pkg.startsWith(b, ignoreCase = true)
@@ -558,8 +612,18 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         multiWindowMode = mode
                     )
                 }
+                logMwSummary(
+                    "trigger=$triggerSrc windows=${appWins.size} " +
+                        "pkgs=${seenPkgs.distinct().take(8).joinToString(",")} " +
+                        "blockedSeen=$pkg mode=$mode"
+                )
                 return
             }
+            // No blocked package in any visible window this scan.
+            logMwSummary(
+                "trigger=$triggerSrc windows=${appWins.size} " +
+                    "pkgs=${seenPkgs.distinct().take(8).joinToString(",")} blockedSeen=none"
+            )
         } catch (_: Exception) { }
     }
 
@@ -701,8 +765,21 @@ class AiStudyAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         try {
             if (event == null) return
-            val pkg = event.packageName?.toString() ?: return
             val eventType = event.eventType
+
+            // v1.2.3-hotfix: window-set changes (split-screen enter/exit,
+            // freeform window add/remove, PiP) often carry NO package name,
+            // so they must be handled BEFORE the package-based early return
+            // below. The scan itself is study-period gated and 3s-throttled.
+            if (eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+                if (AiStudyGuardManager.isStudyPeriodActive(applicationContext)) {
+                    enforceMultiWindowProtections(
+                        System.currentTimeMillis(), "windows-changed"
+                    )
+                }
+            }
+
+            val pkg = event.packageName?.toString() ?: return
 
             // 1. Never block self (Focivo)
             if (pkg.equals(applicationContext.packageName, ignoreCase = true)) {
