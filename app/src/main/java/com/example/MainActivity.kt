@@ -711,8 +711,10 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onPauseTimer = { viewModel.pauseTimer() },
                                         onResumeTimer = { viewModel.resumeTimer() },
                                         onFinishEarly = {
-                                            // v1.3.1: strict mode — ending early is blocked behind
-                                            // an explicit confirmation (the session is discarded).
+                                            // v1.2.3 (Task 10): strict mode FULL lock-in —
+                                            // the session cannot be stopped or restarted
+                                            // until the timer finishes. The dialog
+                                            // explains why; there is no early-exit path.
                                             if (com.example.util.StrictModeManager.isStrictModeEnabled(context)) {
                                                 showStrictEndConfirmDialog = true
                                             } else {
@@ -1049,14 +1051,12 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     )
                 }
 
-                // v1.3.1: strict-mode end-early confirmation (Regain parity).
+                // v1.2.3 (Task 10): strict-mode FULL lock-in (Regain parity).
+                // When strict is on, tapping Stop never ends the session —
+                // StrictLockDialog explains why (animated text + mascot).
                 if (showStrictEndConfirmDialog) {
-                    com.example.ui.components.StrictEndSessionDialog(
-                        onDismiss = { showStrictEndConfirmDialog = false },
-                        onConfirmEnd = {
-                            showStrictEndConfirmDialog = false
-                            viewModel.finishSessionEarly()
-                        }
+                    com.example.ui.components.StrictLockDialog(
+                        onDismiss = { showStrictEndConfirmDialog = false }
                     )
                 }
 

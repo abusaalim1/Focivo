@@ -13,14 +13,20 @@ import android.net.Uri
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,12 +50,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Games
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -64,6 +72,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -286,6 +295,74 @@ private fun ShieldGroupRow(
                 }
             }
             trailing()
+        }
+        if (showDivider) {
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(focivoTokens().line))
+        }
+    }
+}
+
+/**
+ * v1.2.3 (Task 10) — explain-on-tap row for the Strict section: tapping the
+ * row expands a plain-English explanation of what the option does; the
+ * option itself is enabled via its toggle/button. The toggle consumes its
+ * own taps, so flipping it never expands the row.
+ */
+@Composable
+private fun ExpandableShieldRow(
+    title: String,
+    subtitle: String? = null,
+    explanation: String,
+    showDivider: Boolean = true,
+    tag: (@Composable () -> Unit)? = null,
+    trailing: @Composable () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { expanded = !expanded }
+                .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(text = title, style = shieldBody(14, FontWeight.SemiBold))
+                    tag?.invoke()
+                    Icon(
+                        imageVector = Icons.Default.ExpandMore,
+                        contentDescription = if (expanded) "Hide explanation" else "Show what this does",
+                        tint = focivoTokens().muted,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .rotate(if (expanded) 180f else 0f)
+                    )
+                }
+                if (subtitle != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(text = subtitle, style = shieldBody(12, FontWeight.Normal, focivoTokens().muted).copy(lineHeight = 17.4.sp))
+                }
+            }
+            trailing()
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(animationSpec = tween(280)) + fadeIn(animationSpec = tween(280)),
+            exit = shrinkVertically(animationSpec = tween(240)) + fadeOut(animationSpec = tween(240))
+        ) {
+            Text(
+                text = explanation,
+                style = shieldBody(12, FontWeight.Normal, focivoTokens().muted).copy(lineHeight = 18.sp),
+                modifier = Modifier.padding(bottom = 14.dp)
+            )
         }
         if (showDivider) {
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(focivoTokens().line))
@@ -759,9 +836,13 @@ fun FocusShieldHubSheet(
                         .padding(horizontal = 20.dp, vertical = 4.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        ShieldGroupRow(
+                        ExpandableShieldRow(
                             title = "Strict focus",
                             subtitle = "Keeps apps locked until your session ends",
+                            explanation = "When this is on, a running session is fully locked. " +
+                                "Tapping Stop shows a reminder instead of ending the session — " +
+                                "it cannot be stopped or restarted until the timer finishes, " +
+                                "and blocked apps stay locked the whole time.",
                             trailing = {
                                 ShieldToggle(
                                     checked = isStrictModeEnabled,
@@ -777,9 +858,11 @@ fun FocusShieldHubSheet(
                                 )
                             }
                         )
-                        ShieldGroupRow(
+                        ExpandableShieldRow(
                             title = "Block split screen",
                             subtitle = "Blocked apps can't open in split-screen",
+                            explanation = "While a session runs, blocked apps cannot open in " +
+                                "split-screen. Try it and the block screen appears instead of the app.",
                             trailing = {
                                 ShieldToggle(
                                     checked = isBlockSplitScreen,
@@ -789,9 +872,11 @@ fun FocusShieldHubSheet(
                                 )
                             }
                         )
-                        ShieldGroupRow(
+                        ExpandableShieldRow(
                             title = "Block floating window",
                             subtitle = "Blocked apps can't open as floating windows",
+                            explanation = "While a session runs, blocked apps cannot open as " +
+                                "floating or pop-up windows. Try it and the block screen appears instead of the app.",
                             trailing = {
                                 ShieldToggle(
                                     checked = isBlockFloatingWindow,
@@ -801,9 +886,11 @@ fun FocusShieldHubSheet(
                                 )
                             }
                         )
-                        ShieldGroupRow(
+                        ExpandableShieldRow(
                             title = "Deep focus",
                             subtitle = "Prevent switching to other apps while studying",
+                            explanation = "While a session runs, switching to any other app " +
+                                "shows the focus overlay instead of that app, so you stay with your session.",
                             tag = { ShieldTag(text = "Optional", active = false) },
                             trailing = {
                                 ShieldToggle(
