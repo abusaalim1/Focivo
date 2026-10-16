@@ -1,4 +1,4 @@
-name: TMP Compile Check (delete after verify)
+name: TMP V123 Test Dump (delete after verify)
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  compile:
+  v123-test:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -24,5 +24,10 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Compile main + unit tests
-        run: gradle :app:compileDebugUnitTestKotlin --no-configuration-cache --stacktrace 2>&1 | grep -E "^e:|error:|FAILED|warning: " | head -40
+      - name: Run v123 screenshot tests
+        run: gradle :app:testDebugUnitTest --tests "com.example.screenshots.v123.*" --no-configuration-cache --stacktrace
+        continue-on-error: true
+
+      - name: Dump test results
+        if: always()
+        run: python3 -c "import glob,xml.etree.ElementTree as ET;[print(tc.get('classname'),'::',tc.get('name'),'->','PASS' if not (list(tc.iter('failure'))+list(tc.iter('error'))) else 'FAIL') for f in glob.glob('app/build/test-results/testDebugUnitTest/TEST-com.example.screenshots.v123.*.xml') for tc in ET.parse(f).getroot().iter('testcase')];[print(chr(61)*70,tc.get('classname'),'::',tc.get('name'),'MESSAGE:',(fl.get('message')or '')[:600],'STACK:',(fl.text or '')[:3000]) for f in glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml') for tc in ET.parse(f).getroot().iter('testcase') for fl in list(tc.iter('failure'))+list(tc.iter('error'))]"
