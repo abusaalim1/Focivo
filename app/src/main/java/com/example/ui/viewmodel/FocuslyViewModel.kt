@@ -2088,6 +2088,31 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             Log.i(TAG, "Start Study blocked: missing focus permissions: $missing")
             return
         }
+        // v1.2.3 (Task 13.2) — pre-session Strict Mode + AI Guard prompt.
+        // Offer to turn them on before the session starts. Both already on
+        // -> no sheet, straight into the unchanged start flow below.
+        val app = getApplication<Application>()
+        val strictOn = try { com.example.util.StrictModeManager.isStrictModeEnabled(app) }
+            catch (_: Exception) { true }
+        val guardOn = try { com.example.util.AiStudyGuardManager.isAiGuardEnabled(app) }
+            catch (_: Exception) { true }
+        if (!strictOn || !guardOn) {
+            _promptStrictOn.value = strictOn
+            _promptGuardOn.value = guardOn
+            _showStrictGuardPromptSheet.value = true
+            Log.i(TAG, "Pre-session prompt shown (strict=$strictOn, guard=$guardOn)")
+            return
+        }
+        continueSessionStartAfterPrompt()
+    }
+
+    // v1.2.3 (Task 13.2) — resumes the exact start flow the session-start
+    // gate used before the pre-session prompt sheet existed. "Save & Block"
+    // auto-block path goes straight to startTimer(); everything else shows
+    // the pre-study block sheet. Used by the prompt's skip/continue path and
+    // the both-already-on path alike.
+    fun continueSessionStartAfterPrompt() {
+        _showStrictGuardPromptSheet.value = false
         val prefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
         // If user clicked "Save & Block", auto-block saved apps without asking. Otherwise show selection sheet.
         if (prefs.autoBlockStudyAppsWithoutAsking && prefs.blockedAppsList.isNotBlank()) {
@@ -2095,6 +2120,42 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         } else {
             _showPreStudyBlockSheet.value = true
         }
+    }
+
+    // v1.2.3 (Task 13.2) — pre-session prompt sheet state. These report
+    // whether each protection is REALLY on (prefs read, same source the
+    // guards themselves read), so the enable buttons reflect reality.
+    private val _showStrictGuardPromptSheet = MutableStateFlow(false)
+    val showStrictGuardPromptSheet: StateFlow<Boolean> = _showStrictGuardPromptSheet.asStateFlow()
+    private val _promptStrictOn = MutableStateFlow(true)
+    val promptStrictOn: StateFlow<Boolean> = _promptStrictOn.asStateFlow()
+    private val _promptGuardOn = MutableStateFlow(true)
+    val promptGuardOn: StateFlow<Boolean> = _promptGuardOn.asStateFlow()
+
+    /**
+     * v1.2.3 (Task 13.2) — prompt-sheet enable actions. Each one REALLY
+     * enables the feature (the same calls the hub toggles use); the sheet
+     * stays open so the user can enable the other one too. Swipe-dismiss
+     * behaves like "Start session" (skip path — no changes forced).
+     */
+    fun enableStrictFromPrompt() {
+        try {
+            com.example.util.StrictModeManager.setStrictModeEnabled(getApplication(), true)
+            _promptStrictOn.value = true
+            Log.i(TAG, "Strict Mode enabled from pre-session prompt")
+        } catch (_: Exception) { }
+    }
+
+    fun enableGuardFromPrompt() {
+        try {
+            com.example.util.AiStudyGuardManager.setAiGuardEnabled(getApplication(), true)
+            _promptGuardOn.value = com.example.util.AiStudyGuardManager.isAiGuardEnabled(getApplication())
+            Log.i(TAG, "AI Guard enabled from pre-session prompt")
+        } catch (_: Exception) { }
+    }
+
+    fun dismissStrictGuardPrompt() {
+        continueSessionStartAfterPrompt()
     }
 
     fun dismissPreStudyBlockSheet() {

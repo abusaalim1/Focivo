@@ -62,6 +62,7 @@ import com.example.ui.components.MascotPose
 import com.example.ui.components.PreStudyAppBlockSheet
 import com.example.util.MascotPose as BuddyMascotPose
 import com.example.ui.components.StudyHubSheet
+import com.example.ui.components.StrictGuardPromptSheet
 import com.example.ui.components.TimerFaceHost
 import com.example.ui.components.TimerFaceParams
 import com.example.ui.components.resolveThemeBackdropRes
@@ -116,6 +117,14 @@ fun FocusScreen(
     showPreStudyBlockSheet: Boolean = false,
     onConfirmPreStudyBlock: (Set<String>, Boolean) -> Unit = { _, _ -> },
     onDismissPreStudyBlock: () -> Unit = {},
+    // v1.2.3 (Task 13.2) — pre-session Strict Mode + AI Guard prompt sheet.
+    showStrictGuardPromptSheet: Boolean = false,
+    promptStrictOn: Boolean = false,
+    promptGuardOn: Boolean = false,
+    onEnableStrictFromPrompt: () -> Unit = {},
+    onEnableGuardFromPrompt: () -> Unit = {},
+    onStartFromStrictGuardPrompt: () -> Unit = {},
+    onDismissStrictGuardPrompt: () -> Unit = {},
     onStartTimer: () -> Unit,
     onPauseTimer: () -> Unit,
     onResumeTimer: () -> Unit,
@@ -659,6 +668,18 @@ fun FocusScreen(
                     onConfirmPreStudyBlock(selectedPackages, dontShowAgain)
                 },
                 onDismiss = { onDismissPreStudyBlock() }
+            )
+        }
+
+        // v1.2.3 (Task 13.2) — pre-session Strict Mode + AI Guard prompt.
+        if (showStrictGuardPromptSheet) {
+            StrictGuardPromptSheet(
+                strictOn = promptStrictOn,
+                guardOn = promptGuardOn,
+                onEnableStrict = onEnableStrictFromPrompt,
+                onEnableGuard = onEnableGuardFromPrompt,
+                onStartSession = onStartFromStrictGuardPrompt,
+                onDismiss = onDismissStrictGuardPrompt
             )
         }
     }

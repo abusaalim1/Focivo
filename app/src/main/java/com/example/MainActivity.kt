@@ -273,6 +273,10 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val activeAiBlock by viewModel.activeAiBlock.collectAsState()
     val activeAiResolved by viewModel.activeAiResolved.collectAsState()
     val showPreStudyBlockSheet by viewModel.showPreStudyBlockSheet.collectAsState()
+    // v1.2.3 (Task 13.2) — pre-session Strict Mode + AI Guard prompt sheet.
+    val showStrictGuardPromptSheet by viewModel.showStrictGuardPromptSheet.collectAsState()
+    val promptStrictOn by viewModel.promptStrictOn.collectAsState()
+    val promptGuardOn by viewModel.promptGuardOn.collectAsState()
     val isSupportLockZenSheetOpen by viewModel.isSupportLockZenSheetOpen.collectAsState()
     val showMilestoneDonationPrompt by viewModel.showMilestoneDonationPrompt.collectAsState()
     val showSessionDonationPrompt by viewModel.showSessionDonationPrompt.collectAsState()
@@ -707,6 +711,14 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                             viewModel.confirmPreStudyBlock(pkgs, dontShowAgain)
                                         },
                                         onDismissPreStudyBlock = { viewModel.dismissPreStudyBlockSheet() },
+                                        // v1.2.3 (Task 13.2) — pre-session Strict Mode + AI Guard prompt sheet.
+                                        showStrictGuardPromptSheet = showStrictGuardPromptSheet,
+                                        promptStrictOn = promptStrictOn,
+                                        promptGuardOn = promptGuardOn,
+                                        onEnableStrictFromPrompt = { viewModel.enableStrictFromPrompt() },
+                                        onEnableGuardFromPrompt = { viewModel.enableGuardFromPrompt() },
+                                        onStartFromStrictGuardPrompt = { viewModel.continueSessionStartAfterPrompt() },
+                                        onDismissStrictGuardPrompt = { viewModel.dismissStrictGuardPrompt() },
                                         onStartTimer = { viewModel.requestStudySessionStart() },
                                         onPauseTimer = { viewModel.pauseTimer() },
                                         onResumeTimer = { viewModel.resumeTimer() },
