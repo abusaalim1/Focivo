@@ -1,0 +1,28 @@
+name: TMP Compile Check (delete after verify)
+
+on:
+  push:
+    branches: [feat/v123-splash]
+  workflow_dispatch:
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Compile main + unit tests
+        run: gradle :app:compileDebugUnitTestKotlin --no-configuration-cache --stacktrace 2>&1 | grep -E "^e:|error:|FAILED|warning: " | head -40
