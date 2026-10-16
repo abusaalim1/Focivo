@@ -37,6 +37,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Icon
@@ -1076,7 +1077,12 @@ fun PermissionGrantContent(
     progress: Float,
     onAllow: () -> Unit,
     onLater: () -> Unit,
-    onBack: (() -> Unit)?
+    onBack: (() -> Unit)?,
+    // v1.2.3: the REAL system-side granted state, re-read by the caller on
+    // every composition (driven by permTick bumps on launcher callback,
+    // intent fire and ON_RESUME). Defaults to false so existing callers and
+    // screenshot tests keep compiling unchanged.
+    granted: Boolean = false
 ) {
     val isDark = isAppInDarkTheme()
     val tPrimary = focivoTokens().text
@@ -1144,13 +1150,19 @@ fun PermissionGrantContent(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // Dark card row with white Allow pill (reference pattern)
+        // Dark card row with white Allow pill (reference pattern). When the
+        // permission is granted the row picks up a lime edge and the pill
+        // becomes a non-clickable lime "Granted" indicator.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(22.dp))
                 .background(rowBg)
-                .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(22.dp))
+                .border(
+                    1.dp,
+                    if (granted) RegainLimePrimary.copy(alpha = 0.55f) else Color(0x1AFFFFFF),
+                    RoundedCornerShape(22.dp)
+                )
                 .padding(horizontal = 20.dp, vertical = 16.dp)
                 .testTag("permission_row_${spec.id}")
         ) {
@@ -1170,28 +1182,39 @@ fun PermissionGrantContent(
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
+                val pillBase = Modifier
+                    .clip(CircleShape)
+                    .background(if (granted) RegainLimePrimary else Color.White)
                 Box(
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(Color.White)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = onAllow
-                        )
+                    modifier = (if (granted) pillBase else pillBase.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onAllow
+                    ))
                         .padding(horizontal = 26.dp, vertical = 12.dp)
-                        .testTag("permission_allow_${spec.id}"),
+                        .testTag(if (granted) "permission_granted_${spec.id}" else "permission_allow_${spec.id}"),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "Allow",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            color = focivoTokens().onAccent,
-                            fontSize = 15.sp
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (granted) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = NearBlack,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = if (granted) "Granted" else "Allow",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontFamily = PoppinsFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = if (granted) NearBlack else focivoTokens().onAccent,
+                                fontSize = 15.sp
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
@@ -1449,7 +1472,9 @@ fun OnboardingFlowScreen(
         if (step != null && step.kind == StepKind.PERMISSION) {
             val spec = permSpecs.getOrNull(step.index)
             if (spec != null && isPermissionGranted(context, spec.id)) {
-                delay(350)
+                // v1.2.3: hold the step on its "Granted" rendering long enough
+                // for the user to perceive the confirmation before moving on.
+                delay(900)
                 advance()
             }
         }
@@ -1543,9 +1568,16 @@ fun OnboardingFlowScreen(
         }
         StepKind.PERMISSION -> {
             val spec = permSpecs.getOrNull(step.index) ?: return
+            // v1.2.3: re-read the REAL system state on every composition. The
+            // existing permTick bumps (ActivityResult callback, intent fire,
+            // ON_RESUME) drive recomposition, so a just-granted permission
+            // flips this step to its "Granted" rendering instead of looking
+            // ungranted. Covers all 7 permission steps via the shared content.
+            val grantedNow = isPermissionGranted(context, spec.id)
             PermissionGrantContent(
                 spec = spec,
                 progress = progressFor(stepPos),
+                granted = grantedNow,
                 onAllow = { requestPermission(spec) },
                 onLater = {
                     if (spec.id == "notifications") markNotificationsDecided()
