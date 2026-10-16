@@ -78,6 +78,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.R
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimePrimary
 import com.example.util.AiStudyGuardManager
 import com.example.util.DeviceAppInfo
@@ -202,8 +203,8 @@ fun PreStudyAppBlockSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF141814),
-        contentColor = Color(0xFFF0F4ED)
+        containerColor = focivoTokens().bg,
+        contentColor = focivoTokens().text
     ) {
         Column(
             modifier = Modifier
@@ -232,7 +233,7 @@ fun PreStudyAppBlockSheet(
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontFamily = PoppinsFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFFF0F4ED),
+                                color = focivoTokens().text,
                                 fontSize = 16.sp
                             )
                         )
@@ -241,14 +242,14 @@ fun PreStudyAppBlockSheet(
                             else "Distracting apps will be locked until timer ends",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFFA0A89E),
+                                color = focivoTokens().muted,
                                 fontSize = 11.sp
                             )
                         )
                     }
                 }
                 IconButton(onClick = onDismiss) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFA0A89E))
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = focivoTokens().muted)
                 }
             }
 
@@ -261,9 +262,9 @@ fun PreStudyAppBlockSheet(
                 exit = fadeOut() + shrinkVertically()
             ) {
                 Surface(
-                    color = Color(0xFF241B12),
+                    color = focivoTokens().warning.copy(alpha = 0.12f),
                     shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF9800).copy(alpha = 0.55f)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, focivoTokens().warning.copy(alpha = 0.55f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 10.dp)
@@ -273,7 +274,7 @@ fun PreStudyAppBlockSheet(
                             Icon(
                                 imageVector = Icons.Default.Warning,
                                 contentDescription = null,
-                                tint = Color(0xFFFF9800),
+                                tint = focivoTokens().warning,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -282,7 +283,7 @@ fun PreStudyAppBlockSheet(
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontFamily = PoppinsFontFamily,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFFFCC80)
+                                    color = focivoTokens().warning
                                 )
                             )
                         }
@@ -291,7 +292,7 @@ fun PreStudyAppBlockSheet(
                             text = "To strictly lock apps and trigger Mascot warnings, please enable missing permissions:",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFFFFE0B2),
+                                color = focivoTokens().warning,
                                 fontSize = 11.sp
                             )
                         )
@@ -343,7 +344,7 @@ fun PreStudyAppBlockSheet(
                 exit = fadeOut() + shrinkVertically()
             ) {
                 Surface(
-                    color = Color(0xFF142416),
+                    color = focivoTokens().accent.copy(alpha = 0.12f),
                     shape = RoundedCornerShape(10.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, RegainLimePrimary.copy(alpha = 0.4f)),
                     modifier = Modifier
@@ -378,14 +379,14 @@ fun PreStudyAppBlockSheet(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search apps...", color = Color(0xFFA0A89E), fontSize = 13.sp) },
+                placeholder = { Text("Search apps...", color = focivoTokens().muted, fontSize = 13.sp) },
                 leadingIcon = {
-                    Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = Color(0xFFA0A89E))
+                    Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = focivoTokens().muted)
                 },
                 trailingIcon = {
                     if (searchQuery.isNotBlank()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = Color(0xFFA0A89E))
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = focivoTokens().muted)
                         }
                     }
                 },
@@ -393,10 +394,10 @@ fun PreStudyAppBlockSheet(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = RegainLimePrimary,
                     unfocusedBorderColor = Color(0x358CE000),
-                    focusedContainerColor = Color(0xFF1D221C),
-                    unfocusedContainerColor = Color(0xFF1D221C),
-                    focusedTextColor = Color(0xFFF0F4ED),
-                    unfocusedTextColor = Color(0xFFF0F4ED)
+                    focusedContainerColor = focivoTokens().surface2,
+                    unfocusedContainerColor = focivoTokens().surface2,
+                    focusedTextColor = focivoTokens().text,
+                    unfocusedTextColor = focivoTokens().text
                 ),
                 singleLine = true,
                 modifier = Modifier
@@ -437,7 +438,7 @@ fun PreStudyAppBlockSheet(
                     TextButton(
                         onClick = { selectedPackages.clear() }
                     ) {
-                        Text("Clear All", color = Color(0xFFA0A89E), fontSize = 11.sp)
+                        Text("Clear All", color = focivoTokens().muted, fontSize = 11.sp)
                     }
                 }
             }
@@ -459,7 +460,7 @@ fun PreStudyAppBlockSheet(
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = "Loading installed apps...",
-                            color = Color(0xFFA0A89E),
+                            color = focivoTokens().muted,
                             fontFamily = PoppinsFontFamily,
                             fontSize = 12.sp
                         )
@@ -488,7 +489,7 @@ fun PreStudyAppBlockSheet(
 
                             item(key = "header_$catKey") {
                                 Surface(
-                                    color = Color(0xFF1B201A),
+                                    color = focivoTokens().surface,
                                     shape = RoundedCornerShape(10.dp),
                                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x208CE000)),
                                     modifier = Modifier.fillMaxWidth()
@@ -515,7 +516,7 @@ fun PreStudyAppBlockSheet(
                                                 style = MaterialTheme.typography.titleSmall.copy(
                                                     fontFamily = PoppinsFontFamily,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFFF0F4ED),
+                                                    color = focivoTokens().text,
                                                     fontSize = 13.sp
                                                 )
                                             )
@@ -528,7 +529,7 @@ fun PreStudyAppBlockSheet(
                                                     text = "$selectedInCat/${appsInCat.size}",
                                                     style = MaterialTheme.typography.labelSmall.copy(
                                                         fontFamily = PoppinsFontFamily,
-                                                        color = if (selectedInCat > 0) RegainLimePrimary else Color(0xFFA0A89E),
+                                                        color = if (selectedInCat > 0) focivoTokens().accentText else focivoTokens().muted,
                                                         fontSize = 10.sp
                                                     ),
                                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -554,7 +555,7 @@ fun PreStudyAppBlockSheet(
                                             Icon(
                                                 imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                                 contentDescription = null,
-                                                tint = Color(0xFFA0A89E),
+                                                tint = focivoTokens().muted,
                                                 modifier = Modifier.size(18.dp)
                                             )
                                         }
@@ -610,7 +611,7 @@ fun PreStudyAppBlockSheet(
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RegainLimePrimary,
-                        contentColor = Color(0xFF021207)
+                        contentColor = focivoTokens().onAccent
                     ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
@@ -636,8 +637,8 @@ fun PreStudyAppBlockSheet(
                 Button(
                     onClick = { handleBlockAction(false) },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF2A342B),
-                        contentColor = Color(0xFFE0E6DC)
+                        containerColor = focivoTokens().surface2,
+                        contentColor = focivoTokens().text
                     ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
@@ -660,7 +661,7 @@ fun PreStudyAppBlockSheet(
                     onClick = { handleBlockAction(true) },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RegainLimePrimary,
-                        contentColor = Color(0xFF021207)
+                        contentColor = focivoTokens().onAccent
                     ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
@@ -696,7 +697,7 @@ fun PreStudyAppBlockSheet(
                     fontFamily = PoppinsFontFamily,
                     fontWeight = FontWeight.Medium,
                     fontSize = 12.sp,
-                    color = Color(0xFFA0A89E)
+                    color = focivoTokens().muted
                 )
             }
         }
@@ -717,7 +718,7 @@ private fun PermissionStatusButton(
 ) {
     if (isGranted) {
         Surface(
-            color = Color(0xFF142B18),
+            color = focivoTokens().accent.copy(alpha = 0.12f),
             shape = RoundedCornerShape(8.dp),
             border = androidx.compose.foundation.BorderStroke(1.dp, RegainLimePrimary.copy(alpha = 0.5f)),
             modifier = modifier.height(34.dp)
@@ -749,10 +750,10 @@ private fun PermissionStatusButton(
         OutlinedButton(
             onClick = onClick,
             colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = Color(0xFFFFB74D),
-                containerColor = Color(0x20FF9800)
+                contentColor = focivoTokens().warning,
+                containerColor = focivoTokens().warning.copy(alpha = 0.12f)
             ),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB74D)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, focivoTokens().warning),
             shape = RoundedCornerShape(8.dp),
             modifier = modifier.height(34.dp)
         ) {
@@ -777,11 +778,11 @@ private fun AppRowItem(
     onToggle: (Boolean) -> Unit
 ) {
     Surface(
-        color = if (isChecked) Color(0xFF222B20) else Color(0xFF171B16),
+        color = if (isChecked) focivoTokens().surface2 else focivoTokens().surface,
         shape = RoundedCornerShape(8.dp),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (isChecked) RegainLimePrimary.copy(alpha = 0.4f) else Color(0x10FFFFFF)
+            if (isChecked) RegainLimePrimary.copy(alpha = 0.4f) else focivoTokens().line
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -834,7 +835,7 @@ private fun AppRowItem(
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontFamily = PoppinsFontFamily,
                     fontWeight = FontWeight.Medium,
-                    color = Color(0xFFF0F4ED),
+                    color = focivoTokens().text,
                     fontSize = 13.sp
                 ),
                 maxLines = 1,
@@ -846,8 +847,8 @@ private fun AppRowItem(
                 onCheckedChange = onToggle,
                 colors = CheckboxDefaults.colors(
                     checkedColor = RegainLimePrimary,
-                    uncheckedColor = Color(0xFFA0A89E),
-                    checkmarkColor = Color(0xFF021207)
+                    uncheckedColor = focivoTokens().muted,
+                    checkmarkColor = focivoTokens().onAccent
                 )
             )
         }
@@ -859,12 +860,12 @@ private fun AppLetterPlaceholder(name: String) {
     Box(
         modifier = Modifier
             .size(28.dp)
-            .background(Color(0xFF283028), RoundedCornerShape(6.dp)),
+            .background(focivoTokens().surface2, RoundedCornerShape(6.dp)),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = name.take(1).uppercase(),
-            color = Color(0xFFF0F4ED),
+            color = focivoTokens().text,
             fontWeight = FontWeight.Bold,
             fontSize = 12.sp
         )

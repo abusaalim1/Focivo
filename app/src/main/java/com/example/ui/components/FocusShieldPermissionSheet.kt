@@ -55,6 +55,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.R
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.SerifItalicFontFamily
+import com.example.ui.theme.focivoTokens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,12 +104,10 @@ fun FocusShieldPermissionSheet(
     // v1.2.3 design-unification — owner clean-redesign language:
     // #0A0A0B sheet, #B6F13A lime, Poppins body + Instrument Serif italic
     // for the headline (same icon-tile header as the Focus Shield page).
-    val sheetBackground = Color(0xFF0A0A0B)
-    val accentLime = Color(0xFFB6F13A)
+    val sheetBackground = focivoTokens().bg
+    val accentLime = focivoTokens().accent
 
-    val serifItalic = FontFamily(
-        Font(R.font.instrument_serif_italic, FontWeight.Normal, FontStyle.Italic)
-    )
+    val serifItalic = SerifItalicFontFamily
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -281,7 +281,7 @@ private fun PermissionItemCard(
     onClick: () -> Unit
 ) {
     // v1.2.3 design-unification: owner clean-redesign lime.
-    val accentLime = Color(0xFFB6F13A)
+    val accentLime = focivoTokens().accent
 
     Row(
         modifier = Modifier
@@ -307,7 +307,7 @@ private fun PermissionItemCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (isGranted) accentLime else Color(0xFFE2E8F0),
+                tint = if (isGranted) accentLime else focivoTokens().muted,
                 modifier = Modifier.size(20.dp)
             )
         }

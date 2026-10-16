@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
@@ -52,8 +53,8 @@ fun AchievementBadgeCard(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textPrimary = focivoTokens().text
+    val textSecondary = focivoTokens().muted
 
     GlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -72,9 +73,9 @@ fun AchievementBadgeCard(
                     .clip(CircleShape)
                     .background(
                         if (achievement.isUnlocked) {
-                            if (isDark) Color(0x358CE000) else RegainLimeContainer
+                            focivoTokens().accent.copy(alpha = 0.2f)
                         } else {
-                            if (isDark) Color(0x15FFFFFF) else Color(0xFFEFF4EA)
+                            focivoTokens().surface2
                         }
                     )
                     .border(

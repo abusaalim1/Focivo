@@ -34,12 +34,14 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.isAppInDarkTheme
 import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(onSplashFinished: () -> Unit) {
-    val isDark = isAppInDarkTheme()
+    val T = focivoTokens()
+    val isDark = T.isDark
     var startAnim by remember { mutableStateOf(false) }
 
     val alphaAnim by animateFloatAsState(
@@ -60,13 +62,13 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
         onSplashFinished()
     }
 
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textPrimary = T.text
+    val textSecondary = T.muted
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)),
+            .background(T.bg),
         contentAlignment = Alignment.Center
     ) {
         Column(

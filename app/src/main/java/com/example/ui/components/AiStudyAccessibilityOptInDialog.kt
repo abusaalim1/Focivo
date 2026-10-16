@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimePrimary
 
 @Composable
@@ -51,10 +52,11 @@ fun AiStudyAccessibilityOptInDialog(
     onDismiss: () -> Unit
 ) {
     val darkSurface = Color(0xFF141814)
-    val cardBg = Color(0xFF1D241D)
+    val T = focivoTokens()
+    val cardBg = T.surface
     val limeAccent = RegainLimePrimary
-    val textPrimary = Color(0xFFF0F4ED)
-    val textSecondary = Color(0xFFA0A89E)
+    val textPrimary = T.text
+    val textSecondary = T.muted
     val scrollState = rememberScrollState()
 
     Dialog(

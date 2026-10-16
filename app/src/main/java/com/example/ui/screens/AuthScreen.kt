@@ -95,17 +95,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.ui.theme.MutedBorderLight
-import com.example.ui.theme.MutedTextLight
-import com.example.ui.theme.NearBlack
+import com.example.ui.theme.T.line
+import com.example.ui.theme.T.muted
+import com.example.ui.theme.T.text
 import com.example.ui.theme.PoppinsFontFamily
-import com.example.ui.theme.PureWhite
-import com.example.ui.theme.RegainBgTop
-import com.example.ui.theme.RegainLimeContainer
-import com.example.ui.theme.RegainLimeDeepText
-import com.example.ui.theme.RegainLimeLight
-import com.example.ui.theme.RegainLimePrimary
-import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.SerifItalicFontFamily
+import com.example.ui.theme.focivoTokens
+import com.example.ui.theme.T.text
+import com.example.ui.theme.T.softAccent
+import com.example.ui.theme.T.accentText
+import com.example.ui.theme.T.accent
+import com.example.ui.theme.T.accent
+import com.example.ui.theme.T.muted
 import com.example.ui.theme.isAppInDarkTheme
 
 /** v1.2: which tab the auth screen opens on — set by the splash flow. */
@@ -213,15 +214,15 @@ fun AuthScreen(
         }
     }
 
-    // v1.2: always dark for continuity with the splash animation
-    // (BgDark #0D110E + Lime #8CE000, same as FocivoSplash).
-    val isDark = true
-    val authBg = Color(0xFF0D110E)
-    val authLime = Color(0xFF8CE000)
-    val textColorPrimary = Color(0xFFF2F7EE)
-    val textColorSecondary = Color(0xFFA5B2A2)
-    val fieldBgColor = Color(0xFF182218)
-    val fieldBorderColor = Color(0xFF2E4028)
+    // Owner's Full App Redesign token system (dark + light aware).
+    val T = focivoTokens()
+    val isDark = T.isDark
+    val authBg = T.bg
+    val authLime = T.accent
+    val textColorPrimary = T.text
+    val textColorSecondary = T.muted
+    val fieldBgColor = T.surface
+    val fieldBorderColor = T.line
 
     Box(
         modifier = modifier
@@ -276,7 +277,7 @@ fun AuthScreen(
                         fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
-                        color = if (isDark) RegainLimeLight else RegainLimeDeepText,
+                        color = if (isDark) T.accent else T.accentText,
                         letterSpacing = 0.5.sp
                     ),
                     modifier = Modifier.testTag("focusly_wordmark")
@@ -287,12 +288,12 @@ fun AuthScreen(
                 Text(
                     text = if (isRegisterMode) "Start your focus" else "Welcome back",
                     style = TextStyle(
-                        fontFamily = FontFamily.Serif,
+                        fontFamily = SerifItalicFontFamily,
                         fontStyle = FontStyle.Italic,
                         fontWeight = FontWeight.Normal,
                         fontSize = 32.sp,
                         lineHeight = 38.sp,
-                        color = Color.White,
+                        color = T.text,
                         textAlign = TextAlign.Center
                     ),
                     modifier = Modifier.testTag("auth_headline")
@@ -348,7 +349,7 @@ fun AuthScreen(
                             .weight(1f)
                             .clip(CircleShape)
                             .background(
-                                if (!isRegisterMode) RegainLimePrimary else Color.Transparent
+                                if (!isRegisterMode) T.accent else Color.Transparent
                             )
                             .clickable {
                                 if (isRegisterMode) {
@@ -367,7 +368,7 @@ fun AuthScreen(
                                 fontFamily = PoppinsFontFamily,
                                 fontSize = 14.sp,
                                 fontWeight = if (!isRegisterMode) FontWeight.Bold else FontWeight.Medium,
-                                color = if (!isRegisterMode) PureWhite else textColorSecondary
+                                color = if (!isRegisterMode) T.onAccent else textColorSecondary
                             )
                         )
                     }
@@ -378,7 +379,7 @@ fun AuthScreen(
                             .weight(1f)
                             .clip(CircleShape)
                             .background(
-                                if (isRegisterMode) RegainLimePrimary else Color.Transparent
+                                if (isRegisterMode) T.accent else Color.Transparent
                             )
                             .clickable {
                                 if (!isRegisterMode) {
@@ -397,7 +398,7 @@ fun AuthScreen(
                                 fontFamily = PoppinsFontFamily,
                                 fontSize = 14.sp,
                                 fontWeight = if (isRegisterMode) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isRegisterMode) PureWhite else textColorSecondary
+                                color = if (isRegisterMode) T.onAccent else textColorSecondary
                             )
                         )
                     }
@@ -445,8 +446,8 @@ fun AuthScreen(
                         .padding(bottom = 14.dp)
                         .testTag("auth_verification_card"),
                     shape = RoundedCornerShape(16.dp),
-                    color = RegainLimeContainer,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, RegainLimePrimary)
+                    color = T.softAccent,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, T.accent)
                 ) {
                     Row(
                         modifier = Modifier
@@ -458,7 +459,7 @@ fun AuthScreen(
                             text = verificationMessage,
                             style = TextStyle(
                                 fontFamily = PoppinsFontFamily,
-                                color = RegainLimeDeepText,
+                                color = T.accentText,
                                 fontSize = 13.sp,
                                 lineHeight = 18.sp,
                                 fontWeight = FontWeight.Bold
@@ -477,8 +478,8 @@ fun AuthScreen(
                         .padding(bottom = 14.dp)
                         .testTag("auth_error_card"),
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFFFFF0F0),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFCDCD))
+                    color = T.danger.copy(alpha = 0.10f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, T.danger.copy(alpha = 0.25f))
                 ) {
                     Column(
                         modifier = Modifier
@@ -493,7 +494,7 @@ fun AuthScreen(
                                 text = activeError,
                                 style = TextStyle(
                                     fontFamily = PoppinsFontFamily,
-                                    color = Color(0xFFD32F2F),
+                                    color = T.danger,
                                     fontSize = 13.sp,
                                     lineHeight = 18.sp,
                                     fontWeight = FontWeight.Medium
@@ -510,7 +511,7 @@ fun AuthScreen(
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Clear error",
-                                    tint = Color(0xFFD32F2F),
+                                    tint = T.danger,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -527,8 +528,8 @@ fun AuthScreen(
                                 },
                                 shape = CircleShape,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = RegainLimePrimary,
-                                    contentColor = PureWhite
+                                    containerColor = T.accent,
+                                    contentColor = T.onAccent
                                 ),
                                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                                 modifier = Modifier
@@ -561,8 +562,8 @@ fun AuthScreen(
                                 },
                                 shape = CircleShape,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = RegainLimePrimary,
-                                    contentColor = PureWhite
+                                    containerColor = T.accent,
+                                    contentColor = T.onAccent
                                 ),
                                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                                 modifier = Modifier
@@ -623,13 +624,13 @@ fun AuthScreen(
                                 fontWeight = FontWeight.Medium
                             ),
                             placeholder = {
-                                Text("Enter your full name", color = MutedTextLight, fontFamily = PoppinsFontFamily, fontSize = 14.sp)
+                                Text("Enter your full name", color = T.muted, fontFamily = PoppinsFontFamily, fontSize = 14.sp)
                             },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Default.Person,
                                     contentDescription = "Name",
-                                    tint = RegainLimePrimary,
+                                    tint = T.accent,
                                     modifier = Modifier.size(20.dp)
                                 )
                             },
@@ -640,8 +641,8 @@ fun AuthScreen(
                                 unfocusedContainerColor = fieldBgColor,
                                 focusedTextColor = textColorPrimary,
                                 unfocusedTextColor = textColorPrimary,
-                                cursorColor = RegainLimePrimary,
-                                focusedBorderColor = RegainLimePrimary,
+                                cursorColor = T.accent,
+                                focusedBorderColor = T.accent,
                                 unfocusedBorderColor = fieldBorderColor
                             ),
                             keyboardOptions = KeyboardOptions(
@@ -684,13 +685,13 @@ fun AuthScreen(
                             fontWeight = FontWeight.Medium
                         ),
                         placeholder = {
-                            Text("name@example.com", color = MutedTextLight, fontFamily = PoppinsFontFamily, fontSize = 14.sp)
+                            Text("name@example.com", color = T.muted, fontFamily = PoppinsFontFamily, fontSize = 14.sp)
                         },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Email,
                                 contentDescription = "Email",
-                                tint = RegainLimePrimary,
+                                tint = T.accent,
                                 modifier = Modifier.size(20.dp)
                             )
                         },
@@ -716,8 +717,8 @@ fun AuthScreen(
                             unfocusedContainerColor = fieldBgColor,
                             focusedTextColor = textColorPrimary,
                             unfocusedTextColor = textColorPrimary,
-                            cursorColor = RegainLimePrimary,
-                            focusedBorderColor = RegainLimePrimary,
+                            cursorColor = T.accent,
+                            focusedBorderColor = T.accent,
                             unfocusedBorderColor = fieldBorderColor
                         ),
                         keyboardOptions = KeyboardOptions(
@@ -761,7 +762,7 @@ fun AuthScreen(
                         placeholder = {
                             Text(
                                 if (isRegisterMode) "Choose a password (min. 4 chars)" else "Enter your password",
-                                color = MutedTextLight,
+                                color = T.muted,
                                 fontFamily = PoppinsFontFamily,
                                 fontSize = 14.sp
                             )
@@ -770,7 +771,7 @@ fun AuthScreen(
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = "Password",
-                                tint = RegainLimePrimary,
+                                tint = T.accent,
                                 modifier = Modifier.size(20.dp)
                             )
                         },
@@ -792,8 +793,8 @@ fun AuthScreen(
                             unfocusedContainerColor = fieldBgColor,
                             focusedTextColor = textColorPrimary,
                             unfocusedTextColor = textColorPrimary,
-                            cursorColor = RegainLimePrimary,
-                            focusedBorderColor = RegainLimePrimary,
+                            cursorColor = T.accent,
+                            focusedBorderColor = T.accent,
                             unfocusedBorderColor = fieldBorderColor
                         ),
                         keyboardOptions = KeyboardOptions(
@@ -830,7 +831,7 @@ fun AuthScreen(
                                     fontFamily = PoppinsFontFamily,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = if (isDark) RegainLimeLight else RegainLimeDeepText
+                                    color = if (isDark) T.accent else T.accentText
                                 )
                             )
                         }
@@ -859,9 +860,9 @@ fun AuthScreen(
                                 }
                             },
                             colors = CheckboxDefaults.colors(
-                                checkedColor = RegainLimePrimary,
+                                checkedColor = T.accent,
                                 uncheckedColor = textColorSecondary,
-                                checkmarkColor = PureWhite
+                                checkmarkColor = T.onAccent
                             ),
                             modifier = Modifier.testTag("privacy_policy_checkbox")
                         )
@@ -873,7 +874,7 @@ fun AuthScreen(
                             pushStringAnnotation(tag = "PRIVACY_POLICY", annotation = "open")
                             withStyle(
                                 style = SpanStyle(
-                                    color = if (isDark) RegainLimeLight else RegainLimeDeepText,
+                                    color = if (isDark) T.accent else T.accentText,
                                     fontFamily = PoppinsFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
@@ -982,7 +983,7 @@ fun AuthScreen(
                             fontFamily = PoppinsFontFamily,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isDark) RegainLimeLight else RegainLimeDeepText
+                            color = if (isDark) T.accent else T.accentText
                         )
                     )
                 }
@@ -1114,11 +1115,11 @@ fun GoogleAccountSelectDialog(
     var inputError by remember { mutableStateOf<String?>(null) }
 
     val isDark = isAppInDarkTheme()
-    val dialogBg = if (isDark) Color(0xFF1B221B) else PureWhite
-    val dialogFieldBg = if (isDark) Color(0xFF242C23) else PureWhite
-    val dialogTextColor = if (isDark) PureWhite else NearBlack
-    val dialogSecondaryText = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val dialogBorder = if (isDark) Color(0x358CE000) else MutedBorderLight
+    val dialogBg = T.surface
+    val dialogFieldBg = T.surface2
+    val dialogTextColor = T.text
+    val dialogSecondaryText = T.muted
+    val dialogBorder = T.accent.copy(alpha = 0.2f)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1186,11 +1187,11 @@ fun GoogleAccountSelectDialog(
                         googleName = it
                         inputError = null
                     },
-                    placeholder = { Text("e.g. Tommy Smith", fontFamily = PoppinsFontFamily, fontSize = 13.5.sp, color = MutedTextLight) },
+                    placeholder = { Text("e.g. Tommy Smith", fontFamily = PoppinsFontFamily, fontSize = 13.5.sp, color = T.muted) },
                     singleLine = true,
                     shape = CircleShape,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RegainLimePrimary,
+                        focusedBorderColor = T.accent,
                         unfocusedBorderColor = dialogBorder,
                         focusedContainerColor = dialogFieldBg,
                         unfocusedContainerColor = dialogFieldBg,
@@ -1214,11 +1215,11 @@ fun GoogleAccountSelectDialog(
                         googleEmail = it
                         inputError = null
                     },
-                    placeholder = { Text("tommy@gmail.com", fontFamily = PoppinsFontFamily, fontSize = 13.5.sp, color = MutedTextLight) },
+                    placeholder = { Text("tommy@gmail.com", fontFamily = PoppinsFontFamily, fontSize = 13.5.sp, color = T.muted) },
                     singleLine = true,
                     shape = CircleShape,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RegainLimePrimary,
+                        focusedBorderColor = T.accent,
                         unfocusedBorderColor = dialogBorder,
                         focusedContainerColor = dialogFieldBg,
                         unfocusedContainerColor = dialogFieldBg,
@@ -1232,7 +1233,7 @@ fun GoogleAccountSelectDialog(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = inputError!!,
-                        style = TextStyle(color = Color(0xFFD32F2F), fontSize = 12.sp, fontFamily = PoppinsFontFamily)
+                        style = TextStyle(color = T.danger, fontSize = 12.sp, fontFamily = PoppinsFontFamily)
                     )
                 }
 
@@ -1249,7 +1250,7 @@ fun GoogleAccountSelectDialog(
                         onSelectAccount(name, googleEmail.trim())
                     },
                     shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = RegainLimePrimary, contentColor = MaterialTheme.colorScheme.onPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = T.accent, contentColor = MaterialTheme.colorScheme.onPrimary),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
@@ -1269,7 +1270,7 @@ fun GoogleAccountSelectDialog(
                 ) {
                     Text(
                         text = "Use Android Credential Manager Prompt",
-                        style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 12.5.sp, color = RegainLimeDeepText, fontWeight = FontWeight.SemiBold)
+                        style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 12.5.sp, color = T.accentText, fontWeight = FontWeight.SemiBold)
                     )
                 }
             }
@@ -1290,8 +1291,8 @@ private fun ForgotPasswordDialog(
 ) {
     var email by remember { mutableStateOf(initialEmail) }
     val isDark = isAppInDarkTheme()
-    val textPrimary = if (isDark) PureWhite else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA9B3AB) else SecondaryTextLight
+    val textPrimary = T.text
+    val textSecondary = T.muted
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1320,7 +1321,7 @@ private fun ForgotPasswordDialog(
                             text = resetState.message,
                             fontFamily = PoppinsFontFamily,
                             fontSize = 14.sp,
-                            color = Color(0xFFEF4444)
+                            color = T.danger
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -1342,8 +1343,8 @@ private fun ForgotPasswordDialog(
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = RegainLimePrimary,
-                            cursorColor = RegainLimePrimary
+                            focusedBorderColor = T.accent,
+                            cursorColor = T.accent
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1387,8 +1388,8 @@ private fun SetNewPasswordSheet(
     var confirm by remember { mutableStateOf("") }
     var localError by remember { mutableStateOf<String?>(null) }
     val isDark = isAppInDarkTheme()
-    val textPrimary = if (isDark) PureWhite else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA9B3AB) else SecondaryTextLight
+    val textPrimary = T.text
+    val textSecondary = T.muted
     val updating = resetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Updating
 
     AlertDialog(
@@ -1419,8 +1420,8 @@ private fun SetNewPasswordSheet(
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RegainLimePrimary,
-                        cursorColor = RegainLimePrimary
+                        focusedBorderColor = T.accent,
+                        cursorColor = T.accent
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1435,8 +1436,8 @@ private fun SetNewPasswordSheet(
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RegainLimePrimary,
-                        cursorColor = RegainLimePrimary
+                        focusedBorderColor = T.accent,
+                        cursorColor = T.accent
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1450,7 +1451,7 @@ private fun SetNewPasswordSheet(
                         text = showError,
                         fontFamily = PoppinsFontFamily,
                         fontSize = 13.sp,
-                        color = Color(0xFFEF4444)
+                        color = T.danger
                     )
                 }
             }

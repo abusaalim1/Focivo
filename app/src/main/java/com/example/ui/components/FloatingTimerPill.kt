@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.focivoTokens
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -83,8 +84,8 @@ fun FloatingTimerPill(
         modifier = modifier
             .shadow(elevation = 14.dp, shape = RoundedCornerShape(22.dp), spotColor = Color.Black.copy(alpha = 0.6f))
             .clip(RoundedCornerShape(22.dp))
-            .background(Color(0xFF111613))
-            .border(1.dp, Color(0x26FFFFFF), RoundedCornerShape(22.dp))
+            .background(focivoTokens().surface)
+            .border(1.dp, focivoTokens().line, RoundedCornerShape(22.dp))
             .clickable(
                 interactionSource = pillInteraction,
                 indication = null,
@@ -99,7 +100,7 @@ fun FloatingTimerPill(
             modifier = Modifier
                 .size(46.dp)
                 .clip(CircleShape)
-                .background(Color(0xFF8FD400)),
+                .background(focivoTokens().accent),
             contentAlignment = Alignment.Center
         ) {
             Canvas(modifier = Modifier.size(20.dp)) {
@@ -111,7 +112,7 @@ fun FloatingTimerPill(
                     lineTo(w * 0.28f, h * 0.82f)
                     close()
                 }
-                drawPath(path, Color(0xFF10160F))
+                drawPath(path, focivoTokens().onAccent)
             }
         }
 
@@ -127,7 +128,7 @@ fun FloatingTimerPill(
             )
             Text(
                 text = "Time remaining",
-                color = Color(0xFF9AA79B),
+                color = focivoTokens().muted,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -140,7 +141,7 @@ fun FloatingTimerPill(
             modifier = Modifier
                 .size(38.dp)
                 .clip(CircleShape)
-                .background(Color(0xFF232B25))
+                .background(focivoTokens().surface2)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -151,7 +152,7 @@ fun FloatingTimerPill(
             Icon(
                 imageVector = Icons.Default.Close,
                 contentDescription = "Hide timer",
-                tint = Color(0xFFC9D3CA),
+                tint = focivoTokens().text,
                 modifier = Modifier.size(20.dp)
             )
         }

@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.SecondaryTextLight
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -82,10 +83,11 @@ private fun applyDistractionSuggestion(context: android.content.Context, answerK
 fun OnboardingScreen(
     onCompleteOnboarding: (dailyGoalMinutes: Int) -> Unit
 ) {
-    val isDark = isAppInDarkTheme()
+    val T = focivoTokens()
+    val isDark = T.isDark
     // v1.4.2: explicit text colors (colorScheme.onSurface renders dark on dark cards)
-    val tPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val tSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val tPrimary = T.text
+    val tSecondary = T.muted
     val context = LocalContext.current
     var currentStep by remember { mutableIntStateOf(0) }
     var selectedGoalHours by remember { mutableIntStateOf(4) }
@@ -126,7 +128,7 @@ fun OnboardingScreen(
                             .height(4.dp)
                             .clip(CircleShape)
                             .background(
-                                if (isActive) RegainLimePrimary else (if (isDark) Color(0x22FFFFFF) else Color(0x18000000))
+                                if (isActive) T.accent else T.line
                             )
                     )
                 }
@@ -273,7 +275,7 @@ fun OnboardingScreen(
                                                     modifier = Modifier
                                                         .size(10.dp)
                                                         .clip(CircleShape)
-                                                        .background(if (isDark) Color(0xFF121511) else Color.White)
+                                                        .background(T.surface)
                                                 )
                                             }
                                         }

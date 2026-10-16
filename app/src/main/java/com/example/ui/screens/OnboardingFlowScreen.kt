@@ -80,6 +80,7 @@ import com.example.ui.components.RegainMascotView
 import com.example.ui.components.SensitivePermission
 import com.example.ui.components.TrustExplainerDialog
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
@@ -358,7 +359,7 @@ private fun FlowProgressBar(progress: Float, isDark: Boolean) {
             .fillMaxWidth()
             .height(4.dp)
             .clip(CircleShape)
-            .background(if (isDark) Color(0x22FFFFFF) else Color(0x18000000))
+            .background(focivoTokens().line)
     ) {
         Box(
             modifier = Modifier
@@ -398,7 +399,7 @@ fun OnboardingWhitePill(
             style = MaterialTheme.typography.titleMedium.copy(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = if (enabled) Color(0xFF0D1B05) else Color(0x990D1B05),
+                color = if (enabled) focivoTokens().onAccent else focivoTokens().onAccent.copy(alpha = 0.6f),
                 fontSize = 16.sp
             )
         )
@@ -424,7 +425,7 @@ private fun QuietTextButton(text: String, onClick: () -> Unit, testTag: String =
             style = MaterialTheme.typography.titleSmall.copy(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF8E9B8A),
+                color = focivoTokens().muted,
                 fontSize = 14.sp
             )
         )
@@ -441,7 +442,7 @@ fun OpeningIntroVisual(progress: Float) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)),
+            .background(focivoTokens().bg),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -465,7 +466,7 @@ fun OpeningIntroVisual(progress: Float) {
                     fontWeight = FontWeight.Bold,
                     fontSize = 34.sp,
                     letterSpacing = 8.sp,
-                    color = if (isDark) Color(0xFFF0F4ED) else NearBlack
+                    color = focivoTokens().text
                 ),
                 modifier = Modifier.alpha(progress)
             )
@@ -475,7 +476,7 @@ fun OpeningIntroVisual(progress: Float) {
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontFamily = PoppinsFontFamily,
                     fontSize = 14.sp,
-                    color = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+                    color = focivoTokens().muted
                 ),
                 modifier = Modifier.alpha(progress)
             )
@@ -543,15 +544,15 @@ fun FlowQuestionContent(
     onBack: (() -> Unit)?
 ) {
     val isDark = isAppInDarkTheme()
-    val tPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val tSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val cardBg = if (isDark) Color(0xFF171C16) else Color.White
-    val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0xFFE3EADF)
+    val tPrimary = focivoTokens().text
+    val tSecondary = focivoTokens().muted
+    val cardBg = focivoTokens().surface
+    val cardBorder = focivoTokens().line
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7))
+            .background(focivoTokens().bg)
             .padding(horizontal = 24.dp)
             .padding(top = 56.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState())
@@ -570,7 +571,7 @@ fun FlowQuestionContent(
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
-                        color = if (isDark) RegainLimePrimary else Color(0xFF4C8A00),
+                        color = focivoTokens().accentText,
                         letterSpacing = 1.6.sp,
                         fontSize = 11.sp
                     )
@@ -683,7 +684,7 @@ fun FlowQuestionContent(
                                     fontFamily = PoppinsFontFamily,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isSelected && isDark) RegainLimePrimary
-                                    else if (isSelected) Color(0xFF3E6E00)
+                                    else if (isSelected) focivoTokens().accentText
                                     else tPrimary,
                                     fontSize = 15.sp
                                 ),
@@ -708,7 +709,7 @@ fun FlowQuestionContent(
                                             modifier = Modifier
                                                 .size(10.dp)
                                                 .clip(RoundedCornerShape(3.dp))
-                                                .background(if (isDark) Color(0xFF121511) else Color.White)
+                                                .background(focivoTokens().surface)
                                         )
                                     }
                                 }
@@ -730,7 +731,7 @@ fun FlowQuestionContent(
                                             modifier = Modifier
                                                 .size(10.dp)
                                                 .clip(CircleShape)
-                                                .background(if (isDark) Color(0xFF121511) else Color.White)
+                                                .background(focivoTokens().surface)
                                         )
                                     }
                                 }
@@ -770,13 +771,13 @@ fun ShowcaseSlideContent(
     onSkip: () -> Unit
 ) {
     val isDark = isAppInDarkTheme()
-    val tPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val tSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val tPrimary = focivoTokens().text
+    val tSecondary = focivoTokens().muted
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7))
+            .background(focivoTokens().bg)
             .padding(horizontal = 24.dp)
             .padding(top = 72.dp, bottom = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -812,7 +813,7 @@ fun ShowcaseSlideContent(
             style = MaterialTheme.typography.labelSmall.copy(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = if (isDark) RegainLimePrimary else Color(0xFF4C8A00),
+                color = focivoTokens().accentText,
                 letterSpacing = 2.sp,
                 fontSize = 11.sp
             )
@@ -860,8 +861,8 @@ fun GroupStepContent(
     onSkip: () -> Unit
 ) {
     val isDark = isAppInDarkTheme()
-    val tPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val tSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val tPrimary = focivoTokens().text
+    val tSecondary = focivoTokens().muted
     val preview = remember(users) {
         users.sortedByDescending { it.weeklyStudySeconds }.take(3)
     }
@@ -869,7 +870,7 @@ fun GroupStepContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7))
+            .background(focivoTokens().bg)
             .padding(horizontal = 24.dp)
             .padding(top = 56.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState()),
@@ -912,7 +913,7 @@ fun GroupStepContent(
                             text = "Live",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFF9AA79B),
+                                color = focivoTokens().muted,
                                 fontSize = 12.sp
                             )
                         )
@@ -936,7 +937,7 @@ fun GroupStepContent(
                             text = "Your leaderboard will appear here as you focus.",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFF9AA79B),
+                                color = focivoTokens().muted,
                                 fontSize = 13.sp
                             ),
                             textAlign = TextAlign.Center
@@ -955,7 +956,7 @@ fun GroupStepContent(
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontFamily = PoppinsFontFamily,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF9AA79B),
+                                    color = focivoTokens().muted,
                                     fontSize = 14.sp
                                 ),
                                 modifier = Modifier.width(24.dp)
@@ -966,7 +967,7 @@ fun GroupStepContent(
                                     .clip(CircleShape)
                                     .background(
                                         if (user.isCurrentUser) RegainLimePrimary
-                                        else Color(0xFF2A332A)
+                                        else focivoTokens().surface2
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -975,7 +976,7 @@ fun GroupStepContent(
                                     style = MaterialTheme.typography.titleSmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (user.isCurrentUser) Color(0xFF0D1B05) else Color.White,
+                                        color = if (user.isCurrentUser) focivoTokens().onAccent else focivoTokens().text,
                                         fontSize = 15.sp
                                     )
                                 )
@@ -1078,17 +1079,17 @@ fun PermissionGrantContent(
     onBack: (() -> Unit)?
 ) {
     val isDark = isAppInDarkTheme()
-    val tPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val tSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val bubbleBg = if (isDark) Color(0xFF1B211A) else Color.White
-    val bubbleBorder = if (isDark) Color(0x22FFFFFF) else Color(0xFFE3EADF)
-    val rowBg = if (isDark) Color(0xFF171B16) else Color(0xFF10140F)
+    val tPrimary = focivoTokens().text
+    val tSecondary = focivoTokens().muted
+    val bubbleBg = focivoTokens().surface
+    val bubbleBorder = focivoTokens().line
+    val rowBg = focivoTokens().surface2
     var whyExpanded by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7))
+            .background(focivoTokens().bg)
             .padding(horizontal = 24.dp)
             .padding(top = 56.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState())
@@ -1105,7 +1106,7 @@ fun PermissionGrantContent(
                 modifier = Modifier
                     .size(64.dp)
                     .clip(CircleShape)
-                    .background(if (isDark) Color(0xFF1E251D) else Color(0xFFF0F4EC))
+                    .background(focivoTokens().surface)
                     .border(1.dp, RegainLimePrimary.copy(alpha = 0.4f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -1187,7 +1188,7 @@ fun PermissionGrantContent(
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0D1B05),
+                            color = focivoTokens().onAccent,
                             fontSize = 15.sp
                         )
                     )

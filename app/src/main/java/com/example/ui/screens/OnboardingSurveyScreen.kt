@@ -85,6 +85,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.example.R
 import com.example.ui.components.GlassCard
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeLight
@@ -378,21 +379,12 @@ fun OnboardingSurveyScreen(
     val currentQuestion = questions[currentStepIndex]
     val totalSteps = questions.size
 
-    val bgGradient = if (darkTheme) {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFF0D151E),
-                Color(0xFF070C12),
-                Color(0xFF030508)
-            )
+    val T = focivoTokens()
+    val bgGradient = Brush.verticalGradient(
+        colors = listOf(
+            T.bg,
+            T.bg
         )
-    } else {
-        Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFFF7FCF5),
-                Color(0xFFEFF9EB),
-                Color(0xFFE4F5DC)
-            )
         )
     }
 
@@ -454,7 +446,7 @@ fun OnboardingSurveyScreen(
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = "Back",
-                                        tint = if (darkTheme) RegainLimePrimary else Color(0xFF15803D),
+                                        tint = focivoTokens().accentText,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -472,7 +464,7 @@ fun OnboardingSurveyScreen(
                                     fontFamily = PoppinsFontFamily,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 1.3.sp,
-                                    color = if (darkTheme) RegainLimePrimary else Color(0xFF15803D)
+                                    color = focivoTokens().accentText
                                 )
                             )
 
@@ -487,7 +479,7 @@ fun OnboardingSurveyScreen(
                                 .fillMaxWidth()
                                 .height(5.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(if (darkTheme) Color(0xFF1B2820) else Color(0xFFE2E8F0))
+                                .background(focivoTokens().surface2)
                         ) {
                             val activeProgress = when (stage) {
                                 OnboardingStage.INTRO -> 0.10f
@@ -505,16 +497,7 @@ fun OnboardingSurveyScreen(
                                         ambientColor = RegainLimePrimary.copy(alpha = 0.6f)
                                     )
                                     .clip(RoundedCornerShape(3.dp))
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            colors = listOf(
-                                                RegainLimePrimary,
-                                                Color(0xFFAEF72A),
-                                                RegainLimeLight,
-                                                RegainLimePrimary
-                                            )
-                                        )
-                                    )
+                                    .background(focivoTokens().accent)
                             )
                         }
                     }
@@ -581,7 +564,7 @@ fun OnboardingSurveyScreen(
                                         )
                                         .clip(CircleShape)
                                         .background(
-                                            if (buttonEnabled) RegainLimePrimary else (if (darkTheme) Color(0x33FFFFFF) else Color(0xFFCBD5E1))
+                                            if (buttonEnabled) focivoTokens().accent else focivoTokens().accent.copy(alpha = 0.35f)
                                         )
                                         .clickable(enabled = buttonEnabled) {
                                             when (currentStepIndex) {
@@ -747,7 +730,7 @@ fun OnboardingSurveyScreen(
                                             fontFamily = PoppinsFontFamily,
                                             fontWeight = FontWeight.Bold,
                                             letterSpacing = 2.sp,
-                                            color = if (darkTheme) RegainLimePrimary else Color(0xFF15803D)
+                                            color = focivoTokens().accentText
                                         )
                                     )
 
@@ -759,7 +742,7 @@ fun OnboardingSurveyScreen(
                                             fontFamily = PoppinsFontFamily,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 24.sp,
-                                            color = if (darkTheme) Color(0xFFF0F4ED) else NearBlack
+                                            color = focivoTokens().text
                                         )
                                     )
 
@@ -790,7 +773,7 @@ fun OnboardingSurveyScreen(
                                                         fontFamily = PoppinsFontFamily,
                                                         fontWeight = FontWeight.Bold,
                                                         letterSpacing = 1.2.sp,
-                                                        color = if (darkTheme) RegainLimePrimary else Color(0xFF15803D)
+                                                        color = focivoTokens().accentText
                                                     )
                                                 )
                                             }
@@ -802,7 +785,7 @@ fun OnboardingSurveyScreen(
                                                     fontWeight = FontWeight.Medium,
                                                     fontSize = 15.sp,
                                                     lineHeight = 22.sp,
-                                                    color = if (darkTheme) Color(0xFFF0F4ED) else NearBlack
+                                                    color = focivoTokens().text
                                                 )
                                             )
                                         }
@@ -835,7 +818,7 @@ fun OnboardingSurveyScreen(
                                             Icon(
                                                 imageVector = question.icon,
                                                 contentDescription = null,
-                                                tint = if (darkTheme) RegainLimePrimary else Color(0xFF15803D),
+                                                tint = focivoTokens().accentText,
                                                 modifier = Modifier.size(24.dp)
                                             )
                                         }
@@ -847,7 +830,7 @@ fun OnboardingSurveyScreen(
                                                     fontFamily = PoppinsFontFamily,
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 18.sp,
-                                                    color = if (darkTheme) Color(0xFFF0F4ED) else NearBlack
+                                                    color = focivoTokens().text
                                                 )
                                             )
                                             Spacer(modifier = Modifier.height(2.dp))
@@ -857,7 +840,7 @@ fun OnboardingSurveyScreen(
                                                     fontFamily = PoppinsFontFamily,
                                                     fontSize = 12.sp,
                                                     lineHeight = 16.sp,
-                                                    color = if (darkTheme) Color(0xFFA0A89E) else SecondaryTextLight
+                                                    color = focivoTokens().muted
                                                 )
                                             )
                                         }
@@ -883,11 +866,11 @@ fun OnboardingSurveyScreen(
                                                             .testTag("survey_name_input"),
                                                         colors = OutlinedTextFieldDefaults.colors(
                                                             focusedBorderColor = RegainLimePrimary,
-                                                            unfocusedBorderColor = if (darkTheme) Color.White.copy(alpha = 0.3f) else Color(0xFF94A3B8),
-                                                            focusedLabelColor = if (darkTheme) RegainLimePrimary else Color(0xFF15803D),
-                                                            unfocusedLabelColor = if (darkTheme) Color.White.copy(alpha = 0.7f) else Color(0xFF475569),
-                                                            focusedTextColor = if (darkTheme) Color.White else Color(0xFF0F172A),
-                                                            unfocusedTextColor = if (darkTheme) Color.White else Color(0xFF0F172A)
+                                                            unfocusedBorderColor = focivoTokens().line,
+                                                            focusedLabelColor = focivoTokens().accentText,
+                                                            unfocusedLabelColor = focivoTokens().muted,
+                                                            focusedTextColor = focivoTokens().text,
+                                                            unfocusedTextColor = focivoTokens().text
                                                         )
                                                     )
                                                 }
@@ -1110,7 +1093,7 @@ private fun ObsidianPermissionModalOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xCC04070D))
+                .background(focivoTokens().scrim)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -1141,26 +1124,8 @@ private fun ObsidianPermissionModalOverlay(
                             ambientColor = Color.Black.copy(alpha = 0.6f)
                         )
                         .clip(RoundedCornerShape(26.dp))
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0xFF0F151E),
-                                    Color(0xFF080C12),
-                                    Color(0xFF05070B)
-                                )
-                            )
-                        )
-                        .border(
-                            width = 1.2.dp,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0x55FFFFFF),
-                                    Color(0x20FFFFFF),
-                                    Color(0x0DFFFFFF)
-                                )
-                            ),
-                            shape = RoundedCornerShape(26.dp)
-                        )
+                        .background(focivoTokens().surface)
+                        .border(1.dp, focivoTokens().line, RoundedCornerShape(26.dp))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
@@ -1216,7 +1181,7 @@ private fun ObsidianPermissionModalOverlay(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 10.5.sp,
                                     letterSpacing = 1.3.sp,
-                                    color = Color(0xFFCBD5E1)
+                                    color = focivoTokens().muted
                                 )
                             )
                         }
@@ -1241,7 +1206,7 @@ private fun ObsidianPermissionModalOverlay(
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 13.5.sp,
                                 lineHeight = 19.sp,
-                                color = Color(0xFF94A3B8)
+                                color = focivoTokens().muted
                             ),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(horizontal = 8.dp)
@@ -1267,15 +1232,7 @@ private fun ObsidianPermissionModalOverlay(
                                             ambientColor = RegainLimePrimary.copy(alpha = 0.25f)
                                         )
                                         .clip(RoundedCornerShape(14.dp))
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                colors = listOf(
-                                                    RegainLimePrimary,
-                                                    Color(0xFFAEF72A),
-                                                    RegainLimeLight
-                                                )
-                                            )
-                                        )
+                                        .background(focivoTokens().accent)
                                         .clickable { onEnableClick() },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -1307,7 +1264,7 @@ private fun ObsidianPermissionModalOverlay(
                                             fontFamily = PoppinsFontFamily,
                                             fontWeight = FontWeight.Medium,
                                             fontSize = 13.sp,
-                                            color = Color(0xFF94A3B8)
+                                            color = focivoTokens().muted
                                         )
                                     )
                                 }
@@ -1358,17 +1315,9 @@ private fun OptionList(
             val optionIconRes = optionIcons?.getOrNull(index)
             val isSelected = option == selectedOption
 
-            val cardBg = if (isSelected) {
-                if (darkTheme) Color(0xEE1C2F22) else Color(0xF2F0FDF4)
-            } else {
-                if (darkTheme) Color(0xCC111813) else Color(0xFAFFFFFF)
-            }
+            val cardBg = if (isSelected) focivoTokens().softAccent else focivoTokens().surface
 
-            val borderColor = if (isSelected) {
-                RegainLimePrimary
-            } else {
-                if (darkTheme) Color(0x22FFFFFF) else Color(0xFFE2E8F0)
-            }
+            val borderColor = if (isSelected) focivoTokens().accent else focivoTokens().line
 
             Box(
                 modifier = Modifier
@@ -1413,9 +1362,9 @@ private fun OptionList(
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                             fontSize = 14.5.sp,
                             color = if (isSelected) {
-                                if (darkTheme) Color.White else NearBlack
+                                focivoTokens().text
                             } else {
-                                if (darkTheme) Color(0xDDFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
+                                focivoTokens().muted
                             }
                         ),
                         modifier = Modifier.weight(1f)
@@ -1445,7 +1394,7 @@ private fun OptionList(
                                 .clip(CircleShape)
                                 .border(
                                     width = 1.5.dp,
-                                    color = if (darkTheme) Color(0x40FFFFFF) else Color(0xFFCBD5E1),
+                                    color = focivoTokens().line,
                                     shape = CircleShape
                                 )
                         )
@@ -1473,17 +1422,9 @@ private fun MultiSelectOptionList(
             val optionIconRes = optionIcons?.getOrNull(index)
             val isSelected = selectedOptions.contains(option)
 
-            val cardBg = if (isSelected) {
-                if (darkTheme) Color(0xEE1C2F22) else Color(0xF2F0FDF4)
-            } else {
-                if (darkTheme) Color(0xCC111813) else Color(0xFAFFFFFF)
-            }
+            val cardBg = if (isSelected) focivoTokens().softAccent else focivoTokens().surface
 
-            val borderColor = if (isSelected) {
-                RegainLimePrimary
-            } else {
-                if (darkTheme) Color(0x22FFFFFF) else Color(0xFFE2E8F0)
-            }
+            val borderColor = if (isSelected) focivoTokens().accent else focivoTokens().line
 
             Box(
                 modifier = Modifier
@@ -1528,9 +1469,9 @@ private fun MultiSelectOptionList(
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                             fontSize = 14.5.sp,
                             color = if (isSelected) {
-                                if (darkTheme) Color.White else NearBlack
+                                focivoTokens().text
                             } else {
-                                if (darkTheme) Color(0xDDFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
+                                focivoTokens().muted
                             }
                         ),
                         modifier = Modifier.weight(1f)
@@ -1545,7 +1486,7 @@ private fun MultiSelectOptionList(
                             .background(if (isSelected) RegainLimePrimary else Color.Transparent)
                             .border(
                                 width = 1.5.dp,
-                                color = if (isSelected) RegainLimePrimary else (if (darkTheme) Color(0x40FFFFFF) else Color(0xFFCBD5E1)),
+                                color = if (isSelected) focivoTokens().accent else focivoTokens().line,
                                 shape = RoundedCornerShape(6.dp)
                             ),
                         contentAlignment = Alignment.Center

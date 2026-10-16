@@ -53,6 +53,7 @@ import com.example.R
 import com.example.data.FocuslyRepository
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.util.TimerTheme
@@ -96,11 +97,12 @@ fun StudyHubSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val isDark = isAppInDarkTheme()
-    val sheetBackground = if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val rowBg = if (isDark) Color(0xFF1D221C) else Color.White
-    val rowBorder = if (isDark) Color(0x228CE000) else Color(0xFFDCE6D2)
+    val sheetBackground = T.bg
+    val T = focivoTokens()
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val rowBg = T.surface
+    val rowBorder = T.line
 
     var expandedSection by remember { mutableStateOf(initialExpandedSection) }
     var showDistractionDialog by remember { mutableStateOf(false) }
@@ -463,7 +465,7 @@ private fun HubToggleRow(
             colors = SwitchDefaults.colors(
                 checkedTrackColor = StudyAccent,
                 checkedThumbColor = Color.White,
-                uncheckedTrackColor = if (isDark) Color(0xFF3A3F3A) else Color(0xFFE0E0E0)
+                uncheckedTrackColor = T.trackOff
             )
         )
     }
@@ -505,7 +507,7 @@ private fun HubActionRow(
             size = 44.dp,
             customContent = iconCustom,
             vectorCircleColor = if (badgeCount > 0) StudyAccent.copy(alpha = 0.18f)
-            else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6),
+            else T.surface2,
             vectorTint = if (badgeCount > 0) (if (isDark) StudyAccent else Color(0xFF4A7A00))
             else textSecondary
         )

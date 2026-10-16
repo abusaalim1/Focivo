@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.isAppInDarkTheme
 import androidx.compose.ui.graphics.Color
@@ -43,8 +44,9 @@ fun StrictEndSessionDialog(
     onConfirmEnd: () -> Unit
 ) {
     val isDark = isAppInDarkTheme()
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else Color(0xFF5A6258)
+    val T = focivoTokens()
+    val textPrimary = T.text
+    val textSecondary = T.muted
 
     BasicAlertDialog(
         onDismissRequest = onDismiss,
@@ -52,7 +54,7 @@ fun StrictEndSessionDialog(
     ) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = if (isDark) Color(0xFF1D221C) else Color.White
+            color = focivoTokens().surface
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),

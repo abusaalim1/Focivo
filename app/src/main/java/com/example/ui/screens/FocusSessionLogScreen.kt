@@ -72,6 +72,7 @@ import com.example.ui.components.MascotPose
 import com.example.ui.components.RegainMascotView
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
@@ -89,9 +90,10 @@ fun FocusSessionLogScreen(
     onDeleteSession: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val isDark = isAppInDarkTheme()
-    val textPrimary = if (isDark) Color(0xFFF2F7EE) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA5B2A2) else Color(0xFF6B7280)
+    val T = focivoTokens()
+    val isDark = T.isDark
+    val textPrimary = T.text
+    val textSecondary = T.muted
     val limeAccent = RegainLimePrimary
 
     var selectedFilter by remember { mutableStateOf("All") }
@@ -332,7 +334,7 @@ fun FocusSessionLogScreen(
                                     selectedContainerColor = limeAccent,
                                     selectedLabelColor = NearBlack,
                                     containerColor = if (isDark) Color(0x18FFFFFF) else Color(0x0A000000),
-                                    labelColor = if (isDark) Color(0xFFE9EFE7) else textSecondary
+                                    labelColor = textSecondary
                                 ),
                                 border = FilterChipDefaults.filterChipBorder(
                                     borderColor = if (isSelected) limeAccent else (if (isDark) Color(0x20FFFFFF) else Color(0x15000000)),
@@ -611,7 +613,7 @@ private fun FocusSessionLogCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(if (isDark) Color(0xFF0F1711) else Color(0xFFF3F6F1))
+                    .background(focivoTokens().surface)
                     .border(1.dp, if (isDark) Color(0x18FFFFFF) else Color(0x10000000), RoundedCornerShape(14.dp))
                     .padding(horizontal = 12.dp, vertical = 9.dp)
             ) {

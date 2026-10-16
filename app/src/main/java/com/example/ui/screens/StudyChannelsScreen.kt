@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
@@ -60,7 +61,7 @@ import com.example.util.StudyChannelsManager
 // v1.2.3 design-unification — owner's clean-redesign language:
 // #0A0A0B bg, #131315 cards, #1F1F22 lines, #B6F13A lime, #76767C muted,
 // Poppins body + Instrument Serif italic for the page headline.
-private val ChannelsLime = Color(0xFFB6F13A)
+private val ChannelsLime @Composable get() = focivoTokens().accent
 
 private val ChannelsSerifItalic = FontFamily(
     Font(R.font.instrument_serif_italic, FontWeight.Normal, FontStyle.Italic)
@@ -98,12 +99,12 @@ fun StudyChannelsScreen(
         }
     }
 
-    val bg = if (isDark) Color(0xFF0A0A0B) else Color(0xFFF5FAFB)
-    val cardBg = if (isDark) Color(0xFF131315) else Color.White
-    val cardBorder = if (isDark) Color(0xFF1F1F22) else Color(0xFFDCE6D2)
-    val titleColor = if (isDark) Color(0xFFF4F4F5) else NearBlack
-    val bodyColor = if (isDark) Color(0xFF76767C) else SecondaryTextLight
-    val accentText = if (isDark) ChannelsLime else RegainLimeDeepText
+    val bg = focivoTokens().bg
+    val cardBg = focivoTokens().surface
+    val cardBorder = focivoTokens().line
+    val titleColor = focivoTokens().text
+    val bodyColor = focivoTokens().muted
+    val accentText = focivoTokens().accentText
 
     Column(
         modifier = Modifier
@@ -200,7 +201,7 @@ fun StudyChannelsScreen(
             Text(
                 text = "Please enter a valid, non-duplicate channel name.",
                 style = MaterialTheme.typography.bodySmall.copy(
-                    color = Color(0xFFFF5252),
+                    color = focivoTokens().danger,
                     fontSize = 12.sp
                 )
             )

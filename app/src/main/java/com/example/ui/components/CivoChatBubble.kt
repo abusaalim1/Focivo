@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.SecondaryTextLight
@@ -137,7 +138,7 @@ fun CivoChatBubble(
                         ambientColor = RegainLimePrimary.copy(alpha = 0.25f)
                     )
                     .background(
-                        color = if (darkTheme) RegainLimePrimary.copy(alpha = 0.18f) else Color(0x33A3E635),
+                        color = focivoTokens().accent.copy(alpha = 0.18f),
                         shape = CircleShape
                     )
             )
@@ -147,7 +148,7 @@ fun CivoChatBubble(
                 modifier = Modifier
                     .size(avatarSize)
                     .clip(CircleShape)
-                    .background(if (darkTheme) Color(0xFF142418) else Color(0xFFEBF7EE))
+                    .background(focivoTokens().surface2)
                     .border(
                         width = 1.5.dp,
                         brush = Brush.linearGradient(
@@ -177,16 +178,16 @@ fun CivoChatBubble(
                 .shadow(
                     elevation = 4.dp,
                     shape = RoundedCornerShape(topStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp, bottomStart = 20.dp),
-                    spotColor = if (darkTheme) RegainLimePrimary.copy(alpha = 0.20f) else Color.Black.copy(alpha = 0.08f),
+                    spotColor = focivoTokens().accent.copy(alpha = 0.20f),
                     ambientColor = Color.Black.copy(alpha = 0.04f)
                 )
                 .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp, bottomStart = 20.dp))
                 .background(
-                    if (darkTheme) Color(0xF0121D15) else Color(0xFAFFFFFF)
+                    focivoTokens().surface
                 )
                 .border(
                     width = 1.dp,
-                    color = if (darkTheme) Color(0x30FFFFFF) else Color(0xFFE2E8F0),
+                    color = focivoTokens().line,
                     shape = RoundedCornerShape(topStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp, bottomStart = 20.dp)
                 )
                 .clickable {
@@ -217,7 +218,7 @@ fun CivoChatBubble(
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
-                            color = if (darkTheme) RegainLimePrimary else Color(0xFF15803D),
+                            color = focivoTokens().accentText,
                             letterSpacing = 0.5.sp
                         )
                     )
@@ -234,7 +235,7 @@ fun CivoChatBubble(
                             fontWeight = FontWeight.Medium,
                             fontSize = 14.5.sp,
                             lineHeight = 21.sp,
-                            color = if (darkTheme) Color(0xFFF0F4ED) else NearBlack
+                            color = focivoTokens().text
                         )
                     )
 
@@ -261,7 +262,7 @@ fun CivoChatBubble(
                             fontWeight = FontWeight.Normal,
                             fontSize = 12.sp,
                             lineHeight = 17.sp,
-                            color = (if (darkTheme) Color(0xFFA0A89E) else SecondaryTextLight).copy(alpha = 0.85f)
+                            color = focivoTokens().muted.copy(alpha = 0.85f)
                         )
                     )
                 }

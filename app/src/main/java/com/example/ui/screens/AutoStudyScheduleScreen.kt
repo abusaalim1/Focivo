@@ -73,6 +73,7 @@ import com.example.ui.theme.LavenderSoft
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
@@ -98,8 +99,9 @@ fun AutoStudyScheduleScreen(
     val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     // v1.4.2: explicit text colors (colorScheme.onSurface renders dark on dark cards)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val T = focivoTokens()
+    val textPrimary = T.text
+    val textSecondary = T.muted
 
     var activeSheetSchedule by remember { mutableStateOf<SupabaseScheduledBlockDto?>(null) }
     var isSheetOpen by remember { mutableStateOf(false) }
@@ -270,13 +272,13 @@ fun AutoStudyScheduleScreen(
 
                     val statusBadgeBg = when {
                         isActive -> RegainLimeContainer
-                        isBreak -> Color(0xFFFEF3C7) // Amber
-                        else -> if (isDark) Color(0xFF1E241E) else Color(0xFFF1F5F9)
+                        isBreak -> T.warning.copy(alpha = 0.15f) // Amber
+                        else -> T.surface2
                     }
 
                     val statusBadgeText = when {
                         isActive -> RegainLimeDeepText
-                        isBreak -> Color(0xFF92400E)
+                        isBreak -> T.warning
                         else -> textSecondary
                     }
 
@@ -426,7 +428,7 @@ fun AutoStudyScheduleScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isDark) Color(0xFF1E241E) else Color(0xFFF8FAFC))
+                                        .background(T.surface2)
                                         .padding(12.dp)
                                 ) {
                                     Text(
@@ -531,7 +533,7 @@ fun AutoStudyScheduleScreen(
                         onDeleteSchedule(delId)
                         scheduleToDeleteId = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                    colors = ButtonDefaults.buttonColors(containerColor = T.danger)
                 ) {
                     Text("Delete", color = MaterialTheme.colorScheme.onError, fontWeight = FontWeight.Bold)
                 }
@@ -687,7 +689,7 @@ private fun ScheduleCardItem(
                     Icon(
                         imageVector = Icons.Default.Coffee,
                         contentDescription = null,
-                        tint = Color(0xFFD97706), // Warm Amber
+                        tint = T.warning, // Warm Amber
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -696,7 +698,7 @@ private fun ScheduleCardItem(
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFD97706),
+                            color = T.warning,
                             fontSize = 13.sp
                         )
                     )
@@ -726,7 +728,7 @@ private fun ScheduleCardItem(
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                if (isSelected) RegainLimeContainer else (if (isAppInDarkTheme()) Color(0xFF1E241E) else Color(0xFFF1F5F9))
+                                if (isSelected) T.softAccent else T.surface2
                             )
                             .padding(vertical = 4.dp),
                         contentAlignment = Alignment.Center
@@ -808,7 +810,7 @@ private fun ScheduleCardItem(
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Delete Schedule",
-                            tint = Color(0xFFEF4444),
+                            tint = T.danger,
                             modifier = Modifier.size(18.dp)
                         )
                     }

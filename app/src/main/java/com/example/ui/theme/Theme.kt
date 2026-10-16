@@ -17,39 +17,51 @@ fun isAppInDarkTheme(): Boolean {
 }
 
 private val RegainLightThemeColorScheme = lightColorScheme(
-    primary = RegainLimePrimary,
-    onPrimary = Color(0xFF021207),
-    primaryContainer = RegainLimeContainer,
-    onPrimaryContainer = RegainLimeDeepText,
-    secondary = RegainLimeLight,
-    onSecondary = NearBlack,
-    tertiary = SoftPastelTealText,
-    background = RegainBgTop,
-    onBackground = NearBlack,
-    surface = PureWhite,
-    onSurface = NearBlack,
-    surfaceVariant = RegainLimeContainer,
-    onSurfaceVariant = SecondaryTextLight,
-    outline = MutedBorderLight,
-    outlineVariant = Color(0x0F000000)
+    primary = FocivoLightTokens.accent,
+    onPrimary = FocivoLightTokens.onAccent,
+    primaryContainer = FocivoLightTokens.softAccent,
+    onPrimaryContainer = FocivoLightTokens.accentText,
+    secondary = FocivoLightTokens.accentText,
+    onSecondary = FocivoLightTokens.onAccent,
+    tertiary = FocivoLightTokens.muted,
+    background = FocivoLightTokens.bg,
+    onBackground = FocivoLightTokens.text,
+    surface = FocivoLightTokens.surface,
+    onSurface = FocivoLightTokens.text,
+    surfaceVariant = FocivoLightTokens.surface2,
+    onSurfaceVariant = FocivoLightTokens.muted,
+    surfaceContainerLowest = FocivoLightTokens.bg,
+    surfaceContainerLow = FocivoLightTokens.surface,
+    surfaceContainer = FocivoLightTokens.surface2,
+    surfaceContainerHigh = FocivoLightTokens.surface2,
+    outline = FocivoLightTokens.line,
+    outlineVariant = FocivoLightTokens.line,
+    error = FocivoLightTokens.danger,
+    onError = Color.White
 )
 
 private val RegainDarkThemeColorScheme = darkColorScheme(
-    primary = RegainLimePrimary,
-    onPrimary = PureWhite,
-    primaryContainer = Color(0xFF25331A),
-    onPrimaryContainer = RegainLimeLight,
-    secondary = RegainLimeLight,
-    onSecondary = PureWhite,
-    tertiary = SoftPastelTealText,
-    background = Color(0xFF111411),
-    onBackground = Color(0xFFF0F4ED),
-    surface = Color(0xFF1D221C),
-    onSurface = Color(0xFFF0F4ED),
-    surfaceVariant = Color(0xFF262C24),
-    onSurfaceVariant = Color(0xFFA0A89E),
-    outline = Color(0xFF333A31),
-    outlineVariant = Color(0x20FFFFFF)
+    primary = FocivoDarkTokens.accent,
+    onPrimary = FocivoDarkTokens.onAccent,
+    primaryContainer = FocivoDarkTokens.softAccent,
+    onPrimaryContainer = FocivoDarkTokens.accentText,
+    secondary = FocivoDarkTokens.accentText,
+    onSecondary = FocivoDarkTokens.onAccent,
+    tertiary = FocivoDarkTokens.muted,
+    background = FocivoDarkTokens.bg,
+    onBackground = FocivoDarkTokens.text,
+    surface = FocivoDarkTokens.surface,
+    onSurface = FocivoDarkTokens.text,
+    surfaceVariant = FocivoDarkTokens.surface2,
+    onSurfaceVariant = FocivoDarkTokens.muted,
+    surfaceContainerLowest = FocivoDarkTokens.bg,
+    surfaceContainerLow = FocivoDarkTokens.surface,
+    surfaceContainer = FocivoDarkTokens.surface2,
+    surfaceContainerHigh = FocivoDarkTokens.surface2,
+    outline = FocivoDarkTokens.line,
+    outlineVariant = FocivoDarkTokens.line,
+    error = FocivoDarkTokens.danger,
+    onError = FocivoDarkTokens.bg
 )
 
 @Composable
@@ -59,7 +71,10 @@ fun FocuslyTheme(
 ) {
     val colorScheme = if (darkTheme) RegainDarkThemeColorScheme else RegainLightThemeColorScheme
 
-    CompositionLocalProvider(LocalIsDarkTheme provides darkTheme) {
+    CompositionLocalProvider(
+        LocalIsDarkTheme provides darkTheme,
+        LocalFocivoTokens provides if (darkTheme) FocivoDarkTokens else FocivoLightTokens
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,

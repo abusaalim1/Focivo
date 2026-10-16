@@ -73,6 +73,7 @@ import com.example.service.ScheduledBlockScheduler
 import com.example.ui.components.pressFeedback
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
@@ -144,15 +145,16 @@ fun ScheduleEditSheet(
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val isDark = isAppInDarkTheme()
-    val surfaceDark = if (isDark) Color(0xFF121412) else Color(0xFFFFFFFF)
-    val cardBackground = if (isDark) Color(0xFF1B221B) else Color(0xFFF6FAF2)
-    val cardBorderColor = if (isDark) Color(0x358CE000) else Color(0xFFE0EAD4)
-    val accentViolet = RegainLimePrimary
-    val accentGreen = Color(0xFF10B981)
-    val accentRed = Color(0xFFEF4444)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val chipBackground = if (isDark) Color(0xFF242C23) else Color(0xFFEFF6E6)
+    val surfaceDark = T.surface
+    val T = focivoTokens()
+    val cardBackground = T.surface
+    val cardBorderColor = T.accent.copy(alpha = 0.2f)
+    val accentViolet = T.accent
+    val accentGreen = T.success
+    val accentRed = T.danger
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val chipBackground = T.surface2
 
     fun openTimePicker(initialTime: String, onTimePicked: (String) -> Unit) {
         val parts = initialTime.split(":")
@@ -517,8 +519,8 @@ fun ScheduleEditSheet(
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
                                     checkedTrackColor = Color(0xFFF59E0B),
-                                    uncheckedTrackColor = if (isDark) Color(0xFF374151) else Color(0xFFD1D5DB),
-                                    uncheckedThumbColor = if (isDark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
+                                    uncheckedTrackColor = T.trackOff,
+                                    uncheckedThumbColor = T.thumbOff
                                 )
                             )
                         }

@@ -44,6 +44,7 @@ import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
@@ -85,12 +86,13 @@ fun SessionDonationPromptSheet(
     onNeverShowAgain: () -> Unit = {}
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val isDark = isAppInDarkTheme()
+    val T = focivoTokens()
+    val isDark = T.isDark
 
-    val bgSurface = if (isDark) Color(0xFF1D221C) else Color(0xFFFFFFFF)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val cardBorder = if (isDark) Color(0x30FFFFFF) else Color(0xFFDCE6D2)
+    val bgSurface = T.surface
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val cardBorder = T.line
 
     val minsSpent = maxOf(1, session.durationSeconds / 60)
     val promptCopy = getSessionDonationCopy(
@@ -158,7 +160,7 @@ fun SessionDonationPromptSheet(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (isDark) Color(0xFF262C24) else Color(0xFFEFF8E6))
+                        .background(T.surface2)
                         .border(1.dp, cardBorder, RoundedCornerShape(12.dp))
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
@@ -166,7 +168,7 @@ fun SessionDonationPromptSheet(
                         Icon(
                             imageVector = Icons.Default.Schedule,
                             contentDescription = null,
-                            tint = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                            tint = if (isDark) focivoTokens().accent else RegainLimeDeepText,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(5.dp))
@@ -187,7 +189,7 @@ fun SessionDonationPromptSheet(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (isDark) Color(0xFF262C24) else Color(0xFFEFF8E6))
+                            .background(T.surface2)
                         .border(1.dp, cardBorder, RoundedCornerShape(12.dp))
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
@@ -195,7 +197,7 @@ fun SessionDonationPromptSheet(
                             Icon(
                                 imageVector = Icons.Default.Favorite,
                                 contentDescription = null,
-                                tint = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                                tint = if (isDark) focivoTokens().accent else RegainLimeDeepText,
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.width(5.dp))

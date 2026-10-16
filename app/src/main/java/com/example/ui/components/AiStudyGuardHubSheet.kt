@@ -63,6 +63,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.example.R
 import com.example.ui.components.FeatureIcon
 import com.example.ui.theme.BalooBrandFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
@@ -137,11 +138,12 @@ fun AiStudyGuardHubSheet(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val isDark = isAppInDarkTheme()
-    val sheetBackground = if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val accentLime = if (isDark) RegainLimePrimary else RegainLimeDeepText
+    val T = focivoTokens()
+    val isDark = T.isDark
+    val sheetBackground = T.bg
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val accentLime = T.accentText
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

@@ -18,8 +18,8 @@ val RegainBackgroundBrush = Brush.verticalGradient(
     )
 )
 
-// 2. Primary Accent (Vivid Lime-Green)
-val RegainLimePrimary = Color(0xFF8CE000)      // Vivid energetic lime-green (#8CE000)
+// 2. Primary Accent — owner's Full App Redesign system lime (#B6F13A).
+val RegainLimePrimary = Color(0xFFB6F13A)      // System lime accent
 val RegainLimeLight = Color(0xFFA6EB38)        // Soft light lime
 val RegainLimeDark = Color(0xFF72B800)         // Darker lime border
 val RegainLimeDeepText = Color(0xFF4C8000)     // High-contrast green text

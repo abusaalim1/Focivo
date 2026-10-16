@@ -53,6 +53,7 @@ import com.example.ui.components.MascotPose
 import com.example.ui.components.RegainMascotView
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimeLight
@@ -83,10 +84,11 @@ fun OfflineScreen(
         }
     }
 
-    val bgColor = if (isDark) Color(0xFF0D110E) else Color(0xFFF9FBF7)
-    val cardBg = if (isDark) Color(0xFF161E17) else Color.White
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else Color(0xFF6B7280)
+    val T = focivoTokens()
+    val bgColor = T.bg
+    val cardBg = T.surface
+    val textPrimary = T.text
+    val textSecondary = T.muted
 
     Box(
         modifier = Modifier
@@ -109,7 +111,7 @@ fun OfflineScreen(
                     .background(
                         Brush.radialGradient(
                             colors = listOf(
-                                (if (isDark) Color(0x358CE000) else Color(0x208CE000)),
+                                focivoTokens().accent.copy(alpha = 0.2f),
                                 Color.Transparent
                             )
                         )
@@ -136,10 +138,10 @@ fun OfflineScreen(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(if (isDark) Color(0x33FFB74D) else Color(0xFFFFF3E0))
+                    .background(T.warning.copy(alpha = 0.15f))
                     .border(
                         1.dp,
-                        if (isDark) Color(0x66FFB74D) else Color(0xFFFFCC80),
+                        T.warning.copy(alpha = 0.4f),
                         RoundedCornerShape(20.dp)
                     )
                     .padding(horizontal = 14.dp, vertical = 6.dp)
@@ -148,7 +150,7 @@ fun OfflineScreen(
                     Icon(
                         imageVector = Icons.Default.CloudOff,
                         contentDescription = null,
-                        tint = if (isDark) Color(0xFFFFB74D) else Color(0xFFE65100),
+                        tint = T.warning,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -157,7 +159,7 @@ fun OfflineScreen(
                         fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 13.sp,
-                        color = if (isDark) Color(0xFFFFB74D) else Color(0xFFE65100)
+                        color = T.warning
                     )
                 }
             }
@@ -195,7 +197,7 @@ fun OfflineScreen(
                     .background(cardBg)
                     .border(
                         1.dp,
-                        if (isDark) Color(0x288CFF00) else Color(0xFFE2EBD6),
+                        T.accent.copy(alpha = 0.2f),
                         RoundedCornerShape(18.dp)
                     )
                     .padding(16.dp)
@@ -330,7 +332,7 @@ fun OfflineScreen(
                         text = msg,
                         fontFamily = PoppinsFontFamily,
                         fontSize = 12.sp,
-                        color = Color(0xFFEF5350),
+                        color = T.danger,
                         textAlign = TextAlign.Center
                     )
                 }

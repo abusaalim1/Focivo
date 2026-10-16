@@ -85,6 +85,7 @@ import com.example.data.model.WeeklyRecapSummary
 import com.example.data.model.WeeklySessionDetail
 import com.example.data.model.WeeklySubjectStat
 import com.example.ui.theme.AppleLinearFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
@@ -144,10 +145,11 @@ fun SundayRecapGlassDialog(
             contentAlignment = Alignment.Center
         ) {
             // Main Frosted Glass Card Container
-            val glassBackground = if (isDark) Color(0xF2161E16) else Color(0xF8FFFFFF)
-            val glassBorder = if (isDark) Color(0x408CE000) else Color(0xFFD4E6C3)
-            val textPrimary = if (isDark) Color(0xFFF3F8F0) else NearBlack
-            val textSecondary = if (isDark) Color(0xFFA5B2A1) else SecondaryTextLight
+            val T = focivoTokens()
+            val glassBackground = T.surface
+            val glassBorder = T.accent.copy(alpha = 0.25f)
+            val textPrimary = T.text
+            val textSecondary = T.muted
 
             Card(
                 modifier = Modifier
@@ -186,15 +188,15 @@ fun SundayRecapGlassDialog(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (isDark) Color(0xFF23321C) else Color(0xFFEBF7DE))
-                                .border(1.dp, RegainLimePrimary.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                .background(T.accent.copy(alpha = 0.12f))
+                                .border(1.dp, T.accent.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
                                 .padding(horizontal = 12.dp, vertical = 5.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.AutoAwesome,
                                     contentDescription = null,
-                                    tint = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                                    tint = focivoTokens().accentText,
                                     modifier = Modifier.size(13.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -203,7 +205,7 @@ fun SundayRecapGlassDialog(
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = AppleLinearFontFamily,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                                        color = focivoTokens().accentText,
                                         letterSpacing = 1.sp,
                                         fontSize = 10.5.sp
                                     )
@@ -216,7 +218,7 @@ fun SundayRecapGlassDialog(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(if (isDark) Color(0x33FFFFFF) else Color(0x14000000))
+                                .background(T.surface2)
                                 .testTag("close_sunday_recap_btn")
                         ) {
                             Icon(
@@ -291,8 +293,8 @@ fun SundayRecapGlassDialog(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isDark) Color(0xFF1F2D1E) else Color(0xFFE9F4DC))
-                                        .border(1.dp, RegainLimePrimary.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                        .background(T.accent.copy(alpha = 0.12f))
+                                        .border(1.dp, T.accent.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
                                         .clickable { handleShareImage() }
                                         .padding(horizontal = 12.dp, vertical = 6.dp)
                                 ) {
@@ -303,7 +305,7 @@ fun SundayRecapGlassDialog(
                                         Icon(
                                             imageVector = Icons.Default.Image,
                                             contentDescription = "Share Image Card",
-                                            tint = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                                            tint = focivoTokens().accentText,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Text(
@@ -311,7 +313,7 @@ fun SundayRecapGlassDialog(
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = AppleLinearFontFamily,
                                                 fontWeight = FontWeight.Bold,
-                                                color = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                                                color = focivoTokens().accentText,
                                                 fontSize = 11.5.sp
                                             )
                                         )
@@ -399,8 +401,8 @@ fun SundayRecapGlassDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(18.dp))
-                                        .background(if (isDark) Color(0xFF1E281C) else Color(0xFFF3F8EC))
-                                        .border(1.dp, if (isDark) Color(0x338CE000) else Color(0xFFD8E6C8), RoundedCornerShape(18.dp))
+                                        .background(focivoTokens().surface)
+                                        .border(1.dp, focivoTokens().accent.copy(alpha = 0.2f), RoundedCornerShape(18.dp))
                                         .padding(14.dp)
                                 ) {
                                     Row(
@@ -412,7 +414,7 @@ fun SundayRecapGlassDialog(
                                             Icon(
                                                 imageVector = Icons.Default.MenuBook,
                                                 contentDescription = null,
-                                                tint = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                                                tint = focivoTokens().accentText,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
@@ -439,7 +441,7 @@ fun SundayRecapGlassDialog(
                                                     text = if (showAllSessions) "Show Less" else "View All",
                                                     style = MaterialTheme.typography.labelSmall.copy(
                                                         fontFamily = AppleLinearFontFamily,
-                                                        color = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                                                        color = focivoTokens().accentText,
                                                         fontWeight = FontWeight.SemiBold,
                                                         fontSize = 11.5.sp
                                                     )
@@ -447,7 +449,7 @@ fun SundayRecapGlassDialog(
                                                 Icon(
                                                     imageVector = if (showAllSessions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                                                     contentDescription = null,
-                                                    tint = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                                                    tint = focivoTokens().accentText,
                                                     modifier = Modifier.size(14.dp)
                                                 )
                                             }
@@ -490,7 +492,7 @@ fun SundayRecapGlassDialog(
                                     Icon(
                                         imageVector = Icons.Default.EmojiEvents,
                                         contentDescription = null,
-                                        tint = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                                        tint = focivoTokens().accentText,
                                         modifier = Modifier.size(20.dp)
                                     )
                                     Spacer(modifier = Modifier.width(10.dp))
@@ -500,7 +502,7 @@ fun SundayRecapGlassDialog(
                                             style = MaterialTheme.typography.labelMedium.copy(
                                                 fontFamily = AppleLinearFontFamily,
                                                 fontWeight = FontWeight.Bold,
-                                                color = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                                                color = focivoTokens().accentText,
                                                 fontSize = 12.sp
                                             )
                                         )
@@ -594,8 +596,8 @@ private fun MetricGlassCard(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(if (isDark) Color(0xFF1E281C) else Color(0xFFF3F8EC))
-            .border(1.dp, if (isDark) Color(0x338CE000) else Color(0xFFD8E6C8), RoundedCornerShape(16.dp))
+            .background(focivoTokens().surface)
+            .border(1.dp, focivoTokens().accent.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Column {
@@ -608,7 +610,7 @@ private fun MetricGlassCard(
                     text = title.uppercase(),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontFamily = AppleLinearFontFamily,
-                        color = if (isDark) Color(0xFFA0ACA0) else SecondaryTextLight,
+                        color = T.muted,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 9.5.sp,
                         letterSpacing = 0.5.sp
@@ -617,7 +619,7 @@ private fun MetricGlassCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                    tint = focivoTokens().accentText,
                     modifier = Modifier.size(14.dp)
                 )
             }
@@ -627,7 +629,7 @@ private fun MetricGlassCard(
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontFamily = AppleLinearFontFamily,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color(0xFFF0F6EC) else NearBlack,
+                    color = T.text,
                     fontSize = 18.sp,
                     letterSpacing = (-0.3).sp
                 )
@@ -636,7 +638,7 @@ private fun MetricGlassCard(
                 text = subValue,
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontFamily = AppleLinearFontFamily,
-                    color = if (isDark) Color(0xFF889688) else Color(0xFF7A887A),
+                    color = T.muted,
                     fontSize = 10.5.sp
                 )
             )
@@ -658,8 +660,8 @@ private fun DailyBarMiniVisualizer(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(if (isDark) Color(0xFF1E281C) else Color(0xFFF3F8EC))
-            .border(1.dp, if (isDark) Color(0x338CE000) else Color(0xFFD8E6C8), RoundedCornerShape(18.dp))
+            .background(focivoTokens().surface)
+            .border(1.dp, focivoTokens().accent.copy(alpha = 0.2f), RoundedCornerShape(18.dp))
             .padding(14.dp)
     ) {
         Row(
@@ -682,7 +684,7 @@ private fun DailyBarMiniVisualizer(
                         text = "Best: $bestDayName",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontFamily = AppleLinearFontFamily,
-                            color = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                            color = focivoTokens().accentText,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 11.sp
                         )
@@ -720,7 +722,7 @@ private fun DailyBarMiniVisualizer(
                             text = if (stat.totalMinutes >= 60) "${stat.totalMinutes / 60}h" else "${stat.totalMinutes}m",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontFamily = AppleLinearFontFamily,
-                                color = if (isBest) (if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText) else textSecondary,
+                                color = if (isBest) (focivoTokens().accentText) else textSecondary,
                                 fontSize = 8.5.sp,
                                 fontWeight = if (isBest) FontWeight.Bold else FontWeight.Normal
                             )
@@ -751,7 +753,7 @@ private fun DailyBarMiniVisualizer(
                             .width(16.dp)
                             .fillMaxHeight(0.65f)
                             .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                            .background(if (isDark) Color(0x33FFFFFF) else Color(0x18000000)),
+                            .background(T.surface2),
                         contentAlignment = Alignment.BottomCenter
                     ) {
                         Box(
@@ -770,7 +772,7 @@ private fun DailyBarMiniVisualizer(
                         text = stat.dayName.take(3),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontFamily = AppleLinearFontFamily,
-                            color = if (isBest) (if (isDark) Color(0xFFF0F6EC) else NearBlack) else textSecondary,
+                            color = if (isBest) T.text else textSecondary,
                             fontWeight = if (isBest) FontWeight.Bold else FontWeight.Medium,
                             fontSize = 10.sp
                         )
@@ -792,8 +794,8 @@ private fun SubjectBreakdownSection(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(if (isDark) Color(0xFF1E281C) else Color(0xFFF3F8EC))
-            .border(1.dp, if (isDark) Color(0x338CE000) else Color(0xFFD8E6C8), RoundedCornerShape(18.dp))
+            .background(focivoTokens().surface)
+            .border(1.dp, focivoTokens().accent.copy(alpha = 0.2f), RoundedCornerShape(18.dp))
             .padding(14.dp)
     ) {
         Row(
@@ -849,7 +851,7 @@ private fun SubjectBreakdownSection(
                             text = "$formattedTime • ${sub.sessionCount} session${if (sub.sessionCount > 1) "s" else ""}",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontFamily = AppleLinearFontFamily,
-                                color = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                                color = focivoTokens().accentText,
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 11.sp
                             )
@@ -864,7 +866,7 @@ private fun SubjectBreakdownSection(
                             .fillMaxWidth()
                             .height(6.dp)
                             .clip(CircleShape)
-                            .background(if (isDark) Color(0x33FFFFFF) else Color(0x18000000))
+                            .background(T.surface2)
                     ) {
                         Box(
                             modifier = Modifier
@@ -895,8 +897,8 @@ private fun SessionItemRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isDark) Color(0xFF243021) else Color(0xFFE8F2DF))
-            .border(1.dp, if (isDark) Color(0x26FFFFFF) else Color(0xFFD4E3C8), RoundedCornerShape(12.dp))
+            .background(T.surface2)
+            .border(1.dp, T.line, RoundedCornerShape(12.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         Row(
@@ -921,7 +923,7 @@ private fun SessionItemRow(
                         text = session.subject,
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontFamily = AppleLinearFontFamily,
-                            color = if (isDark) Color(0xFFA6EB38) else RegainLimeDeepText,
+                            color = focivoTokens().accentText,
                             fontWeight = FontWeight.Medium,
                             fontSize = 10.5.sp
                         )
@@ -955,7 +957,7 @@ private fun SessionItemRow(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (isDark) Color(0xFF2E3D2A) else Color(0xFFDCEBCF))
+                    .background(T.accent.copy(alpha = 0.15f))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(

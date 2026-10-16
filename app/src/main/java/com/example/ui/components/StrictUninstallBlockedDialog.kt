@@ -28,6 +28,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.R
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.isAppInDarkTheme
 
@@ -57,10 +58,11 @@ fun StrictUninstallBlockedDialog(
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else Color(0xFF5A635A)
-    val cardBg = if (isDark) Color(0xFF1A2030) else Color.White
-    val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0xFFE2E8E0)
+    val T = focivoTokens()
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val cardBg = T.surface
+    val cardBorder = T.line
 
     Dialog(
         onDismissRequest = onDismiss,

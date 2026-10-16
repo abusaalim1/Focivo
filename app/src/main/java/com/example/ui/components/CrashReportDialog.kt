@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.focivoTokens
 
 /**
  * v1.1.2: shown on the launch AFTER a crash. Displays the captured stack trace
@@ -43,10 +44,11 @@ fun CrashReportDialog(
     onCopy: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val darkSurface = Color(0xFF141814)
-    val limeAccent = RegainLimePrimary
-    val textPrimary = Color(0xFFF0F4ED)
-    val textSecondary = Color(0xFFA0A89E)
+    val T = focivoTokens()
+    val darkSurface = T.surface
+    val limeAccent = T.accent
+    val textPrimary = T.text
+    val textSecondary = T.muted
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -87,12 +89,12 @@ fun CrashReportDialog(
                     fontSize = 10.sp,
                     lineHeight = 14.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = Color(0xFFD7E0D4),
+                    color = T.muted,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 320.dp)
                         .verticalScroll(rememberScrollState())
-                        .background(Color(0xFF0B0E0B), RoundedCornerShape(12.dp))
+                        .background(T.bg, RoundedCornerShape(12.dp))
                         .padding(12.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -111,7 +113,7 @@ fun CrashReportDialog(
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = limeAccent,
-                            contentColor = Color(0xFF0E120E)
+                            contentColor = T.onAccent
                         )
                     ) {
                         Text("Copy", fontWeight = FontWeight.Bold)

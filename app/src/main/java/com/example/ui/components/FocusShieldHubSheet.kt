@@ -86,6 +86,7 @@ import com.example.service.ScheduledBlockScheduler
 import com.example.ui.screens.StudyChannelsScreen
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.util.AiStudyGuardManager
 import com.example.util.AppIconView
 import com.example.util.DeviceAppInfo
@@ -188,29 +189,27 @@ data class BlockableAppItem(
 )
 
 // ---------------------------------------------------------------------------
-// Design tokens — exact values from the owner's Focus Shield clean-redesign.
+// Design tokens — owner's Shield clean-redesign, now dark/light aware.
+// The dark values are exactly the tokens above (bg #0A0A0B, surface #131315,
+// line #1F1F22, text #F4F4F5, muted #76767C, accent #B6F13A); light mode uses
+// the system counterpart set via focivoTokens().
 // ---------------------------------------------------------------------------
-private val ShieldBg = Color(0xFF0A0A0B)
-private val ShieldSurface = Color(0xFF131315)
-private val ShieldLine = Color(0xFF1F1F22)
-private val ShieldText = Color(0xFFF4F4F5)
-private val ShieldMuted = Color(0xFF76767C)
-private val ShieldAccent = Color(0xFFB6F13A)
-private val ShieldSoft = Color(0x1EB6F13A)
-private val ShieldBorderAccent = Color(0x2EB6F13A)
-private val ShieldCoral = Color(0xFFFF6B6B)
-private val ShieldAmber = Color(0xFFF5A524)
-private val ShieldGreen = Color(0xFF10B981)
-private val ShieldTrackOff = Color(0xFF26262B)
-private val ShieldThumbOff = Color(0xFF8B8B92)
-private val ShieldChipBorder = Color(0xFF2C2C31)
 
 private val ShieldSerifItalic = FontFamily(
     Font(R.font.instrument_serif_italic, FontWeight.Normal, FontStyle.Italic)
 )
 
-private fun shieldBody(size: Int, weight: FontWeight = FontWeight.Normal, color: Color = ShieldText) =
-    TextStyle(fontFamily = PoppinsFontFamily, fontSize = size.sp, fontWeight = weight, color = color)
+@Composable
+private fun shieldBody(
+    size: Int,
+    weight: FontWeight = FontWeight.Normal,
+    color: Color = Color.Unspecified
+) = TextStyle(
+    fontFamily = PoppinsFontFamily,
+    fontSize = size.sp,
+    fontWeight = weight,
+    color = if (color == Color.Unspecified) focivoTokens().text else color
+)
 
 /** The exact toggle from the design: 48x28, dark track / grey thumb, lime when on. */
 @Composable
@@ -225,14 +224,14 @@ private fun ShieldToggle(
         enabled = enabled,
         modifier = Modifier.size(width = 48.dp, height = 28.dp),
         colors = SwitchDefaults.colors(
-            checkedThumbColor = ShieldBg,
-            checkedTrackColor = ShieldAccent,
-            uncheckedThumbColor = ShieldThumbOff,
-            uncheckedTrackColor = ShieldTrackOff,
+            checkedThumbColor = focivoTokens().bg,
+            checkedTrackColor = focivoTokens().accent,
+            uncheckedThumbColor = focivoTokens().thumbOff,
+            uncheckedTrackColor = focivoTokens().trackOff,
             uncheckedBorderColor = Color.Transparent,
             checkedBorderColor = Color.Transparent,
-            disabledCheckedThumbColor = ShieldBg.copy(alpha = 0.7f),
-            disabledCheckedTrackColor = ShieldAccent.copy(alpha = 0.5f)
+            disabledCheckedThumbColor = focivoTokens().bg.copy(alpha = 0.7f),
+            disabledCheckedTrackColor = focivoTokens().accent.copy(alpha = 0.5f)
         )
     )
 }
@@ -250,7 +249,7 @@ private fun ShieldEyebrow(
     ) {
         Text(
             text = title.uppercase(),
-            style = shieldBody(11, FontWeight.SemiBold, ShieldMuted).copy(letterSpacing = 1.76.sp)
+            style = shieldBody(11, FontWeight.SemiBold, focivoTokens().muted).copy(letterSpacing = 1.76.sp)
         )
         action?.invoke()
     }
@@ -283,13 +282,13 @@ private fun ShieldGroupRow(
                 }
                 if (subtitle != null) {
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(text = subtitle, style = shieldBody(12, FontWeight.Normal, ShieldMuted).copy(lineHeight = 17.4.sp))
+                    Text(text = subtitle, style = shieldBody(12, FontWeight.Normal, focivoTokens().muted).copy(lineHeight = 17.4.sp))
                 }
             }
             trailing()
         }
         if (showDivider) {
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(ShieldLine))
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(focivoTokens().line))
         }
     }
 }
@@ -300,13 +299,13 @@ private fun ShieldTag(text: String, active: Boolean) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(99.dp))
-            .background(if (active) ShieldSoft else Color.Transparent)
-            .border(1.dp, if (active) ShieldBorderAccent else ShieldChipBorder, RoundedCornerShape(99.dp))
+            .background(if (active) focivoTokens().softAccent else Color.Transparent)
+            .border(1.dp, if (active) focivoTokens().accent.copy(alpha = 0.18f) else focivoTokens().chipBorder, RoundedCornerShape(99.dp))
             .padding(horizontal = 8.dp, vertical = 2.dp)
     ) {
         Text(
             text = text.uppercase(),
-            style = shieldBody(9, FontWeight.SemiBold, if (active) ShieldAccent else ShieldMuted).copy(letterSpacing = 0.72.sp)
+            style = shieldBody(9, FontWeight.SemiBold, if (active) focivoTokens().accent else focivoTokens().muted).copy(letterSpacing = 0.72.sp)
         )
     }
 }
@@ -322,7 +321,7 @@ private fun PulsingDot() {
         modifier = Modifier
             .size(7.dp)
             .clip(CircleShape)
-            .background(ShieldAccent.copy(alpha = alpha))
+            .background(focivoTokens().accent.copy(alpha = alpha))
     )
 }
 
@@ -478,7 +477,7 @@ fun FocusShieldHubSheet(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(ShieldBg)
+            .background(focivoTokens().bg)
             .testTag("focus_shield_hub_sheet")
     ) {
         LazyColumn(
@@ -498,13 +497,13 @@ fun FocusShieldHubSheet(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(ShieldSoft),
+                            .background(focivoTokens().softAccent),
                         contentAlignment = Alignment.Center
                     ) {
                         androidx.compose.material3.Icon(
                             imageVector = Icons.Filled.Shield,
                             contentDescription = "Focus Shield",
-                            tint = ShieldAccent,
+                            tint = focivoTokens().accent,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -515,25 +514,25 @@ fun FocusShieldHubSheet(
                                 fontFamily = ShieldSerifItalic,
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = ShieldText,
+                                color = focivoTokens().text,
                                 letterSpacing = (-0.44).sp,
                                 lineHeight = 26.sp
                             )
                         )
-                        Text(text = "Distraction blocker", style = shieldBody(12, FontWeight.Normal, ShieldMuted))
+                        Text(text = "Distraction blocker", style = shieldBody(12, FontWeight.Normal, focivoTokens().muted))
                     }
                     Box(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(ShieldSurface)
+                            .background(focivoTokens().surface)
                             .clickable(onClick = onDismiss),
                         contentAlignment = Alignment.Center
                     ) {
                         androidx.compose.material3.Icon(
                             imageVector = Icons.Filled.Close,
                             contentDescription = "Close",
-                            tint = ShieldMuted,
+                            tint = focivoTokens().muted,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -551,10 +550,10 @@ fun FocusShieldHubSheet(
                         .clip(RoundedCornerShape(26.dp))
                         .background(
                             Brush.linearGradient(
-                                listOf(Color(0x24B6F13A), Color(0x08B6F13A), ShieldSurface)
+                                listOf(Color(0x24B6F13A), Color(0x08B6F13A), focivoTokens().surface)
                             )
                         )
-                        .border(1.dp, ShieldBorderAccent, RoundedCornerShape(26.dp))
+                        .border(1.dp, focivoTokens().accent.copy(alpha = 0.18f), RoundedCornerShape(26.dp))
                         .padding(22.dp)
                 ) {
                     Row(
@@ -583,7 +582,7 @@ fun FocusShieldHubSheet(
                                     } else {
                                         "Distracting apps stay open"
                                     },
-                                    style = shieldBody(12, FontWeight.Medium, ShieldAccent)
+                                    style = shieldBody(12, FontWeight.Medium, focivoTokens().accent)
                                 )
                             }
                             if (blockedAttemptsCount > 0) {
@@ -591,12 +590,12 @@ fun FocusShieldHubSheet(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(99.dp))
-                                        .background(ShieldSoft)
+                                        .background(focivoTokens().softAccent)
                                         .padding(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
                                     Text(
                                         text = "$blockedAttemptsCount intercepted",
-                                        style = shieldBody(10, FontWeight.SemiBold, ShieldAccent).copy(letterSpacing = 0.4.sp)
+                                        style = shieldBody(10, FontWeight.SemiBold, focivoTokens().accent).copy(letterSpacing = 0.4.sp)
                                     )
                                 }
                             }
@@ -630,8 +629,8 @@ fun FocusShieldHubSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(24.dp))
-                            .background(ShieldSurface)
-                            .border(1.dp, ShieldLine, RoundedCornerShape(24.dp))
+                            .background(focivoTokens().surface)
+                            .border(1.dp, focivoTokens().line, RoundedCornerShape(24.dp))
                             .padding(20.dp)
                     ) {
                         Row(
@@ -651,24 +650,24 @@ fun FocusShieldHubSheet(
                                         fontFamily = PoppinsFontFamily,
                                         fontSize = 32.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = ShieldText
+                                        color = focivoTokens().text
                                     )
                                 )
                                 Text(
                                     text = "Unlocks strictly at 00:00",
-                                    style = shieldBody(12, FontWeight.Normal, ShieldMuted)
+                                    style = shieldBody(12, FontWeight.Normal, focivoTokens().muted)
                                 )
                             }
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(99.dp))
-                                    .background(ShieldSoft)
-                                    .border(1.dp, ShieldBorderAccent, RoundedCornerShape(99.dp))
+                                    .background(focivoTokens().softAccent)
+                                    .border(1.dp, focivoTokens().accent.copy(alpha = 0.18f), RoundedCornerShape(99.dp))
                                     .padding(horizontal = 14.dp, vertical = 8.dp)
                             ) {
                                 Text(
                                     text = "Locked",
-                                    style = shieldBody(12, FontWeight.Bold, ShieldAccent)
+                                    style = shieldBody(12, FontWeight.Bold, focivoTokens().accent)
                                 )
                             }
                         }
@@ -678,7 +677,7 @@ fun FocusShieldHubSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(24.dp))
-                            .background(ShieldSurface)
+                            .background(focivoTokens().surface)
                             .padding(20.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -686,14 +685,14 @@ fun FocusShieldHubSheet(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Strictly block for a custom duration",
-                                style = shieldBody(12, FontWeight.Normal, ShieldMuted)
+                                style = shieldBody(12, FontWeight.Normal, focivoTokens().muted)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(99.dp))
-                                    .background(ShieldBg)
+                                    .background(focivoTokens().bg)
                                     .padding(4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(0.dp)
                             ) {
@@ -703,7 +702,7 @@ fun FocusShieldHubSheet(
                                         modifier = Modifier
                                             .weight(1f)
                                             .clip(RoundedCornerShape(99.dp))
-                                            .background(if (selected) ShieldAccent else Color.Transparent)
+                                            .background(if (selected) focivoTokens().accent else Color.Transparent)
                                             .clickable { selectedDurationMinutes = mins }
                                             .padding(vertical = 10.dp),
                                         contentAlignment = Alignment.Center
@@ -713,7 +712,7 @@ fun FocusShieldHubSheet(
                                             style = shieldBody(
                                                 13,
                                                 if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                                if (selected) ShieldBg else ShieldMuted
+                                                if (selected) focivoTokens().bg else focivoTokens().muted
                                             )
                                         )
                                     }
@@ -724,7 +723,7 @@ fun FocusShieldHubSheet(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(99.dp))
-                                    .background(ShieldAccent)
+                                    .background(focivoTokens().accent)
                                     .clickable {
                                         if (!isAllPermissionsGranted) {
                                             enableWithGate { onStartStandaloneShield(selectedDurationMinutes) }
@@ -737,7 +736,7 @@ fun FocusShieldHubSheet(
                             ) {
                                 Text(
                                     text = "Start ${selectedDurationMinutes}m lock",
-                                    style = shieldBody(15, FontWeight.Bold, ShieldBg)
+                                    style = shieldBody(15, FontWeight.Bold, focivoTokens().bg)
                                 )
                             }
                         }
@@ -756,7 +755,7 @@ fun FocusShieldHubSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(24.dp))
-                        .background(ShieldSurface)
+                        .background(focivoTokens().surface)
                         .padding(horizontal = 20.dp, vertical = 4.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -867,7 +866,7 @@ fun FocusShieldHubSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(24.dp))
-                        .background(ShieldSurface)
+                        .background(focivoTokens().surface)
                         .padding(horizontal = 20.dp)
                         .padding(top = 16.dp, bottom = 4.dp)
                 ) {
@@ -891,7 +890,7 @@ fun FocusShieldHubSheet(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "ChatGPT & Claude academic sentinel",
-                                    style = shieldBody(12, FontWeight.Normal, ShieldMuted).copy(lineHeight = 17.4.sp)
+                                    style = shieldBody(12, FontWeight.Normal, focivoTokens().muted).copy(lineHeight = 17.4.sp)
                                 )
                             }
                             ShieldToggle(
@@ -915,9 +914,9 @@ fun FocusShieldHubSheet(
                         Spacer(modifier = Modifier.height(16.dp))
                         Column(modifier = Modifier.fillMaxWidth()) {
                             listOf(
-                                Triple("Warning", "3-minute grace window", ShieldAmber),
-                                Triple("Lockout", "3 hours if casual chatter continues", ShieldCoral),
-                                Triple("Resolved", "Instantly when you return to study", ShieldAccent)
+                                Triple("Warning", "3-minute grace window", focivoTokens().warning),
+                                Triple("Lockout", "3 hours if casual chatter continues", focivoTokens().danger),
+                                Triple("Resolved", "Instantly when you return to study", focivoTokens().accent)
                             ).forEachIndexed { index, (title, sub, dot) ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -935,19 +934,19 @@ fun FocusShieldHubSheet(
                                                 modifier = Modifier
                                                     .width(1.dp)
                                                     .height(16.dp)
-                                                    .background(ShieldLine)
+                                                    .background(focivoTokens().line)
                                             )
                                         }
                                     }
                                     Column(modifier = Modifier.padding(bottom = if (index < 2) 14.dp else 0.dp)) {
                                         Text(text = title, style = shieldBody(13, FontWeight.SemiBold))
-                                        Text(text = sub, style = shieldBody(12, FontWeight.Normal, ShieldMuted))
+                                        Text(text = sub, style = shieldBody(12, FontWeight.Normal, focivoTokens().muted))
                                     }
                                 }
                             }
                         }
                         Spacer(modifier = Modifier.height(14.dp))
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(ShieldLine))
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(focivoTokens().line))
 
                         ShieldGroupRow(
                             title = "YouTube content filter",
@@ -982,12 +981,12 @@ fun FocusShieldHubSheet(
                             ) {
                                 Text(
                                     text = "Test the content filter",
-                                    style = shieldBody(12, FontWeight.Medium, ShieldMuted)
+                                    style = shieldBody(12, FontWeight.Medium, focivoTokens().muted)
                                 )
                                 androidx.compose.material3.Icon(
                                     imageVector = Icons.Filled.ChevronRight,
                                     contentDescription = null,
-                                    tint = ShieldMuted,
+                                    tint = focivoTokens().muted,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -997,7 +996,7 @@ fun FocusShieldHubSheet(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(ShieldBg)
+                                    .background(focivoTokens().bg)
                                     .padding(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
@@ -1011,14 +1010,14 @@ fun FocusShieldHubSheet(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(10.dp))
-                                            .border(1.dp, ShieldLine, RoundedCornerShape(10.dp))
+                                            .border(1.dp, focivoTokens().line, RoundedCornerShape(10.dp))
                                             .clickable {
                                                 testYouTubeQuery = sample
                                                 testYouTubeResult = com.example.util.YouTubeVideoClassifier.evaluate(sample)
                                             }
                                             .padding(horizontal = 12.dp, vertical = 10.dp)
                                     ) {
-                                        Text(text = sample, style = shieldBody(12, FontWeight.Normal, ShieldText))
+                                        Text(text = sample, style = shieldBody(12, FontWeight.Normal, focivoTokens().text))
                                     }
                                 }
                                 if (testYouTubeResult != null) {
@@ -1026,19 +1025,19 @@ fun FocusShieldHubSheet(
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = if (res.isEducational) "Study content" else "Non-study content",
-                                        style = shieldBody(13, FontWeight.SemiBold, if (res.isEducational) ShieldGreen else ShieldCoral)
+                                        style = shieldBody(13, FontWeight.SemiBold, if (res.isEducational) focivoTokens().success else focivoTokens().danger)
                                     )
                                     Text(
                                         text = "Confidence: ${(res.confidence * 100).toInt()}%",
-                                        style = shieldBody(11, FontWeight.Normal, ShieldMuted)
+                                        style = shieldBody(11, FontWeight.Normal, focivoTokens().muted)
                                     )
                                     Text(
                                         text = "Category: ${res.category}",
-                                        style = shieldBody(11, FontWeight.Normal, ShieldMuted)
+                                        style = shieldBody(11, FontWeight.Normal, focivoTokens().muted)
                                     )
                                     Text(
                                         text = "Reason: ${res.reason}",
-                                        style = shieldBody(11, FontWeight.Normal, ShieldMuted)
+                                        style = shieldBody(11, FontWeight.Normal, focivoTokens().muted)
                                     )
                                 }
                             }
@@ -1058,13 +1057,13 @@ fun FocusShieldHubSheet(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "Allowlisted channels always count as study",
-                                    style = shieldBody(12, FontWeight.Normal, ShieldMuted).copy(lineHeight = 17.4.sp)
+                                    style = shieldBody(12, FontWeight.Normal, focivoTokens().muted).copy(lineHeight = 17.4.sp)
                                 )
                             }
                             androidx.compose.material3.Icon(
                                 imageVector = Icons.Filled.ChevronRight,
                                 contentDescription = "Open",
-                                tint = ShieldMuted,
+                                tint = focivoTokens().muted,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -1083,14 +1082,14 @@ fun FocusShieldHubSheet(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(99.dp))
-                                .background(ShieldSoft)
+                                .background(focivoTokens().softAccent)
                                 .clickable {
                                     editingSchedule = null
                                     showScheduleEditSheet = true
                                 }
                                 .padding(horizontal = 14.dp, vertical = 7.dp)
                         ) {
-                            Text(text = "+ Add", style = shieldBody(12, FontWeight.SemiBold, ShieldAccent))
+                            Text(text = "+ Add", style = shieldBody(12, FontWeight.SemiBold, focivoTokens().accent))
                         }
                     }
                 )
@@ -1100,7 +1099,7 @@ fun FocusShieldHubSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(24.dp))
-                            .background(ShieldSurface)
+                            .background(focivoTokens().surface)
                             .padding(horizontal = 20.dp, vertical = 30.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1109,13 +1108,13 @@ fun FocusShieldHubSheet(
                                 modifier = Modifier
                                     .size(52.dp)
                                     .clip(CircleShape)
-                                    .background(ShieldSoft),
+                                    .background(focivoTokens().softAccent),
                                 contentAlignment = Alignment.Center
                             ) {
                                 androidx.compose.material3.Icon(
                                     imageVector = Icons.Filled.Schedule,
                                     contentDescription = null,
-                                    tint = ShieldAccent,
+                                    tint = focivoTokens().accent,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
@@ -1124,7 +1123,7 @@ fun FocusShieldHubSheet(
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = "Set study hours, break windows and active days to block distractions automatically.",
-                                style = shieldBody(12, FontWeight.Normal, ShieldMuted).copy(
+                                style = shieldBody(12, FontWeight.Normal, focivoTokens().muted).copy(
                                     textAlign = TextAlign.Center, lineHeight = 18.sp
                                 )
                             )
@@ -1135,7 +1134,7 @@ fun FocusShieldHubSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(24.dp))
-                            .background(ShieldSurface)
+                            .background(focivoTokens().surface)
                             .padding(horizontal = 20.dp, vertical = 4.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -1159,7 +1158,7 @@ fun FocusShieldHubSheet(
                                             Spacer(modifier = Modifier.height(2.dp))
                                             Text(
                                                 text = "${ScheduledBlockScheduler.formatDisplayTime(block.start_time)} – ${ScheduledBlockScheduler.formatDisplayTime(block.end_time)} · ${block.days_active}",
-                                                style = shieldBody(12, FontWeight.Normal, ShieldMuted)
+                                                style = shieldBody(12, FontWeight.Normal, focivoTokens().muted)
                                             )
                                             if (isScheduledBlockActive) {
                                                 Spacer(modifier = Modifier.height(4.dp))
@@ -1173,7 +1172,7 @@ fun FocusShieldHubSheet(
                                     }
                                 }
                                 if (index < scheduledBlocks.size - 1) {
-                                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(ShieldLine))
+                                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(focivoTokens().line))
                                 }
                             }
                         }
@@ -1186,7 +1185,7 @@ fun FocusShieldHubSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(24.dp))
-                        .background(ShieldSurface)
+                        .background(focivoTokens().surface)
                         .clickable {
                             onDismiss()
                             onOpenAppLimits()
@@ -1205,13 +1204,13 @@ fun FocusShieldHubSheet(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Set a time budget for each app",
-                                style = shieldBody(12, FontWeight.Normal, ShieldMuted)
+                                style = shieldBody(12, FontWeight.Normal, focivoTokens().muted)
                             )
                         }
                         androidx.compose.material3.Icon(
                             imageVector = Icons.Filled.ChevronRight,
                             contentDescription = "Open",
-                            tint = ShieldMuted,
+                            tint = focivoTokens().muted,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1230,12 +1229,12 @@ fun FocusShieldHubSheet(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(99.dp))
-                                .background(ShieldSoft)
+                                .background(focivoTokens().softAccent)
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text(
                                 text = "$protectedCount protected",
-                                style = shieldBody(10, FontWeight.SemiBold, ShieldAccent).copy(letterSpacing = 0.4.sp)
+                                style = shieldBody(10, FontWeight.SemiBold, focivoTokens().accent).copy(letterSpacing = 0.4.sp)
                             )
                         }
                     }
@@ -1247,7 +1246,7 @@ fun FocusShieldHubSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(99.dp))
-                        .background(ShieldSurface)
+                        .background(focivoTokens().surface)
                         .padding(horizontal = 18.dp, vertical = 13.dp)
                 ) {
                     Row(
@@ -1257,20 +1256,20 @@ fun FocusShieldHubSheet(
                         androidx.compose.material3.Icon(
                             imageVector = Icons.Filled.Search,
                             contentDescription = null,
-                            tint = ShieldMuted,
+                            tint = focivoTokens().muted,
                             modifier = Modifier.size(18.dp)
                         )
                         BasicTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
                             singleLine = true,
-                            textStyle = shieldBody(13, FontWeight.Normal, ShieldText),
+                            textStyle = shieldBody(13, FontWeight.Normal, focivoTokens().text),
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("app_search_input"),
                             decorationBox = { inner ->
                                 if (searchQuery.isEmpty()) {
-                                    Text(text = "Search installed apps", style = shieldBody(13, FontWeight.Normal, ShieldMuted))
+                                    Text(text = "Search installed apps", style = shieldBody(13, FontWeight.Normal, focivoTokens().muted))
                                 }
                                 inner()
                             }
@@ -1291,7 +1290,7 @@ fun FocusShieldHubSheet(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(99.dp))
-                                .background(if (selected) ShieldAccent else ShieldSurface)
+                                .background(if (selected) focivoTokens().accent else focivoTokens().surface)
                                 .clickable { selectedCategoryTab = cat }
                                 .padding(horizontal = 14.dp, vertical = 8.dp)
                         ) {
@@ -1300,7 +1299,7 @@ fun FocusShieldHubSheet(
                                 style = shieldBody(
                                     12,
                                     if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                    if (selected) ShieldBg else ShieldMuted
+                                    if (selected) focivoTokens().bg else focivoTokens().muted
                                 )
                             )
                         }
@@ -1317,12 +1316,12 @@ fun FocusShieldHubSheet(
                 ) {
                     Text(
                         text = "Block all social",
-                        style = shieldBody(12, FontWeight.SemiBold, ShieldCoral),
+                        style = shieldBody(12, FontWeight.SemiBold, focivoTokens().danger),
                         modifier = Modifier.clickable { onBlockAllSocial() }
                     )
                     Text(
                         text = "Unblock all",
-                        style = shieldBody(12, FontWeight.SemiBold, ShieldMuted),
+                        style = shieldBody(12, FontWeight.SemiBold, focivoTokens().muted),
                         modifier = Modifier.clickable { onUnblockAll() }
                     )
                 }
@@ -1335,14 +1334,14 @@ fun FocusShieldHubSheet(
                             .padding(vertical = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "No matching apps found", style = shieldBody(13, FontWeight.Normal, ShieldMuted))
+                        Text(text = "No matching apps found", style = shieldBody(13, FontWeight.Normal, focivoTokens().muted))
                     }
                 } else {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(24.dp))
-                            .background(ShieldSurface)
+                            .background(focivoTokens().surface)
                             .padding(horizontal = 20.dp, vertical = 4.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -1359,7 +1358,7 @@ fun FocusShieldHubSheet(
                                             modifier = Modifier
                                                 .size(38.dp)
                                                 .clip(RoundedCornerShape(12.dp))
-                                                .background(ShieldBg),
+                                                .background(focivoTokens().bg),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             val fallback = if (app.category.contains("Game", ignoreCase = true)) {
@@ -1374,13 +1373,13 @@ fun FocusShieldHubSheet(
                                                 contentDescription = app.name,
                                                 modifier = Modifier.size(28.dp),
                                                 fallbackVector = fallback,
-                                                fallbackTint = ShieldMuted
+                                                fallbackTint = focivoTokens().muted
                                             )
                                         }
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(text = app.name, style = shieldBody(14, FontWeight.SemiBold))
                                             Spacer(modifier = Modifier.height(2.dp))
-                                            Text(text = app.category, style = shieldBody(12, FontWeight.Normal, ShieldMuted))
+                                            Text(text = app.category, style = shieldBody(12, FontWeight.Normal, focivoTokens().muted))
                                         }
                                         ShieldToggle(
                                             checked = app.isBlocked,
@@ -1394,7 +1393,7 @@ fun FocusShieldHubSheet(
                                         )
                                     }
                                     if (index < displayApps.size - 1) {
-                                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(ShieldLine))
+                                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(focivoTokens().line))
                                     }
                                 }
                             }
@@ -1414,7 +1413,7 @@ fun FocusShieldHubSheet(
                         if (punishmentLogs.size > 2) {
                             Text(
                                 text = if (activityExpanded) "Show less" else "View all",
-                                style = shieldBody(12, FontWeight.SemiBold, ShieldAccent).copy(letterSpacing = 0.48.sp),
+                                style = shieldBody(12, FontWeight.SemiBold, focivoTokens().accent).copy(letterSpacing = 0.48.sp),
                                 modifier = Modifier.clickable { activityExpanded = !activityExpanded }
                             )
                         }
@@ -1427,12 +1426,12 @@ fun FocusShieldHubSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(24.dp))
-                            .background(ShieldSurface)
+                            .background(focivoTokens().surface)
                             .padding(20.dp)
                     ) {
                         Text(
                             text = "No guard activity yet. Warnings and resolutions will appear here.",
-                            style = shieldBody(12, FontWeight.Normal, ShieldMuted)
+                            style = shieldBody(12, FontWeight.Normal, focivoTokens().muted)
                         )
                     }
                 } else {
@@ -1440,15 +1439,15 @@ fun FocusShieldHubSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(24.dp))
-                            .background(ShieldSurface)
+                            .background(focivoTokens().surface)
                             .padding(horizontal = 20.dp, vertical = 4.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             shownLogs.forEachIndexed { index, log ->
                                 val (statusFg, statusLabel) = when (log.status) {
-                                    "blocked" -> Pair(ShieldCoral, "BLOCKED (3h)")
-                                    "warned_resolved" -> Pair(ShieldGreen, "RESOLVED")
-                                    else -> Pair(ShieldAmber, "WARNED")
+                                    "blocked" -> Pair(focivoTokens().danger, "BLOCKED (3h)")
+                                    "warned_resolved" -> Pair(focivoTokens().success, "RESOLVED")
+                                    else -> Pair(focivoTokens().warning, "WARNED")
                                 }
                                 val friendlyApp = when (log.app_package) {
                                     "com.openai.chatgpt" -> "ChatGPT"
@@ -1468,7 +1467,7 @@ fun FocusShieldHubSheet(
                                             Spacer(modifier = Modifier.height(2.dp))
                                             Text(
                                                 text = log.reason,
-                                                style = shieldBody(12, FontWeight.Normal, ShieldMuted),
+                                                style = shieldBody(12, FontWeight.Normal, focivoTokens().muted),
                                                 maxLines = 2
                                             )
                                         }
@@ -1476,7 +1475,7 @@ fun FocusShieldHubSheet(
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(99.dp))
-                                                .background(ShieldSoft)
+                                                .background(focivoTokens().softAccent)
                                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                                         ) {
                                             Text(
@@ -1486,7 +1485,7 @@ fun FocusShieldHubSheet(
                                         }
                                     }
                                     if (index < shownLogs.size - 1) {
-                                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(ShieldLine))
+                                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(focivoTokens().line))
                                     }
                                 }
                             }
@@ -1510,7 +1509,7 @@ fun FocusShieldHubSheet(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(99.dp))
-                            .border(1.dp, ShieldChipBorder.copy(alpha = 0.6f), RoundedCornerShape(99.dp))
+                            .border(1.dp, focivoTokens().chipBorder.copy(alpha = 0.6f), RoundedCornerShape(99.dp))
                             .clickable {
                                 if (!isAllPermissionsGranted) {
                                     enableWithGate { onTriggerTestIntercept("Instagram & Reels") }
@@ -1521,13 +1520,13 @@ fun FocusShieldHubSheet(
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "Test Instagram lock", style = shieldBody(12, FontWeight.Medium, ShieldText))
+                        Text(text = "Test Instagram lock", style = shieldBody(12, FontWeight.Medium, focivoTokens().text))
                     }
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(99.dp))
-                            .border(1.dp, ShieldChipBorder.copy(alpha = 0.6f), RoundedCornerShape(99.dp))
+                            .border(1.dp, focivoTokens().chipBorder.copy(alpha = 0.6f), RoundedCornerShape(99.dp))
                             .clickable {
                                 if (!isAllPermissionsGranted) {
                                     enableWithGate { onTriggerTestIntercept("YouTube & Shorts") }
@@ -1538,7 +1537,7 @@ fun FocusShieldHubSheet(
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "Test Shorts lock", style = shieldBody(12, FontWeight.Medium, ShieldText))
+                        Text(text = "Test Shorts lock", style = shieldBody(12, FontWeight.Medium, focivoTokens().text))
                     }
                 }
             }
@@ -1548,7 +1547,7 @@ fun FocusShieldHubSheet(
         // Nested overlays — unchanged behaviour
         // ---------------------------------------------------------------
         if (showStudyChannels) {
-            Box(modifier = Modifier.fillMaxSize().background(ShieldBg)) {
+            Box(modifier = Modifier.fillMaxSize().background(focivoTokens().bg)) {
                 StudyChannelsScreen(onBack = { showStudyChannels = false })
             }
         }

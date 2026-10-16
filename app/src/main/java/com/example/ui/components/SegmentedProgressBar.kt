@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
@@ -58,8 +59,8 @@ fun SegmentedProgressBar(
     val goalHours = goalMinutes / 60
     val formattedGoal = "${goalHours}h"
 
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textPrimary = focivoTokens().text
+    val textSecondary = focivoTokens().muted
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -111,7 +112,7 @@ fun SegmentedProgressBar(
 
             for (i in 0 until segments) {
                 val segmentFraction = (filledSegments - i).coerceIn(0f, 1f)
-                val segmentTrackColor = if (isDark) Color(0x30FFFFFF) else Color(0xFFE2EBD6)
+                val segmentTrackColor = focivoTokens().line
 
                 Box(
                     modifier = Modifier

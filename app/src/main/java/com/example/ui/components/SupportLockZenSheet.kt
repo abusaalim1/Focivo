@@ -67,6 +67,7 @@ import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
@@ -92,7 +93,8 @@ fun SupportLockZenSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val isDark = isAppInDarkTheme()
+    val T = focivoTokens()
+    val isDark = T.isDark
 
     var selectedAmount by remember { mutableStateOf(99) }
     var customAmountText by remember { mutableStateOf("99") }
@@ -106,10 +108,10 @@ fun SupportLockZenSheet(
     var paymentWaitRemaining by remember { mutableStateOf(30) }
     var paymentWaitJob by remember { mutableStateOf<Job?>(null) }
 
-    val bgSurface = if (isDark) Color(0xFF1D221C) else Color(0xFFFFFFFF)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val cardBorder = if (isDark) Color(0x30FFFFFF) else Color(0xFFDCE6D2)
+    val bgSurface = T.surface
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val cardBorder = T.line
 
     val effectiveAmount = if (isCustomSelected) {
         customAmountText.toIntOrNull() ?: 99
@@ -287,7 +289,7 @@ fun SupportLockZenSheet(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) RegainLimeContainer else (if (isDark) Color(0x1AFFFFFF) else Color(0xFFF4F6F0)))
+                            .background(if (isSelected) T.softAccent else T.surface2))
                             .border(
                                 1.5.dp,
                                 if (isSelected) RegainLimePrimary else cardBorder,
@@ -385,7 +387,7 @@ fun SupportLockZenSheet(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = if (isDark) Color(0xFF232B22) else Color(0xFFEDF7E7),
+                    color = T.surface2,
                     border = BorderStroke(1.dp, RegainLimePrimary.copy(alpha = 0.6f))
                 ) {
                     Column(
@@ -582,10 +584,11 @@ fun SupportLockZenMilestoneDialog(
     onDismiss: () -> Unit,
     onNeverShowAgain: () -> Unit = {}
 ) {
-    val isDark = isAppInDarkTheme()
-    val bgSurface = if (isDark) Color(0xFF1D221C) else Color(0xFFFFFFFF)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val T = focivoTokens()
+    val isDark = T.isDark
+    val bgSurface = T.surface
+    val textPrimary = T.text
+    val textSecondary = T.muted
 
     AlertDialog(
         onDismissRequest = onDismiss,

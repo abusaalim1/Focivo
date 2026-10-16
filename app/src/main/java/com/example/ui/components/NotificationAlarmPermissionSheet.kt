@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.CivoChatBubble
 import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.focivoTokens
 import com.example.util.PermissionUtils
 import kotlinx.coroutines.launch
 
@@ -97,10 +98,10 @@ fun NotificationAlarmPermissionSheet(
         dismissSheet(onPermissionGranted)
     }
 
-    val sheetBackground = Color(0xFF100D1C)
-    val accentLime = RegainLimePrimary
-    val accentGreen = Color(0xFF69F0AE)
-
+    val T = focivoTokens()
+    val sheetBackground = T.bg
+    val accentLime = T.accent
+    
     ModalBottomSheet(
         onDismissRequest = { dismissSheet(onDismiss) },
         sheetState = sheetState,
@@ -147,7 +148,7 @@ fun NotificationAlarmPermissionSheet(
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            listOf(Color(0xFF8CE000), Color(0xFF5CA300))
+                            listOf(T.accent, T.accent.copy(alpha = 0.7f))
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -155,7 +156,7 @@ fun NotificationAlarmPermissionSheet(
                 Icon(
                     imageVector = Icons.Default.NotificationsActive,
                     contentDescription = null,
-                    tint = Color(0xFF021207),
+                    tint = T.onAccent,
                     modifier = Modifier.size(36.dp)
                 )
             }
@@ -177,21 +178,21 @@ fun NotificationAlarmPermissionSheet(
             ) {
                 PermissionFeatureRow(
                     icon = Icons.Default.Alarm,
-                    iconTint = Color(0xFF8CE000),
+                    iconTint = T.accent,
                     title = "Precise Focus & Break Alarms",
                     description = "Plays your custom Zen Bell loudly when a 25m or 50m sprint finishes, even if your phone screen is turned off."
                 )
 
                 PermissionFeatureRow(
                     icon = Icons.Default.Notifications,
-                    iconTint = Color(0xFF8CE000),
+                    iconTint = T.accent,
                     title = "Live Background Countdown",
                     description = "Keeps remaining session time visible in your notification tray so you never lose track of deep work."
                 )
 
                 PermissionFeatureRow(
                     icon = Icons.Default.Vibration,
-                    iconTint = Color(0xFF8CE000),
+                    iconTint = T.accent,
                     title = "Haptic Transition Signals",
                     description = "Subtle tactile pulses notify you when moving from deep focus to relaxation breaks."
                 )

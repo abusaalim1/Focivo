@@ -34,13 +34,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimePrimary
 import com.example.util.AppUpdateInfo
 
-private val OverlayCardBg = Color(0xF21D221C)
-private val OverlayTitle = Color(0xFFF7F8F4)
-private val OverlayBody = Color(0xFFB9C2B6)
-private val OverlayButtonText = Color(0xFF061505)
+private val OverlayCardBg @Composable get() = focivoTokens().surface
+private val OverlayTitle @Composable get() = focivoTokens().text
+private val OverlayBody @Composable get() = focivoTokens().muted
+private val OverlayButtonText @Composable get() = focivoTokens().onAccent
 
 @Composable
 private fun OverlayShell(

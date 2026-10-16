@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 
@@ -54,11 +55,12 @@ fun PrivacyPolicySheet(
     onDismiss: () -> Unit,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 ) {
-    val darkSurface = Color(0xFF141814)
-    val cardBg = Color(0xFF1C221C)
-    val textPrimary = Color(0xFFF0F4ED)
-    val textSecondary = Color(0xFFA5B0A4)
-    val limeAccent = RegainLimePrimary
+    val T = focivoTokens()
+    val darkSurface = T.bg
+    val cardBg = T.surface
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val limeAccent = T.accent
     val scrollState = rememberScrollState()
 
     ModalBottomSheet(

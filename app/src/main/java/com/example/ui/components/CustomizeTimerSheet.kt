@@ -55,10 +55,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.FocuslyRepository
-import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
-import com.example.ui.theme.SecondaryTextLight
-import com.example.ui.theme.isAppInDarkTheme
+import com.example.ui.theme.focivoTokens
 import com.example.util.PomodoroConfig
 import com.example.util.PomodoroStyleManager
 import com.example.util.TimerFaceManager
@@ -79,7 +77,7 @@ import com.example.util.loadPomodoroConfig
  * ring color shift); the user starts it with the normal Start button.
  */
 // v1.2.3 design-unification — owner clean-redesign accent (#B6F13A).
-private val CustomizeAccent = Color(0xFFB6F13A)
+private val T.accent = Color(0xFFB6F13A)
 
 private val CustomizeSounds = listOf("Silent", "Rain", "White noise", "Cafe", "Forest", "Ocean")
 
@@ -121,15 +119,16 @@ fun CustomizeTimerSheet(
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val isDark = isAppInDarkTheme()
+    val T = focivoTokens()
+    val isDark = T.isDark
     // v1.2.3 design-unification: dark surfaces follow the owner
     // clean-redesign tokens (#0A0A0B bg / #131315 cards / #1F1F22 lines).
-    val sheetBackground = if (isDark) Color(0xFF0A0A0B) else Color(0xFFFAFBF7)
-    val textPrimary = if (isDark) Color(0xFFF4F4F5) else NearBlack
-    val textSecondary = if (isDark) Color(0xFF76767C) else SecondaryTextLight
-    val cardBg = if (isDark) Color(0xFF131315) else Color.White
-    val cardBorder = if (isDark) Color(0xFF1F1F22) else Color(0xFFDCE6D2)
-    val selectedBg = if (isDark) Color(0x1EB6F13A) else Color(0xFFF1F8E4)
+    val sheetBackground = T.bg
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val cardBg = T.surface
+    val cardBorder = T.line
+    val selectedBg = T.softAccent
 
     var selectedSubject by remember { mutableStateOf(currentSubject.ifBlank { "Deep Study" }) }
     var customSubjectInput by remember { mutableStateOf("") }
@@ -372,7 +371,7 @@ fun CustomizeTimerSheet(
                                     .background(if (isSelected) selectedBg else cardBg)
                                     .border(
                                         1.dp,
-                                        if (isSelected) CustomizeAccent else cardBorder,
+                                        if (isSelected) T.accent else cardBorder,
                                         RoundedCornerShape(14.dp)
                                     )
                                     .pressFeedback()
@@ -390,7 +389,7 @@ fun CustomizeTimerSheet(
                                     Icon(
                                         imageVector = Icons.Default.Lock,
                                         contentDescription = "Locked",
-                                        tint = Color(0xFFF5A524),
+                                        tint = T.warning,
                                         modifier = Modifier.size(13.dp)
                                     )
                                 } else {
@@ -415,7 +414,7 @@ fun CustomizeTimerSheet(
                                         text = "${theme.unlockPoints}",
                                         fontFamily = PoppinsFontFamily,
                                         fontSize = 10.sp,
-                                        color = Color(0xFFF5A524)
+                                        color = T.warning
                                     )
                                 }
                             }
@@ -445,7 +444,7 @@ fun CustomizeTimerSheet(
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
-                            color = if (isDark) CustomizeAccent else Color(0xFF4A7A00)
+                            color = T.accentText
                         )
                     }
                     TimerFacePicker(
@@ -488,8 +487,8 @@ fun CustomizeTimerSheet(
                             onDismiss()
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = CustomizeAccent,
-                            contentColor = Color.Black
+                            containerColor = T.accent,
+                            contentColor = T.onAccent
                         ),
                         shape = RoundedCornerShape(20.dp),
                         modifier = Modifier
@@ -529,7 +528,7 @@ fun CustomizeTimerSheet(
                                 fontFamily = PoppinsFontFamily,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
-                                color = if (isDark) CustomizeAccent else Color(0xFF4A7A00)
+                                color = T.accentText
                             )
                         }
                         TextButton(
@@ -546,7 +545,7 @@ fun CustomizeTimerSheet(
                                 fontFamily = PoppinsFontFamily,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
-                                color = if (isDark) CustomizeAccent else Color(0xFF4A7A00)
+                                color = T.accentText
                             )
                         }
                     }
@@ -591,7 +590,7 @@ private fun CustomizeChip(
             .background(if (selected) selectedBg else cardBg)
             .border(
                 1.dp,
-                if (selected) CustomizeAccent else cardBorder,
+                if (selected) T.accent else cardBorder,
                 RoundedCornerShape(14.dp)
             )
             .pressFeedback()

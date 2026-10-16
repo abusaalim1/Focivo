@@ -81,17 +81,21 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.SerifItalicFontFamily
+import com.example.ui.theme.focivoTokens
 
-// v1.2.3 design-unification — owner's clean-redesign language:
-// Poppins body, Instrument Serif italic for the page headline,
-// lime accent #B6F13A, 48x28 toggles, 11sp/1.76sp section eyebrows.
-private val SettingsLime = Color(0xFFB6F13A)
-private val SettingsTrackOff = Color(0xFF26262B)
-private val SettingsThumbOff = Color(0xFF8B8B92)
-
-private val SettingsSerifItalic = FontFamily(
-    Font(R.font.instrument_serif_italic, FontWeight.Normal, FontStyle.Italic)
-)
+// Owner's Full App Redesign token system (dark + light aware).
+private object SettingsT {
+    val Lime @Composable get() = focivoTokens().accent
+    val TrackOff @Composable get() = focivoTokens().trackOff
+    val ThumbOff @Composable get() = focivoTokens().thumbOff
+    val Bg @Composable get() = focivoTokens().bg
+    val Surface @Composable get() = focivoTokens().surface
+    val Line @Composable get() = focivoTokens().line
+    val Text @Composable get() = focivoTokens().text
+    val Muted @Composable get() = focivoTokens().muted
+    val SerifItalic @Composable get() = SerifItalicFontFamily
+}
 
 /** The design's toggle: 48x28, dark track / grey thumb, lime when on. */
 @Composable
@@ -105,10 +109,10 @@ private fun SettingsShieldToggle(
         onCheckedChange = onCheckedChange,
         modifier = modifier.size(width = 48.dp, height = 28.dp),
         colors = SwitchDefaults.colors(
-            checkedThumbColor = Color(0xFF0A0A0B),
-            checkedTrackColor = SettingsLime,
-            uncheckedThumbColor = SettingsThumbOff,
-            uncheckedTrackColor = SettingsTrackOff,
+            checkedThumbColor = SettingsT.Bg,
+            checkedTrackColor = SettingsT.Lime,
+            uncheckedThumbColor = SettingsT.ThumbOff,
+            uncheckedTrackColor = SettingsT.TrackOff,
             uncheckedBorderColor = Color.Transparent,
             checkedBorderColor = Color.Transparent
         )
@@ -143,13 +147,9 @@ fun SettingsScreen(
     // renders dark on this screen's dark cards, so every title/subtitle gets
     // an explicit color from the proven isDark pattern (same convention as
     // DeepFocusSettingsSheet) instead of relying on MaterialTheme defaults.
-    val textPrimary = if (isDark) Color(0xFFF4F4F5) else NearBlack
-    val textSecondary = if (isDark) Color(0xFF76767C) else SecondaryTextLight
-    // v1.4.2: the screen sits on the full-bleed theme backdrop — the title
-    // follows the selected theme, not the app dark/light mode.
-    val theme by TimerThemeManager.selectedTheme.collectAsState()
-    val onBackdrop = theme.onBackdropContent
-    val titleShadow = backdropTitleShadow(onBackdrop)
+    val textPrimary = SettingsT.Text
+    val textSecondary = SettingsT.Muted
+    // Full App Redesign: flat token background; title uses token text.
 
     var notificationsEnabled by remember { mutableStateOf(userPreferences?.notificationsEnabled ?: true) }
     var hapticsEnabled by remember { mutableStateOf(userPreferences?.hapticsEnabled ?: true) }
@@ -182,6 +182,7 @@ fun SettingsScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
+            .background(SettingsT.Bg)
             .padding(horizontal = 20.dp)
             .testTag("settings_screen"),
         contentPadding = PaddingValues(top = 16.dp, bottom = 60.dp),
@@ -200,7 +201,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(if (isDark) Color(0x18FFFFFF) else Color(0x10000000))
+                        .background(SettingsT.Surface)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -214,11 +215,10 @@ fun SettingsScreen(
                 Text(
                     text = "Preferences",
                     style = MaterialTheme.typography.headlineSmall.copy(
-                        fontFamily = SettingsSerifItalic,
+                        fontFamily = SettingsT.SerifItalic,
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,
-                        color = onBackdrop,
-                        shadow = titleShadow
+                        color = SettingsT.Text
                     )
                 )
             }
@@ -239,7 +239,7 @@ fun SettingsScreen(
                         Icon(
                             imageVector = Icons.Default.DarkMode,
                             contentDescription = null,
-                            tint = SettingsLime,
+                            tint = SettingsT.Lime,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
@@ -288,7 +288,7 @@ fun SettingsScreen(
                         Icon(
                             imageVector = Icons.Default.Schedule,
                             contentDescription = null,
-                            tint = SettingsLime,
+                            tint = SettingsT.Lime,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
@@ -319,7 +319,7 @@ fun SettingsScreen(
                                     .weight(1f)
                                     .clip(RoundedCornerShape(14.dp))
                                     .background(
-                                        if (isSelected) SettingsLime else (if (isDark) Color(0x18FFFFFF) else Color(0x0C000000))
+                                        if (isSelected) SettingsT.Lime else SettingsT.Surface
                                     )
                                     .clickable { onUpdateDailyGoal(minutes) }
                                     .padding(vertical = 12.dp),
@@ -360,7 +360,7 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = Icons.Default.Vibration,
                                 contentDescription = null,
-                                tint = SettingsLime,
+                                tint = SettingsT.Lime,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
@@ -391,7 +391,7 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = Icons.Default.Notifications,
                                 contentDescription = null,
-                                tint = SettingsLime,
+                                tint = SettingsT.Lime,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
@@ -418,7 +418,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
-                            .background(if (isDark) Color(0x18FFFFFF) else Color(0x08000000))
+                            .background(SettingsT.Surface)
                             .padding(14.dp)
                     ) {
                         Row(
@@ -433,7 +433,7 @@ fun SettingsScreen(
                                 Icon(
                                     imageVector = Icons.Default.NotificationsOff,
                                     contentDescription = null,
-                                    tint = SettingsLime,
+                                    tint = SettingsT.Lime,
                                     modifier = Modifier.size(22.dp)
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -491,7 +491,7 @@ fun SettingsScreen(
                                     .weight(1f)
                                     .height(42.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(SettingsLime)
+                                    .background(SettingsT.Lime)
                                     .clickable {
                                         if (!hasDndPermission) {
                                             StudyNotificationBlockerManager.openDndSettings(context)
@@ -507,7 +507,7 @@ fun SettingsScreen(
                                     text = if (!hasDndPermission) "Enable Do Not Disturb Access" else "Block Notifications Now",
                                     style = MaterialTheme.typography.labelMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF021207)
+                                        color = SettingsT.Bg
                                     )
                                 )
                             }
@@ -822,7 +822,7 @@ fun SettingsScreen(
                         Icon(
                             imageVector = Icons.Default.Info,
                             contentDescription = null,
-                            tint = SettingsLime,
+                            tint = SettingsT.Lime,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
@@ -869,7 +869,7 @@ fun SettingsScreen(
                             .testTag("check_for_updates_button"),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = SettingsLime
+                            contentColor = SettingsT.Lime
                         )
                     ) {
                         Row(
@@ -880,7 +880,7 @@ fun SettingsScreen(
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(16.dp),
                                     strokeWidth = 2.dp,
-                                    color = SettingsLime
+                                    color = SettingsT.Lime
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
@@ -893,7 +893,7 @@ fun SettingsScreen(
                                     imageVector = Icons.Default.SystemUpdate,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp),
-                                    tint = SettingsLime
+                                    tint = SettingsT.Lime
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
@@ -910,7 +910,7 @@ fun SettingsScreen(
                         Text(
                             text = manualUpdateMessage,
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = if (manualUpdateMessage.contains("available", ignoreCase = true)) SettingsLime else textSecondary,
+                                color = if (manualUpdateMessage.contains("available", ignoreCase = true)) SettingsT.Lime else textSecondary,
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Medium
                             )

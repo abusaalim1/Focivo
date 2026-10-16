@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
@@ -103,11 +104,12 @@ fun DeepFocusSettingsSheet(
 
     val isDarkMode = isAppInDarkTheme()
     val isDark = isDarkMode
-    val sheetBackground = if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val rowBg = if (isDark) Color(0xFF1D221C) else Color.White
-    val rowBorder = if (isDark) Color(0x228CE000) else Color(0xFFDCE6D2)
+    val sheetBackground = T.bg
+    val T = focivoTokens()
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val rowBg = T.surface
+    val rowBorder = T.line
 
     var showDeviceAdminPrompt by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(initialShowThemePicker) }
@@ -184,7 +186,7 @@ fun DeepFocusSettingsSheet(
                     Text(
                         text = "Enable Admin",
                         fontWeight = FontWeight.Bold,
-                        color = if (isDark) RegainLimePrimary else RegainLimeDeepText
+                        color = T.accentText
                     )
                 }
             },
@@ -426,8 +428,8 @@ private fun SettingsToggleRow(
             size = 44.dp,
             customContent = iconCustom,
             vectorCircleColor = if (checked) RegainLimePrimary.copy(alpha = 0.18f)
-            else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6),
-            vectorTint = if (checked) (if (isDark) RegainLimePrimary else RegainLimeDeepText)
+            else T.surface2,
+            vectorTint = if (checked) T.accentText
             else textSecondary
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -455,7 +457,7 @@ private fun SettingsToggleRow(
             colors = SwitchDefaults.colors(
                 checkedTrackColor = RegainLimePrimary,
                 checkedThumbColor = Color.White,
-                uncheckedTrackColor = if (isDark) Color(0xFF3A3F3A) else Color(0xFFE0E0E0)
+                uncheckedTrackColor = T.trackOff
             )
         )
     }
@@ -501,8 +503,8 @@ private fun SettingsActionRow(
             size = 44.dp,
             customContent = iconCustom,
             vectorCircleColor = if (badgeCount > 0) RegainLimePrimary.copy(alpha = 0.18f)
-            else if (isDark) Color(0xFF2C3238) else Color(0xFFF3F4F6),
-            vectorTint = if (badgeCount > 0) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary
+            else T.surface2,
+            vectorTint = if (badgeCount > 0) T.accentText else textSecondary
         )
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -556,9 +558,10 @@ fun LockedThemeDialog(
     focusPoints: Int,
     onDismiss: () -> Unit
 ) {
-    val isDark = isAppInDarkTheme()
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val T = focivoTokens()
+    val isDark = T.isDark
+    val textPrimary = T.text
+    val textSecondary = T.muted
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = {

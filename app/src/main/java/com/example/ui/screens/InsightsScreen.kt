@@ -63,6 +63,8 @@ import com.example.data.model.ReflectionEntity
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.SerifItalicFontFamily
+import com.example.ui.theme.focivoTokens
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -70,24 +72,28 @@ import java.util.Locale
 
 /* ───────────────────────── Design tokens (supplied design) ───────────────────────── */
 
+/**
+ * Design tokens for Insights — resolves to the dark/light system set.
+ * (The supplied design's dark values are exactly the system dark tokens.)
+ */
 private object C {
-    val Bg = Color(0xFF0A0A0B)
-    val Surface = Color(0xFF131315)
-    val Line = Color(0xFF1F1F22)
-    val Ink = Color(0xFFF4F4F5)
-    val Muted = Color(0xFF76767C)
-    val Accent = Color(0xFFB6F13A)
-    val AccentSoft = Color(0x1FB6F13A)
-    val AccentDim = Color(0xFF6E9B1E)
-    val GoalLine = Color(0xFF34343A)
-    val SegGray = Color(0xFF2A2A2F)
+    val Bg @Composable get() = focivoTokens().bg
+    val Surface @Composable get() = focivoTokens().surface
+    val Line @Composable get() = focivoTokens().line
+    val Ink @Composable get() = focivoTokens().text
+    val Muted @Composable get() = focivoTokens().muted
+    val Accent @Composable get() = focivoTokens().accent
+    val AccentSoft @Composable get() = focivoTokens().softAccent
+    val AccentDim @Composable get() = focivoTokens().accentText
+    val GoalLine @Composable get() = if (focivoTokens().isDark) Color(0xFF34343A) else Color(0xFFD8D8D2)
+    val SegGray @Composable get() = focivoTokens().surface2
 }
 
 /**
  * App font pair (owner rule): Poppins for ALL body/labels; Instrument Serif
  * italic ONLY for highlight/display text (headlines, hero numbers, stat values).
  */
-private val SerifItalic = FontFamily(Font(R.font.instrument_serif_italic))
+private val SerifItalic = SerifItalicFontFamily
 
 /* ───────────────────────── UI state (built from real data) ───────────────────────── */
 

@@ -47,6 +47,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimePrimary
 import com.example.util.AppUpdateInfo
 import com.example.util.AppUpdateManager
@@ -57,11 +58,12 @@ fun AppUpdateDialog(
     onDownloadClick: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val darkSurface = Color(0xFF0F1510)
-    val cardBg = Color(0xFF182218)
-    val limeAccent = RegainLimePrimary
-    val textPrimary = Color(0xFFF2F7EE)
-    val textSecondary = Color(0xFFA5B2A2)
+    val T = focivoTokens()
+    val darkSurface = T.bg
+    val cardBg = T.surface
+    val limeAccent = T.accent
+    val textPrimary = T.text
+    val textSecondary = T.muted
     val scrollState = rememberScrollState()
 
     // v1.2: in-app update progress — the dialog now downloads + installs
@@ -274,7 +276,7 @@ fun AppUpdateDialog(
                     is AppUpdateManager.UpdateDownloadState.Failed -> {
                         Text(
                             text = s.reason,
-                            color = Color(0xFFFF8A80),
+                            color = T.danger,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             fontFamily = PoppinsFontFamily,

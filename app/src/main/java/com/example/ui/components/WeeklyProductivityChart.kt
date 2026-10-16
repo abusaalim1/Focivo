@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.FocusSessionEntity
 import com.example.ui.theme.MutedBorderLight
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimeContainer
@@ -300,7 +301,7 @@ fun WeeklyProductivityChart(
 
                 // Daily Target Goal Badge
                 Surface(
-                    color = if (isDark) Color(0x188CE000) else RegainLimeContainer,
+                    color = focivoTokens().accent.copy(alpha = 0.12f),
                     shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x358CE000))
                 ) {
@@ -364,9 +365,9 @@ fun WeeklyProductivityChart(
                 // Week Progress Badge
                 Surface(
                     color = if (summary.percentageVsLastWeek >= 0) {
-                        if (isDark) Color(0x228CE000) else Color(0x152E7D32)
+                        focivoTokens().accent.copy(alpha = 0.15f)
                     } else {
-                        if (isDark) Color(0x22FF5252) else Color(0x15D32F2F)
+                        focivoTokens().danger.copy(alpha = 0.12f)
                     },
                     shape = RoundedCornerShape(10.dp)
                 ) {
@@ -411,8 +412,8 @@ fun WeeklyProductivityChart(
                     modifier = Modifier
                         .fillMaxSize()
                         .drawBehind {
-                            val strokeColor = if (isDark) Color(0x15FFFFFF) else Color(0x12000000)
-                            val goalLineColor = if (isDark) Color(0x558CE000) else Color(0x664C9A00)
+                            val strokeColor = focivoTokens().line
+                            val goalLineColor = focivoTokens().accent.copy(alpha = 0.4f)
 
                             // Top boundary line
                             drawLine(
@@ -526,9 +527,9 @@ fun WeeklyProductivityChart(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(
                                         if (isSelected) {
-                                            if (isDark) Color(0x30FFFFFF) else Color(0x20000000)
+                                            focivoTokens().line
                                         } else {
-                                            if (isDark) Color(0x12FFFFFF) else Color(0x0C000000)
+                                            focivoTokens().line
                                         }
                                     )
                                     .border(
@@ -567,8 +568,8 @@ fun WeeklyProductivityChart(
                                                     // Inactive / 0h
                                                     Brush.verticalGradient(
                                                         colors = listOf(
-                                                            if (isDark) Color(0x20FFFFFF) else Color(0x18000000),
-                                                            if (isDark) Color(0x10FFFFFF) else Color(0x0A000000)
+                                                            focivoTokens().line,
+                                                            focivoTokens().line.copy(alpha = 0.5f)
                                                         )
                                                     )
                                                 }
@@ -605,11 +606,11 @@ fun WeeklyProductivityChart(
             // Guarded: hidden when the weekly list is empty (selectedDayModel == null)
             if (selectedDayModel != null) {
             Surface(
-                color = if (isDark) Color(0xFF1B221A) else Color(0xFFF2F7EE),
+                color = focivoTokens().surface,
                 shape = RoundedCornerShape(16.dp),
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
-                    if (isDark) Color(0x258CE000) else Color(0x358CE000)
+                    focivoTokens().accent.copy(alpha = 0.25f)
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -737,7 +738,7 @@ fun WeeklyProductivityChart(
             ) {
                 // Pill 1: Daily Average
                 Surface(
-                    color = if (isDark) Color(0xFF141914) else Color(0xFFF7FAF4),
+                    color = focivoTokens().surface2,
                     shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
                     modifier = Modifier.weight(1f)
@@ -771,7 +772,7 @@ fun WeeklyProductivityChart(
 
                 // Pill 2: Best Day
                 Surface(
-                    color = if (isDark) Color(0xFF141914) else Color(0xFFF7FAF4),
+                    color = focivoTokens().surface2,
                     shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
                     modifier = Modifier.weight(1f)
@@ -807,7 +808,7 @@ fun WeeklyProductivityChart(
 
                 // Pill 3: Goals Hit
                 Surface(
-                    color = if (isDark) Color(0xFF141914) else Color(0xFFF7FAF4),
+                    color = focivoTokens().surface2,
                     shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, cardBorder),
                     modifier = Modifier.weight(1f)

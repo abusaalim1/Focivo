@@ -60,6 +60,7 @@ import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
@@ -74,11 +75,12 @@ fun PriorityItemRow(
     onStartFocus: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isAppInDarkTheme()
-    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
+    val T = focivoTokens()
+    val isDark = T.isDark
+    val cardBg = T.surface
     val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textPrimary = T.text
+    val textSecondary = T.muted
 
     val formattedIndex = String.format("%02d", index + 1)
     val interactionSource = remember { MutableInteractionSource() }
@@ -235,11 +237,12 @@ fun PlannerTaskCard(
     onStartFocus: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isAppInDarkTheme()
-    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
+    val T = focivoTokens()
+    val isDark = T.isDark
+    val cardBg = T.surface
     val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textPrimary = T.text
+    val textSecondary = T.muted
 
     Box(
         modifier = modifier
@@ -387,10 +390,11 @@ fun TaskBottomSheet(
     onDismiss: () -> Unit,
     onSaveTask: (title: String, category: String, duration: Int, priority: Int, schedule: String, notes: String, isTopPriority: Boolean) -> Unit
 ) {
-    val isDark = isAppInDarkTheme()
-    val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
-    val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
-    val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
+    val T = focivoTokens()
+    val isDark = T.isDark
+    val cardBg = T.surface
+    val textPrimary = T.text
+    val textSecondary = T.muted
     val borderColor = if (isDark) MaterialTheme.colorScheme.outline else MutedBorderLight
 
     var title by remember { mutableStateOf("") }

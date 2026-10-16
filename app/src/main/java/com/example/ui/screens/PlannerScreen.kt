@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.backdropContentColor
 import com.example.ui.theme.backdropTitleShadow
@@ -78,8 +79,8 @@ fun PlannerScreen(
 ) {
     val isDark = isAppInDarkTheme()
     // v1.4.2: explicit text colors (colorScheme.onSurface renders dark on dark cards)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textPrimary = focivoTokens().text
+    val textSecondary = focivoTokens().muted
     // v1.4.2: top-of-screen text sits on the full-bleed theme backdrop, so it
     // follows the selected theme (not the app dark/light mode).
     val theme by TimerThemeManager.selectedTheme.collectAsState()
@@ -155,7 +156,7 @@ fun PlannerScreen(
                             modifier = Modifier
                                 .size(42.dp)
                                 .clip(CircleShape)
-                                .background(if (isDark) Color(0x18FFFFFF) else Color(0x0C000000))
+                                .background(focivoTokens().surface2)
                                 .testTag("planner_alarm_button")
                         ) {
                             Icon(
@@ -198,7 +199,7 @@ fun PlannerScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(
-                                    if (isSelected) RegainLimePrimary else (if (isDark) Color(0x12FFFFFF) else Color(0x08000000))
+                                    if (isSelected) focivoTokens().accent else focivoTokens().line
                                 )
                                 .clickable { selectedDayIndex = index }
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -232,7 +233,7 @@ fun PlannerScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(if (isDark) Color(0x10FFFFFF) else Color(0x08000000))
+                        .background(focivoTokens().surface2)
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -325,8 +326,8 @@ private fun PlannerTaskRow(
     onStartFocus: () -> Unit
 ) {
     // v1.4.2: explicit text colors (colorScheme.onSurface renders dark on dark cards)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textPrimary = focivoTokens().text
+    val textSecondary = focivoTokens().muted
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -372,7 +373,7 @@ private fun PlannerTaskRow(
                             .clip(CircleShape)
                             .border(
                                 width = 1.5.dp,
-                                color = if (task.isCompleted) RegainLimePrimary else (if (isDark) Color(0x40FFFFFF) else Color(0x30000000)),
+                                color = if (task.isCompleted) focivoTokens().accentText else focivoTokens().muted,
                                 shape = CircleShape
                             )
                             .background(if (task.isCompleted) RegainLimePrimary else Color.Transparent)

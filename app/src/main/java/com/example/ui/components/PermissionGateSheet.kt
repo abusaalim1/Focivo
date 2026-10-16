@@ -50,6 +50,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.util.PermissionUtils
@@ -71,12 +72,13 @@ fun PermissionGateSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val isDark = isAppInDarkTheme()
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else Color(0xFF5A635A)
-    val cardBg = if (isDark) Color(0xFF1A2019) else Color.White
+    val T = focivoTokens()
+    val isDark = T.isDark
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val cardBg = T.surface
     val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0xFFE2E8E0)
-    val rowBg = if (isDark) Color(0xFF232A22) else Color(0xFFF2F5EE)
+    val rowBg = T.surface2
 
     var explainerFor by remember { mutableStateOf<String?>(null) }
 
