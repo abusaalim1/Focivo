@@ -409,25 +409,23 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     // Screen navigation states
     var isSplashFinished by remember { mutableStateOf(false) }
     // v1.2: owner-supplied animated splash (ui.splash.FocivoSplash, used as-is).
-    // The variant is decided ONCE per cold start, after the session restore
-    // finishes: an existing session (signed-in OR guest) -> short RETURNING
-    // animation; no session -> full NEW_USER animation, whose finish preselects
-    // the Create Account tab on the auth screen.
-    var splashVariant by remember { mutableStateOf<SplashVariant?>(null) }
+    // v1.2.4: the variant is decided SYNCHRONOUSLY at first composition from
+    // local persisted session state (SharedPreferences) — there is no async
+    // flip. Signed-in/guest users NEVER see the 8s new-user animation;
+    // true first-run users never see the returning one. (The old
+    // LaunchedEffect defaulted to NEW_USER while auth restored, so signed-in
+    // users briefly saw the new-user splash before the variant flipped.)
+    val hasSessionAtLaunch = remember { hasLocalSessionAtLaunch(context) }
+    var splashVariant by remember {
+        mutableStateOf(if (hasSessionAtLaunch) SplashVariant.RETURNING else SplashVariant.NEW_USER)
+    }
     var splashWantsCreateAccount by remember { mutableStateOf(false) }
     // v1.2.3: real user data for the WelcomeScene (name / today's
     // minutes), read from the same on-device stores the share cards use.
-    var splashWelcomeInfo by remember { mutableStateOf(WelcomeInfo()) }
-
-    LaunchedEffect(isAuthChecking, currentUser) {
-        if (!isAuthChecking && splashVariant == null) {
-            if (currentUser != null) {
-                splashVariant = SplashVariant.RETURNING
-                splashWelcomeInfo = loadSplashWelcomeInfo(context)
-            } else {
-                splashVariant = SplashVariant.NEW_USER
-            }
-        }
+    var splashWelcomeInfo by remember {
+        mutableStateOf(
+            if (hasSessionAtLaunch) loadSplashWelcomeInfo(context) else WelcomeInfo()
+        )
     }
     var isSettingsOpen by remember { mutableStateOf(false) }
     // v1.1: Mascot Buddy dedicated screen.
@@ -498,6 +496,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
             // v1.2: NEW_USER -> Auth with Create Account preselected;
             // RETURNING -> falls through to the existing routing below
             // (onboarding checks / guest skip / main shell — untouched).
+            // v1.2.4: the variant is decided synchronously at launch and
+            // never flipped, so the correct animation plays from frame one.
             FocivoSplash(
                 variant = splashVariant ?: SplashVariant.NEW_USER,
                 welcome = splashWelcomeInfo,
@@ -1148,4 +1148,22 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
             } // CompositionLocalProvider (v1.4.0-round2 theme accent)
         }
     }
+}
+
+/**
+ * v1.2.4 — synchronous splash-variant decision (owner bug 2026-10-16 19:57:
+ * signed-in users briefly saw the 8s new-user splash before the async
+ * session restore flipped the variant).
+ *
+ * Reads the same persisted stores the async restore uses, but
+ * synchronously from SharedPreferences at first composition: any stored
+ * user id (signed-in account) or an explicit guest session means the
+ * RETURNING variant. Only a true first run (no stored session at all)
+ * gets NEW_USER. The variant is then never flipped during the launch.
+ */
+private fun hasLocalSessionAtLaunch(context: android.content.Context): Boolean = try {
+    AndroidPreferenceSessionManager.getStoredUserId(context) != null ||
+        AndroidPreferenceSessionManager.isGuestSession(context)
+} catch (_: Throwable) {
+    false
 }

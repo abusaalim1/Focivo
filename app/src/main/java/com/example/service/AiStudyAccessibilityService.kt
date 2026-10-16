@@ -165,6 +165,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
     private var a11yBlockView: androidx.compose.ui.platform.ComposeView? = null
     private var a11yBlockHost: com.example.ui.overlay.OverlayLifecycleHost? = null
     private var a11yBlockWm: WindowManager? = null
+    // v1.2.4: bounds the current block overlay is clipped to (null =
+    // fullscreen). Split-pane / freeform interceptions cover ONLY the
+    // offending window so the rest of the screen stays usable.
+    private var a11yBlockBounds: android.graphics.Rect? = null
+    // v1.2.4: bounds the current block overlay is clipped to (null =
+    // fullscreen). Split-pane / freeform interceptions cover ONLY the
+    // offending window so the rest of the screen stays usable.
     private val a11yBlockedPackage = androidx.compose.runtime.mutableStateOf("")
     private val a11yAppName = androidx.compose.runtime.mutableStateOf("")
     private val a11yDurationSec = androidx.compose.runtime.mutableStateOf(0)
@@ -222,16 +229,32 @@ class AiStudyAccessibilityService : AccessibilityService() {
         else a11yMainHandler.post(action)
     }
 
-    private fun a11yOverlayParams(): WindowManager.LayoutParams {
+    /**
+     * v1.2.4 — window-bounded block overlay (owner order 2026-10-16 19:57):
+     * when a blocked app is caught in a split pane or a freeform/small
+     * window, [bounds] (the offending AccessibilityWindowInfo bounds in
+     * screen coordinates) clips the TYPE_ACCESSIBILITY_OVERLAY to exactly
+     * that window — the block appears INSIDE the small window, never on
+     * the launcher/home. Null bounds = the existing fullscreen path.
+     */
+    private fun a11yOverlayParams(bounds: android.graphics.Rect? = null): WindowManager.LayoutParams {
+        val useBounds = bounds != null && bounds.width() > 0 && bounds.height() > 0
         return WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
+            if (useBounds) bounds!!.width() else WindowManager.LayoutParams.MATCH_PARENT,
+            if (useBounds) bounds!!.height() else WindowManager.LayoutParams.MATCH_PARENT,
             // Renders above ALL app windows (incl. OEM freeform layers) —
             // the strongest layer a third-party app can use.
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             android.graphics.PixelFormat.TRANSLUCENT
         ).apply {
+            if (useBounds) {
+                // bounds are screen coordinates (getBoundsInScreen) and
+                // FLAG_LAYOUT_IN_SCREEN keeps the window in screen space.
+                x = bounds!!.left
+                y = bounds!!.top
+                gravity = android.view.Gravity.TOP or android.view.Gravity.START
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -256,7 +279,10 @@ class AiStudyAccessibilityService : AccessibilityService() {
         durationSec: Int = 0,
         reason: String? = null,
         isPunishment: Boolean = false,
-        warningVariant: Boolean = false
+        warningVariant: Boolean = false,
+        // v1.2.4: offending window bounds (screen coords) — clips the
+        // overlay to exactly that window. Null = fullscreen path.
+        windowBounds: android.graphics.Rect? = null
     ): Boolean {
         if (a11yBlockView != null) {
             a11yBlockedPackage.value = blockedPackage
@@ -264,6 +290,15 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yDurationSec.value = durationSec
             a11yReason.value = reason
             a11yPunishment.value = isPunishment
+            // Reposition to the offending window when a (different) bound
+            // is supplied — e.g. fullscreen overlay followed by a
+            // small-window intercept of the same package.
+            if (windowBounds != null && windowBounds != a11yBlockBounds) {
+                a11yBlockBounds = android.graphics.Rect(windowBounds)
+                try {
+                    a11yBlockWm?.updateViewLayout(a11yBlockView, a11yOverlayParams(a11yBlockBounds))
+                } catch (_: Exception) { }
+            }
             return true
         }
         val host = com.example.ui.overlay.OverlayLifecycleHost()
@@ -300,7 +335,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 }
             }
             host.show()
-            wm.addView(view, a11yOverlayParams())
+            // v1.2.4: clip to the offending window when bounds were given.
+            a11yBlockBounds = windowBounds?.let { android.graphics.Rect(it) }
+            wm.addView(view, a11yOverlayParams(a11yBlockBounds))
             a11yBlockView = view
             a11yBlockHost = host
             a11yBlockWm = wm
@@ -337,6 +374,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yBlockView = null
             a11yBlockHost = null
             a11yBlockWm = null
+            a11yBlockBounds = null
             a11yBlockDrawn = false
         }
     }
@@ -607,6 +645,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 // v1.2.3: ANY visible blocked window triggers — the old code
                 // only covered floating/split and relied on the event-package
                 // path for fullscreen, which misses already-open apps.
+                // v1.2.4 (owner 2026-10-16 19:57): the block UI must cover ONLY
+                // the offending window — a blocked app in a split pane or a
+                // freeform/small window gets the block INSIDE that window,
+                // never a fullscreen block over the launcher/home. The
+                // detected window bounds ride into the overlay layout; the
+                // fullscreen path keeps the existing fullscreen overlay.
+                val overlayBounds = if (mode == "fullscreen") null else android.graphics.Rect(rect)
                 if (nowTime - lastGeneralAppInterceptTimeMs > 2500L || lastGeneralInterceptedPkg != pkg) {
                     lastGeneralAppInterceptTimeMs = nowTime
                     lastGeneralInterceptedPkg = pkg
@@ -615,7 +660,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     try {
                         AiStudyGuardManager.logGuardActivity(
                             ctx, friendlyName, "multiwindow-detect", "intercept",
-                            "src=windows-list mode=$mode bounds=${rect.width()}x${rect.height()} trigger=$triggerSrc"
+                            "src=windows-list mode=$mode bounds=${rect.width()}x${rect.height()} " +
+                                "overlay=" + (overlayBounds?.let { "window ${it.width()}x${it.height()}@${it.left},${it.top}" } ?: "fullscreen") +
+                                " trigger=$triggerSrc"
                         )
                     } catch (_: Exception) { }
                     BlockOverlayManager.intercept(
@@ -625,7 +672,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         durationSec = try { FocusShieldService.getRemainingSeconds(ctx) } catch (_: Exception) { 0 },
                         reason = "$friendlyName is locked during your active focus session.",
                         isPunishment = false,
-                        multiWindowMode = mode
+                        multiWindowMode = mode,
+                        windowBounds = overlayBounds
                     )
                 }
                 logMwSummary(
@@ -859,9 +907,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
             // itself can't be intercepted, but landing on the launcher re-shows the
             // focus overlay. Placed BEFORE the essential-apps early return because
             // launchers are permanently protected everywhere else.
+            // v1.2.3 phantom-lock fix (RC2 belt-and-braces): ALSO require a real
+            // study period, like every other intercept path — the persisted
+            // deep-focus flag must never be the sole authority.
             if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
                 DeepFocusManager.isDeepFocusSessionActive(applicationContext) &&
                 StrictModeManager.isBlockHomeScreenEnabled(applicationContext) &&
+                AiStudyGuardManager.isStudyPeriodActive(applicationContext) &&
                 EssentialAppsGuard.isLauncherPackage(applicationContext, pkg)
             ) {
                 val nowHome = System.currentTimeMillis()

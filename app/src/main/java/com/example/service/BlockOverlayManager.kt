@@ -118,19 +118,22 @@ object BlockOverlayManager {
         durationSec: Int,
         reason: String?,
         isPunishment: Boolean,
-        warningVariant: Boolean = false
+        warningVariant: Boolean = false,
+        // v1.2.4: offending window bounds (screen coords) — clips the
+        // overlay to exactly that window. Null = fullscreen path.
+        windowBounds: android.graphics.Rect? = null
     ): Boolean {
         val svc = AiStudyAccessibilityService.connectedInstance ?: return false
         if (svc.isA11yBlockOverlayShowing()) return true
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            return svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant)
+            return svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant, windowBounds)
         }
         val result = java.util.concurrent.atomic.AtomicBoolean(false)
         val latch = java.util.concurrent.CountDownLatch(1)
         mainHandler.post {
             try {
                 result.set(
-                    svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant)
+                    svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant, windowBounds)
                 )
             } finally {
                 latch.countDown()
@@ -328,28 +331,39 @@ object BlockOverlayManager {
         durationSec: Int = 0,
         reason: String? = null,
         isPunishment: Boolean = false,
-        multiWindowMode: String? = null
+        multiWindowMode: String? = null,
+        // v1.2.4: offending window bounds (screen coords) for split-pane /
+        // freeform interceptions — the block UI covers ONLY that window.
+        windowBounds: android.graphics.Rect? = null
     ) {
+        // v1.1.3: Guard Hub diagnostics — every intercept is recorded with
+        // the concrete reason so device tests are evidence-based.
         // v1.2.2 (share screen): record every real intercept so the Session
         // Complete "Shield" card can show the apps blocked during the session.
         SessionBlockRecorder.record(context, blockedPackage, appName)
         val alreadyShowing = isBlockUiShowing()
         val path = resolveOverlayPath(context)
         val shown = when (path) {
-            OverlayPath.A11Y -> showViaA11y(blockedPackage, appName, durationSec, reason, isPunishment)
+            OverlayPath.A11Y -> showViaA11y(blockedPackage, appName, durationSec, reason, isPunishment, windowBounds = windowBounds)
             OverlayPath.APP -> showIfPermitted(context, blockedPackage, appName, durationSec, reason, isPunishment)
             OverlayPath.ACTIVITY -> false
         }
         // v1.2.3: braces — a second, guaranteed-top layer for multi-window.
+        // v1.2.4: when the overlay is clipped to the offending window's
+        // bounds (split/freeform), it IS the correctly-placed block — do not
+        // launch the fullscreen braces Activity on top of it. Braces stay
+        // for the no-bounds floating case and the no-draw watchdog below.
         var bracesLaunched = false
         if (shown && !alreadyShowing) {
-            if (multiWindowMode == "floating") {
+            if (multiWindowMode == "floating" && windowBounds == null) {
                 bracesLaunched = launchBracesActivity(
                     context, blockedPackage, appName, durationSec, reason, isPunishment, "floating"
                 )
             } else if (path == OverlayPath.A11Y) {
                 // No-draw watchdog: addView succeeding doesn't prove the frame
                 // composited. If nothing drew in 800ms, bring the Activity.
+                // v1.2.4: now also covers floating/split interceptions whose
+                // bounds-clipped overlay is the placed block.
                 mainHandler.postDelayed({
                     try {
                         val svc = AiStudyAccessibilityService.connectedInstance
@@ -373,6 +387,9 @@ object BlockOverlayManager {
                     if (shown) "shown" else "fallback",
                     "path=" + path.name.lowercase() +
                         (if (multiWindowMode != null) " mode=$multiWindowMode" else "") +
+                        (if (windowBounds != null)
+                            " overlay=bounds ${windowBounds.width()}x${windowBounds.height()}@${windowBounds.left},${windowBounds.top}"
+                        else "") +
                         if (bracesLaunched) " braces=activity" else ""
                 )
             } catch (_: Exception) { }
