@@ -11,7 +11,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -99,8 +98,8 @@ class V123NavPillHotfixTest {
 
     /** The bottom bar must stay a slim dock — never a screen-tall capsule. */
     private fun assertNavBarCompact() {
-        val rootH = composeTestRule.onRoot().getBoundsInRoot().height
-        val navH = composeTestRule.onNodeWithTag("floating_nav").getBoundsInRoot().height
+        val rootH = composeTestRule.onRoot().fetchSemanticsNode().size.height.toFloat()
+        val navH = composeTestRule.onNodeWithTag("floating_nav").fetchSemanticsNode().size.height.toFloat()
         org.junit.Assert.assertTrue(
             "REGRESSION: bottom nav bar is ${navH}px of ${rootH}px tall " +
                 "(>= 30% of the screen) — the liquid-pill geometry bug is back.",
