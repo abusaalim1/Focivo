@@ -205,16 +205,14 @@ fun SessionCompleteScreen(
                 suppressedNotifs = suppressedNotifs,
                 onOpenDigest = { showDigestSheet = true },
                 shareContent = {
-                    Box(modifier = Modifier.weight(1f)) {
-                        FocivoShareEntry(
-                            data = shareData,
-                            onWhatsApp = { shareCard(it, toWhatsApp = true) },
-                            onMore = { shareCard(it, toWhatsApp = false) },
-                            onDownload = { downloadCard(it) },
-                            onContinue = onDismiss,
-                            animateEntrance = animateEntrance
-                        )
-                    }
+                    FocivoShareEntry(
+                        data = shareData,
+                        onWhatsApp = { shareCard(it, toWhatsApp = true) },
+                        onMore = { shareCard(it, toWhatsApp = false) },
+                        onDownload = { downloadCard(it) },
+                        onContinue = onDismiss,
+                        animateEntrance = animateEntrance
+                    )
                 }
             )
         }
@@ -391,7 +389,9 @@ private fun SessionFlowShareStage(
                 )
             }
         }
-        shareContent()
+        Box(modifier = Modifier.weight(1f)) {
+            shareContent()
+        }
     }
 }
 
