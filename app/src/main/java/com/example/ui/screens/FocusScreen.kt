@@ -106,7 +106,6 @@ fun FocusScreen(
     currentTaskTitle: String,
     distractionsCount: Int,
     ambientSound: String,
-    userStreak: Int = 0,
     userPreferences: UserPreferencesEntity? = null,
     isShieldActive: Boolean = false,
     isDeepFocusEnabled: Boolean = false,
@@ -184,7 +183,7 @@ fun FocusScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-            // Top Bar: streak readout (idle) / session title (running) + the
+            // Top Bar: session title + the
             // ONE menu button that opens the study hub.
             Row(
                 modifier = Modifier
@@ -193,38 +192,9 @@ fun FocusScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (!isRunning) {
-                    // Current streak pill (display only — hub holds the controls)
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(if (isDark) Color(0x28FFFFFF) else Color(0x10000000))
-                            .border(1.dp, if (isDark) Color(0x35B6F13A) else Color(0x20B6F13A), CircleShape)
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                            .testTag("focus_streak_pill")
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            // v1.5.0: iOS-style 3D flame asset for the streak.
-                            Image(
-                                painter = painterResource(id = R.drawable.emoji3d_flame),
-                                contentDescription = "Streak",
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "${userStreak}d",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    color = selectedTheme.onBackdropContent,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
-                            )
-                        }
-                    }
-                } else {
-                    Spacer(modifier = Modifier.width(44.dp))
-                }
+                // v1.2.3: no top-bar readout in idle state; the leading spacer
+                // keeps the title centered (hub holds the controls).
+                Spacer(modifier = Modifier.width(44.dp))
 
                 // Active topic title (only while a session runs)
                 Text(

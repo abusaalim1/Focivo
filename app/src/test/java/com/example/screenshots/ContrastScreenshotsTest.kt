@@ -185,7 +185,6 @@ class ContrastScreenshotsTest {
                 users = users,
                 currentUserName = "Abu Saalim",
                 currentUserPoints = 1250,
-                currentUserStreak = 12,
                 sessions = fakeSessions()
             )
         }

@@ -201,7 +201,6 @@ private const val DOWNLOAD_PATH = "M12 4v11M7 11l5 5 5-5M5 20h14"
 fun FocivoShareScreen(
     minutes: Int,
     distractions: Int,
-    streak: Int,
     modifier: Modifier = Modifier,
     name: String = "",
     /** Real data (owner: every value must be the user's own, never faked). */
@@ -223,7 +222,6 @@ fun FocivoShareScreen(
 ) {
     val m = minutes
     val d = distractions
-    val s = streak
     val n = name.trim()
     val date = remember { shareDateLabel() }
 
@@ -254,8 +252,8 @@ fun FocivoShareScreen(
     else "without a single distraction."
 
     val cardList: List<@Composable () -> Unit> = listOf(
-        { RingCard(date, m, d, s, n) },
-        { TodayCard(todayTotalMin, todaySessions, weekMinutes, s) },
+        { RingCard(date, m, d, n) },
+        { TodayCard(todayTotalMin, todaySessions, weekMinutes) },
         { MessageCard(date, m, d) },
         { ShieldCard(blockedApps, m) },
     )
@@ -562,7 +560,7 @@ private fun distractionLabel(d: Int) = "$d distraction${if (d == 1) "" else "s"}
 /* ═══════════════════════════ Card 1 — ring ═══════════════════════════ */
 
 @Composable
-private fun RingCard(date: String, m: Int, d: Int, s: Int, n: String) {
+private fun RingCard(date: String, m: Int, d: Int, n: String) {
     val pr = min(1f, m / 60f)
     CardFrame(
         drawBg = {
@@ -637,7 +635,6 @@ private fun RingCard(date: String, m: Int, d: Int, s: Int, n: String) {
         Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             Chip("✓ Completed", Color(0xFF161B17), Edge, Color.White)
             Chip(distractionLabel(d), Color(0xFF161B17), Edge, Color.White)
-            if (s > 0) FlameChip("${s}d")
         }
 
         Spacer(Modifier.weight(1f))
@@ -658,7 +655,7 @@ private fun Quote(text: String, color: Color) {
 /* ═══════════════════════════ Card 2 — today ═══════════════════════════ */
 
 @Composable
-private fun TodayCard(todayTotal: Int, sessions: Int, week: List<Int>, s: Int) {
+private fun TodayCard(todayTotal: Int, sessions: Int, week: List<Int>) {
     // Real data only: today's total minutes, today's session count, and the
     // last-7-day minutes (oldest..today; the last bar is today, lime).
     val wk = (week + List(7) { 0 }).take(7)
@@ -674,7 +671,6 @@ private fun TodayCard(todayTotal: Int, sessions: Int, week: List<Int>, s: Int) {
             modifier = Modifier.padding(top = 30.dp),
         )
         Text(hm(todayTotal), style = sf(76f, 1f, fg), modifier = Modifier.padding(top = 34.dp))
-        StreakLine(sessions, s, fg)
 
         // .bars
         Row(
@@ -885,49 +881,6 @@ private fun appTilePainter(context: android.content.Context, app: ShareBlockedAp
 
 /* ═══════════════════════════ Production additions ═══════════════════════════ */
 
-/**
- * Streak chip with the 3D flame asset — the app rule is ZERO unicode
- * emojis, so the HTML's flame becomes emoji3d_flame, same spot and size.
- */
-@Composable
-private fun FlameChip(text: String) {
-    Row(
-        Modifier
-            .clip(CircleShape)
-            .background(Color(0xFF161B17))
-            .border(1.dp, Edge, CircleShape)
-            .padding(horizontal = 13.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Image(painterResource(R.drawable.emoji3d_flame), null, Modifier.size(14.dp))
-        Text(text, style = ts(Outfit, 11.5f, FontWeight.Medium, color = Color.White))
-    }
-}
-
-/** "N sessions · [flame] S day streak" — the HTML's line, flame as image. */
-@Composable
-private fun StreakLine(sessions: Int, s: Int, fg: Color) {
-    Row(
-        Modifier.padding(top = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            "$sessions session${if (sessions == 1) "" else "s"}",
-            style = ts(Outfit, 13f, lh = 1.4f, color = fg.copy(alpha = .65f)),
-        )
-        if (s > 0) {
-            Text(" · ", style = ts(Outfit, 13f, lh = 1.4f, color = fg.copy(alpha = .65f)))
-            Image(painterResource(R.drawable.emoji3d_flame), null, Modifier.size(15.dp))
-            Text(
-                " $s day streak",
-                style = ts(Outfit, 13f, lh = 1.4f, color = fg.copy(alpha = .65f)),
-            )
-        }
-    }
-}
-
 private fun shareDateLabel(): String = try {
     SimpleDateFormat("MMM d", Locale.US).format(Date())
 } catch (_: Exception) { "" }
@@ -950,7 +903,6 @@ fun FocivoShareEntry(
     FocivoShareScreen(
         minutes = data.minutes,
         distractions = data.distractions,
-        streak = data.streakDays,
         name = data.userName.orEmpty(),
         todayTotalMin = data.todayTotalMinutes,
         todaySessions = data.todaySessions,
@@ -975,8 +927,8 @@ fun FocivoShareCardPng(index: Int, data: ShareScreenData) {
     val date = remember { data.dateLabel.ifBlank { shareDateLabel() } }
     Box(Modifier.size(360.dp, 450.dp)) {
         when (index.coerceIn(0, 3)) {
-            0 -> RingCard(date, data.minutes, data.distractions, data.streakDays, data.userName.orEmpty())
-            1 -> TodayCard(data.todayTotalMinutes, data.todaySessions, data.weekMinutes, data.streakDays)
+            0 -> RingCard(date, data.minutes, data.distractions, data.userName.orEmpty())
+            1 -> TodayCard(data.todayTotalMinutes, data.todaySessions, data.weekMinutes)
             2 -> MessageCard(date, data.minutes, data.distractions)
             else -> ShieldCard(data.blockedApps, data.minutes)
         }

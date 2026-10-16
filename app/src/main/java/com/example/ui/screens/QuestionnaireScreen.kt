@@ -127,7 +127,7 @@ fun QuestionnaireScreen(
     var answerDistractionApp by remember { mutableStateOf("Instagram Reels & TikTok") }
     var answerPreferredTime by remember { mutableStateOf("Evening (6 PM - 10 PM)") }
     var answerScreenTimeGoalMinutes by remember { mutableIntStateOf(480) }
-    var answerMotivationStyle by remember { mutableStateOf("Streaks (Don't break daily streak)") }
+    var answerMotivationStyle by remember { mutableStateOf("Consistency (Build an unbroken daily habit)") }
 
     val questions = remember {
         listOf(
@@ -167,7 +167,7 @@ fun QuestionnaireScreen(
                 id = 3,
                 stepLabel = "STEP 04 OF 08 · CORE OBJECTIVE",
                 questionTitle = "What is your primary\nstudy goal?",
-                subtitle = "We will align your daily study streak and target hours with this objective.",
+                subtitle = "We will align your daily study habit and target hours with this objective.",
                 icon = Icons.Default.Timer,
                 options = listOf(
                     "Pass exams with strong marks",
@@ -223,7 +223,7 @@ fun QuestionnaireScreen(
                 subtitle = "Your home banners and notification messages will adapt to your preferred style.",
                 icon = Icons.Default.Shield,
                 options = listOf(
-                    "Streaks (Keep daily study habit alive)",
+                    "Consistency (Keep your daily habit alive)",
                     "Leaderboard competition (Compete for top rank)",
                     "Quiet reminders (Gentle, calm guidance)"
                 )

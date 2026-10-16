@@ -52,7 +52,6 @@ import com.example.ui.theme.NearBlack
 import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.widget.FocusShieldWidgetProvider
-import com.example.widget.StreakMotivationWidgetProvider
 import com.example.widget.StudyTimerWidgetProvider
 import com.example.widget.TodayScheduleWidgetProvider
 import com.example.widget.ZenStudyCoachWidgetProvider
@@ -61,7 +60,7 @@ import com.example.widget.ZenStudyCoachWidgetProvider
  * v1.1 — Widgets page (rebuilt per owner fix).
  *
  * Shows the ACTUAL home-screen widgets — each pack layout
- * (widget_{focus_timer,streak,focus_shield,timetable,zen_coach}) inflated
+ * (widget_{focus_timer,focus_shield,timetable,zen_coach}) inflated
  * for real via AndroidView with sample-but-realistic data, pixel-consistent
  * with what the launcher renders. One full widget preview per card, with a
  * "+ Add" action BELOW each preview that does the REAL pin flow
@@ -85,18 +84,6 @@ private fun widgetEntries(): List<WidgetEntry> = listOf(
             v.findViewById<TextView>(R.id.tv_title)?.text = "25:00"
             v.findViewById<TextView>(R.id.tv_sub)?.text = "Deep work session"
             v.findViewById<TextView>(R.id.tv_badge)?.text = "Ready"
-        }
-    ),
-    WidgetEntry(
-        title = "Streak",
-        layoutRes = R.layout.widget_streak,
-        providerClass = StreakMotivationWidgetProvider::class.java,
-        sampleData = { v ->
-            v.findViewById<TextView>(R.id.tv_title)?.text = "12 day streak"
-            v.findViewById<TextView>(R.id.tv_sub)?.text = "Level 3 Student · 1,240 XP"
-            v.findViewById<TextView>(R.id.tv_quote)?.text = "\u201CEvery page studied today is a step towards your dream.\u201D"
-            v.findViewById<TextView>(R.id.tv_goal)?.text = "120 / 360 min"
-            v.findViewById<android.widget.ProgressBar>(R.id.pb_goal)?.progress = 33
         }
     ),
     WidgetEntry(

@@ -199,15 +199,15 @@ private fun BoxWithConstraintsScope.NewUserScene(p: Float, W: Dp, cy: Dp) {
     }
 }
 
-/** Signed-in user ke real data (naam, streak, aaj ke minutes). Sab optional. */
-data class WelcomeInfo(val name: String? = null, val streakDays: Int = 0, val todayMinutes: Int = 0)
+/** Signed-in user ke real data (naam, aaj ke minutes). Sab optional. */
+data class WelcomeInfo(val name: String? = null, val todayMinutes: Int = 0)
 
 private fun greeting(): String {
     val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
     return if (h < 12) "Good morning," else if (h < 17) "Good afternoon," else "Good evening,"
 }
 
-/** Signed-in concept: aurora + greeting + streak pill. 3s, naye user wale radar se bilkul alag. */
+/** Signed-in concept: aurora + greeting + today pill. 3s, naye user wale radar se bilkul alag. */
 @Composable
 private fun BoxWithConstraintsScope.WelcomeScene(p: Float, W: Dp, cy: Dp, info: WelcomeInfo) {
     val ex = 1f - seg(p, .86f, 1f)
@@ -250,9 +250,8 @@ private fun BoxWithConstraintsScope.WelcomeScene(p: Float, W: Dp, cy: Dp, info: 
         Text(nm, color = Lime, fontFamily = Body, fontWeight = FontWeight.Bold, fontSize = (.115f * w).sp)
     }
 
-    // streak + today pill (count-up). v1.2.3 (owner rule, zero unicode emojis):
-    // the flame glyph is the app's 3D flame drawable, not a unicode emoji.
-    if (info.streakDays > 0 || info.todayMinutes > 0) {
+    // today pill (count-up)
+    if (info.todayMinutes > 0) {
         val pa = seg(p, .5f, .68f); val pc = seg(p, .5f, .75f)
         Line((.5f * w + (1 - pa) * 14).dp - 18.dp, cy, pa * ex) {
             Row(
@@ -260,15 +259,7 @@ private fun BoxWithConstraintsScope.WelcomeScene(p: Float, W: Dp, cy: Dp, info: 
                     .padding(horizontal = 18.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (info.streakDays > 0) Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    Image(painterResource(R.drawable.emoji3d_flame), "streak", Modifier.size(15.dp))
-                    Text("${(info.streakDays * pc).toInt()} day streak", color = Color.White.copy(alpha = .85f), fontFamily = Body, fontSize = 13.sp)
-                }
-                if (info.streakDays > 0 && info.todayMinutes > 0) Box(Modifier.width(1.dp).height(14.dp).background(Color.White.copy(alpha = .2f)))
-                if (info.todayMinutes > 0) Text("${(info.todayMinutes * pc).toInt()}m focused today", color = Color.White.copy(alpha = .85f), fontFamily = Body, fontSize = 13.sp)
+                Text("${(info.todayMinutes * pc).toInt()}m focused today", color = Color.White.copy(alpha = .85f), fontFamily = Body, fontSize = 13.sp)
             }
         }
     }
@@ -278,7 +269,7 @@ private fun BoxWithConstraintsScope.WelcomeScene(p: Float, W: Dp, cy: Dp, info: 
 @Composable
 fun SplashHost(
     isSignedIn: Boolean,
-    welcome: WelcomeInfo = WelcomeInfo(),   // WelcomeInfo(name = user.firstName, streakDays = streak, todayMinutes = todayFocus)
+    welcome: WelcomeInfo = WelcomeInfo(),   // WelcomeInfo(name = user.firstName, todayMinutes = todayFocus)
     goToCreateAccount: () -> Unit,          // new user -> Auth screen, "Create Account" tab selected
     goToHome: () -> Unit                    // signed-in -> Home
 ) {
@@ -291,7 +282,6 @@ fun SplashHost(
  *  stores the share cards use (synchronous prefs read, no launch delay):
  *  - name: user_preferences currentUserName (same resolution rules as the
  *    share cards; first name only for the greeting line)
- *  - streakDays: user_preferences currentStreak
  *  - todayMinutes: today's total from focus_sessions (same per-day
  *    aggregation the share-card "Today" card uses)
  *  Null/blank name -> the scene falls back to "Welcome back" by itself.
@@ -307,7 +297,6 @@ internal fun loadSplashWelcomeInfo(context: android.content.Context): WelcomeInf
             email.isNotBlank() -> email.substringBefore("@").split(" ").first().takeIf { it.isNotBlank() }
             else -> null
         }
-        val streak = obj?.optInt("currentStreak", 0)?.coerceAtLeast(0) ?: 0
         var todayMinutes = 0
         try {
             val arr = org.json.JSONArray(prefs.getString("focus_sessions", "[]") ?: "[]")
@@ -324,6 +313,6 @@ internal fun loadSplashWelcomeInfo(context: android.content.Context): WelcomeInf
             }
             todayMinutes = (total / 60).coerceAtLeast(0)
         } catch (_: Exception) { }
-        WelcomeInfo(name = name, streakDays = streak, todayMinutes = todayMinutes)
+        WelcomeInfo(name = name, todayMinutes = todayMinutes)
     } catch (_: Exception) { WelcomeInfo() }
 }

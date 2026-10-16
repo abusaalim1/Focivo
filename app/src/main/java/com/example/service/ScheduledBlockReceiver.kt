@@ -23,8 +23,6 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
          */
         const val ACTION_SCHEDULE_REMINDER = "com.example.action.SCHEDULE_REMINDER"
         const val EXTRA_REMINDER_SUBJECT = "extra_reminder_subject"
-        /** v1.4.3: daily 19:00 streak-saver evaluation. */
-        const val ACTION_STREAK_SAVER_CHECK = "com.example.action.STREAK_SAVER_CHECK"
         // v1.1: notification survival — every scheduled type is AlarmManager-backed.
         const val ACTION_SUNDAY_RECAP_CHECK = "com.example.action.SUNDAY_RECAP_CHECK"
         const val ACTION_UPDATE_CHECK = "com.example.action.UPDATE_CHECK"
@@ -67,7 +65,7 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
                     }
 
                     ScheduledBlockScheduler.evaluateAndReschedule(context)
-                    // v1.1: re-arm ALL survival alarms (streak saver, study
+                    // v1.1: re-arm ALL survival alarms (study
                     // reminder, Sunday recap, update check, comeback) —
                     // idempotent, no duplicates.
                     FocivoNotifications.scheduleAllSurvivalAlarms(context)
@@ -160,10 +158,6 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
                 val subject = intent.getStringExtra(EXTRA_REMINDER_SUBJECT)
                 Log.i(TAG, "Schedule reminder fired for subject=$subject")
                 FocivoNotifications.postScheduleReminder(context, subject)
-            }
-            ACTION_STREAK_SAVER_CHECK -> {
-                Log.i(TAG, "Streak-saver check fired")
-                FocivoNotifications.handleStreakSaverCheck(context)
             }
             // v1.1: survival-hardened scheduled types.
             ACTION_SUNDAY_RECAP_CHECK -> {

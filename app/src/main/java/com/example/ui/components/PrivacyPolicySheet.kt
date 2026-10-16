@@ -210,7 +210,7 @@ fun PrivacyPolicySheet(
                         SubSectionHeader("2.2 Usage Data", textPrimary)
                         Text(text = "To provide core app features, we collect:", color = textSecondary, fontSize = 13.sp, fontFamily = PoppinsFontFamily)
                         BulletPoint("Study session data (duration, start/end times, session type)", textSecondary)
-                        BulletPoint("Focus streaks, points, and achievement progress", textSecondary)
+                        BulletPoint("Focus points and achievement progress", textSecondary)
                         BulletPoint("Schedules and alarms you create", textSecondary)
                         BulletPoint("App blocking preferences (which apps you choose to block, and when)", textSecondary)
                         BulletPoint("Leaderboard participation data (if you choose to appear on the leaderboard)", textSecondary)
@@ -300,7 +300,7 @@ fun PrivacyPolicySheet(
                     ) {
                         SubSectionHeader("5.1 Usage Access (PACKAGE_USAGE_STATS)", textPrimary)
                         Text(
-                            text = "Used to measure your focus duration, study session statistics, and app usage limits. This allows Focivo to calculate your study streaks and daily analytics without reading any content inside your apps.",
+                            text = "Used to measure your focus duration, study session statistics, and app usage limits. This allows Focivo to calculate your daily analytics without reading any content inside your apps.",
                             color = textSecondary,
                             fontSize = 13.sp,
                             lineHeight = 19.sp,
@@ -327,7 +327,7 @@ fun PrivacyPolicySheet(
                     ) {
                         Text(text = "We use the information described above to:", color = textSecondary, fontSize = 13.sp, fontFamily = PoppinsFontFamily)
                         BulletPoint("Provide and maintain core app functionality (focus timers, app blocking, schedules, alarms)", textSecondary)
-                        BulletPoint("Track your progress, streaks, and achievements", textSecondary)
+                        BulletPoint("Track your progress and achievements", textSecondary)
                         BulletPoint("Personalize reminders and notifications based on your stated goals and survey responses", textSecondary)
                         BulletPoint("Display leaderboard rankings, if you choose to participate", textSecondary)
                         BulletPoint("Improve app performance and fix bugs", textSecondary)

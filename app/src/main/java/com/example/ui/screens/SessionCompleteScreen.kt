@@ -105,7 +105,7 @@ fun SessionCompleteScreen(
     }
 
     // v1.2.2 — the owner's own share-screen design: every value is the user's
-    // real data (session minutes/distractions, name, today's totals, streak,
+    // real data (session minutes/distractions, name, today's totals,
     // last-7-day minutes, apps the shield blocked during THIS session).
     val shareData = remember(session) { loadShareScreenData(context, session) }
     val shareText = if (session.distractionsCount == 0) {

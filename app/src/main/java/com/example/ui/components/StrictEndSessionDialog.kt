@@ -78,7 +78,7 @@ fun StrictEndSessionDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Ending now discards this session — no record, no points, no streak. Are you sure?",
+                    text = "Ending now discards this session — no record, no points. Are you sure?",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = PoppinsFontFamily,
                         color = textSecondary,

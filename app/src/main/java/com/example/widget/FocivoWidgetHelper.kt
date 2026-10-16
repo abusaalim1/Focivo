@@ -28,17 +28,6 @@ object FocivoWidgetHelper {
     const val ACTION_OPEN_SHIELD_HUB = "com.example.widget.ACTION_OPEN_SHIELD_HUB"
     const val ACTION_TOGGLE_SHIELD = "com.example.widget.ACTION_TOGGLE_SHIELD"
     const val ACTION_OPEN_ZEN_BREAK = "com.example.widget.ACTION_OPEN_ZEN_BREAK"
-    const val ACTION_OPEN_STREAK = "com.example.widget.ACTION_OPEN_STREAK"
-
-    private val MOTIVATIONAL_QUOTES = listOf(
-        "\"Every page studied today is a step towards your dream.\"",
-        "\"Stay consistent. Small daily focus turns into giant victories.\"",
-        "\"Your future self will thank you for studying right now.\"",
-        "\"Deep focus beats shallow hustle every single day.\"",
-        "\"Discipline is choosing between what you want now and what you want most.\"",
-        "\"One chapter at a time. You are closer than you think.\"",
-        "\"Focus on the process, and the rank will follow automatically.\""
-    )
 
     private val ZEN_STUDY_TIPS = listOf(
         "\"Take a deep breath. 25 minutes of deep focus is better than 4 hours of distracted study.\"",
@@ -60,15 +49,7 @@ object FocivoWidgetHelper {
                 updateTimerWidget(context, appWidgetManager, id)
             }
 
-            // 2. Streak & Motivation Widget
-            val streakIds = appWidgetManager.getAppWidgetIds(
-                ComponentName(context, StreakMotivationWidgetProvider::class.java)
-            )
-            for (id in streakIds) {
-                updateStreakWidget(context, appWidgetManager, id)
-            }
-
-            // 3. Today's Schedule Widget
+            // 2. Today's Schedule Widget
             val scheduleIds = appWidgetManager.getAppWidgetIds(
                 ComponentName(context, TodayScheduleWidgetProvider::class.java)
             )
@@ -76,7 +57,7 @@ object FocivoWidgetHelper {
                 updateScheduleWidget(context, appWidgetManager, id)
             }
 
-            // 4. Focus Shield Widget
+            // 3. Focus Shield Widget
             val shieldIds = appWidgetManager.getAppWidgetIds(
                 ComponentName(context, FocusShieldWidgetProvider::class.java)
             )
@@ -84,7 +65,7 @@ object FocivoWidgetHelper {
                 updateShieldWidget(context, appWidgetManager, id)
             }
 
-            // 5. Zen Study Coach Widget
+            // 4. Zen Study Coach Widget
             val zenIds = appWidgetManager.getAppWidgetIds(
                 ComponentName(context, ZenStudyCoachWidgetProvider::class.java)
             )
@@ -168,79 +149,7 @@ object FocivoWidgetHelper {
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
-    // --- 2. Daily Streak & Motivation Widget (v1.1 pack: widget_streak) ---
-    fun updateStreakWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
-        val views = RemoteViews(context.packageName, R.layout.widget_streak)
-
-        val localPrefs = context.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
-        val userPrefsJson = localPrefs.getString("user_preferences", null)
-        var streak = 1
-        var level = 1
-        var focusPoints = 0
-        var dailyGoal = 90
-
-        if (userPrefsJson != null) {
-            try {
-                val obj = JSONObject(userPrefsJson)
-                streak = obj.optInt("currentStreak", 1).coerceAtLeast(1)
-                level = obj.optInt("userLevel", obj.optInt("currentLevel", 1)).coerceAtLeast(1)
-                focusPoints = obj.optInt("focusPoints", 0)
-                dailyGoal = obj.optInt("dailyGoalMinutes", 90).coerceAtLeast(30)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error parsing prefs for streak widget: ${e.message}")
-            }
-        }
-
-        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        var todayMinutes = 0
-        try {
-            val sessionsJson = localPrefs.getString("focus_sessions", "[]") ?: "[]"
-            val array = JSONArray(sessionsJson)
-            for (i in 0 until array.length()) {
-                val session = array.getJSONObject(i)
-                val date = session.optString("date", "")
-                if (date == todayStr || date.startsWith(todayStr)) {
-                    todayMinutes += session.optInt("durationMinutes", 0)
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error calculating today's minutes: ${e.message}")
-        }
-
-        val progress = ((todayMinutes.toFloat() / dailyGoal.toFloat()) * 100).toInt().coerceIn(0, 100)
-        val dayOfYear = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
-        val quote = MOTIVATIONAL_QUOTES[dayOfYear % MOTIVATIONAL_QUOTES.size]
-
-        views.setTextViewText(
-            R.id.tv_title,
-            "$streak day${if (streak > 1) "s" else ""} streak"
-        )
-        views.setTextViewText(
-            R.id.tv_sub,
-            "Level $level Student · $focusPoints XP"
-        )
-        views.setTextViewText(R.id.tv_quote, "\u201C$quote\u201D")
-        views.setTextViewText(
-            R.id.tv_goal,
-            "$todayMinutes / $dailyGoal min"
-        )
-        views.setProgressBar(R.id.pb_goal, 100, progress, false)
-
-        val streakIntent = Intent(context, MainActivity::class.java).apply {
-            action = ACTION_OPEN_STREAK
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("EXTRA_NAV_TAB", "PROFILE")
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            context, 201, streakIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.fw_root, pendingIntent)
-
-        appWidgetManager.updateAppWidget(appWidgetId, views)
-    }
-
-    // --- 3. Today's Schedule & Targets Widget (v1.1 pack: widget_timetable) ---
+    // --- 2. Today's Schedule & Targets Widget (v1.1 pack: widget_timetable) ---
     fun updateScheduleWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
         val views = RemoteViews(context.packageName, R.layout.widget_timetable)
 
@@ -319,7 +228,7 @@ object FocivoWidgetHelper {
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
-    // --- 4. Focus Shield & Deep Lock Widget (v1.1 pack: widget_focus_shield) ---
+    // --- 3. Focus Shield & Deep Lock Widget (v1.1 pack: widget_focus_shield) ---
     fun updateShieldWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
         val views = RemoteViews(context.packageName, R.layout.widget_focus_shield)
 
@@ -374,7 +283,7 @@ object FocivoWidgetHelper {
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
-    // --- 5. AI Study Coach & Zen Break Widget (v1.1 pack: widget_zen_coach) ---
+    // --- 4. AI Study Coach & Zen Break Widget (v1.1 pack: widget_zen_coach) ---
     fun updateZenWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
         val views = RemoteViews(context.packageName, R.layout.widget_zen_coach)
 
@@ -414,17 +323,18 @@ object FocivoWidgetHelper {
         )
         views.setOnClickPendingIntent(R.id.btn_primary, pZen)
 
-        val coachIntent = Intent(context, MainActivity::class.java).apply {
-            action = ACTION_OPEN_STREAK
+        // v1.2.3 (streak removal): the "AI Coach" secondary button and the
+        // widget root previously pointed at the deleted streak widget. They
+        // now open the app home — a widget button must never be dead.
+        val homeIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("EXTRA_NAV_TAB", "PROFILE")
         }
-        val pCoach = PendingIntent.getActivity(
-            context, 502, coachIntent,
+        val pHome = PendingIntent.getActivity(
+            context, 502, homeIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        views.setOnClickPendingIntent(R.id.btn_secondary, pCoach)
-        views.setOnClickPendingIntent(R.id.fw_root, pCoach)
+        views.setOnClickPendingIntent(R.id.btn_secondary, pHome)
+        views.setOnClickPendingIntent(R.id.fw_root, pHome)
 
         appWidgetManager.updateAppWidget(appWidgetId, views)
     }

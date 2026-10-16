@@ -59,8 +59,8 @@ import java.util.Calendar
  *  - splash NEW_USER mid-frame: radar WITHOUT the lime glow and WITHOUT the
  *    filled disc body (the 1.2.1 owner removal stays in effect)
  *  - splash RETURNING: the NEW WelcomeScene (aurora + greeting + real-data
- *    streak/today pill) with seeded WelcomeInfo(name="Abu Saalim",
- *    streakDays=7, todayMinutes=95), captured late in the animation
+ *    today pill) with seeded WelcomeInfo(name="Abu Saalim",
+ *    todayMinutes=95), captured late in the animation
  * PNGs land in app/src/test/screenshots/v123/.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -91,7 +91,7 @@ class V123ScreenshotsTest {
             FocuslyTheme(darkTheme = true) {
                 FocivoSplash(
                     variant = SplashVariant.RETURNING,
-                    welcome = WelcomeInfo(name = "Abu Saalim", streakDays = 7, todayMinutes = 95),
+                    welcome = WelcomeInfo(name = "Abu Saalim", todayMinutes = 95),
                     onFinished = {},
                     testProgress = 0.85f
                 )
@@ -162,7 +162,6 @@ class V123ScreenshotsTest {
                 currentTaskTitle = "Physics: Units & Measurement",
                 distractionsCount = 0,
                 ambientSound = "Rain",
-                userStreak = 7,
                 userPreferences = focusPrefs(),
                 onStartTimer = {},
                 onPauseTimer = {},

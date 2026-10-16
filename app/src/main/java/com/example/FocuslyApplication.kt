@@ -111,7 +111,7 @@ class FocuslyApplication : Application() {
             Log.e("FocuslyApplication", "Failed to initialize ScheduledBlockScheduler: ${e.message}", e)
         }
 
-        // v1.4.3: refresh the study-reminder + daily 19:00 streak-saver alarms
+        // v1.4.3: refresh the study-reminder alarms
         // on every process start (evaluateAndReschedule covers this too; belt
         // and braces so the alarms exist even if evaluate throws early).
         // v1.1: + Sunday recap, update check, comeback — all survival alarms

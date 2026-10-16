@@ -875,59 +875,6 @@ class FocuslyRepository(private val context: Context) {
         }
     }
 
-    private fun calculateConsecutiveStreak(sessions: List<FocusSessionEntity>): Pair<Int, Int> {
-        if (sessions.isEmpty()) return Pair(0, 0)
-
-        val dayFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-        val sessionDays = sessions.map { dayFormat.format(java.util.Date(it.completedAt)) }.toSet()
-
-        val cal = java.util.Calendar.getInstance()
-        val todayStr = dayFormat.format(cal.time)
-        cal.add(java.util.Calendar.DAY_OF_YEAR, -1)
-        val yesterdayStr = dayFormat.format(cal.time)
-
-        var currentStreak = 0
-        if (sessionDays.contains(todayStr) || sessionDays.contains(yesterdayStr)) {
-            val checkCal = java.util.Calendar.getInstance()
-            if (!sessionDays.contains(todayStr)) {
-                checkCal.add(java.util.Calendar.DAY_OF_YEAR, -1)
-            }
-            while (sessionDays.contains(dayFormat.format(checkCal.time))) {
-                currentStreak++
-                checkCal.add(java.util.Calendar.DAY_OF_YEAR, -1)
-            }
-        }
-
-        val sortedDates = sessionDays.mapNotNull {
-            try { dayFormat.parse(it) } catch (_: Exception) { null }
-        }.sorted()
-
-        var maxStreak = currentStreak
-        var streakCount = 0
-        var lastDate: java.util.Date? = null
-
-        for (d in sortedDates) {
-            if (lastDate == null) {
-                streakCount = 1
-            } else {
-                val diffMs = d.time - lastDate.time
-                val diffDays = (diffMs / (24 * 60 * 60 * 1000L)).toInt()
-                if (diffDays == 1) {
-                    streakCount++
-                } else if (diffDays > 1) {
-                    streakCount = 1
-                }
-            }
-            lastDate = d
-            if (streakCount > maxStreak) {
-                maxStreak = streakCount
-            }
-        }
-
-        val finalCurrent = if (sessionDays.contains(todayStr)) currentStreak.coerceAtLeast(1) else currentStreak
-        return Pair(finalCurrent, maxStreak.coerceAtLeast(finalCurrent))
-    }
-
     suspend fun syncWithSupabase(userUuid: String) = withContext(Dispatchers.IO) {
         if (userUuid.isBlank()) return@withContext
         try {
@@ -1079,7 +1026,6 @@ class FocuslyRepository(private val context: Context) {
                 val profilePhoto = remoteProfile?.avatar_url?.takeIf { it.isNotBlank() }
                     ?: myLeaderboardRow?.avatar_url?.takeIf { it.isNotBlank() }
 
-                val (calcCurrentStreak, calcBestStreak) = calculateConsecutiveStreak(_allSessions.value)
                 val totalSessionsPoints = _allSessions.value.sumOf { it.focusPointsEarned }
                 val localPrefs = _userPreferences.value ?: UserPreferencesEntity()
 
@@ -1095,8 +1041,8 @@ class FocuslyRepository(private val context: Context) {
 
                 val resolvedPoints = maxOf(remotePrefs?.focus_points ?: 0, totalSessionsPoints, localPrefs.focusPoints)
                 val resolvedLevel = maxOf(1, remotePrefs?.user_level ?: 1, localPrefs.userLevel, (resolvedPoints / 100) + 1)
-                val resolvedCurrentStreak = maxOf(calcCurrentStreak, remotePrefs?.current_streak ?: 0, localPrefs.currentStreak)
-                val resolvedBestStreak = maxOf(calcBestStreak, remotePrefs?.best_streak ?: 0, localPrefs.bestStreak, resolvedCurrentStreak)
+                val resolvedCurrentStreak = maxOf(remotePrefs?.current_streak ?: 0, localPrefs.currentStreak)
+                val resolvedBestStreak = maxOf(remotePrefs?.best_streak ?: 0, localPrefs.bestStreak, resolvedCurrentStreak)
                 val remoteShownAtMs = parseIsoToMillis(remotePrefs?.last_donation_prompt_shown_at)
                 val resolvedShownAt = maxOf(localPrefs.lastDonationPromptShownAt, remoteShownAtMs)
                 val resolvedDismissedCount = maxOf(localPrefs.donationPromptDismissedCount, remotePrefs?.donation_prompt_dismissed_count ?: 0)

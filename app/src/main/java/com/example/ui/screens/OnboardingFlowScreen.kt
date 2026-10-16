@@ -244,7 +244,7 @@ private fun buildQuestions(): List<FlowQuestion> = listOf(
             FlowOption("Strict App Blocker & Study Lock", R.drawable.ic3d_shield),
             FlowOption("AI Academic Sentinel (ChatGPT / Claude)", R.drawable.ic3d_lock),
             FlowOption("Smart Scheduled Study Windows", R.drawable.ic3d_calendar),
-            FlowOption("Streak Leaderboard & Daily Tracking", R.drawable.ic3d_trophy)
+            FlowOption("Leaderboard & Daily Tracking", R.drawable.ic3d_trophy)
         )
     )
 )
@@ -267,8 +267,8 @@ private fun buildShowcaseSlides(): List<ShowcaseSlide> = listOf(
     ),
     ShowcaseSlide(
         pose = MascotPose.CELEBRATING,
-        caption = "STREAKS",
-        line = "Streaks turn small wins into momentum."
+        caption = "CONSISTENCY",
+        line = "Small wins build lasting momentum."
     )
 )
 
@@ -277,10 +277,10 @@ private fun buildPermissionSpecs(): List<PermissionSpec> = listOf(
         id = "notifications",
         rowLabel = "Notification permission",
         bubbleLead = "To ",
-        bubbleAccent = "send you focus reminders and streak alerts",
+        bubbleAccent = "send you focus reminders and timer alerts",
         bubbleTail = ", we need notification access.",
         privacyLine = "Your privacy matters to us. We never share your data.",
-        whyBody = "Reminders for your study windows, streak milestones and timer alerts. Nothing else — no spam, ever.",
+        whyBody = "Reminders for your study windows, focus milestones and timer alerts. Nothing else — no spam, ever.",
         pose = MascotPose.WELCOME
     ),
     PermissionSpec(

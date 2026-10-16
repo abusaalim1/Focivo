@@ -190,7 +190,6 @@ class V122ScreenshotsTest {
                 currentTaskTitle = "Physics: Units & Measurement",
                 distractionsCount = 0,
                 ambientSound = "Rain",
-                userStreak = 7,
                 userPreferences = prefs,
                 onStartTimer = {},
                 onPauseTimer = {},
@@ -273,7 +272,6 @@ class V122ScreenshotsTest {
         userName = "Abu Saalim",
         todayTotalMinutes = 95,
         todaySessions = 3,
-        streakDays = 7,
         weekMinutes = listOf(30, 50, 20, 65, 40, 15, 95),
         weekLabels = listOf("F", "S", "S", "M", "T", "W", "T"),
         blockedApps = listOf(

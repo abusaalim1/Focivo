@@ -79,7 +79,7 @@ object ScheduledBlockScheduler {
             current.add(0, fixedSchedule)
         }
         saveLocalSchedules(context, current)
-        refreshReminderAlarms(context) // v1.4.3: 10-min reminder + streak-saver
+        refreshReminderAlarms(context) // v1.4.3: 10-min reminder
 
         // Sync with Supabase
         if (fixedSchedule.user_id.isNotBlank() && fixedSchedule.user_id != "anonymous" && fixedSchedule.user_id != "local_user") {
@@ -104,7 +104,7 @@ object ScheduledBlockScheduler {
         Log.i(TAG, "[ScheduledBlockWrite] [$triggerSource] Deleting schedule id=$scheduleId")
         val current = getLocalSchedules(context).filterNot { it.id == scheduleId }
         saveLocalSchedules(context, current)
-        refreshReminderAlarms(context) // v1.4.3: 10-min reminder + streak-saver
+        refreshReminderAlarms(context) // v1.4.3: 10-min reminder
 
         ioScope.launch {
             try {
@@ -131,7 +131,7 @@ object ScheduledBlockScheduler {
             val updated = oldItem.copy(is_enabled = isEnabled, user_id = finalUserId)
             current[index] = updated
             saveLocalSchedules(context, current)
-            refreshReminderAlarms(context) // v1.4.3: 10-min reminder + streak-saver
+            refreshReminderAlarms(context) // v1.4.3: 10-min reminder
 
             Log.i(TAG, "[ScheduledBlockWrite] [$triggerSource] Toggled schedule id=$scheduleId from is_enabled=${oldItem.is_enabled} -> $isEnabled, user_id=$finalUserId")
 
@@ -199,7 +199,7 @@ object ScheduledBlockScheduler {
 
         val finalList = mergedMap.values.toList()
         saveLocalSchedules(context, finalList)
-        refreshReminderAlarms(context) // v1.4.3: 10-min reminder + streak-saver
+        refreshReminderAlarms(context) // v1.4.3: 10-min reminder
         return finalList
     }
 
@@ -689,7 +689,7 @@ object ScheduledBlockScheduler {
             }
         }
 
-        // v1.4.3: 10-minute heads-up + daily streak-saver alarms
+        // v1.4.3: 10-minute heads-up alarm
         refreshReminderAlarms(context)
 
         // Schedule the next transition alarm
@@ -817,15 +817,12 @@ object ScheduledBlockScheduler {
     }
 
     /**
-     * v1.4.3: refresh the 10-minute study reminder + daily streak-saver alarm.
+     * v1.4.3: refresh the 10-minute study reminder alarm.
      * Call after any schedule mutation and on evaluate/boot.
      */
     fun refreshReminderAlarms(context: Context) {
         try {
             FocivoNotifications.scheduleStudyReminder(context)
-        } catch (_: Exception) { }
-        try {
-            FocivoNotifications.scheduleStreakSaverDaily(context)
         } catch (_: Exception) { }
     }
 

@@ -638,7 +638,6 @@ fun ProfileScreen(
 
             // Quick Stats Strip — mockup: flat stats with hairline dividers.
             item {
-                val currentStreakDays = userPreferences?.currentStreak ?: 0
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -687,7 +686,6 @@ fun ProfileScreen(
                     }
                     StatCell(value = "$sessionCount", label = "Sessions", valueColor = T.text, showDivider = false)
                     StatCell(value = hoursFocused, label = "Focused", valueColor = T.text, showDivider = true)
-                    StatCell(value = "${currentStreakDays}d", label = "Streak", valueColor = T.accentText, showDivider = true)
                 }
             }
 

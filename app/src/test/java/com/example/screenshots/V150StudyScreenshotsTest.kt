@@ -87,7 +87,6 @@ class V150StudyScreenshotsTest {
                 currentTaskTitle = "Physics",
                 distractionsCount = 2,
                 ambientSound = "Rain",
-                userStreak = 12,
                 userPreferences = fakePrefs(),
                 isShieldActive = true,
                 isDeepFocusEnabled = true,

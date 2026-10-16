@@ -119,7 +119,7 @@ enum class PermissionOverlayType(
 ) {
     NOTIFICATIONS(
         title = "Allow Notifications",
-        shortSubtitle = "To keep you motivated with timely study reminders, streak milestones, and focus timer alerts, I need permission to send you notifications.",
+        shortSubtitle = "To keep you motivated with timely study reminders and focus timer alerts, I need permission to send you notifications.",
         emoji = "",
         permissionName = "Notification Alerts",
         buttonText = "Enable Notifications"
@@ -351,7 +351,7 @@ fun OnboardingSurveyScreen(
             id = 6,
             stepLabel = "STEP 7 OF 8 • DAILY TARGET",
             questionTitle = "What is your daily focus target?",
-            subtitle = "Track screen time savings and build your streak.",
+            subtitle = "Track screen time savings and build your habit.",
             icon = Icons.Default.Timer,
             options = listOf(
                 "1 Hour (60 mins)",
@@ -370,7 +370,7 @@ fun OnboardingSurveyScreen(
                 "Strict App Blocker & Study Lock",
                 "AI Academic Sentinel (ChatGPT / Claude)",
                 "Smart Scheduled Study Windows",
-                "Streak Leaderboard & Daily Tracking"
+                "Leaderboard & Daily Tracking"
             ),
             isMultiSelect = true
         )

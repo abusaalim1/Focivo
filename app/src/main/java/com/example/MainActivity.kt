@@ -408,7 +408,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     // the Create Account tab on the auth screen.
     var splashVariant by remember { mutableStateOf<SplashVariant?>(null) }
     var splashWantsCreateAccount by remember { mutableStateOf(false) }
-    // v1.2.3: real user data for the WelcomeScene (name / streak / today's
+    // v1.2.3: real user data for the WelcomeScene (name / today's
     // minutes), read from the same on-device stores the share cards use.
     var splashWelcomeInfo by remember { mutableStateOf(WelcomeInfo()) }
 
@@ -695,7 +695,6 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         currentTaskTitle = currentTaskTitle,
                                         distractionsCount = distractionsCount,
                                         ambientSound = ambientSound,
-                                        userStreak = userPreferences?.currentStreak ?: 0,
                                         userPreferences = userPreferences,
                                         isShieldActive = hasCoreShieldPerms && (userPreferences?.isAppBlockerEnabled == true || isTimerRunning || isStandaloneShieldActive),
                                         isDeepFocusEnabled = isDeepFocusEnabled,
@@ -747,7 +746,6 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         currentUserName = userPreferences?.currentUserName ?: "You",
                                         currentUserPhotoUrl = userPreferences?.currentUserPhotoUrl,
                                         currentUserPoints = userPreferences?.focusPoints ?: 0,
-                                        currentUserStreak = userPreferences?.currentStreak ?: 1,
                                         sessions = sessions,
                                         onRefresh = { viewModel.refreshLeaderboard() }
                                     )

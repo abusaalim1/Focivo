@@ -108,18 +108,6 @@ fun AchievementBadgeCard(
                             }
                             drawPath(path, color = badgeColor, style = Stroke(strokeW, cap = StrokeCap.Round))
                         }
-                        "streak_7" -> {
-                            // Diamond / Hexagon Geometry
-                            val path = Path().apply {
-                                moveTo(13.dp.toPx(), 2.dp.toPx())
-                                lineTo(24.dp.toPx(), 13.dp.toPx())
-                                lineTo(13.dp.toPx(), 24.dp.toPx())
-                                lineTo(2.dp.toPx(), 13.dp.toPx())
-                                close()
-                            }
-                            drawPath(path, color = badgeColor, style = Stroke(strokeW))
-                            drawCircle(color = badgeColor, radius = 2.5.dp.toPx(), center = Offset(13.dp.toPx(), 13.dp.toPx()))
-                        }
                         else -> {
                             // Precision geometric rings
                             drawCircle(color = badgeColor, radius = 11.dp.toPx(), style = Stroke(strokeW))

@@ -58,7 +58,6 @@ import com.example.ui.theme.isAppInDarkTheme
 fun getSessionDonationCopy(
     rotationIndex: Int,
     sessionMinutes: Int,
-    currentStreak: Int = 0,
     totalFocusMinutes: Long
 ): String {
     val totalHours = maxOf(1, (totalFocusMinutes / 60).toInt())
@@ -79,7 +78,6 @@ fun getSessionDonationCopy(
 fun SessionDonationPromptSheet(
     session: FocusSessionEntity,
     rotationIndex: Int,
-    currentStreak: Int,
     totalFocusMinutes: Long,
     onSupportClick: () -> Unit,
     onDismiss: () -> Unit,
@@ -98,7 +96,6 @@ fun SessionDonationPromptSheet(
     val promptCopy = getSessionDonationCopy(
         rotationIndex = rotationIndex,
         sessionMinutes = minsSpent,
-        currentStreak = currentStreak,
         totalFocusMinutes = totalFocusMinutes
     )
 
@@ -152,7 +149,7 @@ fun SessionDonationPromptSheet(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Stat Highlight Chips (Session duration + Streak)
+            // Stat Highlight Chips (session duration + total hours)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically

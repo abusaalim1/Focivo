@@ -36,7 +36,6 @@ data class WeeklyRecapSummary(
     val totalMinutesFocused: Int,
     val totalHoursFormatted: String, // e.g., "14.5"
     val sessionCount: Int,
-    val currentStreak: Int,
     val pointsEarned: Int = 0,
     val bestDayName: String,
     val bestDayMinutes: Int,
@@ -56,9 +55,6 @@ data class WeeklyRecapSummary(
         sb.append("━━━━━━━━━━━━━━━━━━━━━━\n")
         sb.append("*Total Focus Time:* $totalHoursFormatted hrs ($totalMinutesFocused mins)\n")
         sb.append("*Sessions Completed:* $sessionCount\n")
-        if (currentStreak > 0) {
-            sb.append("*Study Streak:* $currentStreak Day${if (currentStreak > 1) "s" else ""}\n")
-        }
         if (topSubject.isNotBlank() && topSubject != "General Study") {
             sb.append("*Top Subject:* $topSubject\n")
         }

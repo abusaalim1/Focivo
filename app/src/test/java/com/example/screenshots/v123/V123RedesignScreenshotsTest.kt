@@ -114,11 +114,11 @@ class V123RedesignScreenshotsTest {
     )
 
     private fun fakeLeaderboard() = listOf(
-        LeaderboardUser(displayName = "Aarav", weeklyStudySeconds = 19200, streak = 12, isCurrentUser = false),
-        LeaderboardUser(displayName = "Abu Saalim", weeklyStudySeconds = 17100, streak = 9, isCurrentUser = true),
-        LeaderboardUser(displayName = "Zoya", weeklyStudySeconds = 14400, streak = 7, isCurrentUser = false),
-        LeaderboardUser(displayName = "Kabir", weeklyStudySeconds = 10800, streak = 5, isCurrentUser = false),
-        LeaderboardUser(displayName = "Meera", weeklyStudySeconds = 7200, streak = 3, isCurrentUser = false)
+        LeaderboardUser(displayName = "Aarav", weeklyStudySeconds = 19200, isCurrentUser = false),
+        LeaderboardUser(displayName = "Abu Saalim", weeklyStudySeconds = 17100, isCurrentUser = true),
+        LeaderboardUser(displayName = "Zoya", weeklyStudySeconds = 14400, isCurrentUser = false),
+        LeaderboardUser(displayName = "Kabir", weeklyStudySeconds = 10800, isCurrentUser = false),
+        LeaderboardUser(displayName = "Meera", weeklyStudySeconds = 7200, isCurrentUser = false)
     )
 
     private fun shot(dark: Boolean, name: String, content: @Composable () -> Unit) {
@@ -174,7 +174,6 @@ class V123RedesignScreenshotsTest {
             users = fakeLeaderboard(),
             currentUserName = "Abu Saalim",
             currentUserPoints = 285,
-            currentUserStreak = 9,
             sessions = fakeSessions()
         )
     }
@@ -185,7 +184,6 @@ class V123RedesignScreenshotsTest {
             users = fakeLeaderboard(),
             currentUserName = "Abu Saalim",
             currentUserPoints = 285,
-            currentUserStreak = 9,
             sessions = fakeSessions()
         )
     }

@@ -147,7 +147,6 @@ fun LeaderboardScreen(
     currentUserName: String,
     currentUserPhotoUrl: String? = null,
     currentUserPoints: Int,
-    currentUserStreak: Int,
     sessions: List<FocusSessionEntity> = emptyList(),
     onRefresh: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -196,7 +195,7 @@ fun LeaderboardScreen(
     }
 
     val currentEntry = remember(
-        currentUserName, currentUserPhotoUrl, currentUserPoints, currentUserStreak,
+        currentUserName, currentUserPhotoUrl, currentUserPoints,
         myTodayStudySeconds, myWeeklyStudySeconds, myAllTimeStudySeconds, users
     ) {
         val remoteMe = users.firstOrNull { it.isCurrentUser || it.displayName.equals(currentUserName, ignoreCase = true) }
@@ -210,7 +209,7 @@ fun LeaderboardScreen(
             weeklyStudySeconds = effectiveWeekly,
             todayStudySeconds = effectiveToday,
             currentWeekStart = currentMonday,
-            streak = maxOf(remoteMe?.streak ?: 1, currentUserStreak.coerceAtLeast(1)),
+            streak = remoteMe?.streak ?: 1,
             subjectTag = remoteMe?.subjectTag ?: "Active Focus",
             avatarUrl = currentUserPhotoUrl ?: remoteMe?.avatarUrl,
             isCurrentUser = true

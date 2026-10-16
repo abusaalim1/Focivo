@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
@@ -352,20 +351,13 @@ fun SundayRecapGlassDialog(
                             ) {
                                 MetricGlassCard(
                                     modifier = Modifier.weight(1f),
-                                    icon = Icons.Default.LocalFireDepartment,
-                                    title = "Streak",
-                                    value = "${recap.currentStreak}d",
-                                    subValue = "Consistency",
-                                    isDark = isDark
-                                )
-                                MetricGlassCard(
-                                    modifier = Modifier.weight(1f),
                                     icon = Icons.Default.EmojiEvents,
                                     title = "Best Day",
                                     value = recap.bestDayName.take(3),
                                     subValue = "${recap.bestDayMinutes} mins logged",
                                     isDark = isDark
                                 )
+                                Spacer(modifier = Modifier.weight(1f))
                             }
                         }
 

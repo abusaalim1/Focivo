@@ -423,7 +423,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         com.example.widget.FocivoWidgetHelper.updateAllWidgets(getApplication())
     }
 
-    fun calculateWeeklyRecapSummary(sessions: List<FocusSessionEntity>, streak: Int = 0): WeeklyRecapSummary? {
+    fun calculateWeeklyRecapSummary(sessions: List<FocusSessionEntity>): WeeklyRecapSummary? {
         val now = System.currentTimeMillis()
         val cal = Calendar.getInstance()
         val currentWeekOfYear = cal.get(Calendar.WEEK_OF_YEAR)
@@ -574,7 +574,6 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             totalMinutesFocused = totalMinutes,
             totalHoursFormatted = hoursFormatted,
             sessionCount = thisWeekSessions.size,
-            currentStreak = streak,
             pointsEarned = 0,
             bestDayName = bestDayName,
             bestDayMinutes = bestDayMins,
@@ -606,7 +605,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             }
 
             val pastSessions = repository.allSessions.firstOrNull() ?: emptyList()
-            val recap = calculateWeeklyRecapSummary(pastSessions, prefs.currentStreak) ?: return@launch
+            val recap = calculateWeeklyRecapSummary(pastSessions) ?: return@launch
 
             _weeklyReviewSummary.value = recap
 
@@ -654,9 +653,8 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 // Sunday recap ONLY available on Sundays
                 return@launch
             }
-            val prefs = userPreferences.value ?: repository.userPreferences.firstOrNull() ?: UserPreferencesEntity()
             val pastSessions = repository.allSessions.firstOrNull() ?: emptyList()
-            val recap = calculateWeeklyRecapSummary(pastSessions, prefs.currentStreak)
+            val recap = calculateWeeklyRecapSummary(pastSessions)
             if (recap != null) {
                 _weeklyReviewSummary.value = recap
             }
@@ -2671,7 +2669,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     fun finishSessionEarly() {
         // v1.1.5: owner rule — ONLY sessions whose timer runs to natural completion
         // are recorded. Finishing early DISCARDS the session: no record, no points,
-        // no streak change, no completion screen.
+        // no completion screen.
         // v1.1: also clears any active pomodoro run (stop everything cleanly;
         // only completed focus phases were ever recorded).
         _pomodoroState.value = null
@@ -2698,7 +2696,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         _sessionNotes.value = ""
         _completedSessionSummary.value = null
         _showCompletionScreen.value = false
-        Log.i(TAG, "Session discarded early (not recorded): no points/streak change")
+        Log.i(TAG, "Session discarded early (not recorded): no points")
     }
 
     fun skipBreak() {
@@ -2710,8 +2708,8 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     /**
      * v1.2.3 — skip the current FOCUS phase of an active pomodoro run.
      * The in-progress focus phase is DISCARDED exactly like finishing a
-     * session early (no record, no points, no streak change, no completion
-     * screen — the owner's standing rule), then the run advances to the
+     * session early (no record, no points, no completion screen — the
+     * owner's standing rule), then the run advances to the
      * next phase through the existing phase engine. Break-phase skips keep
      * using skipBreak(). No new accounting logic: this only chains the two
      * existing paths.
@@ -2720,59 +2718,6 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         if (_pomodoroState.value?.phase != com.example.util.PomodoroPhase.FOCUS) return
         discardActiveSession()
         advancePomodoroPhase()
-    }
-
-    private fun calculateConsecutiveStreak(sessions: List<FocusSessionEntity>): Pair<Int, Int> {
-        if (sessions.isEmpty()) return Pair(0, 0)
-
-        val dayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val sessionDays = sessions.map { dayFormat.format(Date(it.completedAt)) }.toSet()
-
-        val cal = Calendar.getInstance()
-        val todayStr = dayFormat.format(cal.time)
-        cal.add(Calendar.DAY_OF_YEAR, -1)
-        val yesterdayStr = dayFormat.format(cal.time)
-
-        var currentStreak = 0
-        if (sessionDays.contains(todayStr) || sessionDays.contains(yesterdayStr)) {
-            val checkCal = Calendar.getInstance()
-            if (!sessionDays.contains(todayStr)) {
-                checkCal.add(Calendar.DAY_OF_YEAR, -1)
-            }
-            while (sessionDays.contains(dayFormat.format(checkCal.time))) {
-                currentStreak++
-                checkCal.add(Calendar.DAY_OF_YEAR, -1)
-            }
-        }
-
-        val sortedDates = sessionDays.mapNotNull {
-            try { dayFormat.parse(it) } catch (_: Exception) { null }
-        }.sorted()
-
-        var maxStreak = currentStreak
-        var streakCount = 0
-        var lastDate: Date? = null
-
-        for (d in sortedDates) {
-            if (lastDate == null) {
-                streakCount = 1
-            } else {
-                val diffMs = d.time - lastDate.time
-                val diffDays = (diffMs / (24 * 60 * 60 * 1000L)).toInt()
-                if (diffDays == 1) {
-                    streakCount++
-                } else if (diffDays > 1) {
-                    streakCount = 1
-                }
-            }
-            lastDate = d
-            if (streakCount > maxStreak) {
-                maxStreak = streakCount
-            }
-        }
-
-        val finalCurrent = if (sessionDays.contains(todayStr)) currentStreak.coerceAtLeast(1) else currentStreak
-        return Pair(finalCurrent, maxStreak.coerceAtLeast(finalCurrent))
     }
 
     private fun onTimerCompleted() {
@@ -2867,14 +2812,11 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
 
         viewModelScope.launch {
             repository.recordSession(session)
-            // Update points and streak in preferences
+            // Update points in preferences
             val prefs = userPreferences.value ?: UserPreferencesEntity()
 
             val allPast = repository.allSessions.firstOrNull() ?: emptyList()
             val totalSessions = allPast + session
-            val (calcCurrent, calcBest) = calculateConsecutiveStreak(totalSessions)
-            val currentStreak = calcCurrent
-            val bestStreak = maxOf(prefs.bestStreak, calcBest, currentStreak)
 
             val updatedTotalFocusMinutes = totalSessions.sumOf { it.durationSeconds } / 60
             val updatedPoints = totalSessions.sumOf { it.focusPointsEarned }
@@ -2889,14 +2831,12 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             val updatedPrefs = prefs.copy(
                 focusPoints = updatedPoints,
                 userLevel = updatedLevel,
-                currentStreak = currentStreak,
-                bestStreak = bestStreak,
                 buddyTotalFocusMinutes = updatedTotalFocusMinutes,
                 buddyGrowthStage = newGrowthStage
             )
             repository.savePreferences(updatedPrefs)
 
-            // Real-time Supabase sync for points, streak, and study duration
+            // Real-time Supabase sync for points and study duration
             val uid = SupabaseService.getInstance().getCurrentUserId()
                 ?: _currentUser.value?.firebaseUid
                 ?: AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredUserId(it) }
@@ -2910,12 +2850,12 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                     user_id = uid,
                     display_name = updatedPrefs.currentUserName ?: "Student",
                     study_seconds = totalSeconds.toLong().coerceAtLeast(1L),
-                    streak = currentStreak.coerceAtLeast(1),
+                    streak = prefs.currentStreak.coerceAtLeast(1),
                     subject_tag = _currentTaskTitle.value.ifBlank { "General Study" },
                     avatar_url = avatarUrl
                 )
 
-                Log.i("FocuslyViewModel", "[FocusPointsSync] BEFORE WRITE: Session finished! Earned $pointsEarned pts for user_id=$uid. Updating user_preferences focus_points=$updatedPoints, buddy_minutes=$updatedTotalFocusMinutes, current_streak=$currentStreak, level=$updatedLevel")
+                Log.i("FocuslyViewModel", "[FocusPointsSync] BEFORE WRITE: Session finished! Earned $pointsEarned pts for user_id=$uid. Updating user_preferences focus_points=$updatedPoints, buddy_minutes=$updatedTotalFocusMinutes, level=$updatedLevel")
 
                 val lbResult = SupabaseService.getInstance().upsertLeaderboard(leaderboardDto)
                 Log.i("FocuslyViewModel", "[FocusPointsSync] AFTER WRITE (Leaderboard): status=${lbResult.isSuccess}")
@@ -2933,7 +2873,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 firebaseSyncManager.syncSession(
                     session = session,
                     totalPoints = updatedPoints,
-                    streak = currentStreak
+                    streak = prefs.currentStreak
                 )
             }
 
@@ -2944,7 +2884,6 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 newPoints = updatedPoints,
                 minutes = actualSeconds / 60,
                 pointsEarned = pointsEarned,
-                currentStreak = currentStreak,
                 totalSessions = totalSessions,
                 shieldAttempts = updatedPrefs.shieldBlockedAttempts,
                 isAppBlockerEnabled = updatedPrefs.isAppBlockerEnabled
@@ -3002,7 +2941,6 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         newPoints: Int,
         minutes: Int,
         pointsEarned: Int,
-        currentStreak: Int,
         totalSessions: List<FocusSessionEntity>,
         shieldAttempts: Int,
         isAppBlockerEnabled: Boolean
@@ -3075,10 +3013,6 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 }
             } catch (_: Exception) { }
 
-            // Streak-saver state for the daily 19:00 check.
-            try {
-                com.example.service.FocivoNotifications.saveStreakState(app, currentStreak)
-            } catch (_: Exception) { }
         } catch (_: Exception) { }
     }
 
