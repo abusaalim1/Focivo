@@ -142,34 +142,32 @@ class V123FullSweepScreenshotsTest {
         )
     )
 
-    private fun focusContent() = @Composable {
-        FocusScreen(
-            remainingSeconds = 1500,
-            targetSeconds = 1500,
-            isRunning = false,
-            currentMode = "focus",
-            currentTaskTitle = "Physics: Units & Measurement",
-            distractionsCount = 0,
-            ambientSound = "Rain",
-            userPreferences = fakePrefs(),
-            onStartTimer = {},
-            onPauseTimer = {},
-            onResumeTimer = {},
-            onFinishEarly = {},
-            onAddFiveMinutes = {},
-            onSkipBreak = {},
-            onSelectMode = { _, _ -> },
-            onSelectAmbientSound = {},
-            onLogDistraction = {},
-            onUpdateTaskTitle = {}
-        )
-    }
-
     // ── Focus screen with simplified nav (dark pair) ─────────────────────
 
     @Test
     fun sweep_focus_dark_with_nav() {
-        shell(dark = true, tab = NavTab.FOCUS) { focusContent() }
+        shell(dark = true, tab = NavTab.FOCUS) {
+            FocusScreen(
+                remainingSeconds = 1500,
+                targetSeconds = 1500,
+                isRunning = false,
+                currentMode = "focus",
+                currentTaskTitle = "Physics: Units & Measurement",
+                distractionsCount = 0,
+                ambientSound = "Rain",
+                userPreferences = fakePrefs(),
+                onStartTimer = {},
+                onPauseTimer = {},
+                onResumeTimer = {},
+                onFinishEarly = {},
+                onAddFiveMinutes = {},
+                onSkipBreak = {},
+                onSelectMode = { _, _ -> },
+                onSelectAmbientSound = {},
+                onLogDistraction = {},
+                onUpdateTaskTitle = {}
+            )
+        }
         assertNavBarCompact()
         composeTestRule.onRoot()
             .captureRoboImage("src/test/screenshots/v123/v123_sweep_focus_dark.png")
@@ -319,7 +317,11 @@ class V123FullSweepScreenshotsTest {
                 }
             }
         }
-        composeTestRule.waitForIdle()
+        // No waitForIdle(): CivoChatBubble runs a typewriter (45ms/char over a
+        // ~150-char message) plus an infinite cursor blink, so idleness is
+        // timing-dependent. Advance the test clock past the typing duration
+        // for a deterministic end state (full text, Continue enabled).
+        composeTestRule.mainClock.advanceTimeBy(12_000)
     }
 
     @Test
