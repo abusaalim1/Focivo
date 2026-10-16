@@ -3,7 +3,6 @@ package com.example.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,7 +54,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,16 +86,9 @@ import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.GlassCard
 import com.example.ui.components.LiquidGlassCard
 import com.example.ui.components.pressFeedback
-import com.example.ui.theme.MutedBorderLight
-import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
-import com.example.ui.theme.RegainLimeContainer
-import com.example.ui.theme.RegainLimeDeepText
-import com.example.ui.theme.RegainLimePrimary
-import com.example.ui.theme.themedCardBackground
-import com.example.ui.theme.backdropContentColor
-import com.example.ui.theme.backdropTitleShadow
-import com.example.util.TimerThemeManager
+import com.example.ui.theme.SerifItalicFontFamily
+import com.example.ui.theme.focivoTokens
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.ui.draw.alpha
@@ -105,12 +96,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import com.example.R
 import com.example.ui.theme.BottomNavClearance
-import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// v1.2.3 design-unification — owner's clean-redesign language:
+// Poppins body, Instrument Serif italic for the page headline,
 @Composable
 fun ProfileAvatarImage(
     photoUrl: String?,
@@ -149,7 +141,7 @@ fun ProfileAvatarImage(
             text = monogram,
             style = MaterialTheme.typography.titleMedium.copy(
                 fontFamily = PoppinsFontFamily,
-                color = NearBlack,
+                color = focivoTokens().text,
                 fontWeight = FontWeight.Bold,
                 fontSize = textSizeSp.sp
             )
@@ -258,16 +250,12 @@ fun ProfileScreen(
     var showWidgetsSheet by remember { mutableStateOf(false) }
     val widgetSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Semantic colors for Dark / Light mode compatibility
-    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
-    val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
-    val textPrimary = if (isDark) MaterialTheme.colorScheme.onSurface else NearBlack
-    val textSecondary = if (isDark) MaterialTheme.colorScheme.onSurfaceVariant else SecondaryTextLight
-    // v1.4.2: header text sits directly on the full-bleed theme backdrop, so it
-    // follows the selected theme (not the app dark/light mode).
-    val theme by TimerThemeManager.selectedTheme.collectAsState()
-    val onBackdrop = theme.onBackdropContent
-    val titleShadow = backdropTitleShadow(onBackdrop)
+    // Semantic colors — owner's Full App Redesign token system (dark + light).
+    val T = focivoTokens()
+    val cardBg = T.surface
+    val cardBorder = T.line
+    val textPrimary = T.text
+    val textSecondary = T.muted
 
     val sessionCount = sessions.count { it.durationSeconds > 0 }
     val totalSeconds = sessions.sumOf { it.durationSeconds }
@@ -357,9 +345,11 @@ fun ProfileScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        // Round-3: theme backdrop is drawn once at the MainActivity shell root.
-
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(T.bg)
+    ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -379,24 +369,14 @@ fun ProfileScreen(
                 ) {
                     Column {
                         Text(
-                            text = "IDENTITY",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                color = onBackdrop.copy(alpha = 0.7f),
-                                letterSpacing = 2.sp,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
                             text = "Profile",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontFamily = PoppinsFontFamily,
+                            style = MaterialTheme.typography.headlineLarge.copy(
+                                fontFamily = SerifItalicFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                color = onBackdrop,
-                                shadow = titleShadow,
-                                fontSize = 24.sp
+                                color = T.text,
+                                fontSize = 30.sp,
+                                lineHeight = 35.sp,
+                                letterSpacing = (-0.6).sp
                             )
                         )
                     }
@@ -450,23 +430,24 @@ fun ProfileScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(RegainLimeContainer)
+                                            .background(T.softAccent)
                                             .padding(horizontal = 7.dp, vertical = 2.dp)
                                     ) {
                                         Text(
-                                            text = "UPI DONATE",
+                                            text = "UPI donate",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = PoppinsFontFamily,
-                                                color = RegainLimeDeepText,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 9.sp
+                                                color = T.accentText,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 9.sp,
+                                                letterSpacing = 0.8.sp
                                             )
                                         )
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Voluntary contribution · Keep Focivo free & growing",
+                                    text = "Voluntary contribution · keep Focivo free",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         color = textSecondary,
@@ -507,7 +488,7 @@ fun ProfileScreen(
                             ) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(24.dp),
-                                    color = RegainLimePrimary,
+                                    color = T.accent,
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -529,14 +510,14 @@ fun ProfileScreen(
                                     text = profileError,
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        color = Color(0xFFEF4444)
+                                        color = T.danger
                                     )
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Row(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(RegainLimeContainer)
+                                        .background(T.softAccent)
                                         .clickable { onRetryFetchProfile() }
                                         .padding(horizontal = 12.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -544,7 +525,7 @@ fun ProfileScreen(
                                     Icon(
                                         imageVector = Icons.Default.Refresh,
                                         contentDescription = "Retry",
-                                        tint = RegainLimeDeepText,
+                                        tint = T.accentText,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
@@ -552,7 +533,7 @@ fun ProfileScreen(
                                         text = "Retry Sync",
                                         style = MaterialTheme.typography.labelMedium.copy(
                                             fontFamily = PoppinsFontFamily,
-                                            color = RegainLimeDeepText,
+                                            color = T.accentText,
                                             fontWeight = FontWeight.Bold
                                         )
                                     )
@@ -570,7 +551,7 @@ fun ProfileScreen(
                                         modifier = Modifier
                                             .size(58.dp)
                                             .clip(CircleShape)
-                                            .background(RegainLimePrimary)
+                                            .background(T.accent)
                                             .clickable { showEditProfileDialog = true },
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -603,7 +584,7 @@ fun ProfileScreen(
                                                 Icon(
                                                     imageVector = Icons.Default.Edit,
                                                     contentDescription = "Edit Profile",
-                                                    tint = RegainLimeDeepText,
+                                                    tint = T.accentText,
                                                     modifier = Modifier.size(16.dp)
                                                 )
                                             }
@@ -639,14 +620,14 @@ fun ProfileScreen(
                                         .fillMaxWidth()
                                         .height(6.dp)
                                         .clip(CircleShape)
-                                        .background(if (isDark) Color(0x30FFFFFF) else MutedBorderLight)
+                                        .background(T.line)
                                 ) {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth(dailyProgress.coerceAtLeast(0.08f))
                                             .fillMaxHeight()
                                             .clip(CircleShape)
-                                            .background(RegainLimePrimary)
+                                            .background(T.accent)
                                     )
                                 }
                             }
@@ -655,105 +636,56 @@ fun ProfileScreen(
                 }
             }
 
-            // Quick Stats Strip
+            // Quick Stats Strip — mockup: flat stats with hairline dividers.
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
                 ) {
-                    // Sessions
-                    GlassCard(
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Column(
+                    @Composable
+                    fun StatCell(value: String, label: String, valueColor: Color, showDivider: Boolean) {
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 14.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                                .weight(1f)
+                                .padding(vertical = 4.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = "$sessionCount",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    color = textPrimary,
-                                    fontSize = 20.sp
+                            if (showDivider) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.CenterStart)
+                                        .width(1.dp)
+                                        .height(44.dp)
+                                        .background(T.line)
                                 )
-                            )
-                            Text(
-                                text = "Sessions",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    color = textSecondary,
-                                    fontSize = 10.sp
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = value,
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        color = valueColor,
+                                        fontSize = 24.sp,
+                                        letterSpacing = (-0.5).sp
+                                    )
                                 )
-                            )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = label.uppercase(Locale.getDefault()),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        color = T.muted,
+                                        fontSize = 10.sp,
+                                        letterSpacing = 0.8.sp
+                                    )
+                                )
+                            }
                         }
                     }
-
-                    // Hours
-                    GlassCard(
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 14.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = hoursFocused,
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    color = textPrimary,
-                                    fontSize = 20.sp
-                                )
-                            )
-                            Text(
-                                text = "Focused",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    color = textSecondary,
-                                    fontSize = 10.sp
-                                )
-                            )
-                        }
-                    }
-
-                    // Streak
-                    val currentStreakDays = userPreferences?.currentStreak ?: 0
-                    GlassCard(
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 14.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "${currentStreakDays}d",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 20.sp,
-                                    color = RegainLimeDeepText
-                                )
-                            )
-                            Text(
-                                text = "Streak",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    color = textSecondary,
-                                    fontSize = 10.sp
-                                )
-                            )
-                        }
-                    }
+                    StatCell(value = "$sessionCount", label = "Sessions", valueColor = T.text, showDivider = false)
+                    StatCell(value = hoursFocused, label = "Focused", valueColor = T.text, showDivider = true)
                 }
             }
 
@@ -797,14 +729,14 @@ fun ProfileScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(if (isShieldActive) RegainLimeContainer else (if (isDark) Color(0x30FFFFFF) else Color(0xFFF0F4EC)))
+                                            .background(if (isShieldActive) T.softAccent else T.surface2)
                                             .padding(horizontal = 8.dp, vertical = 2.dp)
                                     ) {
                                         Text(
                                             text = if (isShieldActive) "ARMED" else if (!hasShieldPermissions) "SETUP" else "IDLE",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = PoppinsFontFamily,
-                                                color = if (isShieldActive) RegainLimeDeepText else textSecondary,
+                                                color = if (isShieldActive) T.accentText else textSecondary,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 9.sp
                                             )
@@ -854,11 +786,11 @@ fun ProfileScreen(
                                     .size(52.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (isDark) Color(0xFF1E251D) else Color(0xFFF0F4EC)
+                                        T.surface2
                                     )
                                     .border(
                                         1.dp,
-                                        RegainLimePrimary.copy(alpha = 0.4f),
+                                        T.accent.copy(alpha = 0.4f),
                                         CircleShape
                                     ),
                                 contentAlignment = Alignment.Center
@@ -885,14 +817,14 @@ fun ProfileScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(Color(0xFF8FD400))
+                                            .background(T.accent)
                                             .padding(horizontal = 8.dp, vertical = 2.dp)
                                     ) {
                                         Text(
                                             text = mascotLevel.displayName.uppercase(),
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = PoppinsFontFamily,
-                                                color = NearBlack,
+                                                color = T.text,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 9.sp
                                             )
@@ -959,14 +891,14 @@ fun ProfileScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(RegainLimeContainer)
+                                            .background(T.softAccent)
                                             .padding(horizontal = 8.dp, vertical = 2.dp)
                                     ) {
                                         Text(
                                             text = "5 WIDGETS",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = PoppinsFontFamily,
-                                                color = RegainLimeDeepText,
+                                                color = T.accentText,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 9.sp
                                             )
@@ -1047,14 +979,14 @@ fun ProfileScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(if (isTodaySunday) RegainLimeContainer else Color(0xFF2A342B))
+                                            .background(if (isTodaySunday) T.softAccent else T.line)
                                             .padding(horizontal = 7.dp, vertical = 2.dp)
                                     ) {
                                         Text(
                                             text = if (isTodaySunday) "READY" else "SUNDAY ONLY",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = PoppinsFontFamily,
-                                                color = if (isTodaySunday) RegainLimeDeepText else Color(0xFFB0B8AE),
+                                                color = if (isTodaySunday) T.accentText else T.muted,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 9.sp
                                             )
@@ -1123,14 +1055,14 @@ fun ProfileScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(RegainLimeContainer)
+                                            .background(T.softAccent)
                                             .padding(horizontal = 7.dp, vertical = 2.dp)
                                     ) {
                                         Text(
                                             text = "${sessions.size} LOGS",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = PoppinsFontFamily,
-                                                color = RegainLimeDeepText,
+                                                color = T.accentText,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 9.sp
                                             )
@@ -1298,14 +1230,14 @@ fun ProfileScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(CircleShape)
-                                            .background(RegainLimeContainer)
+                                            .background(T.softAccent)
                                             .padding(horizontal = 7.dp, vertical = 2.dp)
                                     ) {
                                         Text(
                                             text = "v$currentVersionName",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = PoppinsFontFamily,
-                                                color = RegainLimeDeepText,
+                                                color = T.accentText,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 9.sp
                                             )
@@ -1354,13 +1286,13 @@ fun ProfileScreen(
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(CircleShape)
-                                    .background(RegainLimeContainer),
+                                    .background(T.softAccent),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.PrivacyTip,
                                     contentDescription = "Privacy Policy",
-                                    tint = RegainLimeDeepText,
+                                    tint = T.accentText,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -1406,8 +1338,8 @@ fun ProfileScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
-                        .background(if (isDark) Color(0x30EF4444) else Color(0xFFFFEBEE))
-                        .border(1.dp, if (isDark) Color(0x50EF4444) else Color(0xFFFFCDD2), RoundedCornerShape(18.dp))
+                        .background(T.danger.copy(alpha = 0.14f))
+                        .border(1.dp, T.danger.copy(alpha = 0.28f), RoundedCornerShape(18.dp))
                         .clickable { onLogout() }
                         .padding(horizontal = 20.dp, vertical = 16.dp),
                     contentAlignment = Alignment.Center
@@ -1419,7 +1351,7 @@ fun ProfileScreen(
                         Icon(
                             imageVector = Icons.Default.ExitToApp,
                             contentDescription = "Sign Out",
-                            tint = Color(0xFFEF4444),
+                            tint = T.danger,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1427,7 +1359,7 @@ fun ProfileScreen(
                             text = "Sign Out",
                             style = MaterialTheme.typography.labelLarge.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFFEF4444),
+                                color = T.danger,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             )
@@ -1481,7 +1413,7 @@ fun ProfileScreen(
                         modifier = Modifier
                             .size(80.dp)
                             .clip(CircleShape)
-                            .background(RegainLimePrimary)
+                            .background(T.accent)
                             .clickable {
                                 photoPickerLauncher.launch(
                                     androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -1641,7 +1573,7 @@ private fun BadgeGridItem(
                                 .offset(x = 4.dp, y = 4.dp)
                                 .size(20.dp)
                                 .clip(CircleShape)
-                                .background(if (isDark) Color(0xFF2A2A2E) else Color(0xFFE8EDE4))
+                                .background(focivoTokens().surface2)
                                 .border(1.dp, cardBorder, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1659,14 +1591,14 @@ private fun BadgeGridItem(
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(
-                                if (badge.isUnlocked) RegainLimeContainer else (if (isDark) Color(0x20FFFFFF) else Color(0xFFF0F4EC))
+                                if (badge.isUnlocked) focivoTokens().softAccent else focivoTokens().surface2
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = if (badge.isUnlocked) badge.icon else Icons.Default.Lock,
                             contentDescription = badge.title,
-                            tint = if (badge.isUnlocked) RegainLimeDeepText else textSecondary,
+                            tint = if (badge.isUnlocked) focivoTokens().accentText else textSecondary,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1755,8 +1687,8 @@ private fun AchievementDetailDialog(
                             .fillMaxWidth()
                             .height(8.dp)
                             .clip(RoundedCornerShape(4.dp)),
-                        color = RegainLimePrimary,
-                        trackColor = if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
+                        color = focivoTokens().accent,
+                        trackColor = focivoTokens().line
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                 }
@@ -1765,7 +1697,7 @@ private fun AchievementDetailDialog(
                     fontFamily = PoppinsFontFamily,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (badge.isUnlocked) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary
+                    color = if (badge.isUnlocked) focivoTokens().accentText else textSecondary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -1773,12 +1705,12 @@ private fun AchievementDetailDialog(
                     fontFamily = PoppinsFontFamily,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (badge.isUnlocked) (if (isDark) RegainLimePrimary else RegainLimeDeepText) else textSecondary,
+                    color = if (badge.isUnlocked) focivoTokens().accentText else textSecondary,
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .background(
-                            if (badge.isUnlocked) RegainLimePrimary.copy(alpha = 0.16f)
-                            else (if (isDark) Color(0x20FFFFFF) else Color(0xFFF0F4EC))
+                            if (badge.isUnlocked) focivoTokens().accent.copy(alpha = 0.16f)
+                            else focivoTokens().surface2
                         )
                         .padding(horizontal = 12.dp, vertical = 5.dp)
                 )

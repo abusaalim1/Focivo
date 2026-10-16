@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
@@ -65,17 +66,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.FocusSessionEntity
-import com.example.ui.components.AuroraBackground
 import com.example.ui.components.PremiumButton
 import com.example.ui.components.GlassCard
 import com.example.ui.components.MascotPose
 import com.example.ui.components.RegainMascotView
-import com.example.ui.theme.NearBlack
+import com.example.ui.theme.focivoHeadline
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.PoppinsFontFamily
-import com.example.ui.theme.RegainLimeContainer
-import com.example.ui.theme.RegainLimeDeepText
-import com.example.ui.theme.RegainLimePrimary
-import com.example.ui.theme.isAppInDarkTheme
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -89,10 +86,11 @@ fun FocusSessionLogScreen(
     onDeleteSession: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val isDark = isAppInDarkTheme()
-    val textPrimary = if (isDark) Color(0xFFF2F7EE) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA5B2A2) else Color(0xFF6B7280)
-    val limeAccent = RegainLimePrimary
+    val T = focivoTokens()
+    val isDark = T.isDark
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val limeAccent = T.accent
 
     var selectedFilter by remember { mutableStateOf("All") }
     var sessionToDelete by remember { mutableStateOf<FocusSessionEntity?>(null) }
@@ -156,9 +154,7 @@ fun FocusSessionLogScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        AuroraBackground(modifier = Modifier.fillMaxSize())
-
+    Box(modifier = modifier.fillMaxSize().background(T.bg)) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
             Row(
@@ -174,7 +170,7 @@ fun FocusSessionLogScreen(
                         modifier = Modifier
                             .size(42.dp)
                             .clip(CircleShape)
-                            .background(if (isDark) Color(0x20FFFFFF) else Color(0x10000000))
+                            .background(T.surface2)
                             .testTag("back_button")
                     ) {
                         Icon(
@@ -190,12 +186,7 @@ fun FocusSessionLogScreen(
                     Column {
                         Text(
                             text = "Past Focus Sessions",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontFamily = PoppinsFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                color = textPrimary,
-                                fontSize = 19.sp
-                            )
+                            style = focivoHeadline().copy(fontSize = 26.sp, lineHeight = 30.sp)
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
@@ -258,14 +249,14 @@ fun FocusSessionLogScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(CircleShape)
-                                        .background(RegainLimeContainer)
+                                        .background(T.softAccent)
                                         .padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
                                     Text(
                                         text = "${sessions.size} LOGGED",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontFamily = PoppinsFontFamily,
-                                            color = RegainLimeDeepText,
+                                            color = T.accentText,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 9.5.sp
                                         )
@@ -283,19 +274,25 @@ fun FocusSessionLogScreen(
                                     label = "Total Focus",
                                     value = totalHoursFormatted,
                                     icon = Icons.Default.Schedule,
-                                    iconTint = limeAccent
+                                    iconTint = limeAccent,
+                                    labelColor = textSecondary,
+                                    valueColor = textPrimary
                                 )
                                 SummaryStatItem(
                                     label = "Avg Session",
                                     value = "${avgMinutes}m",
                                     icon = Icons.Default.HourglassBottom,
-                                    iconTint = Color(0xFF60A5FA)
+                                    iconTint = limeAccent,
+                                    labelColor = textSecondary,
+                                    valueColor = textPrimary
                                 )
                                 SummaryStatItem(
                                     label = "Focus Points",
                                     value = "+$totalPoints",
                                     icon = Icons.Default.Star,
-                                    iconTint = Color(0xFFFBBF24)
+                                    iconTint = T.warning,
+                                    labelColor = textSecondary,
+                                    valueColor = textPrimary
                                 )
                             }
                         }
@@ -330,12 +327,12 @@ fun FocusSessionLogScreen(
                                 },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = limeAccent,
-                                    selectedLabelColor = NearBlack,
-                                    containerColor = if (isDark) Color(0x18FFFFFF) else Color(0x0A000000),
-                                    labelColor = if (isDark) Color(0xFFE9EFE7) else textSecondary
+                                    selectedLabelColor = T.onAccent,
+                                    containerColor = T.surface2,
+                                    labelColor = textSecondary
                                 ),
                                 border = FilterChipDefaults.filterChipBorder(
-                                    borderColor = if (isSelected) limeAccent else (if (isDark) Color(0x20FFFFFF) else Color(0x15000000)),
+                                    borderColor = if (isSelected) limeAccent else T.chipBorder,
                                     selectedBorderColor = limeAccent,
                                     enabled = true,
                                     selected = isSelected
@@ -432,6 +429,9 @@ fun FocusSessionLogScreen(
     if (sessionToDelete != null) {
         AlertDialog(
             onDismissRequest = { sessionToDelete = null },
+            containerColor = T.surface,
+            titleContentColor = T.text,
+            textContentColor = T.muted,
             title = {
                 Text(
                     text = "Delete Session Log?",
@@ -453,7 +453,7 @@ fun FocusSessionLogScreen(
                         sessionToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFEF4444),
+                        containerColor = T.danger,
                         contentColor = Color.White
                     )
                 ) {
@@ -474,7 +474,9 @@ private fun SummaryStatItem(
     label: String,
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    iconTint: Color
+    iconTint: Color,
+    labelColor: Color,
+    valueColor: Color
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -499,6 +501,7 @@ private fun SummaryStatItem(
             style = MaterialTheme.typography.titleMedium.copy(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Bold,
+                color = valueColor,
                 fontSize = 15.sp
             )
         )
@@ -506,7 +509,7 @@ private fun SummaryStatItem(
             text = label,
             style = MaterialTheme.typography.labelSmall.copy(
                 fontFamily = PoppinsFontFamily,
-                color = Color(0xFF8899A6),
+                color = labelColor,
                 fontSize = 10.sp
             )
         )
@@ -522,9 +525,7 @@ private fun FocusSessionLogCard(
     textSecondary: Color,
     onDelete: () -> Unit
 ) {
-    val cardBg = if (isDark) Color(0xFF141D16) else Color.White
-    val cardBorder = if (isDark) Color(0x25FFFFFF) else Color(0x18000000)
-
+    val T = focivoTokens()
     GlassCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -591,14 +592,14 @@ private fun FocusSessionLogCard(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(RegainLimeContainer)
+                        .background(T.softAccent)
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Text(
                         text = session.getFormattedDuration(),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontFamily = PoppinsFontFamily,
-                            color = RegainLimeDeepText,
+                            color = T.accentText,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
                         )
@@ -611,8 +612,8 @@ private fun FocusSessionLogCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(if (isDark) Color(0xFF0F1711) else Color(0xFFF3F6F1))
-                    .border(1.dp, if (isDark) Color(0x18FFFFFF) else Color(0x10000000), RoundedCornerShape(14.dp))
+                    .background(T.surface2)
+                    .border(1.dp, T.line, RoundedCornerShape(14.dp))
                     .padding(horizontal = 12.dp, vertical = 9.dp)
             ) {
                 Row(
@@ -625,7 +626,7 @@ private fun FocusSessionLogCard(
                         Icon(
                             imageVector = Icons.Default.AccessTime,
                             contentDescription = null,
-                            tint = Color(0xFF60A5FA),
+                            tint = T.muted,
                             modifier = Modifier.size(13.dp)
                         )
                         Spacer(modifier = Modifier.width(5.dp))
@@ -652,11 +653,11 @@ private fun FocusSessionLogCard(
                     }
 
                     // Divider Arrow
-                    Text(
-                        text = "→",
-                        color = textSecondary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = textSecondary,
+                        modifier = Modifier.size(14.dp)
                     )
 
                     // End Time
@@ -707,7 +708,7 @@ private fun FocusSessionLogCard(
                         Icon(
                             imageVector = Icons.Default.Star,
                             contentDescription = null,
-                            tint = Color(0xFFFBBF24),
+                            tint = T.warning,
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))
@@ -727,7 +728,7 @@ private fun FocusSessionLogCard(
                         Icon(
                             imageVector = Icons.Default.Security,
                             contentDescription = null,
-                            tint = if (session.distractionsCount == 0) limeAccent else Color(0xFFFF5252),
+                            tint = if (session.distractionsCount == 0) limeAccent else T.danger,
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))

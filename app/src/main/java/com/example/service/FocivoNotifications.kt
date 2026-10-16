@@ -13,7 +13,6 @@ import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
 import com.example.util.PermissionUtils
-import java.util.Calendar
 import kotlinx.coroutines.flow.first
 
 /**
@@ -28,13 +27,12 @@ import kotlinx.coroutines.flow.first
  *  1. Guard status      — while a study session is running (AiStudyGuardManager)
  *  2. Schedule reminder — 10 min before a scheduled study block (ScheduledBlockScheduler)
  *  3. Session complete  — onTimerCompleted, real minutes + points
- *  4. Streak saver      — daily 19:00, only if no session today and streak >= 2
- *  5. Achievement       — onTimerCompleted, diffed against notified set
- *  6. Theme unlocked    — onTimerCompleted, points crossing a theme price
- *  7. Update available  — checkForAppUpdates, once per version
- *  8. Break over        — onTimerCompleted when mode is a break
- *  9. Held digest       — onTimerCompleted, only if guard held >= 1 notification
- * 10. Sunday recap      — WeeklyRecapNotificationHelper (restyled here too)
+ *  4. Achievement       — onTimerCompleted, diffed against notified set
+ *  5. Theme unlocked    — onTimerCompleted, points crossing a theme price
+ *  6. Update available  — checkForAppUpdates, once per version
+ *  7. Break over        — onTimerCompleted when mode is a break
+ *  8. Held digest       — onTimerCompleted, only if guard held >= 1 notification
+ *  9. Sunday recap      — WeeklyRecapNotificationHelper (restyled here too)
  */
 object FocivoNotifications {
 
@@ -53,7 +51,6 @@ object FocivoNotifications {
 
     private const val ID_SESSION_COMPLETE = 9101
     private const val ID_BREAK_OVER = 9102
-    private const val ID_STREAK_SAVER = 9103
     private const val ID_ACHIEVEMENT_BASE = 9110
     private const val ID_THEME_BASE = 9130
     private const val ID_UPDATE_AVAILABLE = 9150
@@ -198,24 +195,6 @@ object FocivoNotifications {
         )
     }
 
-    /** 4. Streak saver — 19:00, only if no session today, streak >= 2, once per day. */
-    fun postStreakSaver(context: Context, streakDays: Int) {
-        val day = try {
-            java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
-        } catch (_: Exception) { return }
-        val key = "streak_saver_$day"
-        if (isDeduped(context, key)) return
-        markDeduped(context, key)
-        post(
-            context,
-            CHANNEL_MOTIVATION, "Motivation", "Streak reminders",
-            NotificationManager.IMPORTANCE_DEFAULT,
-            ID_STREAK_SAVER,
-            "Keep your streak alive",
-            "A quick session today keeps your $streakDays-day streak going."
-        )
-    }
-
     /** 5. Achievement unlocked — once per achievement id. */
     fun postAchievementUnlocked(context: Context, achievementId: String, achievementName: String) {
         val key = "achievement_$achievementId"
@@ -326,52 +305,7 @@ object FocivoNotifications {
 
     // ------------------------------------------------------------------ state
 
-    /** Streak + last-session day for the daily streak-saver check. Written on session completion. */
-    fun saveStreakState(context: Context, currentStreak: Int) {
-        try {
-            val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
-            context.getSharedPreferences(PREFS_STATE, Context.MODE_PRIVATE).edit()
-                .putInt("streak_current", currentStreak)
-                .putString("last_session_day", day)
-                .apply()
-        } catch (_: Exception) { }
-    }
-
-    fun readStreakState(context: Context): Pair<Int, String?> {
-        return try {
-            val p = context.getSharedPreferences(PREFS_STATE, Context.MODE_PRIVATE)
-            Pair(p.getInt("streak_current", 0), p.getString("last_session_day", null))
-        } catch (_: Exception) {
-            Pair(0, null)
-        }
-    }
-
     // ------------------------------------------------------------------ scheduling
-
-    /** Daily 19:00 streak-saver check (inexact — no exact-alarm permission needed). */
-    fun scheduleStreakSaverDaily(context: Context) {
-        try {
-            val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-            val intent = Intent(context, ScheduledBlockReceiver::class.java).apply {
-                action = ScheduledBlockReceiver.ACTION_STREAK_SAVER_CHECK
-            }
-            val pi = PendingIntent.getBroadcast(
-                context, 9301, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            val next = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, 19)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-                if (timeInMillis <= System.currentTimeMillis()) add(Calendar.DAY_OF_YEAR, 1)
-            }.timeInMillis
-            am.setInexactRepeating(AlarmManager.RTC_WAKEUP, next, AlarmManager.INTERVAL_DAY, pi)
-            Log.i(TAG, "Streak-saver daily check scheduled")
-        } catch (e: Exception) {
-            Log.e(TAG, "scheduleStreakSaverDaily failed: ${e.message}")
-        }
-    }
 
     /** 10-minute heads-up before the next scheduled study block starts. */
     fun scheduleStudyReminder(context: Context) {
@@ -419,18 +353,6 @@ object FocivoNotifications {
         } catch (e: Exception) {
             Log.e(TAG, "scheduleStudyReminder failed: ${e.message}")
         }
-    }
-
-    /** Receiver-side entry: evaluates streak state and posts the saver if due. */
-    fun handleStreakSaverCheck(context: Context) {
-        try {
-            if (!canNotify(context)) return
-            val (streak, lastDay) = readStreakState(context)
-            if (streak < 2) return
-            val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
-            if (lastDay == today) return // already studied today
-            postStreakSaver(context, streak)
-        } catch (_: Exception) { }
     }
 
     // ---------------------------------------------------------------
@@ -590,7 +512,6 @@ object FocivoNotifications {
 
     /** Re-arm every Focivo alarm (idempotent). Called on app start + boot. */
     fun scheduleAllSurvivalAlarms(context: Context) {
-        scheduleStreakSaverDaily(context)
         scheduleStudyReminder(context)
         scheduleSundayRecapWeekly(context)
         scheduleUpdateCheckDaily(context)

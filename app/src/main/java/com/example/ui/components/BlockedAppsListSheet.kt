@@ -49,6 +49,7 @@ import androidx.core.graphics.drawable.toBitmap
 import com.example.R
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.util.InstalledAppsManager
@@ -80,14 +81,15 @@ fun BlockedAppsListSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showAddPicker by remember { mutableStateOf(false) }
 
-    val isDark = isAppInDarkTheme()
-    val lime = Color(0xFF8FD400)
-    val sheetBackground = if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val rowBg = if (isDark) Color(0xFF1D221C) else Color.White
-    val rowBorder = if (isDark) Color(0x228CE000) else Color(0xFFDCE6D2)
-    val deepLimeText = if (isDark) lime else Color(0xFF4A7A00)
+    val T = focivoTokens()
+    val isDark = T.isDark
+    val lime = T.accent
+    val sheetBackground = T.bg
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val rowBg = T.surface
+    val rowBorder = T.accent.copy(alpha = 0.2f)
+    val deepLimeText = T.accentText
 
     // Resolve real app names + icons from the installed-apps cache.
     val cachedApps = remember {

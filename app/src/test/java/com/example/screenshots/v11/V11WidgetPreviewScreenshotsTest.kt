@@ -65,17 +65,6 @@ class V11WidgetPreviewScreenshotsTest {
     }
 
     @Test
-    fun preview_streak() {
-        renderWidget(R.layout.widget_streak, "widget_preview_streak_raw.png") { v ->
-            v.findViewById<TextView>(R.id.tv_title)?.text = "12 day streak"
-            v.findViewById<TextView>(R.id.tv_sub)?.text = "Level 3 Student · 1,240 XP"
-            v.findViewById<TextView>(R.id.tv_quote)?.text = "\u201CEvery page studied today is a step towards your dream.\u201D"
-            v.findViewById<TextView>(R.id.tv_goal)?.text = "120 / 360 min"
-            v.findViewById<ProgressBar>(R.id.pb_goal)?.progress = 33
-        }
-    }
-
-    @Test
     fun preview_focus_shield() {
         renderWidget(R.layout.widget_focus_shield, "widget_preview_focus_shield_raw.png") { v ->
             v.findViewById<TextView>(R.id.tv_title)?.text = "8 apps blocked"

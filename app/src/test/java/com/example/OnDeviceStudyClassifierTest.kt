@@ -128,4 +128,41 @@ class OnDeviceStudyClassifierTest {
             )
         }
     }
+
+    @Test
+    fun testStudyDoubtDetectedAcrossLanguages() {
+        // v1.2.3 (final assembly): the guard pipeline evaluates isStudyDoubt
+        // BEFORE the content classifier's block band — a doubt must never
+        // become a block. Round-4 flagged regional rows scored ~0.70-0.75 on
+        // the content brain (above the 0.69 line); the doubt gate catches them.
+        val doubts = listOf(
+            "\u09b8\u09cd\u09af\u09be\u09b0, \u098f\u0987 \u099f\u09aa\u09bf\u0995\u099f\u09be \u09ac\u09c1\u099d\u09a4\u09c7 \u09aa\u09be\u09b0\u099b\u09bf \u09a8\u09be",
+            "\u099b\u09be\u09f0, \u098f\u0987 \u099f\u09aa\u09bf\u0995\u099f\u09cb \u09ac\u09c1\u099c\u09bf \u09aa\u09cb\u09f1\u09be \u09a8\u09be\u0987",
+            "\u0b9a\u0bbe\u0bb0\u0bcd, \u0b87\u0ba8\u0bcd\u0ba4 \u0b9f\u0bbe\u0baa\u0bbf\u0b95\u0bcd \u0baa\u0bc1\u0bb0\u0bbf\u0baf\u0bb2",
+            "doubt: why is the sky blue? (rayleigh scattering class 10)",
+            "doubt: integration me limits kab lagate hai?",
+            "Doubt: sir, how is inertia different from momentum?",
+            "sir ye topic samajh nahi aa raha physics wala",
+            "Doubt session live physics class 11"
+        )
+        for (d in doubts) {
+            assertTrue("Study doubt not detected: '$d'", OnDeviceStudyClassifier.isStudyDoubt(d))
+        }
+    }
+
+    @Test
+    fun testEntertainmentNotMisreadAsDoubt() {
+        val entertainment = listOf(
+            "Official music video - Arijit Singh new song 2026",
+            "GTA 6 gameplay leak trailer",
+            "funny comedy sketch mr bean",
+            "IPL highlights today match",
+            "vlog: my day in mumbai",
+            "movie review pushpa 2",
+            "cricket live score update"
+        )
+        for (e in entertainment) {
+            assertFalse("Entertainment misread as doubt: '$e'", OnDeviceStudyClassifier.isStudyDoubt(e))
+        }
+    }
 }

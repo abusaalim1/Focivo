@@ -296,7 +296,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     val showSessionDonationPrompt: StateFlow<Boolean> = _showSessionDonationPrompt.asStateFlow()
 
     // v1.2.2 — strict-mode uninstall attempt popup (triggered by MainActivity's
-    // uninstaller intercept intent; dialog content is StrictUninstallBlockedDialog).
+    // uninstaller intercept intent; overlay content is StrictUninstallBlockedOverlay).
     private val _showStrictUninstallBlocked = MutableStateFlow(false)
     val showStrictUninstallBlocked: StateFlow<Boolean> = _showStrictUninstallBlocked.asStateFlow()
     fun triggerStrictUninstallBlocked() { _showStrictUninstallBlocked.value = true }
@@ -423,7 +423,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         com.example.widget.FocivoWidgetHelper.updateAllWidgets(getApplication())
     }
 
-    fun calculateWeeklyRecapSummary(sessions: List<FocusSessionEntity>, streak: Int = 0): WeeklyRecapSummary? {
+    fun calculateWeeklyRecapSummary(sessions: List<FocusSessionEntity>): WeeklyRecapSummary? {
         val now = System.currentTimeMillis()
         val cal = Calendar.getInstance()
         val currentWeekOfYear = cal.get(Calendar.WEEK_OF_YEAR)
@@ -574,7 +574,6 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             totalMinutesFocused = totalMinutes,
             totalHoursFormatted = hoursFormatted,
             sessionCount = thisWeekSessions.size,
-            currentStreak = streak,
             pointsEarned = 0,
             bestDayName = bestDayName,
             bestDayMinutes = bestDayMins,
@@ -606,7 +605,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             }
 
             val pastSessions = repository.allSessions.firstOrNull() ?: emptyList()
-            val recap = calculateWeeklyRecapSummary(pastSessions, prefs.currentStreak) ?: return@launch
+            val recap = calculateWeeklyRecapSummary(pastSessions) ?: return@launch
 
             _weeklyReviewSummary.value = recap
 
@@ -654,9 +653,8 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 // Sunday recap ONLY available on Sundays
                 return@launch
             }
-            val prefs = userPreferences.value ?: repository.userPreferences.firstOrNull() ?: UserPreferencesEntity()
             val pastSessions = repository.allSessions.firstOrNull() ?: emptyList()
-            val recap = calculateWeeklyRecapSummary(pastSessions, prefs.currentStreak)
+            val recap = calculateWeeklyRecapSummary(pastSessions)
             if (recap != null) {
                 _weeklyReviewSummary.value = recap
             }
@@ -2059,7 +2057,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     fun setAmbientSound(sound: String) {
         _ambientSound.value = sound
         if (_isTimerRunning.value) {
-            audioEngine.play(sound)
+            audioEngine.playSound(getApplication(), sound)
         }
     }
 
@@ -2090,6 +2088,31 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             Log.i(TAG, "Start Study blocked: missing focus permissions: $missing")
             return
         }
+        // v1.2.3 (Task 13.2) — pre-session Strict Mode + AI Guard prompt.
+        // Offer to turn them on before the session starts. Both already on
+        // -> no sheet, straight into the unchanged start flow below.
+        val app = getApplication<Application>()
+        val strictOn = try { com.example.util.StrictModeManager.isStrictModeEnabled(app) }
+            catch (_: Exception) { true }
+        val guardOn = try { com.example.util.AiStudyGuardManager.isAiGuardEnabled(app) }
+            catch (_: Exception) { true }
+        if (!strictOn || !guardOn) {
+            _promptStrictOn.value = strictOn
+            _promptGuardOn.value = guardOn
+            _showStrictGuardPromptSheet.value = true
+            Log.i(TAG, "Pre-session prompt shown (strict=$strictOn, guard=$guardOn)")
+            return
+        }
+        continueSessionStartAfterPrompt()
+    }
+
+    // v1.2.3 (Task 13.2) — resumes the exact start flow the session-start
+    // gate used before the pre-session prompt sheet existed. "Save & Block"
+    // auto-block path goes straight to startTimer(); everything else shows
+    // the pre-study block sheet. Used by the prompt's skip/continue path and
+    // the both-already-on path alike.
+    fun continueSessionStartAfterPrompt() {
+        _showStrictGuardPromptSheet.value = false
         val prefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
         // If user clicked "Save & Block", auto-block saved apps without asking. Otherwise show selection sheet.
         if (prefs.autoBlockStudyAppsWithoutAsking && prefs.blockedAppsList.isNotBlank()) {
@@ -2097,6 +2120,42 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         } else {
             _showPreStudyBlockSheet.value = true
         }
+    }
+
+    // v1.2.3 (Task 13.2) — pre-session prompt sheet state. These report
+    // whether each protection is REALLY on (prefs read, same source the
+    // guards themselves read), so the enable buttons reflect reality.
+    private val _showStrictGuardPromptSheet = MutableStateFlow(false)
+    val showStrictGuardPromptSheet: StateFlow<Boolean> = _showStrictGuardPromptSheet.asStateFlow()
+    private val _promptStrictOn = MutableStateFlow(true)
+    val promptStrictOn: StateFlow<Boolean> = _promptStrictOn.asStateFlow()
+    private val _promptGuardOn = MutableStateFlow(true)
+    val promptGuardOn: StateFlow<Boolean> = _promptGuardOn.asStateFlow()
+
+    /**
+     * v1.2.3 (Task 13.2) — prompt-sheet enable actions. Each one REALLY
+     * enables the feature (the same calls the hub toggles use); the sheet
+     * stays open so the user can enable the other one too. Swipe-dismiss
+     * behaves like "Start session" (skip path — no changes forced).
+     */
+    fun enableStrictFromPrompt() {
+        try {
+            com.example.util.StrictModeManager.setStrictModeEnabled(getApplication(), true)
+            _promptStrictOn.value = true
+            Log.i(TAG, "Strict Mode enabled from pre-session prompt")
+        } catch (_: Exception) { }
+    }
+
+    fun enableGuardFromPrompt() {
+        try {
+            com.example.util.AiStudyGuardManager.setAiGuardEnabled(getApplication(), true)
+            _promptGuardOn.value = com.example.util.AiStudyGuardManager.isAiGuardEnabled(getApplication())
+            Log.i(TAG, "AI Guard enabled from pre-session prompt")
+        } catch (_: Exception) { }
+    }
+
+    fun dismissStrictGuardPrompt() {
+        continueSessionStartAfterPrompt()
     }
 
     fun dismissPreStudyBlockSheet() {
@@ -2161,8 +2220,9 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         com.example.util.saveActivePomodoroState(getApplication(), next)
         setMode(next.phaseModeLabel(), next.phaseMinutes())
         Log.i(TAG, "Pomodoro phase -> ${next.phaseModeLabel()} (${next.phaseMinutes()}m)")
-        // Quiet phase start: no "Session started" banner mid-cycle.
-        startTimer(quietPhaseStart = true)
+        // Quiet phase start: no "Session started" banner mid-cycle, and no
+        // lock-in animation (the session is already running).
+        startTimerInternal(quietPhaseStart = true)
     }
 
     fun confirmPreStudyBlock(selectedPackages: Set<String>, saveForFuture: Boolean) {
@@ -2207,7 +2267,58 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * v1.2.3 (final assembly) — Motion Lab "Lock-in start".
+     *
+     * Public session-start entry: plays the lock-in animation (the user's
+     * real blocked apps locking in) and only then starts the timer for
+     * real. Quiet phase starts (pomodoro mid-cycle) skip the animation.
+     * Use [startTimerInternal] for resume-style starts with no animation.
+     */
+    data class LockInStartRequest(
+        val overrideBlockedList: String?,
+        val quietPhaseStart: Boolean
+    )
+
+    private val _showLockInStart = MutableStateFlow(false)
+    val showLockInStart: StateFlow<Boolean> = _showLockInStart.asStateFlow()
+
+    private val _lockInBlockedPackages = MutableStateFlow<List<String>>(emptyList())
+    val lockInBlockedPackages: StateFlow<List<String>> = _lockInBlockedPackages.asStateFlow()
+
+    private var pendingLockInStart: LockInStartRequest? = null
+
     fun startTimer(overrideBlockedList: String? = null, quietPhaseStart: Boolean = false) {
+        if (_isTimerRunning.value) return
+        if (quietPhaseStart) {
+            startTimerInternal(overrideBlockedList, quietPhaseStart)
+            return
+        }
+        // Resolve the blocked packages the overlay will show (real apps).
+        val prefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
+        val raw = overrideBlockedList ?: prefs.blockedAppsList
+        _lockInBlockedPackages.value = raw.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        pendingLockInStart = LockInStartRequest(overrideBlockedList, quietPhaseStart)
+        _showLockInStart.value = true
+        Log.i(TAG, "Lock-in start animation shown")
+    }
+
+    /** Fired by the lock-in overlay when its animation completes. */
+    fun proceedAfterLockInAnimation() {
+        _showLockInStart.value = false
+        val req = pendingLockInStart
+        pendingLockInStart = null
+        startTimerInternal(req?.overrideBlockedList, req?.quietPhaseStart ?: false)
+    }
+
+    /** System back during the lock-in animation: cancel the start entirely. */
+    fun dismissLockInStart() {
+        _showLockInStart.value = false
+        pendingLockInStart = null
+        Log.i(TAG, "Lock-in start dismissed — session not started")
+    }
+
+    fun startTimerInternal(overrideBlockedList: String? = null, quietPhaseStart: Boolean = false) {
         if (_isTimerRunning.value) return
 
         // v1.1: pomodoro — arm the cycle engine. The first Focus phase starts
@@ -2233,7 +2344,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         if (sessionStartTimeMs == 0L) {
             sessionStartTimeMs = System.currentTimeMillis()
         }
-        audioEngine.play(_ambientSound.value)
+        audioEngine.playSound(getApplication(), _ambientSound.value)
 
         val app = getApplication<Application>()
 
@@ -2290,7 +2401,24 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             } else {
                 app.startService(timerIntent)
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+            // v1.2.3 phantom-lock fix (RC3): the manual-timer flags were
+            // pre-written above BEFORE the service started. If the service
+            // never starts (e.g. background-start restriction), those flags
+            // stayed true until end-time -> the guard treated it as an
+            // active study period with nothing actually running. Roll them
+            // back on start failure.
+            try {
+                val prefs = app.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putBoolean("is_manual_timer_running", false)
+                    .putLong("manual_timer_end_time_ms", 0L)
+                    .apply()
+                val tPrefs = app.getSharedPreferences("focusly_timer_state", Context.MODE_PRIVATE)
+                tPrefs.edit().putBoolean("is_timer_running", false).apply()
+                com.example.util.StrictModeManager.setSessionActive(app, false)
+            } catch (_: Exception) {}
+        }
 
         // 2. Evaluate permissions and auto-activate Focus Shield & AI Study Guard
         val hasUsage = com.example.ui.components.FocusShieldPermissions.hasUsageStatsPermission(app)
@@ -2636,7 +2764,8 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun resumeTimer() {
-        startTimer()
+        // Resume never replays the lock-in animation.
+        startTimerInternal()
     }
 
     fun addFiveMinutes() {
@@ -2671,7 +2800,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     fun finishSessionEarly() {
         // v1.1.5: owner rule — ONLY sessions whose timer runs to natural completion
         // are recorded. Finishing early DISCARDS the session: no record, no points,
-        // no streak change, no completion screen.
+        // no completion screen.
         // v1.1: also clears any active pomodoro run (stop everything cleanly;
         // only completed focus phases were ever recorded).
         _pomodoroState.value = null
@@ -2698,7 +2827,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         _sessionNotes.value = ""
         _completedSessionSummary.value = null
         _showCompletionScreen.value = false
-        Log.i(TAG, "Session discarded early (not recorded): no points/streak change")
+        Log.i(TAG, "Session discarded early (not recorded): no points")
     }
 
     fun skipBreak() {
@@ -2707,57 +2836,19 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         setMode(_currentMode.value, _targetSeconds.value / 60)
     }
 
-    private fun calculateConsecutiveStreak(sessions: List<FocusSessionEntity>): Pair<Int, Int> {
-        if (sessions.isEmpty()) return Pair(0, 0)
-
-        val dayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val sessionDays = sessions.map { dayFormat.format(Date(it.completedAt)) }.toSet()
-
-        val cal = Calendar.getInstance()
-        val todayStr = dayFormat.format(cal.time)
-        cal.add(Calendar.DAY_OF_YEAR, -1)
-        val yesterdayStr = dayFormat.format(cal.time)
-
-        var currentStreak = 0
-        if (sessionDays.contains(todayStr) || sessionDays.contains(yesterdayStr)) {
-            val checkCal = Calendar.getInstance()
-            if (!sessionDays.contains(todayStr)) {
-                checkCal.add(Calendar.DAY_OF_YEAR, -1)
-            }
-            while (sessionDays.contains(dayFormat.format(checkCal.time))) {
-                currentStreak++
-                checkCal.add(Calendar.DAY_OF_YEAR, -1)
-            }
-        }
-
-        val sortedDates = sessionDays.mapNotNull {
-            try { dayFormat.parse(it) } catch (_: Exception) { null }
-        }.sorted()
-
-        var maxStreak = currentStreak
-        var streakCount = 0
-        var lastDate: Date? = null
-
-        for (d in sortedDates) {
-            if (lastDate == null) {
-                streakCount = 1
-            } else {
-                val diffMs = d.time - lastDate.time
-                val diffDays = (diffMs / (24 * 60 * 60 * 1000L)).toInt()
-                if (diffDays == 1) {
-                    streakCount++
-                } else if (diffDays > 1) {
-                    streakCount = 1
-                }
-            }
-            lastDate = d
-            if (streakCount > maxStreak) {
-                maxStreak = streakCount
-            }
-        }
-
-        val finalCurrent = if (sessionDays.contains(todayStr)) currentStreak.coerceAtLeast(1) else currentStreak
-        return Pair(finalCurrent, maxStreak.coerceAtLeast(finalCurrent))
+    /**
+     * v1.2.3 — skip the current FOCUS phase of an active pomodoro run.
+     * The in-progress focus phase is DISCARDED exactly like finishing a
+     * session early (no record, no points, no completion screen — the
+     * owner's standing rule), then the run advances to the
+     * next phase through the existing phase engine. Break-phase skips keep
+     * using skipBreak(). No new accounting logic: this only chains the two
+     * existing paths.
+     */
+    fun skipPomodoroFocusPhase() {
+        if (_pomodoroState.value?.phase != com.example.util.PomodoroPhase.FOCUS) return
+        discardActiveSession()
+        advancePomodoroPhase()
     }
 
     private fun onTimerCompleted() {
@@ -2852,14 +2943,11 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
 
         viewModelScope.launch {
             repository.recordSession(session)
-            // Update points and streak in preferences
+            // Update points in preferences
             val prefs = userPreferences.value ?: UserPreferencesEntity()
 
             val allPast = repository.allSessions.firstOrNull() ?: emptyList()
             val totalSessions = allPast + session
-            val (calcCurrent, calcBest) = calculateConsecutiveStreak(totalSessions)
-            val currentStreak = calcCurrent
-            val bestStreak = maxOf(prefs.bestStreak, calcBest, currentStreak)
 
             val updatedTotalFocusMinutes = totalSessions.sumOf { it.durationSeconds } / 60
             val updatedPoints = totalSessions.sumOf { it.focusPointsEarned }
@@ -2874,14 +2962,12 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             val updatedPrefs = prefs.copy(
                 focusPoints = updatedPoints,
                 userLevel = updatedLevel,
-                currentStreak = currentStreak,
-                bestStreak = bestStreak,
                 buddyTotalFocusMinutes = updatedTotalFocusMinutes,
                 buddyGrowthStage = newGrowthStage
             )
             repository.savePreferences(updatedPrefs)
 
-            // Real-time Supabase sync for points, streak, and study duration
+            // Real-time Supabase sync for points and study duration
             val uid = SupabaseService.getInstance().getCurrentUserId()
                 ?: _currentUser.value?.firebaseUid
                 ?: AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredUserId(it) }
@@ -2895,12 +2981,12 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                     user_id = uid,
                     display_name = updatedPrefs.currentUserName ?: "Student",
                     study_seconds = totalSeconds.toLong().coerceAtLeast(1L),
-                    streak = currentStreak.coerceAtLeast(1),
+                    streak = prefs.currentStreak.coerceAtLeast(1),
                     subject_tag = _currentTaskTitle.value.ifBlank { "General Study" },
                     avatar_url = avatarUrl
                 )
 
-                Log.i("FocuslyViewModel", "[FocusPointsSync] BEFORE WRITE: Session finished! Earned $pointsEarned pts for user_id=$uid. Updating user_preferences focus_points=$updatedPoints, buddy_minutes=$updatedTotalFocusMinutes, current_streak=$currentStreak, level=$updatedLevel")
+                Log.i("FocuslyViewModel", "[FocusPointsSync] BEFORE WRITE: Session finished! Earned $pointsEarned pts for user_id=$uid. Updating user_preferences focus_points=$updatedPoints, buddy_minutes=$updatedTotalFocusMinutes, level=$updatedLevel")
 
                 val lbResult = SupabaseService.getInstance().upsertLeaderboard(leaderboardDto)
                 Log.i("FocuslyViewModel", "[FocusPointsSync] AFTER WRITE (Leaderboard): status=${lbResult.isSuccess}")
@@ -2918,7 +3004,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 firebaseSyncManager.syncSession(
                     session = session,
                     totalPoints = updatedPoints,
-                    streak = currentStreak
+                    streak = prefs.currentStreak
                 )
             }
 
@@ -2929,7 +3015,6 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 newPoints = updatedPoints,
                 minutes = actualSeconds / 60,
                 pointsEarned = pointsEarned,
-                currentStreak = currentStreak,
                 totalSessions = totalSessions,
                 shieldAttempts = updatedPrefs.shieldBlockedAttempts,
                 isAppBlockerEnabled = updatedPrefs.isAppBlockerEnabled
@@ -2987,7 +3072,6 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         newPoints: Int,
         minutes: Int,
         pointsEarned: Int,
-        currentStreak: Int,
         totalSessions: List<FocusSessionEntity>,
         shieldAttempts: Int,
         isAppBlockerEnabled: Boolean
@@ -3060,10 +3144,6 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 }
             } catch (_: Exception) { }
 
-            // Streak-saver state for the daily 19:00 check.
-            try {
-                com.example.service.FocivoNotifications.saveStreakState(app, currentStreak)
-            } catch (_: Exception) { }
         } catch (_: Exception) { }
     }
 

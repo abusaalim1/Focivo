@@ -62,6 +62,7 @@ import com.example.ui.components.MascotPose
 import com.example.ui.components.PreStudyAppBlockSheet
 import com.example.util.MascotPose as BuddyMascotPose
 import com.example.ui.components.StudyHubSheet
+import com.example.ui.components.StrictGuardPromptSheet
 import com.example.ui.components.TimerFaceHost
 import com.example.ui.components.TimerFaceParams
 import com.example.ui.components.resolveThemeBackdropRes
@@ -73,10 +74,17 @@ import com.example.ui.theme.backdropTitleShadow
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.ui.theme.themedCardBackground
 import com.example.util.PomodoroConfig
+import com.example.util.PomodoroPhase
 import com.example.util.PomodoroState
+import com.example.util.PomodoroStyleManager
 import com.example.util.TimerFaceManager
 import com.example.util.TimerThemeManager
+import com.example.util.nextPomodoroPhase
 import com.example.util.phaseDisplayLabel
+import com.example.util.phaseMinutes
+import com.example.ui.timer.FocivoPomodoro
+import com.example.ui.timer.PomodoroUiState
+import com.example.ui.timer.PomoPhase as UiPomoPhase
 
 /**
  * v1.5.0 — ONE-BUTTON HUB redesign.
@@ -99,7 +107,6 @@ fun FocusScreen(
     currentTaskTitle: String,
     distractionsCount: Int,
     ambientSound: String,
-    userStreak: Int = 0,
     userPreferences: UserPreferencesEntity? = null,
     isShieldActive: Boolean = false,
     isDeepFocusEnabled: Boolean = false,
@@ -110,6 +117,14 @@ fun FocusScreen(
     showPreStudyBlockSheet: Boolean = false,
     onConfirmPreStudyBlock: (Set<String>, Boolean) -> Unit = { _, _ -> },
     onDismissPreStudyBlock: () -> Unit = {},
+    // v1.2.3 (Task 13.2) — pre-session Strict Mode + AI Guard prompt sheet.
+    showStrictGuardPromptSheet: Boolean = false,
+    promptStrictOn: Boolean = false,
+    promptGuardOn: Boolean = false,
+    onEnableStrictFromPrompt: () -> Unit = {},
+    onEnableGuardFromPrompt: () -> Unit = {},
+    onStartFromStrictGuardPrompt: () -> Unit = {},
+    onDismissStrictGuardPrompt: () -> Unit = {},
     onStartTimer: () -> Unit,
     onPauseTimer: () -> Unit,
     onResumeTimer: () -> Unit,
@@ -128,6 +143,11 @@ fun FocusScreen(
     pomodoroState: PomodoroState? = null,
     // v1.1: starts a pomodoro run through the normal session-start gate.
     onStartPomodoro: (PomodoroConfig) -> Unit = {},
+    // v1.2.3: pomodoro-run controls for the FocivoPomodoro slot —
+    // stop clears the run (discards like finishing early); skip on a focus
+    // phase discards the phase without recording, then advances.
+    onStopPomodoro: () -> Unit = {},
+    onSkipPomodoroFocus: () -> Unit = {},
     // v1.1: blocked-apps list (dedicated destination from the hub).
     onRemoveBlockedApp: (String) -> Unit = {},
     onSaveBlockedApps: (Set<String>) -> Unit = {},
@@ -137,8 +157,9 @@ fun FocusScreen(
 ) {
     val isDark = isAppInDarkTheme()
     val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
-    // v1.5.0: the hub redesign uses one accent lime.
-    val hubAccent = Color(0xFF8FD400)
+    // v1.5.0: the hub redesign uses one accent lime (owner clean-redesign
+    // #B6F13A, aligned with Focus Shield in v1.2.3 design-unification).
+    val hubAccent = Color(0xFFB6F13A)
     val cardBg = themedCardBackground()
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
 
@@ -171,7 +192,7 @@ fun FocusScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-            // Top Bar: streak readout (idle) / session title (running) + the
+            // Top Bar: session title + the
             // ONE menu button that opens the study hub.
             Row(
                 modifier = Modifier
@@ -180,38 +201,9 @@ fun FocusScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (!isRunning) {
-                    // Current streak pill (display only — hub holds the controls)
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(if (isDark) Color(0x28FFFFFF) else Color(0x10000000))
-                            .border(1.dp, if (isDark) Color(0x358FD400) else Color(0x208FD400), CircleShape)
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                            .testTag("focus_streak_pill")
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            // v1.5.0: iOS-style 3D flame asset for the streak.
-                            Image(
-                                painter = painterResource(id = R.drawable.emoji3d_flame),
-                                contentDescription = "Streak",
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "${userStreak}d",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    color = selectedTheme.onBackdropContent,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
-                            )
-                        }
-                    }
-                } else {
-                    Spacer(modifier = Modifier.width(44.dp))
-                }
+                // v1.2.3: no top-bar readout in idle state; the leading spacer
+                // keeps the title centered (hub holds the controls).
+                Spacer(modifier = Modifier.width(44.dp))
 
                 // Active topic title (only while a session runs)
                 Text(
@@ -423,6 +415,43 @@ fun FocusScreen(
                                 alpha = 0.35f
                             )
                         }
+                        // v1.2.3: an active pomodoro run renders the FocivoPomodoro
+                        // UI, constrained to the timer slot — the surrounding
+                        // app chrome (swipe-up gesture, phase pill, controls
+                        // below) is untouched. Classic flow
+                        // (pomodoroState == null) is completely unchanged.
+                        val pomoStyle by PomodoroStyleManager.selectedStyle.collectAsState()
+                        val pomoUiState = remember(pomodoroState, remainingSeconds, targetSeconds, isRunning) {
+                            pomodoroState?.let {
+                                buildPomodoroUiState(it, remainingSeconds, targetSeconds, isRunning)
+                            }
+                        }
+                        if (pomoUiState != null && pomodoroState != null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(660.dp)
+                                    .clip(RoundedCornerShape(28.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                FocivoPomodoro(
+                                    state = pomoUiState,
+                                    style = pomoStyle,
+                                    onToggle = {
+                                        if (isRunning) onPauseTimer() else onResumeTimer()
+                                    },
+                                    onSkip = {
+                                        if (pomodoroState.phase == PomodoroPhase.FOCUS) {
+                                            onSkipPomodoroFocus()
+                                        } else {
+                                            onSkipBreak()
+                                        }
+                                    },
+                                    onReset = onStopPomodoro,
+                                    modifier = Modifier.testTag("pomodoro_timer_component")
+                                )
+                            }
+                        } else {
                         TimerFaceHost(
                             faceId = selectedFace.id,
                             params = TimerFaceParams(
@@ -467,6 +496,7 @@ fun FocusScreen(
                             ),
                             modifier = Modifier.testTag("aurora_timer_component")
                         )
+                        } // else: classic timer face
                     }
                 }
 
@@ -640,5 +670,60 @@ fun FocusScreen(
                 onDismiss = { onDismissPreStudyBlock() }
             )
         }
+
+        // v1.2.3 (Task 13.2) — pre-session Strict Mode + AI Guard prompt.
+        if (showStrictGuardPromptSheet) {
+            StrictGuardPromptSheet(
+                strictOn = promptStrictOn,
+                guardOn = promptGuardOn,
+                onEnableStrict = onEnableStrictFromPrompt,
+                onEnableGuard = onEnableGuardFromPrompt,
+                onStartSession = onStartFromStrictGuardPrompt,
+                onDismiss = onDismissStrictGuardPrompt
+            )
+        }
     }
+}
+
+/**
+ * v1.2.3 — builds the Pomodoro UI state from the live engine state.
+ * remaining/total are the active phase timer's real values (the same ones
+ * the timer slot already passes to TimerFaceHost). sessionIndex follows the
+ * "current session" convention: during a break it points at the session the
+ * break belongs to (so the cycle track shows it complete).
+ */
+private fun buildPomodoroUiState(
+    pomo: PomodoroState,
+    remainingSeconds: Int,
+    targetSeconds: Int,
+    isRunning: Boolean
+): PomodoroUiState {
+    val phase = when (pomo.phase) {
+        PomodoroPhase.FOCUS -> UiPomoPhase.FOCUS
+        PomodoroPhase.SHORT_BREAK -> UiPomoPhase.SHORT
+        PomodoroPhase.LONG_BREAK -> UiPomoPhase.LONG
+    }
+    val cycles = pomo.config.cycles.coerceAtLeast(1)
+    val sessionIndex = when (pomo.phase) {
+        PomodoroPhase.FOCUS -> pomo.focusCompleted
+        else -> pomo.focusCompleted - 1
+    }.coerceIn(0, cycles - 1)
+    // Pure lookahead for the "up next" row; null-safe fallback.
+    val next = nextPomodoroPhase(pomo)
+    val nextPhase = when (next?.phase) {
+        PomodoroPhase.FOCUS -> UiPomoPhase.FOCUS
+        PomodoroPhase.SHORT_BREAK -> UiPomoPhase.SHORT
+        PomodoroPhase.LONG_BREAK -> UiPomoPhase.LONG
+        null -> UiPomoPhase.SHORT
+    }
+    return PomodoroUiState(
+        phase = phase,
+        remainingSec = remainingSeconds,
+        totalSec = targetSeconds,
+        sessionIndex = sessionIndex,
+        sessions = cycles,
+        running = isRunning,
+        nextPhase = nextPhase,
+        nextMinutes = next?.phaseMinutes() ?: pomo.config.shortBreakMinutes
+    )
 }

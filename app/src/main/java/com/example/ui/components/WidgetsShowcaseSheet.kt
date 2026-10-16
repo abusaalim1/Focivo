@@ -49,9 +49,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.R
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.widget.FocusShieldWidgetProvider
-import com.example.widget.StreakMotivationWidgetProvider
 import com.example.widget.StudyTimerWidgetProvider
 import com.example.widget.TodayScheduleWidgetProvider
 import com.example.widget.ZenStudyCoachWidgetProvider
@@ -60,7 +60,7 @@ import com.example.widget.ZenStudyCoachWidgetProvider
  * v1.1 — Widgets page (rebuilt per owner fix).
  *
  * Shows the ACTUAL home-screen widgets — each pack layout
- * (widget_{focus_timer,streak,focus_shield,timetable,zen_coach}) inflated
+ * (widget_{focus_timer,focus_shield,timetable,zen_coach}) inflated
  * for real via AndroidView with sample-but-realistic data, pixel-consistent
  * with what the launcher renders. One full widget preview per card, with a
  * "+ Add" action BELOW each preview that does the REAL pin flow
@@ -84,18 +84,6 @@ private fun widgetEntries(): List<WidgetEntry> = listOf(
             v.findViewById<TextView>(R.id.tv_title)?.text = "25:00"
             v.findViewById<TextView>(R.id.tv_sub)?.text = "Deep work session"
             v.findViewById<TextView>(R.id.tv_badge)?.text = "Ready"
-        }
-    ),
-    WidgetEntry(
-        title = "Streak",
-        layoutRes = R.layout.widget_streak,
-        providerClass = StreakMotivationWidgetProvider::class.java,
-        sampleData = { v ->
-            v.findViewById<TextView>(R.id.tv_title)?.text = "12 day streak"
-            v.findViewById<TextView>(R.id.tv_sub)?.text = "Level 3 Student · 1,240 XP"
-            v.findViewById<TextView>(R.id.tv_quote)?.text = "\u201CEvery page studied today is a step towards your dream.\u201D"
-            v.findViewById<TextView>(R.id.tv_goal)?.text = "120 / 360 min"
-            v.findViewById<android.widget.ProgressBar>(R.id.pb_goal)?.progress = 33
         }
     ),
     WidgetEntry(
@@ -142,7 +130,7 @@ fun WidgetsShowcaseSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF0F1117),
+        containerColor = focivoTokens().bg,
         scrimColor = Color(0x99000000),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
@@ -184,7 +172,7 @@ fun WidgetsShowcaseSheet(
                             text = "Your focus setup, right on your home screen",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFF94A3B8),
+                                color = focivoTokens().muted,
                                 fontSize = 12.sp
                             )
                         )
@@ -225,7 +213,7 @@ fun WidgetsShowcaseSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xFF1A2030))
+                            .background(focivoTokens().surface)
                             .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(18.dp))
                             .padding(16.dp)
                     ) {
@@ -235,14 +223,14 @@ fun WidgetsShowcaseSheet(
                             fontWeight = FontWeight.Bold,
                             fontSize = 10.sp,
                             letterSpacing = 1.5.sp,
-                            color = PageLime
+                            color = focivoTokens().accentText
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "Long-press your home screen, choose Widgets, then find Focivo and drag the widget you want into place.",
                             fontFamily = PoppinsFontFamily,
                             fontSize = 12.5.sp,
-                            color = Color(0xFFF1F5F9),
+                            color = focivoTokens().text,
                             lineHeight = 17.sp
                         )
                     }
@@ -266,7 +254,7 @@ private fun ActualWidgetCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
-            .background(Color(0xFF151923))
+            .background(focivoTokens().surface2)
             .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(22.dp))
             .padding(14.dp)
     ) {
@@ -275,7 +263,7 @@ private fun ActualWidgetCard(
             fontFamily = PoppinsFontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp,
-            color = Color(0xFFF1F5F9),
+            color = focivoTokens().text,
             modifier = Modifier.padding(start = 4.dp, bottom = 10.dp)
         )
         // THE actual widget — same XML the launcher inflates.
@@ -297,7 +285,7 @@ private fun ActualWidgetCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
-                .background(PageLime)
+                .background(focivoTokens().accent)
                 .pressFeedback()
                 .clickable(onClick = onAdd)
                 .padding(vertical = 13.dp),
@@ -307,7 +295,7 @@ private fun ActualWidgetCard(
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = null,
-                    tint = NearBlack,
+                    tint = focivoTokens().onAccent,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -316,7 +304,7 @@ private fun ActualWidgetCard(
                     fontFamily = PoppinsFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    color = NearBlack
+                    color = focivoTokens().onAccent
                 )
             }
         }

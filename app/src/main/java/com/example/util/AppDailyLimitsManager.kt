@@ -327,6 +327,16 @@ object AppDailyLimitsManager {
     private fun triggerAppBlock(context: Context, limit: AppDailyLimitEntity) {
         val appName = limit.appName.ifBlank { limit.appPackage }
         val reason = "Daily time limit of ${limit.dailyLimitMinutes} mins reached for $appName."
+        // v1.2.3: log the concrete reason to Guard Hub — this lock fires BY
+        // DESIGN with no session/schedule, so the hub entry is what tells
+        // the owner it is a daily limit and not a phantom lock.
+        com.example.util.AiStudyGuardManager.logGuardActivity(
+            context = context,
+            app = appName,
+            stage = "DAILY_LIMIT",
+            verdict = "LIMIT_BLOCK",
+            reason = reason
+        )
         try {
             val interceptIntent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
                 context = context,

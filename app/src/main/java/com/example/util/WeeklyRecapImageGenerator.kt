@@ -327,14 +327,13 @@ object WeeklyRecapImageGenerator {
 
         curY += heroBoxHeight + 22f
 
-        // 7. 3-Column Quick Metrics: [Sessions], [Streak], [Best Day]
+        // 7. 2-Column Quick Metrics: [Sessions], [Best Day]
         val metricGap = 16f
-        val colWidth = (contentWidth - metricGap * 2) / 3f
+        val colWidth = (contentWidth - metricGap) / 2f
         val metricCardHeight = 126f
 
         val metrics = listOf(
             MetricCard(R.drawable.emoji3d_bolt, "SESSIONS", "${recap.sessionCount} Done", 0xFF8CE000.toInt()),
-            MetricCard(R.drawable.emoji3d_flame, "STREAK", "${recap.currentStreak} Day${if (recap.currentStreak > 1) "s" else ""}", 0xFFFF9800.toInt()),
             MetricCard(R.drawable.emoji3d_trophy, "BEST DAY", recap.bestDayName, 0xFF38BDF8.toInt())
         )
 

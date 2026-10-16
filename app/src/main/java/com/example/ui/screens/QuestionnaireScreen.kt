@@ -59,6 +59,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.SecondaryTextLight
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -110,10 +111,11 @@ fun QuestionnaireScreen(
         motivationStyle: String
     ) -> Unit = { _, _, _, _, _, _, _, _ -> }
 ) {
-    val isDark = isAppInDarkTheme()
+    val T = focivoTokens()
+    val isDark = T.isDark
     // v1.4.2: explicit text colors (colorScheme.onSurface renders dark on dark surfaces)
-    val qPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val qSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val qPrimary = T.text
+    val qSecondary = T.muted
 
     var currentStep by remember { mutableIntStateOf(0) }
 
@@ -125,7 +127,7 @@ fun QuestionnaireScreen(
     var answerDistractionApp by remember { mutableStateOf("Instagram Reels & TikTok") }
     var answerPreferredTime by remember { mutableStateOf("Evening (6 PM - 10 PM)") }
     var answerScreenTimeGoalMinutes by remember { mutableIntStateOf(480) }
-    var answerMotivationStyle by remember { mutableStateOf("Streaks (Don't break daily streak)") }
+    var answerMotivationStyle by remember { mutableStateOf("Consistency (Build an unbroken daily habit)") }
 
     val questions = remember {
         listOf(
@@ -165,7 +167,7 @@ fun QuestionnaireScreen(
                 id = 3,
                 stepLabel = "STEP 04 OF 08 · CORE OBJECTIVE",
                 questionTitle = "What is your primary\nstudy goal?",
-                subtitle = "We will align your daily study streak and target hours with this objective.",
+                subtitle = "We will align your daily study habit and target hours with this objective.",
                 icon = Icons.Default.Timer,
                 options = listOf(
                     "Pass exams with strong marks",
@@ -221,7 +223,7 @@ fun QuestionnaireScreen(
                 subtitle = "Your home banners and notification messages will adapt to your preferred style.",
                 icon = Icons.Default.Shield,
                 options = listOf(
-                    "Streaks (Keep daily study habit alive)",
+                    "Consistency (Keep your daily habit alive)",
                     "Leaderboard competition (Compete for top rank)",
                     "Quiet reminders (Gentle, calm guidance)"
                 )
@@ -229,15 +231,7 @@ fun QuestionnaireScreen(
         )
     }
 
-    val bgGradient = if (isDark) {
-        Brush.verticalGradient(
-            listOf(Color(0xFF0F0D18), Color(0xFF161226), Color(0xFF0C0A14))
-        )
-    } else {
-        Brush.verticalGradient(
-            listOf(Color(0xFFFAF8FE), Color(0xFFF2EEFD), Color(0xFFFAF9FF))
-        )
-    }
+    val bgGradient = Brush.verticalGradient(listOf(T.bg, T.bg))
 
     Scaffold(
         modifier = Modifier

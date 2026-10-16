@@ -23,8 +23,16 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
          */
         const val ACTION_SCHEDULE_REMINDER = "com.example.action.SCHEDULE_REMINDER"
         const val EXTRA_REMINDER_SUBJECT = "extra_reminder_subject"
-        /** v1.4.3: daily 19:00 streak-saver evaluation. */
-        const val ACTION_STREAK_SAVER_CHECK = "com.example.action.STREAK_SAVER_CHECK"
+        /**
+         * v1.2.3 (Task 13.1): fires 10 minutes before a STRICT schedule
+         * starts. Extra [EXTRA_STRICT_SCHEDULE_ID] carries the schedule id,
+         * [EXTRA_STRICT_START_MS] the window start epoch ms,
+         * [EXTRA_STRICT_SUBJECT] the subject (may be null).
+         */
+        const val ACTION_STRICT_LOCK_WARNING = "com.example.action.STRICT_LOCK_WARNING"
+        const val EXTRA_STRICT_SCHEDULE_ID = "extra_strict_schedule_id"
+        const val EXTRA_STRICT_START_MS = "extra_strict_start_ms"
+        const val EXTRA_STRICT_SUBJECT = "extra_strict_subject"
         // v1.1: notification survival — every scheduled type is AlarmManager-backed.
         const val ACTION_SUNDAY_RECAP_CHECK = "com.example.action.SUNDAY_RECAP_CHECK"
         const val ACTION_UPDATE_CHECK = "com.example.action.UPDATE_CHECK"
@@ -67,7 +75,7 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
                     }
 
                     ScheduledBlockScheduler.evaluateAndReschedule(context)
-                    // v1.1: re-arm ALL survival alarms (streak saver, study
+                    // v1.1: re-arm ALL survival alarms (study
                     // reminder, Sunday recap, update check, comeback) —
                     // idempotent, no duplicates.
                     FocivoNotifications.scheduleAllSurvivalAlarms(context)
@@ -161,9 +169,12 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
                 Log.i(TAG, "Schedule reminder fired for subject=$subject")
                 FocivoNotifications.postScheduleReminder(context, subject)
             }
-            ACTION_STREAK_SAVER_CHECK -> {
-                Log.i(TAG, "Streak-saver check fired")
-                FocivoNotifications.handleStreakSaverCheck(context)
+            ACTION_STRICT_LOCK_WARNING -> {
+                val scheduleId = intent.getStringExtra(EXTRA_STRICT_SCHEDULE_ID) ?: ""
+                val startMs = intent.getLongExtra(EXTRA_STRICT_START_MS, 0L)
+                val subject = intent.getStringExtra(EXTRA_STRICT_SUBJECT)
+                Log.i(TAG, "Strict lock-in warning fired for scheduleId=$scheduleId")
+                StrictLockInManager.handleWarningFired(context, scheduleId, startMs, subject)
             }
             // v1.1: survival-hardened scheduled types.
             ACTION_SUNDAY_RECAP_CHECK -> {

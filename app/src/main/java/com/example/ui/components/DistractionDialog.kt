@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
@@ -70,7 +71,7 @@ fun DistractionDialog(
                     spotColor = Color(0x308CE000)
                 )
                 .clip(RoundedCornerShape(28.dp))
-                .background(if (isDark) Color(0xFF1D221C) else Color(0xFFFFFFFF))
+                .background(focivoTokens().surface)
                 .border(
                     1.dp,
                     if (isDark) Color(0x308CE000) else Color(0x20000000),
@@ -84,7 +85,7 @@ fun DistractionDialog(
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 19.sp,
-                        color = if (isDark) Color(0xFFF0F4ED) else NearBlack
+                        color = focivoTokens().text
                     )
                 )
 
@@ -93,7 +94,7 @@ fun DistractionDialog(
                 Text(
                     text = "Acknowledge the impulse and return to flow.",
                     style = MaterialTheme.typography.bodySmall.copy(
-                        color = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight,
+                        color = focivoTokens().muted,
                         fontSize = 13.sp
                     )
                 )
@@ -109,10 +110,10 @@ fun DistractionDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(if (isDark) Color(0xFF262C24) else Color(0xFFF4F8EE))
+                                .background(focivoTokens().surface2)
                                 .border(
                                     1.dp,
-                                    if (isDark) Color(0x25FFFFFF) else Color(0xFFE2EBD6),
+                                    focivoTokens().line,
                                     RoundedCornerShape(16.dp)
                                 )
                                 .clickable {
@@ -144,7 +145,7 @@ fun DistractionDialog(
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = if (isDark) Color(0xFFF0F4ED) else NearBlack
+                                    color = focivoTokens().text
                                 )
                             )
                         }
@@ -157,7 +158,7 @@ fun DistractionDialog(
                     Text(
                         text = "Never mind",
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            color = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight,
+                            color = focivoTokens().muted,
                             fontWeight = FontWeight.Medium
                         )
                     )

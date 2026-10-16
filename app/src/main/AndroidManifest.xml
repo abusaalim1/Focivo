@@ -145,7 +145,7 @@
                 <action android:name="com.example.action.SCHEDULE_BLOCK_START" />
                 <action android:name="com.example.action.SCHEDULE_BLOCK_END" />
                 <action android:name="com.example.action.SCHEDULE_REMINDER" />
-                <action android:name="com.example.action.STREAK_SAVER_CHECK" />
+                <action android:name="com.example.action.STRICT_LOCK_WARNING" />
                 <action android:name="com.example.action.FOCUS_ALARM_RING" />
                 <action android:name="com.example.action.DISMISS_ALARM" />
                 <action android:name="com.example.action.SNOOZE_ALARM" />
@@ -165,20 +165,7 @@
                 android:resource="@xml/widget_study_timer_info" />
         </receiver>
 
-        <!-- 2. Daily Streak & Motivation Widget -->
-        <receiver
-            android:name=".widget.StreakMotivationWidgetProvider"
-            android:exported="true"
-            android:label="@string/widget_streak_title">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_streak_motivation_info" />
-        </receiver>
-
-        <!-- 3. Today's Schedule & Targets Widget -->
+        <!-- 2. Today's Schedule & Targets Widget -->
         <receiver
             android:name=".widget.TodayScheduleWidgetProvider"
             android:exported="true"
@@ -191,7 +178,7 @@
                 android:resource="@xml/widget_today_schedule_info" />
         </receiver>
 
-        <!-- 4. Focus Shield & Deep Lock Widget -->
+        <!-- 3. Focus Shield & Deep Lock Widget -->
         <receiver
             android:name=".widget.FocusShieldWidgetProvider"
             android:exported="true"
@@ -204,7 +191,7 @@
                 android:resource="@xml/widget_focus_shield_info" />
         </receiver>
 
-        <!-- 5. AI Study Coach & Zen Break Widget -->
+        <!-- 4. AI Study Coach & Zen Break Widget -->
         <receiver
             android:name=".widget.ZenStudyCoachWidgetProvider"
             android:exported="true"
@@ -215,21 +202,6 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_zen_coach_info" />
-        </receiver>
-
-        <!-- v1.1 Anti-Uninstall Shield (Device Admin) -->
-        <receiver
-            android:name=".receiver.FocivoDeviceAdminReceiver"
-            android:label="Focivo Anti-Uninstall Shield"
-            android:description="@string/device_admin_description"
-            android:permission="android.permission.BIND_DEVICE_ADMIN"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
-            </intent-filter>
-            <meta-data
-                android:name="android.app.device_admin"
-                android:resource="@xml/device_admin_policy" />
         </receiver>
 
         <service

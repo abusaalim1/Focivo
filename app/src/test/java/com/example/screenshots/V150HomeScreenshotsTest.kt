@@ -150,16 +150,15 @@ class V150HomeScreenshotsTest {
     fun leaderboard_midnight_dark() {
         useTheme("midnight")
         val users = listOf(
-            LeaderboardUser(id = "1", displayName = "Abu Saalim", todayStudySeconds = 7200L, weeklyStudySeconds = 36000L, studySeconds = 180000L, streak = 12, isCurrentUser = true),
-            LeaderboardUser(id = "2", displayName = "Riya", todayStudySeconds = 5400L, weeklyStudySeconds = 30000L, studySeconds = 150000L, streak = 9),
-            LeaderboardUser(id = "3", displayName = "Arjun", todayStudySeconds = 3600L, weeklyStudySeconds = 25000L, studySeconds = 120000L, streak = 7)
+            LeaderboardUser(id = "1", displayName = "Abu Saalim", todayStudySeconds = 7200L, weeklyStudySeconds = 36000L, studySeconds = 180000L, isCurrentUser = true),
+            LeaderboardUser(id = "2", displayName = "Riya", todayStudySeconds = 5400L, weeklyStudySeconds = 30000L, studySeconds = 150000L),
+            LeaderboardUser(id = "3", displayName = "Arjun", todayStudySeconds = 3600L, weeklyStudySeconds = 25000L, studySeconds = 120000L)
         )
         themed {
             LeaderboardScreen(
                 users = users,
                 currentUserName = "Abu Saalim",
                 currentUserPoints = 1250,
-                currentUserStreak = 12,
                 sessions = fakeSessions()
             )
         }

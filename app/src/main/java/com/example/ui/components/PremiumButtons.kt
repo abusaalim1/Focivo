@@ -30,16 +30,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.LocalAppAccent
-import com.example.ui.theme.OnAccentDark
 import com.example.ui.theme.PoppinsFontFamily
-import com.example.ui.theme.isAppInDarkTheme
+import com.example.ui.theme.focivoTokens
 
 /**
- * v1.4.0-round2: shared premium button system.
- *
- * - 18dp radius, subtle vertical gradient, 1dp top light edge
- * - Poppins semibold label, pressed (0.97x) + disabled states
- * - Accent follows the full-screen theme (LocalAppAccent)
+ * Design-system primary button (owner's Full App Redesign, 2026-10-16):
+ * flat lime pill, dark label, Poppins semibold — pressed (0.97x) + disabled
+ * states. An explicit [accent] still overrides the token.
  */
 @Composable
 fun PremiumButton(
@@ -48,32 +45,20 @@ fun PremiumButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     compact: Boolean = false,
-    accent: Color = LocalAppAccent.current,
+    accent: Color = Color.Unspecified,
     testTag: String? = null
 ) {
+    val T = focivoTokens()
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val radius = 18.dp
-    val top = accent.copy(alpha = if (enabled) 1f else 0.45f)
-    val bottom = accent.copy(alpha = if (enabled) 0.8f else 0.38f)
+    val effectiveAccent = if (accent == Color.Unspecified) T.accent else accent
+    val onAccent = if (accent == Color.Unspecified) T.onAccent else Color(0xFF0A0A0B)
 
     Box(
         modifier = modifier
             .scale(if (pressed && enabled) 0.97f else 1f)
-            .clip(RoundedCornerShape(radius))
-            .background(Brush.verticalGradient(listOf(top, bottom)))
-            .drawBehind {
-                // 1dp top light edge
-                val edgeY = 1.dp.toPx()
-                val inset = radius.toPx()
-                drawLine(
-                    color = Color.White.copy(alpha = if (enabled) 0.4f else 0.15f),
-                    start = Offset(inset, edgeY),
-                    end = Offset(size.width - inset, edgeY),
-                    strokeWidth = 1.dp.toPx()
-                )
-            }
-            .border(1.dp, Color.Black.copy(alpha = 0.08f), RoundedCornerShape(radius))
+            .clip(CircleShape)
+            .background(effectiveAccent.copy(alpha = if (enabled) 1f else 0.4f))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -92,34 +77,31 @@ fun PremiumButton(
             fontFamily = PoppinsFontFamily,
             fontWeight = FontWeight.SemiBold,
             fontSize = if (compact) 13.sp else 16.sp,
-            color = OnAccentDark.copy(alpha = if (enabled) 1f else 0.5f)
+            color = onAccent.copy(alpha = if (enabled) 1f else 0.55f)
         )
     }
 }
 
-/** Ghost/secondary variant: transparent fill, 1dp border, accent label. */
+/** Ghost/secondary variant: surface pill, 1dp line border, primary label. */
 @Composable
 fun PremiumSecondaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    accent: Color = LocalAppAccent.current,
+    accent: Color = Color.Unspecified,
     testTag: String? = null
 ) {
+    val T = focivoTokens()
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val isDark = isAppInDarkTheme()
 
     Box(
         modifier = modifier
             .scale(if (pressed && enabled) 0.97f else 1f)
-            .clip(RoundedCornerShape(18.dp))
-            .border(
-                1.dp,
-                (if (isDark) Color.White else Color.Black).copy(alpha = if (enabled) 0.22f else 0.1f),
-                RoundedCornerShape(18.dp)
-            )
+            .clip(CircleShape)
+            .background(T.surface)
+            .border(1.dp, T.line, CircleShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -134,12 +116,12 @@ fun PremiumSecondaryButton(
             fontFamily = PoppinsFontFamily,
             fontWeight = FontWeight.SemiBold,
             fontSize = 15.sp,
-            color = (if (isDark) Color.White else Color(0xFF1A1A1A)).copy(alpha = if (enabled) 1f else 0.45f)
+            color = T.text.copy(alpha = if (enabled) 1f else 0.45f)
         )
     }
 }
 
-/** Circular glass icon button matching the premium system. */
+/** Circular icon button on the token system. */
 @Composable
 fun PremiumIconButton(
     icon: ImageVector,
@@ -147,26 +129,20 @@ fun PremiumIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
-    iconTint: Color = Color.White,
+    iconTint: Color = Color.Unspecified,
     enabled: Boolean = true
 ) {
+    val T = focivoTokens()
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val isDark = isAppInDarkTheme()
 
     Box(
         modifier = modifier
             .size(size)
             .scale(if (pressed && enabled) 0.92f else 1f)
             .clip(CircleShape)
-            .background(
-                (if (isDark) Color.White else Color.Black).copy(alpha = if (enabled) 0.08f else 0.04f)
-            )
-            .border(
-                0.8.dp,
-                (if (isDark) Color.White else Color.Black).copy(alpha = 0.14f),
-                CircleShape
-            )
+            .background(T.surface)
+            .border(1.dp, T.line, CircleShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -178,7 +154,7 @@ fun PremiumIconButton(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = iconTint.copy(alpha = if (enabled) 1f else 0.4f),
+            tint = (if (iconTint == Color.Unspecified) T.text else iconTint).copy(alpha = if (enabled) 1f else 0.4f),
             modifier = Modifier.size(size * 0.5f)
         )
     }

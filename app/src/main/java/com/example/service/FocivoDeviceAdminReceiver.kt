@@ -63,6 +63,10 @@ class FocivoDeviceAdminReceiver : DeviceAdminReceiver() {
                 // when OEM launchers have been seen dropping our icon, so
                 // re-assert the launcher entry right here.
                 StrictUninstallGuard.reassertLauncherEntryEnabled(context)
+                // v1.2.3: also surface the in-app premium overlay on this
+                // route (Settings -> Apps -> Uninstall), not just the
+                // installer-intercept route.
+                StrictUninstallGuard.notifyStrictUninstallBlocked(context)
                 AiStudyGuardManager.logGuardActivity(
                     context = context,
                     app = "Device Admin",

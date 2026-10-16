@@ -37,6 +37,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Icon
@@ -80,6 +81,7 @@ import com.example.ui.components.RegainMascotView
 import com.example.ui.components.SensitivePermission
 import com.example.ui.components.TrustExplainerDialog
 import com.example.ui.theme.NearBlack
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
@@ -243,7 +245,7 @@ private fun buildQuestions(): List<FlowQuestion> = listOf(
             FlowOption("Strict App Blocker & Study Lock", R.drawable.ic3d_shield),
             FlowOption("AI Academic Sentinel (ChatGPT / Claude)", R.drawable.ic3d_lock),
             FlowOption("Smart Scheduled Study Windows", R.drawable.ic3d_calendar),
-            FlowOption("Streak Leaderboard & Daily Tracking", R.drawable.ic3d_trophy)
+            FlowOption("Leaderboard & Daily Tracking", R.drawable.ic3d_trophy)
         )
     )
 )
@@ -266,8 +268,8 @@ private fun buildShowcaseSlides(): List<ShowcaseSlide> = listOf(
     ),
     ShowcaseSlide(
         pose = MascotPose.CELEBRATING,
-        caption = "STREAKS",
-        line = "Streaks turn small wins into momentum."
+        caption = "CONSISTENCY",
+        line = "Small wins build lasting momentum."
     )
 )
 
@@ -276,10 +278,10 @@ private fun buildPermissionSpecs(): List<PermissionSpec> = listOf(
         id = "notifications",
         rowLabel = "Notification permission",
         bubbleLead = "To ",
-        bubbleAccent = "send you focus reminders and streak alerts",
+        bubbleAccent = "send you focus reminders and timer alerts",
         bubbleTail = ", we need notification access.",
         privacyLine = "Your privacy matters to us. We never share your data.",
-        whyBody = "Reminders for your study windows, streak milestones and timer alerts. Nothing else — no spam, ever.",
+        whyBody = "Reminders for your study windows, focus milestones and timer alerts. Nothing else — no spam, ever.",
         pose = MascotPose.WELCOME
     ),
     PermissionSpec(
@@ -358,7 +360,7 @@ private fun FlowProgressBar(progress: Float, isDark: Boolean) {
             .fillMaxWidth()
             .height(4.dp)
             .clip(CircleShape)
-            .background(if (isDark) Color(0x22FFFFFF) else Color(0x18000000))
+            .background(focivoTokens().line)
     ) {
         Box(
             modifier = Modifier
@@ -398,7 +400,7 @@ fun OnboardingWhitePill(
             style = MaterialTheme.typography.titleMedium.copy(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = if (enabled) Color(0xFF0D1B05) else Color(0x990D1B05),
+                color = if (enabled) focivoTokens().onAccent else focivoTokens().onAccent.copy(alpha = 0.6f),
                 fontSize = 16.sp
             )
         )
@@ -424,7 +426,7 @@ private fun QuietTextButton(text: String, onClick: () -> Unit, testTag: String =
             style = MaterialTheme.typography.titleSmall.copy(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF8E9B8A),
+                color = focivoTokens().muted,
                 fontSize = 14.sp
             )
         )
@@ -441,7 +443,7 @@ fun OpeningIntroVisual(progress: Float) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)),
+            .background(focivoTokens().bg),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -465,7 +467,7 @@ fun OpeningIntroVisual(progress: Float) {
                     fontWeight = FontWeight.Bold,
                     fontSize = 34.sp,
                     letterSpacing = 8.sp,
-                    color = if (isDark) Color(0xFFF0F4ED) else NearBlack
+                    color = focivoTokens().text
                 ),
                 modifier = Modifier.alpha(progress)
             )
@@ -475,7 +477,7 @@ fun OpeningIntroVisual(progress: Float) {
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontFamily = PoppinsFontFamily,
                     fontSize = 14.sp,
-                    color = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+                    color = focivoTokens().muted
                 ),
                 modifier = Modifier.alpha(progress)
             )
@@ -543,15 +545,15 @@ fun FlowQuestionContent(
     onBack: (() -> Unit)?
 ) {
     val isDark = isAppInDarkTheme()
-    val tPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val tSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val cardBg = if (isDark) Color(0xFF171C16) else Color.White
-    val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0xFFE3EADF)
+    val tPrimary = focivoTokens().text
+    val tSecondary = focivoTokens().muted
+    val cardBg = focivoTokens().surface
+    val cardBorder = focivoTokens().line
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7))
+            .background(focivoTokens().bg)
             .padding(horizontal = 24.dp)
             .padding(top = 56.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState())
@@ -570,7 +572,7 @@ fun FlowQuestionContent(
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
-                        color = if (isDark) RegainLimePrimary else Color(0xFF4C8A00),
+                        color = focivoTokens().accentText,
                         letterSpacing = 1.6.sp,
                         fontSize = 11.sp
                     )
@@ -683,7 +685,7 @@ fun FlowQuestionContent(
                                     fontFamily = PoppinsFontFamily,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isSelected && isDark) RegainLimePrimary
-                                    else if (isSelected) Color(0xFF3E6E00)
+                                    else if (isSelected) focivoTokens().accentText
                                     else tPrimary,
                                     fontSize = 15.sp
                                 ),
@@ -708,7 +710,7 @@ fun FlowQuestionContent(
                                             modifier = Modifier
                                                 .size(10.dp)
                                                 .clip(RoundedCornerShape(3.dp))
-                                                .background(if (isDark) Color(0xFF121511) else Color.White)
+                                                .background(focivoTokens().surface)
                                         )
                                     }
                                 }
@@ -730,7 +732,7 @@ fun FlowQuestionContent(
                                             modifier = Modifier
                                                 .size(10.dp)
                                                 .clip(CircleShape)
-                                                .background(if (isDark) Color(0xFF121511) else Color.White)
+                                                .background(focivoTokens().surface)
                                         )
                                     }
                                 }
@@ -770,13 +772,13 @@ fun ShowcaseSlideContent(
     onSkip: () -> Unit
 ) {
     val isDark = isAppInDarkTheme()
-    val tPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val tSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val tPrimary = focivoTokens().text
+    val tSecondary = focivoTokens().muted
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7))
+            .background(focivoTokens().bg)
             .padding(horizontal = 24.dp)
             .padding(top = 72.dp, bottom = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -812,7 +814,7 @@ fun ShowcaseSlideContent(
             style = MaterialTheme.typography.labelSmall.copy(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = if (isDark) RegainLimePrimary else Color(0xFF4C8A00),
+                color = focivoTokens().accentText,
                 letterSpacing = 2.sp,
                 fontSize = 11.sp
             )
@@ -860,8 +862,8 @@ fun GroupStepContent(
     onSkip: () -> Unit
 ) {
     val isDark = isAppInDarkTheme()
-    val tPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val tSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val tPrimary = focivoTokens().text
+    val tSecondary = focivoTokens().muted
     val preview = remember(users) {
         users.sortedByDescending { it.weeklyStudySeconds }.take(3)
     }
@@ -869,7 +871,7 @@ fun GroupStepContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7))
+            .background(focivoTokens().bg)
             .padding(horizontal = 24.dp)
             .padding(top = 56.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState()),
@@ -912,7 +914,7 @@ fun GroupStepContent(
                             text = "Live",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFF9AA79B),
+                                color = focivoTokens().muted,
                                 fontSize = 12.sp
                             )
                         )
@@ -936,7 +938,7 @@ fun GroupStepContent(
                             text = "Your leaderboard will appear here as you focus.",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFF9AA79B),
+                                color = focivoTokens().muted,
                                 fontSize = 13.sp
                             ),
                             textAlign = TextAlign.Center
@@ -955,7 +957,7 @@ fun GroupStepContent(
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontFamily = PoppinsFontFamily,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF9AA79B),
+                                    color = focivoTokens().muted,
                                     fontSize = 14.sp
                                 ),
                                 modifier = Modifier.width(24.dp)
@@ -966,7 +968,7 @@ fun GroupStepContent(
                                     .clip(CircleShape)
                                     .background(
                                         if (user.isCurrentUser) RegainLimePrimary
-                                        else Color(0xFF2A332A)
+                                        else focivoTokens().surface2
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -975,7 +977,7 @@ fun GroupStepContent(
                                     style = MaterialTheme.typography.titleSmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (user.isCurrentUser) Color(0xFF0D1B05) else Color.White,
+                                        color = if (user.isCurrentUser) focivoTokens().onAccent else focivoTokens().text,
                                         fontSize = 15.sp
                                     )
                                 )
@@ -1075,20 +1077,25 @@ fun PermissionGrantContent(
     progress: Float,
     onAllow: () -> Unit,
     onLater: () -> Unit,
-    onBack: (() -> Unit)?
+    onBack: (() -> Unit)?,
+    // v1.2.3: the REAL system-side granted state, re-read by the caller on
+    // every composition (driven by permTick bumps on launcher callback,
+    // intent fire and ON_RESUME). Defaults to false so existing callers and
+    // screenshot tests keep compiling unchanged.
+    granted: Boolean = false
 ) {
     val isDark = isAppInDarkTheme()
-    val tPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val tSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val bubbleBg = if (isDark) Color(0xFF1B211A) else Color.White
-    val bubbleBorder = if (isDark) Color(0x22FFFFFF) else Color(0xFFE3EADF)
-    val rowBg = if (isDark) Color(0xFF171B16) else Color(0xFF10140F)
+    val tPrimary = focivoTokens().text
+    val tSecondary = focivoTokens().muted
+    val bubbleBg = focivoTokens().surface
+    val bubbleBorder = focivoTokens().line
+    val rowBg = focivoTokens().surface2
     var whyExpanded by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7))
+            .background(focivoTokens().bg)
             .padding(horizontal = 24.dp)
             .padding(top = 56.dp, bottom = 24.dp)
             .verticalScroll(rememberScrollState())
@@ -1105,7 +1112,7 @@ fun PermissionGrantContent(
                 modifier = Modifier
                     .size(64.dp)
                     .clip(CircleShape)
-                    .background(if (isDark) Color(0xFF1E251D) else Color(0xFFF0F4EC))
+                    .background(focivoTokens().surface)
                     .border(1.dp, RegainLimePrimary.copy(alpha = 0.4f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -1143,13 +1150,19 @@ fun PermissionGrantContent(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // Dark card row with white Allow pill (reference pattern)
+        // Dark card row with white Allow pill (reference pattern). When the
+        // permission is granted the row picks up a lime edge and the pill
+        // becomes a non-clickable lime "Granted" indicator.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(22.dp))
                 .background(rowBg)
-                .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(22.dp))
+                .border(
+                    1.dp,
+                    if (granted) RegainLimePrimary.copy(alpha = 0.55f) else Color(0x1AFFFFFF),
+                    RoundedCornerShape(22.dp)
+                )
                 .padding(horizontal = 20.dp, vertical = 16.dp)
                 .testTag("permission_row_${spec.id}")
         ) {
@@ -1169,28 +1182,39 @@ fun PermissionGrantContent(
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
+                val pillBase = Modifier
+                    .clip(CircleShape)
+                    .background(if (granted) RegainLimePrimary else Color.White)
                 Box(
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(Color.White)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = onAllow
-                        )
+                    modifier = (if (granted) pillBase else pillBase.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onAllow
+                    ))
                         .padding(horizontal = 26.dp, vertical = 12.dp)
-                        .testTag("permission_allow_${spec.id}"),
+                        .testTag(if (granted) "permission_granted_${spec.id}" else "permission_allow_${spec.id}"),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "Allow",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0D1B05),
-                            fontSize = 15.sp
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (granted) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = NearBlack,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = if (granted) "Granted" else "Allow",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontFamily = PoppinsFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = if (granted) NearBlack else focivoTokens().onAccent,
+                                fontSize = 15.sp
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
@@ -1330,6 +1354,14 @@ fun OnboardingFlowScreen(
 
     var stepPos by remember { mutableIntStateOf(0) }
     var permTick by remember { mutableIntStateOf(0) }
+
+    // v1.2.3: system Back moves to the previous onboarding step instead of
+    // killing the app mid-flow. On the first step the handler is disabled so
+    // the system default (exit) still applies — same as the in-step UI,
+    // which only offers a Back button when stepPos > 0.
+    androidx.activity.compose.BackHandler(enabled = stepPos > 0) {
+        stepPos--
+    }
     // v1.1 final: trust explainer card for sensitive permissions (Accessibility,
     // Device Admin) — shown before the system prompt.
     var explainerFor by remember { mutableStateOf<PermissionSpec?>(null) }
@@ -1440,7 +1472,9 @@ fun OnboardingFlowScreen(
         if (step != null && step.kind == StepKind.PERMISSION) {
             val spec = permSpecs.getOrNull(step.index)
             if (spec != null && isPermissionGranted(context, spec.id)) {
-                delay(350)
+                // v1.2.3: hold the step on its "Granted" rendering long enough
+                // for the user to perceive the confirmation before moving on.
+                delay(900)
                 advance()
             }
         }
@@ -1534,9 +1568,16 @@ fun OnboardingFlowScreen(
         }
         StepKind.PERMISSION -> {
             val spec = permSpecs.getOrNull(step.index) ?: return
+            // v1.2.3: re-read the REAL system state on every composition. The
+            // existing permTick bumps (ActivityResult callback, intent fire,
+            // ON_RESUME) drive recomposition, so a just-granted permission
+            // flips this step to its "Granted" rendering instead of looking
+            // ungranted. Covers all 7 permission steps via the shared content.
+            val grantedNow = isPermissionGranted(context, spec.id)
             PermissionGrantContent(
                 spec = spec,
                 progress = progressFor(stepPos),
+                granted = grantedNow,
                 onAllow = { requestPermission(spec) },
                 onLater = {
                     if (spec.id == "notifications") markNotificationsDecided()

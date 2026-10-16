@@ -18,7 +18,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * v1.1: owner-review screenshots for the home-screen widgets, now using the
- * owner-supplied aesthetic pack layouts (widget_focus_timer / widget_streak /
+ * owner-supplied aesthetic pack layouts (widget_focus_timer /
  * widget_timetable / widget_focus_shield / widget_zen_coach) with the pack's
  * IDs (tv_title, tv_sub, tv_badge, tv_eyebrow, tv_quote, pb_goal, ...).
  * Inflates the REAL widget layouts at 4x2 widget size with realistic sample
@@ -70,19 +70,6 @@ class WidgetScreenshotsTest {
             .tv(R.id.btn_50, "50")
             .tv(R.id.btn_primary, "START")
         capture(v, "widget_timer")
-    }
-
-    @Test
-    fun widget_streak_motivation() {
-        val v = inflate(R.layout.widget_streak)
-            .tv(R.id.tv_eyebrow, "DAILY STREAK")
-            .tv(R.id.tv_badge, "ON FIRE")
-            .tv(R.id.tv_title, "12 day streak")
-            .tv(R.id.tv_sub, "Level 3 Student · 1,240 XP")
-            .tv(R.id.tv_quote, "Every page studied today is a step towards your dream.")
-            .tv(R.id.tv_goal, "120 / 360 min")
-        v.findViewById<ProgressBar>(R.id.pb_goal).progress = 33
-        capture(v, "widget_streak")
     }
 
     @Test

@@ -15,9 +15,11 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.example.MainActivity
 import com.example.util.AiStudyGuardManager
+import com.example.util.BlockedChannelsManager
 import com.example.util.DeepFocusManager
 import com.example.util.EssentialAppsGuard
 import com.example.util.GeminiContentClassifier
+import com.example.util.LocalTitleClassifier
 import com.example.util.OnDeviceStudyClassifier
 import com.example.util.ShortsLockManager
 import com.example.util.ShortsSurfaceDetector
@@ -44,6 +46,17 @@ class AiStudyAccessibilityService : AccessibilityService() {
         var isServiceConnected: Boolean = false
             private set
 
+        /**
+         * v1.2.3 — live service instance for the window-proof block overlay.
+         * Set on connect, cleared on unbind/destroy. BlockOverlayManager
+         * routes overlay show/hide through it when non-null (the
+         * TYPE_ACCESSIBILITY_OVERLAY path); null means the service is not
+         * running and the legacy app-overlay / Activity fallbacks apply.
+         */
+        @Volatile
+        var connectedInstance: AiStudyAccessibilityService? = null
+            private set
+
         private var lastShortsInterceptTimeMs: Long = 0L
         private var lastYouTubeAiInterceptTimeMs: Long = 0L
         private var lastScreenAiInterceptTimeMs: Long = 0L
@@ -60,6 +73,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
         private var lastLivenessWriteMs: Long = 0L
         // v1.3.0: multi-window protection scan throttle
         private var lastMultiWindowScanMs: Long = 0L
+        // v1.2.3: periodic sweep throttle (catches idle windows that emit no events)
+        private var lastPeriodicMwScanMs: Long = 0L
         // v1.3.1: deep-focus home-screen block throttle
         private var lastHomeScreenInterceptMs: Long = 0L
         private var lastHomeInterceptedPkg: String? = null
@@ -68,17 +83,415 @@ class AiStudyAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         isServiceConnected = true
+        connectedInstance = this
+        // v1.2.3 (Tasks 6 & 9): warm both on-device classifier brains off the
+        // main thread so the first title/screen never pays the bundle-parse
+        // cost on the accessibility callback thread.
+        serviceScope.launch {
+            runCatching { LocalTitleClassifier.get(applicationContext) }
+            runCatching { LocalTitleClassifier.getContent(applicationContext) }
+        }
+        // v1.2.3-hotfix: start the real 5s multi-window sweep loop.
+        a11yMainHandler.removeCallbacks(mwSweepRunnable)
+        a11yMainHandler.postDelayed(mwSweepRunnable, 5000L)
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
         isServiceConnected = false
+        connectedInstance = null
+        // v1.2.3: never leave a system-level block overlay orphaned when the
+        // service goes away.
+        runCatching { hideA11yBlockOverlay() }
+        runCatching { hideA11yShortsOverlay() }
+        a11yMainHandler.removeCallbacks(mwSweepRunnable)
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
         isServiceConnected = false
+        connectedInstance = null
+        runCatching { hideA11yBlockOverlay() }
+        runCatching { hideA11yShortsOverlay() }
+        a11yMainHandler.removeCallbacks(mwSweepRunnable)
         super.onDestroy()
         serviceScope.cancel()
+    }
+
+    // ------------------------------------------------------------------
+    // v1.2.3 — window-proof block overlay via TYPE_ACCESSIBILITY_OVERLAY.
+    //
+    // ROOT CAUSE (owner's vivo V2403, 1.2.1/1.2.2): the block screen was a
+    // TYPE_APPLICATION_OVERLAY window added from the app process. On
+    // vivo/OriginOS the freeform "small window" container is composited by
+    // the OEM window manager at a layer that can sit ABOVE third-party
+    // application overlays, and getWindows() may not even report the
+    // freeform window — so the block screen rendered underneath (or never
+    // fired for) the floating/split app. "Small window lock nhi hota hai."
+    //
+    // FIX: render the SAME block UI through the accessibility service with
+    // WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY. This layer is
+    // reserved for accessibility services and is composited above every app
+    // window on every OEM — fullscreen, split-screen AND freeform/small
+    // windows. It needs no SYSTEM_ALERT_WINDOW permission: the overlay works
+    // exactly when the detection that triggers it works (the service itself).
+    //
+    // The 1.1 crash class (ViewTreeLifecycleOwner on a bare ComposeView) is
+    // avoided with the same OverlayLifecycleHost pattern that fixed it.
+    // ------------------------------------------------------------------
+
+    private val a11yMainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /**
+     * v1.2.3-hotfix — REAL periodic multi-window sweep. The old "periodic"
+     * sweep was gated on accessibility EVENTS arriving: an idle blocked app
+     * sitting in a freeform/split window emits no events, so the sweep never
+     * ran and the app was never intercepted. This loop fires every 5s on the
+     * service's main thread for as long as the service is connected; the
+     * scan itself is study-period gated and 3s-throttled, so idle cost is
+     * one cheap windows-list read per 5s.
+     */
+    private val mwSweepRunnable = object : Runnable {
+        override fun run() {
+            try {
+                if (AiStudyGuardManager.isStudyPeriodActive(applicationContext)) {
+                    enforceMultiWindowProtections(
+                        System.currentTimeMillis(), "timer-sweep"
+                    )
+                }
+            } catch (_: Exception) { }
+            a11yMainHandler.postDelayed(this, 5000L)
+        }
+    }
+    private var a11yBlockView: androidx.compose.ui.platform.ComposeView? = null
+    private var a11yBlockHost: com.example.ui.overlay.OverlayLifecycleHost? = null
+    private var a11yBlockWm: WindowManager? = null
+    private val a11yBlockedPackage = androidx.compose.runtime.mutableStateOf("")
+    private val a11yAppName = androidx.compose.runtime.mutableStateOf("")
+    private val a11yDurationSec = androidx.compose.runtime.mutableStateOf(0)
+    private val a11yReason = androidx.compose.runtime.mutableStateOf<String?>(null)
+    private val a11yPunishment = androidx.compose.runtime.mutableStateOf(false)
+
+    private var a11yShortsView: androidx.compose.ui.platform.ComposeView? = null
+    private var a11yShortsHost: com.example.ui.overlay.OverlayLifecycleHost? = null
+    private var a11yShortsWm: WindowManager? = null
+    private val a11yShortsLabel = androidx.compose.runtime.mutableStateOf("Shorts")
+
+    // v1.2.3 (Task 13.1) — strict lock-in 10-minute warning overlay
+    // (TYPE_ACCESSIBILITY_OVERLAY layer, fired from the alarm path).
+    private var a11yStrictWarningView: androidx.compose.ui.platform.ComposeView? = null
+    private var a11yStrictWarningHost: com.example.ui.overlay.OverlayLifecycleHost? = null
+    private var a11yStrictWarningWm: WindowManager? = null
+    private val a11yStrictWarningLabel = androidx.compose.runtime.mutableStateOf("")
+    private val a11yStrictWarningStartMs = androidx.compose.runtime.mutableStateOf(0L)
+
+    /**
+     * v1.2.3 — draw confirmation for the accessibility block overlay.
+     * addView succeeding does NOT prove the frame ever composited (the vivo
+     * freeform question); a one-shot OnDrawListener flips this on the first
+     * real draw. BlockOverlayManager uses it for the no-draw braces fallback.
+     */
+    @Volatile
+    private var a11yBlockDrawn = false
+
+    /** True once the accessibility block overlay has actually drawn a frame. */
+    fun isA11yBlockOverlayDrawn(): Boolean = a11yBlockDrawn
+
+    // v1.2.3 — throttled "seen but skipped" diagnostics for the Guard Hub
+    // (key = reason; proves the scan ran and says why it skipped).
+    private val lastMwSkipLogMs = mutableMapOf<String, Long>()
+
+    /** True when the accessibility-layer block overlay is on screen. */
+    fun isA11yBlockOverlayShowing(): Boolean = a11yBlockView != null
+
+    /**
+     * v1.2.3 (owner 2026-10-16): package currently named by the
+     * accessibility-layer block/warning overlay ("" when hidden). Lets
+     * BlockOverlayManager dismiss exactly the warning it showed without
+     * touching an unrelated block overlay.
+     */
+    fun a11yBlockOverlayPackage(): String = a11yBlockedPackage.value
+
+    /** True when the accessibility-layer Shorts overlay is on screen. */
+    fun isA11yShortsOverlayShowing(): Boolean = a11yShortsView != null
+
+    /** True when the accessibility-layer strict warning overlay is on screen. */
+    fun isA11yStrictWarningShowing(): Boolean = a11yStrictWarningView != null
+
+    private fun runOnA11yMain(action: () -> Unit) {
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) action()
+        else a11yMainHandler.post(action)
+    }
+
+    private fun a11yOverlayParams(): WindowManager.LayoutParams {
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            // Renders above ALL app windows (incl. OEM freeform layers) —
+            // the strongest layer a third-party app can use.
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            android.graphics.PixelFormat.TRANSLUCENT
+        ).apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+    }
+
+    /**
+     * Shows the block overlay on the accessibility layer. Must be called on
+     * the main thread (BlockOverlayManager routes here via Handler).
+     * Returns true when the overlay is (now) showing.
+     *
+     * v1.2.3 (owner 2026-10-16): [warningVariant] renders the Stage-1 guard
+     * warning through this same window-proof layer (Android 10+ silently
+     * drops the old background startActivity, so the warning never
+     * appeared). Lime accent + warning mascot + warning reason copy — not a
+     * punishment.
+     */
+    fun showA11yBlockOverlay(
+        blockedPackage: String,
+        appName: String,
+        durationSec: Int = 0,
+        reason: String? = null,
+        isPunishment: Boolean = false,
+        warningVariant: Boolean = false
+    ): Boolean {
+        if (a11yBlockView != null) {
+            a11yBlockedPackage.value = blockedPackage
+            a11yAppName.value = appName
+            a11yDurationSec.value = durationSec
+            a11yReason.value = reason
+            a11yPunishment.value = isPunishment
+            return true
+        }
+        val host = com.example.ui.overlay.OverlayLifecycleHost()
+        return try {
+            a11yBlockedPackage.value = blockedPackage
+            a11yAppName.value = appName
+            a11yDurationSec.value = durationSec
+            a11yReason.value = reason
+            a11yPunishment.value = isPunishment
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val view = androidx.compose.ui.platform.ComposeView(this).apply {
+                host.installOn(this)
+                setContent {
+                    com.example.ui.theme.FocuslyTheme {
+                        com.example.ui.components.BlockedAppOverlay(
+                            appName = a11yAppName.value,
+                            blockedPackage = a11yBlockedPackage.value,
+                            initialDurationSec = a11yDurationSec.value,
+                            reason = a11yReason.value,
+                            isPunishment = a11yPunishment.value,
+                            mascotRes = if (warningVariant) com.example.R.drawable.mascot_warning_transparent
+                            else com.example.R.drawable.mascot_blocked,
+                            onExitApp = { a11yExitToHome() },
+                            onOpenFocusly = { a11yOpenFocivo() }
+                        )
+                    }
+                }
+                isFocusableInTouchMode = true
+                setOnKeyListener { _, keyCode, event ->
+                    if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                        a11yExitToHome()
+                        true
+                    } else false
+                }
+            }
+            host.show()
+            wm.addView(view, a11yOverlayParams())
+            a11yBlockView = view
+            a11yBlockHost = host
+            a11yBlockWm = wm
+            // v1.2.3: one-shot draw confirmation (see isA11yBlockOverlayDrawn).
+            a11yBlockDrawn = false
+            runCatching {
+                view.viewTreeObserver.addOnDrawListener(
+                    object : android.view.ViewTreeObserver.OnDrawListener {
+                        override fun onDraw() {
+                            a11yBlockDrawn = true
+                            runCatching { view.viewTreeObserver.removeOnDrawListener(this) }
+                        }
+                    }
+                )
+            }
+            Log.i(TAG, "A11y block overlay shown for $blockedPackage (TYPE_ACCESSIBILITY_OVERLAY)")
+            true
+        } catch (t: Throwable) {
+            Log.e(TAG, "A11y block overlay failed: ${t.message}")
+            runCatching { host.dismiss() }
+            a11yBlockView = null
+            a11yBlockHost = null
+            a11yBlockWm = null
+            false
+        }
+    }
+
+    /** Hide the accessibility-layer block overlay if visible. Main thread. */
+    fun hideA11yBlockOverlay() {
+        runOnA11yMain {
+            val view = a11yBlockView ?: return@runOnA11yMain
+            try { a11yBlockWm?.removeView(view) } catch (_: Exception) { }
+            runCatching { a11yBlockHost?.dismiss() }
+            a11yBlockView = null
+            a11yBlockHost = null
+            a11yBlockWm = null
+            a11yBlockDrawn = false
+        }
+    }
+
+    /**
+     * v1.2.3 (Task 13.1) — shows the strict lock-in 10-minute warning on the
+     * accessibility layer. Must be called on the main thread (StrictLockInManager
+     * routes here via Handler). Returns true when the overlay is (now) showing.
+     */
+    fun showA11yStrictWarningOverlay(subjectLabel: String, startMs: Long): Boolean {
+        if (a11yStrictWarningView != null) {
+            a11yStrictWarningLabel.value = subjectLabel
+            a11yStrictWarningStartMs.value = startMs
+            return true
+        }
+        val host = com.example.ui.overlay.OverlayLifecycleHost()
+        return try {
+            a11yStrictWarningLabel.value = subjectLabel
+            a11yStrictWarningStartMs.value = startMs
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val view = androidx.compose.ui.platform.ComposeView(this).apply {
+                host.installOn(this)
+                setContent {
+                    com.example.ui.theme.FocuslyTheme {
+                        com.example.ui.components.StrictWarningOverlay(
+                            subjectLabel = a11yStrictWarningLabel.value,
+                            startMs = a11yStrictWarningStartMs.value,
+                            onDismiss = { hideA11yStrictWarningOverlay() }
+                        )
+                    }
+                }
+                isFocusableInTouchMode = true
+                setOnKeyListener { _, keyCode, event ->
+                    if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                        hideA11yStrictWarningOverlay()
+                        true
+                    } else false
+                }
+            }
+            host.show()
+            wm.addView(view, a11yOverlayParams())
+            a11yStrictWarningView = view
+            a11yStrictWarningHost = host
+            a11yStrictWarningWm = wm
+            Log.i(TAG, "A11y strict warning overlay shown (TYPE_ACCESSIBILITY_OVERLAY)")
+            true
+        } catch (t: Throwable) {
+            Log.e(TAG, "A11y strict warning overlay failed: ${t.message}")
+            runCatching { host.dismiss() }
+            a11yStrictWarningView = null
+            a11yStrictWarningHost = null
+            a11yStrictWarningWm = null
+            false
+        }
+    }
+
+    /** Hide the accessibility-layer strict warning overlay if visible. Main thread. */
+    fun hideA11yStrictWarningOverlay() {
+        runOnA11yMain {
+            val view = a11yStrictWarningView ?: return@runOnA11yMain
+            try { a11yStrictWarningWm?.removeView(view) } catch (_: Exception) { }
+            runCatching { a11yStrictWarningHost?.dismiss() }
+            a11yStrictWarningView = null
+            a11yStrictWarningHost = null
+            a11yStrictWarningWm = null
+        }
+    }
+
+    /**
+     * Shows the Shorts & Reels overlay on the accessibility layer.
+     * Returns true when it is (now) showing.
+     */
+    fun showA11yShortsOverlay(surfaceLabel: String): Boolean {
+        if (a11yShortsView != null) {
+            a11yShortsLabel.value = surfaceLabel
+            return true
+        }
+        val host = com.example.ui.overlay.OverlayLifecycleHost()
+        return try {
+            a11yShortsLabel.value = surfaceLabel
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val view = androidx.compose.ui.platform.ComposeView(this).apply {
+                host.installOn(this)
+                setContent {
+                    com.example.ui.theme.FocuslyTheme {
+                        com.example.ui.components.ShortsBlockedOverlay(
+                            surfaceLabel = a11yShortsLabel.value,
+                            onReturn = { hideA11yShortsOverlay() },
+                            onOpenFocivo = {
+                                hideA11yShortsOverlay()
+                                a11yOpenFocivo()
+                            }
+                        )
+                    }
+                }
+                isFocusableInTouchMode = true
+                setOnKeyListener { _, keyCode, event ->
+                    if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                        hideA11yShortsOverlay()
+                        true
+                    } else false
+                }
+            }
+            host.show()
+            wm.addView(view, a11yOverlayParams())
+            a11yShortsView = view
+            a11yShortsHost = host
+            a11yShortsWm = wm
+            Log.i(TAG, "A11y Shorts overlay shown ($surfaceLabel)")
+            true
+        } catch (t: Throwable) {
+            Log.e(TAG, "A11y Shorts overlay failed: ${t.message}")
+            runCatching { host.dismiss() }
+            a11yShortsView = null
+            a11yShortsHost = null
+            a11yShortsWm = null
+            false
+        }
+    }
+
+    /** Hide the accessibility-layer Shorts overlay if visible. Main thread. */
+    fun hideA11yShortsOverlay() {
+        runOnA11yMain {
+            val view = a11yShortsView ?: return@runOnA11yMain
+            try { a11yShortsWm?.removeView(view) } catch (_: Exception) { }
+            runCatching { a11yShortsHost?.dismiss() }
+            a11yShortsView = null
+            a11yShortsHost = null
+            a11yShortsWm = null
+        }
+    }
+
+    private fun a11yExitToHome() {
+        hideA11yBlockOverlay()
+        // v1.2.3: a braces Activity may be up behind the overlay — dismiss it too.
+        runCatching { BlockOverlayManager.dismissBracesActivity() }
+        try {
+            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(homeIntent)
+        } catch (_: Exception) { }
+    }
+
+    private fun a11yOpenFocivo() {
+        hideA11yBlockOverlay()
+        // v1.2.3: a braces Activity may be up behind the overlay — dismiss it too.
+        runCatching { BlockOverlayManager.dismissBracesActivity() }
+        try {
+            val mainIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            startActivity(mainIntent)
+        } catch (_: Exception) { }
     }
 
     private fun isSettingsOrPackageInstallerApp(pkg: String): Boolean {
@@ -109,64 +522,210 @@ class AiStudyAccessibilityService : AccessibilityService() {
      * mini windows may also match the floating heuristic — both are treated
      * as floating (blocking them is the safer behavior for a focus app).
      */
-    private fun enforceMultiWindowProtections(nowTime: Long) {
+    /**
+     * v1.2.3 — multi-window / any-window protection sweep.
+     *
+     * A blocked package appearing in ANY visible application window (any
+     * bounds — fullscreen, split pane, floating/freeform, partial) is an
+     * intercept trigger during a study period, NOT just the active/foreground
+     * window that [onAccessibilityEvent]'s single-package path sees.
+     *
+     * Why this exists (vivo V2403, build-39): the event-package path misses
+     * (a) blocked apps moved into a split pane without a WINDOW_STATE_CHANGED
+     * for their package, (b) freeform windows sitting idle (no content
+     * changes, so no scan trigger), (c) apps already open when the study
+     * period starts. Every skip writes a throttled Guard Hub entry so the
+     * owner's next device test shows exactly which step saw what.
+     */
+    // v1.2.3-hotfix: throttled scan-summary for the Guard Hub — the owner's
+    // device test needs to SEE "windows-seen count + packages on last
+    // checks", not just intercepts. Every scan exit below writes one.
+    private var lastMwSummaryLogMs = 0L
+    private fun logMwSummary(detail: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastMwSummaryLogMs < 30_000L) return
+        lastMwSummaryLogMs = now
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, "guard", "multiwindow-scan", "ok", detail
+            )
+        } catch (_: Exception) { }
+    }
+
+    private fun enforceMultiWindowProtections(nowTime: Long, triggerSrc: String) {
         val ctx = applicationContext
-        // v1.1 final: during an active focus period a blocked app must be
-        // intercepted in EVERY window mode — fullscreen, split-screen and
-        // floating/small windows alike. The old StrictMode opt-in toggles
-        // (blockSplit/blockFloat) no longer gate this: if the app is blocked
-        // during focus, it is blocked wherever it appears. The toggles are
-        // retained for standalone-shield use outside focus periods.
         if (nowTime - lastMultiWindowScanMs < 3000L) return
         lastMultiWindowScanMs = nowTime
         try {
             val blockedList = FocusShieldService.getActiveBlockedPackages(ctx)
-            if (blockedList.isEmpty()) return
-            val wins = try { windows } catch (_: Exception) { null } ?: return
+            if (blockedList.isEmpty()) {
+                logMwSummary("trigger=$triggerSrc windows=? blocked=0 (no active blocked packages)")
+                return
+            }
+            val wins = try { windows } catch (_: Exception) { null }
+            if (wins == null) {
+                logMwSummary("trigger=$triggerSrc windows=? (windows list unavailable — OEM restricted or service not ready)")
+                return
+            }
             val appWins = wins.filter {
                 try { it.type == AccessibilityWindowInfo.TYPE_APPLICATION } catch (_: Exception) { false }
             }
-            if (appWins.isEmpty()) return
+            if (appWins.isEmpty()) {
+                logMwSummary("trigger=$triggerSrc windows=${wins.size} appWindows=0 (no application windows reported)")
+                return
+            }
             val (dispW, dispH) = getDisplaySizePx()
             if (dispW <= 0 || dispH <= 0) return
-            val multiWindowActive = appWins.size >= 2
             val rect = Rect()
+            val seenPkgs = mutableListOf<String>()
             for (w in appWins) {
                 val pkg = try { w.root?.packageName?.toString() } catch (_: Exception) { null }
-                    ?: continue
+                if (pkg == null) {
+                    logMwSkip("root-null")
+                    continue
+                }
+                seenPkgs.add(pkg)
                 if (pkg.equals(ctx.packageName, ignoreCase = true)) continue
                 val isBlocked = blockedList.any { b ->
                     pkg.equals(b, ignoreCase = true) || pkg.startsWith(b, ignoreCase = true)
                 }
                 if (!isBlocked) continue
-                try { w.getBoundsInScreen(rect) } catch (_: Exception) { continue }
-                if (rect.width() <= 0 || rect.height() <= 0) continue
+                try { w.getBoundsInScreen(rect) } catch (_: Exception) {
+                    logMwSkip("bounds-fail pkg=$pkg")
+                    continue
+                }
+                if (rect.width() <= 0 || rect.height() <= 0) {
+                    logMwSkip("empty-bounds pkg=$pkg")
+                    continue
+                }
                 val isFloating = rect.width() < dispW * 0.85f && rect.height() < dispH * 0.85f
-                val inSplit = multiWindowActive && !isFloating
-                // v1.1 final: a blocked app is blocked in every window mode
-                // during focus — fullscreen, split-screen, floating.
-                val shouldBlock = isFloating || inSplit
-                if (!shouldBlock) continue
+                val mode = when {
+                    isFloating -> "floating"
+                    appWins.size >= 2 -> "split"
+                    else -> "fullscreen"
+                }
+                // v1.2.3: ANY visible blocked window triggers — the old code
+                // only covered floating/split and relied on the event-package
+                // path for fullscreen, which misses already-open apps.
                 if (nowTime - lastGeneralAppInterceptTimeMs > 2500L || lastGeneralInterceptedPkg != pkg) {
                     lastGeneralAppInterceptTimeMs = nowTime
                     lastGeneralInterceptedPkg = pkg
-                    val mode = if (isFloating) "floating window" else "split-screen"
-                    Log.w(TAG, "[MultiWindow] Blocked app ($pkg) in $mode during focus — intercepting.")
                     val friendlyName = try { FocusShieldService.friendlyAppName(ctx, pkg) } catch (_: Exception) { pkg }
-                    // v1.2.1: overlay-first intercept — the overlay covers
-                    // floating windows too; Activity is the no-overlay fallback.
+                    Log.w(TAG, "[MultiWindow] Blocked app ($pkg) visible in $mode window during focus — intercepting (src=windows-list, trigger=$triggerSrc).")
+                    try {
+                        AiStudyGuardManager.logGuardActivity(
+                            ctx, friendlyName, "multiwindow-detect", "intercept",
+                            "src=windows-list mode=$mode bounds=${rect.width()}x${rect.height()} trigger=$triggerSrc"
+                        )
+                    } catch (_: Exception) { }
                     BlockOverlayManager.intercept(
                         context = ctx,
                         blockedPackage = pkg,
                         appName = friendlyName,
                         durationSec = try { FocusShieldService.getRemainingSeconds(ctx) } catch (_: Exception) { 0 },
-                        reason = "$friendlyName is locked during your active focus session ($mode windows are blocked during focus).",
-                        isPunishment = false
+                        reason = "$friendlyName is locked during your active focus session.",
+                        isPunishment = false,
+                        multiWindowMode = mode
                     )
                 }
+                logMwSummary(
+                    "trigger=$triggerSrc windows=${appWins.size} " +
+                        "pkgs=${seenPkgs.distinct().take(8).joinToString(",")} " +
+                        "blockedSeen=$pkg mode=$mode"
+                )
                 return
             }
+            // No blocked package in any visible window this scan.
+            logMwSummary(
+                "trigger=$triggerSrc windows=${appWins.size} " +
+                    "pkgs=${seenPkgs.distinct().take(8).joinToString(",")} blockedSeen=none"
+            )
         } catch (_: Exception) { }
+    }
+
+    /** Throttled Guard Hub "seen but skipped" entries — proves the scan ran. */
+    private fun logMwSkip(reason: String) {
+        val now = System.currentTimeMillis()
+        if (now - (lastMwSkipLogMs[reason] ?: 0L) < 30_000L) return
+        lastMwSkipLogMs[reason] = now
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, "guard", "multiwindow-detect", "skipped", reason
+            )
+        } catch (_: Exception) { }
+    }
+
+    // v1.2.3 (C) — Shorts/Reels near-miss evidence (throttled per app): when
+    // the toggle is ON but no surface is detected, the hub shows exactly
+    // which signals were seen, so a "not blocking" report is debuggable.
+    private val lastShortsCheckLogMs = mutableMapOf<String, Long>()
+
+    private fun logShortsCheck(app: String, rootNode: AccessibilityNodeInfo) {
+        val now = System.currentTimeMillis()
+        if (now - (lastShortsCheckLogMs[app] ?: 0L) < 15_000L) return
+        lastShortsCheckLogMs[app] = now
+        try {
+            val signals = if (app == "instagram") {
+                com.example.util.ShortsSurfaceDetector.debugInstagramSignals(rootNode)
+            } else {
+                com.example.util.ShortsSurfaceDetector.debugYouTubeSignals(rootNode)
+            }
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, app, "shorts-check", "no-surface", signals
+            )
+        } catch (_: Exception) { }
+    }
+
+    // v1.2.3 (owner 2026-10-16): player evidence is a REAL Guard Hub entry —
+    // unthrottled but meaningful: it is written only when the evidence state
+    // CHANGES (playing <-> not-playing), so the feed shows exactly when the
+    // chain considered a video "playing" without drowning in per-event spam.
+    private var lastYouTubePlayerEvidence: Boolean? = null
+
+    private fun logPlayerEvidence(hasPlayer: Boolean, signals: String) {
+        if (lastYouTubePlayerEvidence == hasPlayer) return
+        lastYouTubePlayerEvidence = hasPlayer
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, "YouTube", "youtube-player-evidence",
+                if (hasPlayer) "seen" else "not-detected", signals
+            )
+        } catch (_: Exception) { }
+    }
+
+    /**
+     * v1.2.3 (owner 2026-10-16): feeds the Guard Hub "Last YouTube
+     * evaluation" card — one glanceable row of what the YouTube chain last
+     * decided (player evidence, title source, p_ent band, verdict, action).
+     */
+    private fun recordYouTubeEval(
+        titleSource: String,
+        title: String,
+        playerEvidence: Boolean = true,
+        pEntBand: String = "",
+        verdict: String = "",
+        action: String = ""
+    ) {
+        try {
+            AiStudyGuardManager.recordYouTubeEvaluation(
+                AiStudyGuardManager.LastYouTubeEvaluation(
+                    ts = System.currentTimeMillis(),
+                    playerEvidence = playerEvidence,
+                    titleSource = titleSource,
+                    title = title.take(60),
+                    pEntBand = pEntBand,
+                    verdict = verdict,
+                    action = action
+                )
+            )
+        } catch (_: Exception) { }
+    }
+
+    /** p_ent band label for the hub card (title bundle: study <= 0.20, block >= threshold). */
+    private fun pEntBandLabel(pEnt: Double, blockThreshold: Double): String = when {
+        pEnt >= blockThreshold -> ">= %.2f entertainment".format(Locale.ROOT, blockThreshold)
+        pEnt <= LocalTitleClassifier.STRONG_STUDY_MAX_P_ENT -> "<= 0.20 study"
+        else -> "0.20-%.2f uncertain".format(Locale.ROOT, blockThreshold)
     }
 
     @Suppress("DEPRECATION")
@@ -274,8 +833,21 @@ class AiStudyAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         try {
             if (event == null) return
-            val pkg = event.packageName?.toString() ?: return
             val eventType = event.eventType
+
+            // v1.2.3-hotfix: window-set changes (split-screen enter/exit,
+            // freeform window add/remove, PiP) often carry NO package name,
+            // so they must be handled BEFORE the package-based early return
+            // below. The scan itself is study-period gated and 3s-throttled.
+            if (eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+                if (AiStudyGuardManager.isStudyPeriodActive(applicationContext)) {
+                    enforceMultiWindowProtections(
+                        System.currentTimeMillis(), "windows-changed"
+                    )
+                }
+            }
+
+            val pkg = event.packageName?.toString() ?: return
 
             // 1. Never block self (Focivo)
             if (pkg.equals(applicationContext.packageName, ignoreCase = true)) {
@@ -382,7 +954,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         blockedPackage = pkg,
                         appName = friendlyName,
                         durationSec = remainingSec,
-                        reason = "3-Hour Penalty: $friendlyName is locked for non-study conversation.",
+                        // v1.2.3: names the real trigger reason + expiry (owner:
+                        // "a lock screen shows where no lock should exist").
+                        reason = AiStudyGuardManager.punishmentLockReason(applicationContext, pkg, friendlyName),
                         isPunishment = true
                     )
                 }
@@ -413,11 +987,18 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 }
             }
 
-            // 5b. v1.3.0: multi-window protections — a blocked app opened in
-            // split-screen or a floating window can bypass the fullscreen
-            // intercept above, so scan interactive windows (best-effort).
+            // 5b. v1.2.3: multi-window protections — a blocked app visible in
+            // ANY window (split-screen pane, floating/freeform window, or an
+            // already-open fullscreen window the event-package path missed)
+            // is intercepted via the windows-list scan, not just the
+            // active/foreground window. Event-driven AND periodic: idle
+            // windows emit no events, so a 5s sweep covers them too.
+            if (nowTime - lastPeriodicMwScanMs > 5000L) {
+                lastPeriodicMwScanMs = nowTime
+                enforceMultiWindowProtections(nowTime, "periodic")
+            }
             if (isStudyPeriod && (isWindowStateChanged || eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)) {
-                enforceMultiWindowProtections(nowTime)
+                enforceMultiWindowProtections(nowTime, "event")
             }
 
             // 6. Check per-app daily limit on app open
@@ -468,22 +1049,52 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                         )
                                     }
                                     return
+                                } else {
+                                    // v1.2.3 near-miss evidence (throttled): proves the
+                                    // detector ran and shows exactly which signals
+                                    // were (not) seen on this YouTube screen.
+                                    logShortsCheck("youtube", rootNode)
                                 }
                             }
 
                             // 7B. Intelligent YouTube AI Content Filter (Analyzes active video title & channel with Gemini AI)
                             if (isYouTubeAiFilterOn) {
-                                // v1.2.2 (B2): evidence gate — the filter evaluates
-                                // ONLY a video that is actually playing. Opening
-                                // YouTube (home feed, search) can never produce a
-                                // verdict, no matter what the recommendations say.
-                                if (!ShortsSurfaceDetector.isYouTubeVideoPlayerSurface(rootNode)) {
+                                // v1.2.3 (A2): hardened evidence gate — ONLY actual
+                                // video playback (watch screen, miniplayer, Shorts
+                                // player, or a large inline player) is evaluated.
+                                // Home/feed/search surfaces and muted autoplay
+                                // previews can NEVER produce a verdict, no matter
+                                // what the recommendations say.
+                                val (dispW, _) = getDisplaySizePx()
+                                val watchScreen = ShortsSurfaceDetector.hasYouTubeWatchScreen(rootNode)
+                                val hasPlayer = ShortsSurfaceDetector.isYouTubeVideoPlayerSurface(rootNode, dispW)
+                                // v1.2.3 (owner 2026-10-16): player evidence is
+                                // a real, unthrottled hub entry (state-change
+                                // only) — the owner sees exactly when the
+                                // chain considered a video "playing".
+                                logPlayerEvidence(hasPlayer, ShortsSurfaceDetector.debugYouTubeSignals(rootNode))
+                                if (!hasPlayer) {
                                     // v1.1.9 diagnostic
                                     AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-title", "no-player-evidence")
+                                    recordYouTubeEval(
+                                        titleSource = "no-player", title = "",
+                                        playerEvidence = false, verdict = "SKIPPED",
+                                        action = "not evaluated"
+                                    )
                                 } else {
-                                    val activeVideo = extractPlayingYouTubeVideo(rootNode)
+                                    val activeVideo = extractPlayingYouTubeVideo(rootNode, watchScreen)
+                                    // v1.2.3 (B3): channel-extraction evidence for the hub.
+                                    try {
+                                        AiStudyGuardManager.logGuardActivity(
+                                            applicationContext, "YouTube", "youtube-channel",
+                                            if (activeVideo?.channel.isNullOrBlank()) "not-detected" else "seen",
+                                            "src=" + (activeVideo?.channelSrc ?: "no-pattern-matched"),
+                                            activeVideo?.channel ?: (activeVideo?.title ?: "")
+                                        )
+                                    } catch (_: Exception) { }
                                     if (activeVideo != null && activeVideo.title.isNotBlank() && activeVideo.title.length >= 4) {
-                                        val blocked = processYouTubeVideoTitle(activeVideo.title, activeVideo.channel, activeVideo.metadata)
+                                        val sourceTag = if (watchScreen) "watch-screen" else "miniplayer/shorts"
+                                        val blocked = processYouTubeVideoTitle(activeVideo.title, activeVideo.channel, activeVideo.metadata, sourceTag)
                                         if (blocked) return
                                     } else {
                                         // v1.1.6 fallback: title view-ids not exposed (e.g. fullscreen/custom player).
@@ -491,11 +1102,15 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                         val fallbackTitle = extractFallbackVideoTitle(rootNode)
                                         if (!fallbackTitle.isNullOrBlank()) {
                                             Log.d(TAG, "[YouTube AI Guard] Primary title extraction missed; using fallback title: '$fallbackTitle'")
-                                            val blocked = processYouTubeVideoTitle(fallbackTitle, null, "fallback_title_scan")
+                                            val blocked = processYouTubeVideoTitle(fallbackTitle, null, "fallback_title_scan", "fallback-scan")
                                             if (blocked) return
                                         } else {
                                             // v1.1.9 diagnostic: nothing title-like on screen.
                                             AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-title", "title-null")
+                                            recordYouTubeEval(
+                                                titleSource = "title-null", title = "",
+                                                verdict = "SKIPPED", action = "allowed (fail-open)"
+                                            )
                                         }
                                     }
                                 }
@@ -550,6 +1165,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                     )
                                 }
                                 return
+                            } else {
+                                // v1.2.3 near-miss evidence (throttled).
+                                logShortsCheck("instagram", rootNode)
                             }
                         } finally {
                             try { rootNode.recycle() } catch (_: Exception) {}
@@ -795,8 +1413,78 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                         reason = quickScreen.reason
                                     )
                                 } else if (quickScreen.confidence < 0.90f) {
-                                    // Ambient screen check with Gemini
-                                    serviceScope.launch {
+                                    // v1.2.3 (Task 9, bundle v3): second brain — the on-device
+                                    // screen-content classifier judges the extracted
+                                    // text BEFORE any network call. Bands per spec:
+                                    //   study-doubt phrasing -> STUDY -> allow
+                                    //       (doubt gate FIRST — a doubt must never
+                                    //       become a block; regional doubt rows can
+                                    //       score ~0.70-0.75 above the 0.69 line)
+                                    //   p_ent >= 0.69 -> non-study candidate ->
+                                    //       same discipline flow as a confident
+                                    //       on-device block.
+                                    //   p_ent < 0.20  -> study -> allow locally
+                                    //       (no Gemini call needed).
+                                    //   middle        -> Gemini arbiter below
+                                    //       (no key -> existing fail-open).
+                                    // Task-5 hard rules stay supreme: quick-block
+                                    // confidence gating, fail-open, and the
+                                    // discipline semantics are unchanged.
+                                    val screenText = buildString {
+                                        if (!extraction.screenTitle.isNullOrBlank()) append(extraction.screenTitle).append(". ")
+                                        extraction.textSnippets.forEach { append(it).append(" ") }
+                                    }.trim()
+                                    val contentClf = LocalTitleClassifier.getContent(applicationContext)
+                                    val contentPEnt = if (contentClf != null && screenText.isNotBlank()) {
+                                        contentClf.pEntertainment(screenText)
+                                    } else null
+                                    val contentThreshold = contentClf?.blockThreshold ?: 0.69
+                                    // v1.2.3 (final assembly): explicit study-doubt
+                                    // gate BEFORE the content block band — a doubt
+                                    // phrasing is STUDY, never a block.
+                                    val isDoubt = screenText.isNotBlank() &&
+                                            OnDeviceStudyClassifier.isStudyDoubt(screenText)
+                                    when {
+                                        isDoubt -> {
+                                            val pEntStr = if (contentPEnt != null) {
+                                                "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
+                                            } else "no-score"
+                                            Log.i(TAG, "[Browser AI Guard] Study doubt detected in $browserLabel ($pEntStr) — allowing")
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "STUDY", "study-doubt-allow $pEntStr", urlOrTitle)
+                                            AiStudyGuardManager.onStudyActivityDetected(
+                                                context = applicationContext,
+                                                packageName = pkg,
+                                                messageText = urlOrTitle
+                                            )
+                                        }
+                                        contentPEnt != null && contentPEnt >= contentThreshold -> {
+                                            val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
+                                            val reason = "Non-study screen content detected [local-content $pEntStr]"
+                                            Log.w(TAG, "[Browser AI Guard] $reason in $browserLabel")
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "NON_STUDY", "local-content $pEntStr", urlOrTitle)
+                                            AiStudyGuardManager.onNonStudyDetected(
+                                                context = applicationContext,
+                                                packageName = pkg,
+                                                messageText = urlOrTitle.ifBlank { extraction.textSnippets.firstOrNull() ?: "" },
+                                                reason = reason
+                                            )
+                                        }
+                                        contentPEnt != null && contentPEnt < LocalTitleClassifier.STRONG_STUDY_MAX_P_ENT -> {
+                                            val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "STUDY", "local-content $pEntStr", urlOrTitle)
+                                            AiStudyGuardManager.onStudyActivityDetected(
+                                                context = applicationContext,
+                                                packageName = pkg,
+                                                messageText = urlOrTitle
+                                            )
+                                        }
+                                        else -> {
+                                            if (contentPEnt != null) {
+                                                val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
+                                                AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "UNCERTAIN", "local-content $pEntStr->gemini", urlOrTitle)
+                                            }
+                                            // Ambient screen check with Gemini
+                                            serviceScope.launch {
                                         try {
                                             val gv = GeminiContentClassifier.evaluateScreenWithGemini(
                                                 packageName = pkg,
@@ -832,6 +1520,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                             AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-gemini", "STUDY", "AI check unavailable — allowed", urlOrTitle)
                                         }
                                     }
+                                    }
+                                }
                                 }
                             }
                         } finally {
@@ -953,7 +1643,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
     private data class YouTubeActiveVideoInfo(
         val title: String,
         val channel: String? = null,
-        val metadata: String? = null
+        val metadata: String? = null,
+        /** Which extraction pattern produced the channel (hub diagnostics). */
+        val channelSrc: String? = null
     )
 
     /**
@@ -983,46 +1675,188 @@ class AiStudyAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun processYouTubeVideoTitle(title: String, channel: String?, metadata: String?): Boolean {
+    private fun processYouTubeVideoTitle(title: String, channel: String?, metadata: String?, titleSource: String = ""): Boolean {
+        // v1.2.3 (owner 2026-10-16): study-doubt gate FIRST — mirrors the
+        // browser path. A doubt phrasing ("doubt class", "I don't understand
+        // ...", "how is X different from Y") is STUDY and can never block,
+        // before any classifier or knowledge rule sees the title.
+        if (OnDeviceStudyClassifier.isStudyDoubt(title)) {
+            Log.i(TAG, "[YouTube Guard] Study doubt in title — allowing: '$title'")
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, "YouTube", "youtube-doubt", "STUDY", "study-doubt-allow", title
+            )
+            recordYouTubeEval(
+                titleSource = titleSource, title = title,
+                pEntBand = "doubt", verdict = "STUDY", action = "allowed"
+            )
+            return false
+        }
+
+        // v1.2.3 (B): the user's channel BLOCKLIST beats everything — an
+        // explicitly blocked channel is blocked outright whenever its video
+        // plays during study. Same semantics as the app blocklist: immediate,
+        // no warning flow. The lock screen names the real reason.
+        if (BlockedChannelsManager.isBlockedChannel(applicationContext, channel)) {
+            val now = System.currentTimeMillis()
+            if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
+                lastYouTubeAiInterceptTimeMs = now
+                val reason = "Blocked channel: ${channel?.trim()} is on your blocked-channels list."
+                Log.w(TAG, "[YouTube Guard] $reason Video: '$title'")
+                AiStudyGuardManager.logGuardActivity(
+                    applicationContext, "YouTube", "youtube-blocklist", "NON_STUDY",
+                    "channel-blocklist", "${channel?.trim()} | $title"
+                )
+                YouTubeStudyGuardManager.recordBlockedVideo(
+                    context = applicationContext, title = title, channel = channel, reason = reason
+                )
+                pauseMediaPlayback()
+                com.example.service.BlockOverlayManager.intercept(
+                    context = applicationContext,
+                    blockedPackage = "com.google.android.youtube",
+                    appName = "YouTube",
+                    durationSec = FocusShieldService.getRemainingSeconds(applicationContext),
+                    reason = reason,
+                    isPunishment = false
+                )
+            }
+            recordYouTubeEval(titleSource = titleSource, title = title, verdict = "NON_STUDY", action = "blocked (channel blocklist)")
+            return true
+        }
+
         // v1.2.2 (B1): the user's own study-channel allowlist always wins —
         // a channel they explicitly trust is never verdict-scored.
         if (StudyAllowlistManager.isStudyChannel(applicationContext, channel)) {
             AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-allowlist", "STUDY", "allowlisted-channel", title)
+            recordYouTubeEval(titleSource = titleSource, title = title, verdict = "STUDY", action = "allowed (channel allowlist)")
             return false
         }
 
         // v1.1.8: curated offline knowledge first — instant (<1ms), zero network.
-        // Confident verdicts are used directly; UNCERTAIN falls through to the
-        // existing quickEvaluate -> Gemini flow unchanged.
-        when (StudyGuardKnowledge.scoreVideo(title, channel)) {
+        // v1.2.3 (Task 6, bundle v3): on-device title classifier is the FIRST
+        // title judge, ahead of the knowledge pack. Fully offline (no key,
+        // no network, <1ms): TF-IDF + logistic regression bundle (assets,
+        // v3: 15,109 terms). Held-out 99.73% acc with ZERO false-blocks at
+        // p_ent >= 0.65.
+        //   p_ent >= 0.65 -> ENTERTAINMENT -> same discipline flow as a
+        //                   high-confidence knowledge NON_STUDY.
+        //   p_ent <= 0.20 -> STRONG_STUDY -> allow locally (zero entertainment
+        //                   titles at/below 0.20 in the 5233-title corpus).
+        //   middle        -> UNCERTAIN -> fall through to the existing
+        //                   knowledge -> quick -> Gemini chain below (Gemini
+        //                   arbitrates when a key exists; no key -> the
+        //                   existing fail-open rules apply).
+        // Hard rules stay supreme: this only ever sees actual-playback titles
+        // (callers gate on player evidence), and user channel lists above win.
+        if (title.isNotBlank()) {
+            val localClassifier = LocalTitleClassifier.get(applicationContext)
+            if (localClassifier == null) {
+                AiStudyGuardManager.logGuardActivity(
+                    applicationContext, "YouTube", "youtube-local", "UNCERTAIN",
+                    "bundle-load-failed->existing-chain", title
+                )
+            } else {
+                val localPEnt = localClassifier.pEntertainment(title)
+                val pEntStr = "p_ent=%.3f".format(Locale.ROOT, localPEnt)
+                when (localClassifier.decide(localPEnt)) {
+                    LocalTitleClassifier.TitleDecision.ENTERTAINMENT -> {
+                        AiStudyGuardManager.logGuardActivity(
+                            applicationContext, "YouTube", "youtube-local", "NON_STUDY",
+                            "local-classifier $pEntStr", title
+                        )
+                        recordYouTubeEval(
+                            titleSource = titleSource, title = title,
+                            pEntBand = pEntBandLabel(localPEnt, localClassifier.blockThreshold),
+                            verdict = "NON_STUDY", action = "stage-1 warning"
+                        )
+                        val now = System.currentTimeMillis()
+                        if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
+                            lastYouTubeAiInterceptTimeMs = now
+                            val reason =
+                                "Non-study content detected: \"$title\" [local-classifier $pEntStr]"
+                            Log.w(TAG, "[YouTube Guard] $reason")
+                            YouTubeStudyGuardManager.recordBlockedVideo(
+                                context = applicationContext,
+                                title = title,
+                                channel = channel,
+                                reason = reason
+                            )
+                            pauseMediaPlayback()
+                            AiStudyGuardManager.onNonStudyDetected(
+                                context = applicationContext,
+                                packageName = "com.google.android.youtube",
+                                messageText = title,
+                                reason = reason
+                            )
+                        }
+                        return true
+                    }
+                    LocalTitleClassifier.TitleDecision.STRONG_STUDY -> {
+                        AiStudyGuardManager.logGuardActivity(
+                            applicationContext, "YouTube", "youtube-local", "STUDY",
+                            "local-classifier $pEntStr", title
+                        )
+                        recordYouTubeEval(
+                            titleSource = titleSource, title = title,
+                            pEntBand = pEntBandLabel(localPEnt, localClassifier.blockThreshold),
+                            verdict = "STUDY", action = "allowed"
+                        )
+                        return false
+                    }
+                    LocalTitleClassifier.TitleDecision.UNCERTAIN -> {
+                        AiStudyGuardManager.logGuardActivity(
+                            applicationContext, "YouTube", "youtube-local", "UNCERTAIN",
+                            "local-classifier $pEntStr->existing-chain", title
+                        )
+                    }
+                }
+            }
+        }
+
+        // v1.1.8: curated offline knowledge — instant (<1ms), zero network.
+        // v1.2.3 (A): the hard rule — a knowledge NON_STUDY only fires the
+        // discipline flow at HIGH confidence (score <= -4.0: a multi-word
+        // block phrase or 2+ hits). A weak single-word hit (score -2..-4)
+        // falls through to quick→Gemini instead of blocking on thin evidence.
+        val detailed = StudyGuardKnowledge.scoreVideoDetailed(title, channel)
+        when (detailed.verdict) {
             StudyGuardKnowledge.Verdict.STUDY -> {
-                Log.d(TAG, "[StudyGuardKnowledge] Study video allowed: '$title' ($channel)")
+                Log.d(TAG, "[StudyGuardKnowledge] Study video allowed: '$title' ($channel) [${detailed.evidence}]")
                 // v1.1.9 diagnostic
-                AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-knowledge", "STUDY", "knowledge", title)
+                AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-knowledge", "STUDY", detailed.evidence, title)
+                recordYouTubeEval(titleSource = titleSource, title = title, verdict = "STUDY", action = "allowed")
                 return false
             }
             StudyGuardKnowledge.Verdict.NON_STUDY -> {
-                // v1.1.9 diagnostic (log every evaluation, before the action throttle)
-                AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-knowledge", "NON_STUDY", "knowledge", title)
-                val now = System.currentTimeMillis()
-                if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
-                    lastYouTubeAiInterceptTimeMs = now
-                    Log.w(TAG, "[StudyGuardKnowledge] Non-study video: '$title' ($channel)")
-                    YouTubeStudyGuardManager.recordBlockedVideo(
-                        context = applicationContext,
-                        title = title,
-                        channel = channel,
-                        reason = "Non-study content detected: \"$title\""
+                if (detailed.score > -4.0) {
+                    // Weak signal — treat as UNCERTAIN, fall through.
+                    AiStudyGuardManager.logGuardActivity(
+                        applicationContext, "YouTube", "youtube-knowledge", "UNCERTAIN",
+                        "weak(${detailed.evidence})→quick", title
                     )
-                    pauseMediaPlayback()
-                    AiStudyGuardManager.onNonStudyDetected(
-                        context = applicationContext,
-                        packageName = "com.google.android.youtube",
-                        messageText = title,
-                        reason = "Non-study content detected on YouTube: \"$title\""
-                    )
+                } else {
+                    // v1.1.9 diagnostic (log every evaluation, before the action throttle)
+                    AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-knowledge", "NON_STUDY", detailed.evidence, title)
+                    val now = System.currentTimeMillis()
+                    if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
+                        lastYouTubeAiInterceptTimeMs = now
+                        Log.w(TAG, "[StudyGuardKnowledge] Non-study video: '$title' ($channel) [${detailed.evidence}]")
+                        YouTubeStudyGuardManager.recordBlockedVideo(
+                            context = applicationContext,
+                            title = title,
+                            channel = channel,
+                            reason = "Non-study content detected: \"$title\" [${detailed.evidence}]"
+                        )
+                        pauseMediaPlayback()
+                        AiStudyGuardManager.onNonStudyDetected(
+                            context = applicationContext,
+                            packageName = "com.google.android.youtube",
+                            messageText = title,
+                            reason = "Non-study content detected on YouTube: \"$title\" [${detailed.evidence}]"
+                        )
+                    }
+                    recordYouTubeEval(titleSource = titleSource, title = title, verdict = "NON_STUDY", action = "stage-1 warning")
+                    return true
                 }
-                return true
             }
             StudyGuardKnowledge.Verdict.UNCERTAIN -> {
                 // fall through to existing flow below
@@ -1047,7 +1881,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             // v1.1.9 diagnostic (log every evaluation, before the action throttle)
             AiStudyGuardManager.logGuardActivity(
                 applicationContext, "YouTube", "youtube-quick", "NON_STUDY",
-                quickVerdict.category.ifBlank { "quick" }, title
+                "conf=${quickVerdict.confidence} " + quickVerdict.category.ifBlank { "quick" }, title
             )
             val now = System.currentTimeMillis()
             if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
@@ -1067,6 +1901,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     reason = quickVerdict.reason
                 )
             }
+            recordYouTubeEval(titleSource = titleSource, title = title, verdict = "NON_STUDY", action = "stage-1 warning")
             return true
         } else {
             // v1.1.9 diagnostic
@@ -1086,6 +1921,10 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         applicationContext, "YouTube", "youtube-gemini", "STUDY",
                         "AI check unavailable — allowed", title
                     )
+                    recordYouTubeEval(
+                        titleSource = titleSource, title = title,
+                        verdict = "STUDY", action = "allowed (fail-open: AI unavailable)"
+                    )
                     return@launch
                 }
                 if (!geminiVerdict.isStudyAllowed || geminiVerdict.isAdult) {
@@ -1094,7 +1933,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     val gemStage = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) "youtube-gemini" else "youtube-quick"
                     AiStudyGuardManager.logGuardActivity(
                         applicationContext, "YouTube", gemStage, "NON_STUDY",
-                        geminiVerdict.category.ifBlank { "gemini" }, title
+                        "conf=${geminiVerdict.confidence} " + geminiVerdict.category.ifBlank { "gemini" }, title
                     )
                     val now = System.currentTimeMillis()
                     if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
@@ -1114,13 +1953,25 @@ class AiStudyAccessibilityService : AccessibilityService() {
                             reason = geminiVerdict.reason
                         )
                     }
+                    recordYouTubeEval(
+                        titleSource = titleSource, title = title,
+                        verdict = "NON_STUDY", action = "stage-1 warning"
+                    )
                 } else {
                     // v1.1.9 diagnostic — v1.2.2: honest source label.
                     val allowStage = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) "youtube-gemini" else "youtube-quick"
                     val allowReason = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) "gemini-allow" else "quick-allow"
                     AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", allowStage, "STUDY", allowReason, title)
+                    recordYouTubeEval(
+                        titleSource = titleSource, title = title,
+                        verdict = "STUDY", action = "allowed"
+                    )
                 }
             }
+            recordYouTubeEval(
+                titleSource = titleSource, title = title,
+                verdict = "UNCERTAIN", action = "gemini check pending"
+            )
             return false
         }
     }
@@ -1155,19 +2006,60 @@ class AiStudyAccessibilityService : AccessibilityService() {
         return best
     }
 
-    private fun extractPlayingYouTubeVideo(rootNode: AccessibilityNodeInfo): YouTubeActiveVideoInfo? {
+    /**
+     * v1.2.3: scoped, multi-pattern extraction.
+     *
+     * SCOPE (v1.2.3, owner 2026-10-16): on the dedicated watch screen the
+     * search is constrained to the PLAYER subtree (the outermost
+     * watch/player fragment node) — never the full tree, whose
+     * first-match-wins pass was grabbing recommendation cards below the
+     * player. Recommendation containers are additionally excluded in every
+     * pass as a safety net. On non-watch surfaces (miniplayer floating over
+     * a browse surface, Shorts player) the previous scoping stands: only the
+     * miniplayer subtree, or the Shorts player screen, may contribute.
+     *
+     * CHANNEL (priority): viewId patterns → Subscribe-button sibling →
+     * description patterns (" by " split, @handle). The matched source is
+     * returned for Guard Hub evidence ("channel seen: X / not detected").
+     */
+    private fun extractPlayingYouTubeVideo(rootNode: AccessibilityNodeInfo, watchScreen: Boolean): YouTubeActiveVideoInfo? {
+        val scopeRoot: AccessibilityNodeInfo = if (watchScreen) {
+            findWatchPlayerSubtree(rootNode) ?: rootNode
+        } else {
+            val mini = findMiniplayerRoot(rootNode)
+            if (mini != null) {
+                mini
+            } else {
+                val shortsPlayer = com.example.util.ShortsSurfaceDetector
+                    .detectYouTubeShorts(rootNode) ==
+                    com.example.util.ShortsSurfaceDetector.ShortsSurface.YOUTUBE_SHORTS_PLAYER
+                if (!shortsPlayer) return null
+                rootNode
+            }
+        }
+
         var foundTitle: String? = null
-        var foundChannel: String? = null
         var foundMeta: String? = null
+        var foundChannel: String? = null
+        var channelSrc: String? = null
+        fun setChannel(value: String?, src: String) {
+            if (foundChannel.isNullOrBlank() && !value.isNullOrBlank()) {
+                foundChannel = value!!.trim()
+                channelSrc = src
+            }
+        }
 
-        fun traverse(node: AccessibilityNodeInfo, depth: Int) {
-            if (depth > 12) return
-
+        // Pass 1 — title + channel viewId patterns.
+        fun traversePass1(node: AccessibilityNodeInfo, depth: Int) {
+            if (depth > 12 || (foundTitle != null && foundChannel != null)) return
             val viewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
+            // v1.2.3 (owner 2026-10-16): recommendation containers can never
+            // contribute the playing title — first-match-wins was verdict-
+            // scoring rec cards below the player on the watch screen.
+            if (isRecommendationsContainer(viewId)) return
             val text = node.text?.toString()?.trim()
             val desc = node.contentDescription?.toString()?.trim()
 
-            // 1. Direct watch view title / channel resource matching
             if (viewId.contains("title") || viewId.contains("video_title") || viewId.contains("watch_title") ||
                 viewId.contains("metadata") || viewId.contains("header") || viewId.contains("collapsed_title") ||
                 viewId.contains("expandable_title") || viewId.contains("player_title") || viewId.contains("item_title")) {
@@ -1184,62 +2076,200 @@ class AiStudyAccessibilityService : AccessibilityService() {
             if (viewId.contains("channel_name") || viewId.contains("owner_name") || viewId.contains("author") ||
                 viewId.contains("channel_title") || viewId.contains("byline")) {
                 if (!text.isNullOrBlank() && foundChannel == null) {
-                    foundChannel = text
+                    setChannel(text, "viewid")
                 }
             }
-
-            // 2. YouTube Accessibility Content Descriptions
-            if (foundTitle == null && !desc.isNullOrBlank() && desc.length >= 10) {
-                val lowerDesc = desc.lowercase(Locale.ROOT)
-                if (lowerDesc.contains(" by ") || lowerDesc.contains("views") || lowerDesc.contains("ago") || lowerDesc.contains("minutes") || lowerDesc.contains("hours")) {
-                    if (!lowerDesc.contains("button") && !lowerDesc.contains("tab") && !lowerDesc.contains("search")) {
-                        val parts = desc.split(" by ")
-                        if (parts.size >= 2) {
-                            foundTitle = parts[0].trim()
-                            // v1.3.1: only use the description-derived channel when we don't
-                            // already have one from a channel_name/author node (more reliable).
-                            // Never split the channel segment on digits — channels like
-                            // "3Blue1Brown" or "TED-Ed" must survive intact. Strip trailing
-                            // view-count / age metadata with targeted patterns instead.
-                            if (foundChannel.isNullOrBlank()) {
-                                val afterBy = parts[1].trim()
-                                val metaCut = afterBy.split(Regex("""\s*[•|]\s*""")).firstOrNull()?.trim() ?: afterBy
-                                val channelOnly = metaCut
-                                    .replace(Regex("""\s+\d[\d.,]*[KMB]?\s+views?$""", RegexOption.IGNORE_CASE), "")
-                                    .replace(Regex("""\s+\d+\s+(seconds?|minutes?|hours?|days?|weeks?|months?|years?)\s+ago$""", RegexOption.IGNORE_CASE), "")
-                                    .trim()
-                                if (channelOnly.isNotBlank()) {
-                                    foundChannel = channelOnly
-                                }
-                            }
-                            foundMeta = desc
-                        } else {
-                            foundTitle = desc
-                            foundMeta = desc
-                        }
-                    }
-                }
+            if (viewId.contains("channel_handle") && !text.isNullOrBlank()) {
+                setChannel(text, "handle")
             }
 
             val count = node.childCount
             for (i in 0 until count) {
                 val child = node.getChild(i) ?: continue
-                traverse(child, depth + 1)
+                traversePass1(child, depth + 1)
                 try { child.recycle() } catch (_: Exception) {}
             }
         }
+        traversePass1(scopeRoot, 0)
 
-        traverse(rootNode, 0)
+        // Pass 2 — Subscribe-button sibling: the channel name sits next to
+        // the Subscribe button on the watch screen.
+        if (foundChannel == null) {
+            fun traversePass2(node: AccessibilityNodeInfo, depth: Int) {
+                if (depth > 12 || foundChannel != null) return
+                // v1.2.3: recommendation containers are excluded here too.
+                val p2ViewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
+                if (isRecommendationsContainer(p2ViewId)) return
+                val text = node.text?.toString()?.trim()?.lowercase(Locale.ROOT) ?: ""
+                val desc = node.contentDescription?.toString()?.trim()?.lowercase(Locale.ROOT) ?: ""
+                val isSubscribe = (text == "subscribe" || desc == "subscribe")
+                if (isSubscribe) {
+                    val parent = try { node.parent } catch (_: Exception) { null }
+                    if (parent != null) {
+                        val pc = parent.childCount
+                        for (i in 0 until pc) {
+                            val sib = try { parent.getChild(i) } catch (_: Exception) { null } ?: continue
+                            val st = sib.text?.toString()?.trim()
+                            if (!st.isNullOrBlank() && st.length in 2..60 &&
+                                !st.equals("subscribe", ignoreCase = true) &&
+                                !st.equals("subscribed", ignoreCase = true)
+                            ) {
+                                setChannel(st, "subscribe-sibling")
+                                try { sib.recycle() } catch (_: Exception) {}
+                                break
+                            }
+                            try { sib.recycle() } catch (_: Exception) {}
+                        }
+                        try { parent.recycle() } catch (_: Exception) {}
+                    }
+                    return
+                }
+                val count = node.childCount
+                for (i in 0 until count) {
+                    val child = node.getChild(i) ?: continue
+                    traversePass2(child, depth + 1)
+                    try { child.recycle() } catch (_: Exception) {}
+                }
+            }
+            traversePass2(scopeRoot, 0)
+        }
+
+        // Pass 3 — description patterns ("Title by Channel …", @handle).
+        if (foundTitle == null || foundChannel == null) {
+            fun traversePass3(node: AccessibilityNodeInfo, depth: Int) {
+                if (depth > 12) return
+                // v1.2.3: recommendation containers are excluded here too.
+                val p3ViewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
+                if (isRecommendationsContainer(p3ViewId)) return
+                val desc = node.contentDescription?.toString()?.trim()
+                if (!desc.isNullOrBlank() && desc.length >= 10) {
+                    val lowerDesc = desc.lowercase(Locale.ROOT)
+                    if (lowerDesc.contains(" by ") || lowerDesc.contains("views") || lowerDesc.contains("ago") ||
+                        lowerDesc.contains("minutes") || lowerDesc.contains("hours")) {
+                        if (!lowerDesc.contains("button") && !lowerDesc.contains("tab") && !lowerDesc.contains("search")) {
+                            val parts = desc.split(" by ")
+                            if (parts.size >= 2) {
+                                if (foundTitle == null) foundTitle = parts[0].trim()
+                                // v1.3.1: only use the description-derived channel when we don't
+                                // already have one from a channel_name/author node (more reliable).
+                                // Never split the channel segment on digits — channels like
+                                // "3Blue1Brown" or "TED-Ed" must survive intact. Strip trailing
+                                // view-count / age metadata with targeted patterns instead.
+                                if (foundChannel.isNullOrBlank()) {
+                                    val afterBy = parts[1].trim()
+                                    val metaCut = afterBy.split(Regex("""\s*[•|]\s*""")).firstOrNull()?.trim() ?: afterBy
+                                    val channelOnly = metaCut
+                                        .replace(Regex("""\s+\d[\d.,]*[KMB]?\s+views?$""", RegexOption.IGNORE_CASE), "")
+                                        .replace(Regex("""\s+\d+\s+(seconds?|minutes?|hours?|days?|weeks?|months?|years?)\s+ago$""", RegexOption.IGNORE_CASE), "")
+                                        .trim()
+                                    if (channelOnly.isNotBlank()) {
+                                        setChannel(channelOnly, "desc-by-split")
+                                    }
+                                }
+                                if (foundMeta == null) foundMeta = desc
+                            } else {
+                                if (foundTitle == null) foundTitle = desc
+                                if (foundMeta == null) foundMeta = desc
+                            }
+                        }
+                    }
+                    // @handle in player context.
+                    if (foundChannel == null) {
+                        val handle = Regex("""@[\w.]{2,30}""").find(desc)?.value
+                        if (handle != null) setChannel(handle, "handle-desc")
+                    }
+                }
+                if (foundTitle != null && foundChannel != null) return
+                val count = node.childCount
+                for (i in 0 until count) {
+                    val child = node.getChild(i) ?: continue
+                    traversePass3(child, depth + 1)
+                    try { child.recycle() } catch (_: Exception) {}
+                }
+            }
+            traversePass3(scopeRoot, 0)
+        }
 
         return if (!foundTitle.isNullOrBlank()) {
             YouTubeActiveVideoInfo(
                 title = foundTitle!!,
                 channel = foundChannel,
-                metadata = foundMeta
+                metadata = foundMeta,
+                channelSrc = channelSrc
             )
         } else {
             null
         }
+    }
+
+    /**
+     * v1.2.3 (owner 2026-10-16): viewId fragments of recommendation / browse
+     * containers whose subtrees must NEVER contribute the playing-video
+     * title. Kept tight on purpose — the playing video's own metadata
+     * container must not match.
+     */
+    private fun isRecommendationsContainer(viewId: String): Boolean {
+        return viewId.contains("recommend") || viewId.contains("related_video") ||
+                viewId.contains("watch_next") || viewId.contains("up_next") ||
+                viewId.contains("compact_video")
+    }
+
+    /**
+     * v1.2.3 (owner 2026-10-16): finds the outermost watch/player fragment
+     * node — the playing-video context on the watch screen. Pre-order DFS
+     * returns the shallowest match, so a full watch-page container wins
+     * over the bare video surface inside it (the title lives next to the
+     * player, not inside the surface). Null when no fragment id is exposed.
+     */
+    private fun findWatchPlayerSubtree(rootNode: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        var result: AccessibilityNodeInfo? = null
+        fun traverse(node: AccessibilityNodeInfo, depth: Int) {
+            if (result != null || depth > 10) return
+            val viewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
+            if (viewId.contains("watch_fragment") || viewId.contains("player_fragment") ||
+                viewId.contains("watch_player") || viewId.contains("watch_while") ||
+                viewId.contains("miniplayer") || viewId.contains("mini_player")) {
+                result = node
+                return
+            }
+            val count = node.childCount
+            for (i in 0 until count) {
+                val child = node.getChild(i) ?: continue
+                traverse(child, depth + 1)
+                // NOTE: do not recycle children here — the found subtree root
+                // must stay usable by the caller.
+                if (result == null) {
+                    try { child.recycle() } catch (_: Exception) {}
+                }
+            }
+        }
+        traverse(rootNode, 0)
+        return result
+    }
+
+    /** Finds the miniplayer subtree root (viewId contains miniplayer/watch_while). */
+    private fun findMiniplayerRoot(rootNode: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        var result: AccessibilityNodeInfo? = null
+        fun traverse(node: AccessibilityNodeInfo, depth: Int) {
+            if (result != null || depth > 10) return
+            val viewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
+            if (viewId.contains("miniplayer") || viewId.contains("watch_while") || viewId.contains("mini_player")) {
+                result = node
+                return
+            }
+            val count = node.childCount
+            for (i in 0 until count) {
+                val child = node.getChild(i) ?: continue
+                traverse(child, depth + 1)
+                // NOTE: do not recycle children here — the found subtree root
+                // must stay usable by the caller.
+                if (result == null) {
+                    try { child.recycle() } catch (_: Exception) {}
+                }
+            }
+        }
+        traverse(rootNode, 0)
+        return result
     }
 
     override fun onInterrupt() {

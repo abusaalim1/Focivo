@@ -230,7 +230,6 @@ class V12ScreenshotsTest {
                 currentTaskTitle = "Physics: Units & Measurement",
                 distractionsCount = 0,
                 ambientSound = "Rain",
-                userStreak = 7,
                 userPreferences = fakePrefs(),
                 onStartTimer = {},
                 onPauseTimer = {},
@@ -264,7 +263,6 @@ class V12ScreenshotsTest {
                 currentUserName = "Abu Saalim",
                 currentUserPhotoUrl = null,
                 currentUserPoints = 1250,
-                currentUserStreak = 7,
                 sessions = fakeSessions(),
                 onRefresh = {}
             )

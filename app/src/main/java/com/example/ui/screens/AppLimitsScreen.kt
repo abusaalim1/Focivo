@@ -72,6 +72,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -85,7 +88,8 @@ import com.example.ui.components.AddEditAppLimitSheet
 import com.example.ui.components.FocusShieldPermissions
 import com.example.ui.components.GlassCard
 import com.example.ui.theme.PoppinsFontFamily
-import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.SerifItalicFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.util.AppDailyLimitsManager
 import com.example.util.AppIconView
 import com.example.util.DeviceAppInfo
@@ -99,6 +103,45 @@ data class AppUsageRankItem(
     val usageMinutesToday: Int,
     val limit: AppDailyLimitEntity?
 )
+
+// Owner's Full App Redesign token system (dark + light aware).
+// Dark values are exactly the clean-redesign tokens.
+private object Limits {
+    val Lime @Composable get() = focivoTokens().accent
+    val Surface @Composable get() = focivoTokens().surface
+    val Line @Composable get() = focivoTokens().line
+    val Text @Composable get() = focivoTokens().text
+    val Muted @Composable get() = focivoTokens().muted
+    val TrackOff @Composable get() = focivoTokens().trackOff
+    val ThumbOff @Composable get() = focivoTokens().thumbOff
+    val Bg @Composable get() = focivoTokens().bg
+    val SerifItalic @Composable get() = SerifItalicFontFamily
+}
+
+/** The design's toggle: 48x28, dark track / grey thumb, lime when on. */
+@Composable
+private fun LimitsShieldToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String? = null
+) {
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier
+            .size(48.dp, 28.dp)
+            .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = Limits.Bg,
+            checkedTrackColor = Limits.Lime,
+            uncheckedThumbColor = Limits.ThumbOff,
+            uncheckedTrackColor = Limits.TrackOff,
+            uncheckedBorderColor = Color.Transparent,
+            checkedBorderColor = Color.Transparent
+        )
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -219,16 +262,16 @@ fun AppLimitsScreen(
                         Text(
                             text = "Per-App Daily Limits",
                             style = MaterialTheme.typography.titleLarge.copy(
-                                fontFamily = PoppinsFontFamily,
+                                fontFamily = Limits.SerifItalic,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFFF0F4ED)
+                                color = Limits.Text
                             )
                         )
                         Text(
                             text = "Continuous time budget per app",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFFA0A89E),
+                                color = Limits.Muted,
                                 fontSize = 12.sp
                             )
                         )
@@ -242,12 +285,12 @@ fun AppLimitsScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color(0xFFF0F4ED)
+                            tint = Limits.Text
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF111411)
+                    containerColor = Limits.Bg
                 )
             )
         },
@@ -258,7 +301,7 @@ fun AppLimitsScreen(
                     preselectedAppForAdd = null
                     showAddSheet = true
                 },
-                containerColor = RegainLimePrimary,
+                containerColor = Limits.Lime,
                 contentColor = Color(0xFF021207),
                 modifier = Modifier.testTag("add_app_limit_fab")
             ) {
@@ -268,7 +311,7 @@ fun AppLimitsScreen(
                 )
             }
         },
-        containerColor = Color(0xFF111411),
+        containerColor = Limits.Bg,
         modifier = modifier.testTag("app_limits_screen")
     ) { innerPadding ->
         Column(
@@ -316,14 +359,14 @@ fun AppLimitsScreen(
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontFamily = PoppinsFontFamily,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFF0F4ED)
+                                        color = Limits.Text
                                     )
                                 )
                                 Text(
                                     text = "Required to see live screen time spent on each app & enforce limits",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        color = Color(0xFFA0A89E),
+                                        color = Limits.Muted,
                                         fontSize = 12.sp
                                     )
                                 )
@@ -337,7 +380,7 @@ fun AppLimitsScreen(
                                 FocusShieldPermissions.openUsageAccessSettings(context)
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = RegainLimePrimary,
+                                containerColor = Limits.Lime,
                                 contentColor = Color(0xFF021207)
                             ),
                             shape = RoundedCornerShape(12.dp),
@@ -387,9 +430,10 @@ fun AppLimitsScreen(
                             text = "TODAY'S SCREEN TIME & LIMITS",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = RegainLimePrimary,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
+                                color = Limits.Lime,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.76.sp,
+                                fontSize = 11.sp
                             )
                         )
                         Spacer(modifier = Modifier.height(4.dp))
@@ -400,7 +444,7 @@ fun AppLimitsScreen(
                             text = formattedScreenTime,
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFFF0F4ED),
+                                color = Limits.Text,
                                 fontWeight = FontWeight.Bold
                             )
                         )
@@ -412,7 +456,7 @@ fun AppLimitsScreen(
                             text = "$activeLimitsCount active limits ($formattedBudget budget)",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFFA0A89E),
+                                color = Limits.Muted,
                                 fontSize = 12.sp
                             )
                         )
@@ -434,20 +478,20 @@ fun AppLimitsScreen(
                     Text(
                         text = "Search apps on device...",
                         fontFamily = PoppinsFontFamily,
-                        color = Color(0xFFA0A89E)
+                        color = Limits.Muted
                     )
                 },
                 leadingIcon = {
-                    Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = Color(0xFFA0A89E))
+                    Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = Limits.Muted)
                 },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFF1B201B),
-                    unfocusedContainerColor = Color(0xFF1B201B),
-                    focusedBorderColor = RegainLimePrimary,
-                    unfocusedBorderColor = Color(0x358CE000),
-                    focusedTextColor = Color(0xFFF0F4ED),
-                    unfocusedTextColor = Color(0xFFF0F4ED)
+                    focusedContainerColor = Limits.Surface,
+                    unfocusedContainerColor = Limits.Surface,
+                    focusedBorderColor = Limits.Lime,
+                    unfocusedBorderColor = Limits.Line,
+                    focusedTextColor = Limits.Text,
+                    unfocusedTextColor = Limits.Text
                 ),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
@@ -470,10 +514,10 @@ fun AppLimitsScreen(
                     Surface(
                         onClick = { selectedFilterTab = tabKey },
                         shape = RoundedCornerShape(12.dp),
-                        color = if (isSelected) RegainLimePrimary.copy(alpha = 0.18f) else Color(0xFF1B201B),
+                        color = if (isSelected) Limits.Lime.copy(alpha = 0.18f) else Limits.Surface,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            if (isSelected) RegainLimePrimary else Color(0x208CE000)
+                            if (isSelected) Limits.Lime else Limits.Line
                         ),
                         modifier = Modifier.testTag("filter_tab_$tabKey")
                     ) {
@@ -482,7 +526,7 @@ fun AppLimitsScreen(
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontFamily = PoppinsFontFamily,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) RegainLimePrimary else Color(0xFFA0A89E)
+                                color = if (isSelected) Limits.Lime else Limits.Muted
                             ),
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                         )
@@ -514,7 +558,7 @@ fun AppLimitsScreen(
                             text = if (searchQuery.isBlank()) "No Apps Found" else "No matching apps found",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFFF0F4ED),
+                                color = Limits.Text,
                                 fontWeight = FontWeight.Bold
                             )
                         )
@@ -523,7 +567,7 @@ fun AppLimitsScreen(
                             text = if (searchQuery.isBlank()) "Try changing your filter tab." else "Try a different search keyword.",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFFA0A89E)
+                                color = Limits.Muted
                             )
                         )
                     }
@@ -622,7 +666,7 @@ fun AppRankAndLimitCard(
         !hasLimit || !isLimitEnabled -> Color.Gray
         progressFraction >= 1.0f -> Color(0xFFEF4444)
         progressFraction >= 0.8f -> Color(0xFFF59E0B)
-        else -> RegainLimePrimary
+        else -> Limits.Lime
     }
 
     GlassCard(
@@ -666,7 +710,7 @@ fun AppRankAndLimitCard(
                             text = appInfo.appName.ifBlank { appInfo.packageName },
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFFF0F4ED),
+                                color = Limits.Text,
                                 fontWeight = FontWeight.Bold
                             ),
                             maxLines = 1
@@ -676,14 +720,14 @@ fun AppRankAndLimitCard(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Surface(
-                                color = Color(0xFF202620),
+                                color = Limits.Line,
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(
                                     text = appInfo.category,
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        color = Color(0xFFA0A89E),
+                                        color = Limits.Muted,
                                         fontSize = 10.sp
                                     ),
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -692,14 +736,14 @@ fun AppRankAndLimitCard(
 
                             // Time spent today badge
                             Surface(
-                                color = if (usedMins > 0) RegainLimePrimary.copy(alpha = 0.15f) else Color(0x15FFFFFF),
+                                color = if (usedMins > 0) Limits.Lime.copy(alpha = 0.15f) else Color(0x15FFFFFF),
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(
                                     text = if (usedMins > 0) "$formattedSpentToday today" else "0m today",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        color = if (usedMins > 0) RegainLimePrimary else Color(0xFFA0A89E),
+                                        color = if (usedMins > 0) Limits.Lime else Limits.Muted,
                                         fontWeight = if (usedMins > 0) FontWeight.Bold else FontWeight.Normal,
                                         fontSize = 10.sp
                                     ),
@@ -713,18 +757,12 @@ fun AppRankAndLimitCard(
                 // Limit Controls or "+ Set Limit" Button
                 if (limit != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Switch(
+                        LimitsShieldToggle(
                             checked = limit.isEnabled,
                             onCheckedChange = { isChecked ->
                                 onToggleEnabled(limit.id, isChecked)
                             },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFF021207),
-                                checkedTrackColor = RegainLimePrimary,
-                                uncheckedThumbColor = Color(0xFFA0A89E),
-                                uncheckedTrackColor = Color(0xFF262C24)
-                            ),
-                            modifier = Modifier.testTag("limit_toggle_${limit.id}")
+                            testTag = "limit_toggle_${limit.id}"
                         )
                         IconButton(onClick = { onDeleteLimit(limit.id) }) {
                             Icon(
@@ -739,9 +777,9 @@ fun AppRankAndLimitCard(
                     OutlinedButton(
                         onClick = onSetLimit,
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = RegainLimePrimary
+                            contentColor = Limits.Lime
                         ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, RegainLimePrimary),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Limits.Lime),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         modifier = Modifier.testTag("set_limit_btn_${appInfo.packageName}")
@@ -796,7 +834,7 @@ fun AppRankAndLimitCard(
                     LinearProgressIndicator(
                         progress = { progressFraction },
                         color = progressColor,
-                        trackColor = Color(0xFF262C24),
+                        trackColor = Limits.TrackOff,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(8.dp)
@@ -841,7 +879,7 @@ fun AppRankAndLimitCard(
 
                     // Emergency uses badge
                     Surface(
-                        color = RegainLimePrimary.copy(alpha = 0.15f),
+                        color = Limits.Lime.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Row(
@@ -852,7 +890,7 @@ fun AppRankAndLimitCard(
                                 text = "${limit.emergencyUsesRemainingToday}/${limit.emergencyUsesAllowed} Emergency Uses",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontFamily = PoppinsFontFamily,
-                                    color = RegainLimePrimary,
+                                    color = Limits.Lime,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 10.sp
                                 )

@@ -52,6 +52,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -108,7 +111,7 @@ fun BlockedAppOverlay(
     val context = LocalContext.current
 
     val accentColor = if (isPunishment) Color(0xFFFF5252) else V150Lime
-    val screenBg = Color(0xFF080C09)
+    val screenBg = Color(0xFF0A0A0B)
 
     // Live remaining timer state (same sources as before)
     var remainingSeconds by remember(initialDurationSec) {
@@ -189,6 +192,7 @@ fun BlockedAppOverlay(
             Text(
                 text = "$appName is blocked during focus",
                 style = MaterialTheme.typography.headlineMedium.copy(
+                    fontFamily = BlockSerifItalic,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     fontSize = 23.sp,
@@ -204,7 +208,7 @@ fun BlockedAppOverlay(
             Text(
                 text = if (remainingSeconds > 0) "Unlocks automatically in $timeFormatted"
                 else "Session finished — apps are unlocking",
-                color = Color(0xFF8A978B),
+                color = Color(0xFF76767C),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center
@@ -278,7 +282,13 @@ fun BlockedAppOverlay(
     }
 }
 
-private val V150Lime = Color(0xFF8FD400)
+private val V150Lime = Color(0xFFB6F13A)
+
+// v1.2.3 design-unification — owner's clean-redesign language:
+// Instrument Serif italic for the big display headline.
+private val BlockSerifItalic = FontFamily(
+    Font(R.font.instrument_serif_italic, FontWeight.Normal, FontStyle.Italic)
+)
 
 /** English-only, zero-emoji focus tips used when no priority item exists. */
 private val V150FocusTips = listOf(
@@ -345,7 +355,7 @@ private fun BlockedAppIconBadge(
                     modifier = Modifier
                         .size(64.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF1B241C)),
+                        .background(Color(0xFF1F1F22)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -412,8 +422,8 @@ private fun SuggestionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(Color(0xFF10160F))
-            .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(24.dp))
+            .background(Color(0xFF131315))
+            .border(1.dp, Color(0xFF1F1F22), RoundedCornerShape(24.dp))
             .padding(horizontal = 20.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.Start
     ) {
@@ -437,7 +447,7 @@ private fun SuggestionCard(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = nextPriorityTitle!!,
-                color = Color(0xFFDCE5DC),
+                color = Color(0xFFF4F4F5),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 lineHeight = 20.sp,
@@ -455,7 +465,7 @@ private fun SuggestionCard(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = tip,
-                color = Color(0xFFDCE5DC),
+                color = Color(0xFFF4F4F5),
                 fontSize = 14.sp,
                 lineHeight = 21.sp
             )

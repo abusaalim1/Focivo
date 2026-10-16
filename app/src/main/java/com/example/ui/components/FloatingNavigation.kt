@@ -51,15 +51,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AppleLinearFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.LocalAppAccent
-import com.example.ui.theme.MutedBorderLight
-import com.example.ui.theme.NearBlack
-import com.example.ui.theme.PureWhite
-import com.example.ui.theme.RegainLimeContainer
-import com.example.ui.theme.RegainLimeDeepText
-import com.example.ui.theme.RegainLimeLight
-import com.example.ui.theme.RegainLimePrimary
-import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 
 enum class NavTab(
@@ -83,19 +76,25 @@ fun FloatingNavigation(
     val view = LocalView.current
     val isDark = isAppInDarkTheme()
 
-    val barBg = if (isDark) Color(0xE61C1C1E) else Color(0xF8FFFFFF)
-    val barBorder = if (isDark) Color(0x28FFFFFF) else Color(0x14000000)
-    // v1.4.0-round2: active pill follows the full-screen theme accent
+    val barBg = focivoTokens().surface.copy(alpha = 0.92f)
+    val barBorder = focivoTokens().line
+    // v1.4.0-round2: active tab follows the full-screen theme accent
     // (Aurora accent == RegainLimePrimary, so the default look is unchanged).
     val activeBg = LocalAppAccent.current
-    val activeContent = Color(0xFF061505)
-    val inactiveContent = if (isDark) Color(0xFF8E8E93) else Color(0xFF6C6C70)
+    val activeContent = focivoTokens().onAccent
+    val inactiveContent = focivoTokens().muted
+
+    // Owner order 2026-10-16: the Motion Lab liquid pill effect is REMOVED.
+    // The nav is back to its pre-Motion-Lab form — a simple rounded accent
+    // background behind the selected tab (no cross-tab spring, no
+    // measurement, no draw-layer). Tab behaviour is otherwise identical.
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .testTag("floating_nav"),
         contentAlignment = Alignment.Center
     ) {
         // Apple-inspired Floating Dock
@@ -128,12 +127,6 @@ fun FloatingNavigation(
                         label = "tab_scale"
                     )
 
-                    val activeBgColor by animateColorAsState(
-                        targetValue = if (isSelected) activeBg else Color.Transparent,
-                        animationSpec = tween(180),
-                        label = "tab_bg"
-                    )
-
                     val activeContentColor by animateColorAsState(
                         targetValue = if (isSelected) activeContent else inactiveContent,
                         animationSpec = tween(180),
@@ -146,8 +139,11 @@ fun FloatingNavigation(
                                 scaleX = scale
                                 scaleY = scale
                             }
-                            .clip(CircleShape)
-                            .background(activeBgColor)
+                            // Static per-tab active background (pre-Motion-Lab).
+                            .background(
+                                color = if (isSelected) activeBg else Color.Transparent,
+                                shape = CircleShape
+                            )
                             .clickable(
                                 interactionSource = interactionSource,
                                 indication = null
@@ -204,4 +200,3 @@ fun FloatingNavigation(
         }
     }
 }
-

@@ -48,7 +48,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,13 +58,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.SupabaseScheduledBlockDto
 import com.example.service.ScheduledBlockScheduler
-import com.example.ui.components.AuroraBackground
+import com.example.service.StrictLockInManager
 import com.example.ui.components.GlassCard
 import com.example.ui.components.GlassSwitch
 import com.example.ui.components.MascotPose
@@ -73,6 +76,7 @@ import com.example.ui.theme.LavenderSoft
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
@@ -98,12 +102,31 @@ fun AutoStudyScheduleScreen(
     val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
     val cardBorder = if (isDark) MaterialTheme.colorScheme.outlineVariant else MutedBorderLight
     // v1.4.2: explicit text colors (colorScheme.onSurface renders dark on dark cards)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val T = focivoTokens()
+    val textPrimary = T.text
+    val textSecondary = T.muted
 
     var activeSheetSchedule by remember { mutableStateOf<SupabaseScheduledBlockDto?>(null) }
     var isSheetOpen by remember { mutableStateOf(false) }
     var scheduleToDeleteId by remember { mutableStateOf<String?>(null) }
+
+    // v1.2.3 (Task 13.1): strict lock-in. From the moment the 10-minute
+    // warning fires until the schedule starts, the schedule's toggle is
+    // LOCKED — tapping it shows the plain-English reason instead of
+    // toggling. Re-read every 15s so a warning that fires while the screen
+    // is open takes effect live.
+    val screenContext = LocalContext.current
+    var lockTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(15_000L)
+            lockTick++
+        }
+    }
+    val lockedScheduleId = remember(lockTick, scheduledBlocks) {
+        StrictLockInManager.getLockedScheduleId(screenContext)
+    }
+    var lockReasonText by remember { mutableStateOf<String?>(null) }
 
     fun openNewScheduleSheet() {
         activeSheetSchedule = null
@@ -147,10 +170,9 @@ fun AutoStudyScheduleScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(T.bg)
                 .padding(innerPadding)
         ) {
-            AuroraBackground(modifier = Modifier.fillMaxSize())
-
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -270,13 +292,13 @@ fun AutoStudyScheduleScreen(
 
                     val statusBadgeBg = when {
                         isActive -> RegainLimeContainer
-                        isBreak -> Color(0xFFFEF3C7) // Amber
-                        else -> if (isDark) Color(0xFF1E241E) else Color(0xFFF1F5F9)
+                        isBreak -> T.warning.copy(alpha = 0.15f) // Amber
+                        else -> T.surface2
                     }
 
                     val statusBadgeText = when {
                         isActive -> RegainLimeDeepText
-                        isBreak -> Color(0xFF92400E)
+                        isBreak -> T.warning
                         else -> textSecondary
                     }
 
@@ -426,7 +448,7 @@ fun AutoStudyScheduleScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isDark) Color(0xFF1E241E) else Color(0xFFF8FAFC))
+                                        .background(T.surface2)
                                         .padding(12.dp)
                                 ) {
                                     Text(
@@ -468,10 +490,23 @@ fun AutoStudyScheduleScreen(
                     }
                 } else {
                     items(scheduledBlocks, key = { it.id }) { schedule ->
+                        val isLocked = lockedScheduleId != null && lockedScheduleId == schedule.id
                         ScheduleCardItem(
                             schedule = schedule,
                             installedApps = installedApps,
-                            onToggle = { isEnabled -> onToggleSchedule(schedule.id, isEnabled) },
+                            isLocked = isLocked,
+                            onToggle = { isEnabled ->
+                                if (isLocked) {
+                                    val mins = StrictLockInManager.minutesLeft(screenContext)
+                                    lockReasonText = if (mins > 0) {
+                                        "Locked — your strict study starts in $mins minute${if (mins == 1) "" else "s"} and can no longer be cancelled."
+                                    } else {
+                                        "Locked — your strict study is starting and can no longer be cancelled."
+                                    }
+                                } else {
+                                    onToggleSchedule(schedule.id, isEnabled)
+                                }
+                            },
                             onEdit = { openEditScheduleSheet(schedule) },
                             onDelete = { scheduleToDeleteId = schedule.id },
                             cardBg = cardBg,
@@ -531,7 +566,7 @@ fun AutoStudyScheduleScreen(
                         onDeleteSchedule(delId)
                         scheduleToDeleteId = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
+                    colors = ButtonDefaults.buttonColors(containerColor = T.danger)
                 ) {
                     Text("Delete", color = MaterialTheme.colorScheme.onError, fontWeight = FontWeight.Bold)
                 }
@@ -543,6 +578,57 @@ fun AutoStudyScheduleScreen(
             }
         )
     }
+
+    // v1.2.3 (Task 13.1): locked-toggle reason dialog — a locked tap does
+    // nothing except show this plain-English reason.
+    lockReasonText?.let { reason ->
+        AlertDialog(
+            onDismissRequest = { lockReasonText = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = T.accentText,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Schedule locked",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            color = textPrimary
+                        )
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = reason,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = PoppinsFontFamily,
+                        color = textSecondary
+                    )
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { lockReasonText = null },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RegainLimePrimary,
+                        contentColor = NearBlack
+                    )
+                ) {
+                    Text(
+                        "Got it",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -550,6 +636,7 @@ fun AutoStudyScheduleScreen(
 private fun ScheduleCardItem(
     schedule: SupabaseScheduledBlockDto,
     installedApps: List<DeviceAppInfo>,
+    isLocked: Boolean = false,
     onToggle: (Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -635,6 +722,40 @@ private fun ScheduleCardItem(
                                 )
                             }
                         }
+
+                        // v1.2.3 (Task 13.1): visible lock state while the
+                        // 10-minute warning window is active — the toggle
+                        // does nothing except explain the lock.
+                        if (isLocked) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(focivoTokens().accentText.copy(alpha = 0.16f))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = null,
+                                        tint = focivoTokens().accentText,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "LOCKED",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = PoppinsFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = focivoTokens().accentText,
+                                            fontSize = 9.sp
+                                        ),
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     if (!schedule.subject.isNullOrBlank()) {
@@ -687,7 +808,7 @@ private fun ScheduleCardItem(
                     Icon(
                         imageVector = Icons.Default.Coffee,
                         contentDescription = null,
-                        tint = Color(0xFFD97706), // Warm Amber
+                        tint = focivoTokens().warning, // Warm Amber
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -696,7 +817,7 @@ private fun ScheduleCardItem(
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFD97706),
+                            color = focivoTokens().warning,
                             fontSize = 13.sp
                         )
                     )
@@ -726,7 +847,7 @@ private fun ScheduleCardItem(
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                if (isSelected) RegainLimeContainer else (if (isAppInDarkTheme()) Color(0xFF1E241E) else Color(0xFFF1F5F9))
+                                if (isSelected) focivoTokens().softAccent else focivoTokens().surface2
                             )
                             .padding(vertical = 4.dp),
                         contentAlignment = Alignment.Center
@@ -808,7 +929,7 @@ private fun ScheduleCardItem(
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Delete Schedule",
-                            tint = Color(0xFFEF4444),
+                            tint = focivoTokens().danger,
                             modifier = Modifier.size(18.dp)
                         )
                     }

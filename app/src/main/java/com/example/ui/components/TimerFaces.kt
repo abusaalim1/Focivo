@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
@@ -8,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,9 +42,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,6 +61,8 @@ import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
+import com.example.ui.timer.ClockStyle
+import com.example.ui.timer.FocivoClock
 import com.example.util.TimerFace
 import com.example.util.TimerFaceManager
 import com.example.util.TimerTheme
@@ -117,6 +124,17 @@ fun TimerFaceHost(
         "glass" -> GlassCardFace(params, modifier)
         "arc" -> HalfArcFace(params, modifier)
         "editorial" -> EditorialFace(params, modifier)
+        // v1.2.3 — nine new clock styles. Each renders FocivoClock in the
+        // dial slot with the equipped-study mascot beneath it.
+        "clock_orbit" -> ClockStyleFace(params, ClockStyle.ORBIT, modifier)
+        "clock_flip" -> ClockStyleFace(params, ClockStyle.FLIP, modifier)
+        "clock_liquid" -> ClockStyleFace(params, ClockStyle.LIQUID, modifier)
+        "clock_editorial" -> ClockStyleFace(params, ClockStyle.EDITORIAL, modifier)
+        "clock_dial" -> ClockStyleFace(params, ClockStyle.DIAL, modifier)
+        "clock_horizon" -> ClockStyleFace(params, ClockStyle.HORIZON, modifier)
+        "clock_stack" -> ClockStyleFace(params, ClockStyle.STACK, modifier)
+        "clock_breathe" -> ClockStyleFace(params, ClockStyle.BREATHE, modifier)
+        "clock_bars" -> ClockStyleFace(params, ClockStyle.BARS, modifier)
         else -> AuroraTimer(
             totalSeconds = params.totalSeconds,
             remainingSeconds = params.remainingSeconds,
@@ -133,6 +151,90 @@ fun TimerFaceHost(
             onTimeClick = params.onTimeClick,
             mascotContent = params.mascotContent,
             onMascotClick = params.onMascotClick
+        )
+    }
+}
+
+/**
+ * v1.2.3 — host for the nine new FocivoClock styles. Renders the clock in
+ * the dial slot, then the equipped-study mascot beneath it at modest size
+ * (tap still opens the Mascot screen), then the shared control row.
+ * The clock itself is tappable when idle/paused (tap-to-edit durations,
+ * same rule as the other faces).
+ */
+@Composable
+private fun ClockStyleFace(
+    params: TimerFaceParams,
+    style: ClockStyle,
+    modifier: Modifier = Modifier
+) {
+    val isDark = isAppInDarkTheme()
+    val accent = params.theme?.accent ?: FaceLime
+    val tappable = params.onTimeClick != null && !params.isRunning
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        FacePhasePill(
+            subjectTitle = params.subjectTitle,
+            isBreak = params.isBreak,
+            isRunning = params.isRunning,
+            onTagClick = params.onTagClick
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Box(
+            modifier = Modifier.then(
+                if (tappable) Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { params.onTimeClick?.invoke() } else Modifier
+            ),
+            contentAlignment = Alignment.Center
+        ) {
+            FocivoClock(
+                style = style,
+                remainingSec = params.remainingSeconds,
+                totalSec = params.totalSeconds,
+                accent = accent,
+                modifier = Modifier.size(300.dp)
+            )
+        }
+        if (tappable) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "tap to edit",
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 9.sp,
+                letterSpacing = 2.sp,
+                color = faceTextSecondary(isDark).copy(alpha = 0.75f)
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        // The equipped-study buddy, preserved under every new clock style.
+        if (params.mascotContent != null) {
+            Box(
+                modifier = Modifier.then(
+                    if (params.onMascotClick != null) {
+                        Modifier
+                            .pressFeedback()
+                            .clickable(onClick = params.onMascotClick)
+                    } else Modifier
+                ),
+                contentAlignment = Alignment.Center
+            ) {
+                params.mascotContent()
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+        FaceControlRow(
+            isRunning = params.isRunning,
+            isBreak = params.isBreak,
+            onTogglePlay = params.onTogglePlay,
+            onReset = params.onReset
         )
     }
 }
@@ -878,6 +980,18 @@ fun TimerFaceThumbnail(
                     Box(modifier = Modifier.fillMaxWidth(sampleProgress).height(2.dp).background(FaceLime))
                 }
             }
+            // v1.2.3 — real mini renders of the nine new clock styles.
+            // The designs are dark-native (white ink), so each renders on
+            // a fixed dark tile that reads in both app themes.
+            "clock_orbit" -> ClockStyleThumbnail(ClockStyle.ORBIT)
+            "clock_flip" -> ClockStyleThumbnail(ClockStyle.FLIP)
+            "clock_liquid" -> ClockStyleThumbnail(ClockStyle.LIQUID)
+            "clock_editorial" -> ClockStyleThumbnail(ClockStyle.EDITORIAL)
+            "clock_dial" -> ClockStyleThumbnail(ClockStyle.DIAL)
+            "clock_horizon" -> ClockStyleThumbnail(ClockStyle.HORIZON)
+            "clock_stack" -> ClockStyleThumbnail(ClockStyle.STACK)
+            "clock_breathe" -> ClockStyleThumbnail(ClockStyle.BREATHE)
+            "clock_bars" -> ClockStyleThumbnail(ClockStyle.BARS)
             else -> {
                 // Ring thumbnail: simple glowing ring with digits
                 Box(contentAlignment = Alignment.Center) {
@@ -908,6 +1022,35 @@ fun TimerFaceThumbnail(
 }
 
 /**
+ * v1.2.3 — mini render of one new clock style for the picker. The clock is
+ * drawn at its natural 300dp size and scaled down to fit the card.
+ */
+@Composable
+private fun ClockStyleThumbnail(style: ClockStyle) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFF0D110E)),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(300.dp)
+                .graphicsLayer(scaleX = 0.32f, scaleY = 0.32f)
+        ) {
+            FocivoClock(
+                style = style,
+                remainingSec = 1500,
+                totalSec = 1500,
+                accent = FaceLime
+            )
+        }
+    }
+}
+
+/**
  * "Timer Style" picker — lives in the Customize Timer sheet beside Themes.
  * Live preview thumbnails, Focus Points balance in the header (like the
  * theme picker), gold lock + price on locked cards.
@@ -919,7 +1062,9 @@ fun TimerFacePicker(
     onFaceTap: (face: TimerFace, isLocked: Boolean) -> Unit,
     modifier: Modifier = Modifier,
     textPrimary: Color,
-    cardBorder: Color
+    cardBorder: Color,
+    // v1.2.3: test hook — lets screenshot tests pre-scroll the row.
+    scrollState: ScrollState = rememberScrollState()
 ) {
     val isDark = isAppInDarkTheme()
     Column(modifier = modifier.fillMaxWidth()) {
@@ -937,18 +1082,23 @@ fun TimerFacePicker(
                 tint = Color(0xFFFFD54F),
                 modifier = Modifier.size(18.dp)
             )
-            Text(
-                text = "Your Focus Points: $focusPoints",
+            // Motion Lab #7 — points balance rolls like an odometer.
+            val pointsStyle = TextStyle(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
                 color = textPrimary
             )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "Your Focus Points: ", style = pointsStyle)
+                RollingNumber(value = focusPoints, style = pointsStyle)
+            }
         }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+                .horizontalScroll(scrollState)
+                .testTag("timer_face_picker_row"),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             TimerFaceManager.FACES.forEach { face ->

@@ -183,7 +183,6 @@ class V11NewFeaturesScreenshotsTest {
                 currentTaskTitle = "Physics",
                 distractionsCount = 0,
                 ambientSound = "Rain",
-                userStreak = 12,
                 userPreferences = fakePrefs(),
                 onStartTimer = {},
                 onPauseTimer = {},
@@ -213,7 +212,6 @@ class V11NewFeaturesScreenshotsTest {
                 currentTaskTitle = "Physics",
                 distractionsCount = 0,
                 ambientSound = "Rain",
-                userStreak = 12,
                 userPreferences = fakePrefs(),
                 pomodoroState = PomodoroState(
                     config = PomodoroConfig(25, 5, 15, 4, "classic"),

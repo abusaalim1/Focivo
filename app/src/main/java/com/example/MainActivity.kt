@@ -80,6 +80,8 @@ import com.example.ui.screens.SessionCompleteScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.AuthMode
 import com.example.ui.splash.FocivoSplash
+import com.example.ui.splash.WelcomeInfo
+import com.example.ui.splash.loadSplashWelcomeInfo
 import com.example.ui.splash.SplashVariant
 import com.example.ui.theme.FocuslyTheme
 import com.example.ui.viewmodel.FocuslyViewModel
@@ -271,6 +273,13 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val activeAiBlock by viewModel.activeAiBlock.collectAsState()
     val activeAiResolved by viewModel.activeAiResolved.collectAsState()
     val showPreStudyBlockSheet by viewModel.showPreStudyBlockSheet.collectAsState()
+    // v1.2.3 (Task 13.2) — pre-session Strict Mode + AI Guard prompt sheet.
+    val showStrictGuardPromptSheet by viewModel.showStrictGuardPromptSheet.collectAsState()
+    // v1.2.3 (final assembly) — Motion Lab "Lock-in start" overlay.
+    val showLockInStart by viewModel.showLockInStart.collectAsState()
+    val lockInBlockedPackages by viewModel.lockInBlockedPackages.collectAsState()
+    val promptStrictOn by viewModel.promptStrictOn.collectAsState()
+    val promptGuardOn by viewModel.promptGuardOn.collectAsState()
     val isSupportLockZenSheetOpen by viewModel.isSupportLockZenSheetOpen.collectAsState()
     val showMilestoneDonationPrompt by viewModel.showMilestoneDonationPrompt.collectAsState()
     val showSessionDonationPrompt by viewModel.showSessionDonationPrompt.collectAsState()
@@ -355,6 +364,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
         // Deep Focus Active: Back gesture intercepted to keep student inside session
     }
 
+
+
     val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -404,10 +415,18 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     // the Create Account tab on the auth screen.
     var splashVariant by remember { mutableStateOf<SplashVariant?>(null) }
     var splashWantsCreateAccount by remember { mutableStateOf(false) }
+    // v1.2.3: real user data for the WelcomeScene (name / today's
+    // minutes), read from the same on-device stores the share cards use.
+    var splashWelcomeInfo by remember { mutableStateOf(WelcomeInfo()) }
 
     LaunchedEffect(isAuthChecking, currentUser) {
         if (!isAuthChecking && splashVariant == null) {
-            splashVariant = if (currentUser != null) SplashVariant.RETURNING else SplashVariant.NEW_USER
+            if (currentUser != null) {
+                splashVariant = SplashVariant.RETURNING
+                splashWelcomeInfo = loadSplashWelcomeInfo(context)
+            } else {
+                splashVariant = SplashVariant.NEW_USER
+            }
         }
     }
     var isSettingsOpen by remember { mutableStateOf(false) }
@@ -422,6 +441,37 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val alarmHubSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val shieldHubSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val supportLockZenSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // v1.2.3 — ROOT CAUSE of "Back closes the whole app": navigation is
+    // state-driven (boolean flags + selectedTab) with no back stack, and
+    // most full-screen layers registered no BackHandler — so system Back
+    // fell through to Activity.finish() from Settings, Mascot, App Limits,
+    // the hubs, Session Complete, or any non-Home tab.
+    //
+    // One centralized handler, topmost layer first. Dialog()/ModalBottomSheet
+    // layers handle Back natively (their callbacks register later, so they
+    // win over this one); this covers everything they don't. The app exits
+    // via system Back ONLY from the root Home state — never mid-flow and
+    // never during an active session. Deep Focus keeps its own lock above
+    // (this handler disables itself while that lock is engaged).
+    // Placed AFTER all navigation-state declarations (used below).
+    val deepFocusBackLocked = isTimerRunning && isDeepFocusSessionActive
+    val backAction: (() -> Unit)? = when {
+        showCompletionScreen && completedSessionSummary != null ->
+            ({ viewModel.dismissCompletionScreen() })
+        isSessionLogOpen -> ({ isSessionLogOpen = false })
+        isAutoScheduleOpen -> ({ isAutoScheduleOpen = false })
+        isAppLimitsOpen -> ({ isAppLimitsOpen = false })
+        isAiGuardHubOpen -> ({ viewModel.closeAiGuardHub() })
+        isShieldHubOpen -> ({ viewModel.closeShieldHub() })
+        isSettingsOpen -> ({ isSettingsOpen = false })
+        isMascotOpen -> ({ isMascotOpen = false })
+        selectedTab != NavTab.HOME -> ({ selectedTab = NavTab.HOME })
+        else -> null
+    }
+    androidx.activity.compose.BackHandler(enabled = backAction != null && !deepFocusBackLocked) {
+        backAction?.invoke()
+    }
 
     // Dark theme resolution based on user preferences
     val isSystemDark = isSystemInDarkTheme()
@@ -450,6 +500,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
             // (onboarding checks / guest skip / main shell — untouched).
             FocivoSplash(
                 variant = splashVariant ?: SplashVariant.NEW_USER,
+                welcome = splashWelcomeInfo,
                 onFinished = { openCreateAccount ->
                     splashWantsCreateAccount = openCreateAccount
                     isSplashFinished = true
@@ -651,7 +702,6 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         currentTaskTitle = currentTaskTitle,
                                         distractionsCount = distractionsCount,
                                         ambientSound = ambientSound,
-                                        userStreak = userPreferences?.currentStreak ?: 0,
                                         userPreferences = userPreferences,
                                         isShieldActive = hasCoreShieldPerms && (userPreferences?.isAppBlockerEnabled == true || isTimerRunning || isStandaloneShieldActive),
                                         isDeepFocusEnabled = isDeepFocusEnabled,
@@ -664,12 +714,22 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                             viewModel.confirmPreStudyBlock(pkgs, dontShowAgain)
                                         },
                                         onDismissPreStudyBlock = { viewModel.dismissPreStudyBlockSheet() },
+                                        // v1.2.3 (Task 13.2) — pre-session Strict Mode + AI Guard prompt sheet.
+                                        showStrictGuardPromptSheet = showStrictGuardPromptSheet,
+                                        promptStrictOn = promptStrictOn,
+                                        promptGuardOn = promptGuardOn,
+                                        onEnableStrictFromPrompt = { viewModel.enableStrictFromPrompt() },
+                                        onEnableGuardFromPrompt = { viewModel.enableGuardFromPrompt() },
+                                        onStartFromStrictGuardPrompt = { viewModel.continueSessionStartAfterPrompt() },
+                                        onDismissStrictGuardPrompt = { viewModel.dismissStrictGuardPrompt() },
                                         onStartTimer = { viewModel.requestStudySessionStart() },
                                         onPauseTimer = { viewModel.pauseTimer() },
                                         onResumeTimer = { viewModel.resumeTimer() },
                                         onFinishEarly = {
-                                            // v1.3.1: strict mode — ending early is blocked behind
-                                            // an explicit confirmation (the session is discarded).
+                                            // v1.2.3 (Task 10): strict mode FULL lock-in —
+                                            // the session cannot be stopped or restarted
+                                            // until the timer finishes. The dialog
+                                            // explains why; there is no early-exit path.
                                             if (com.example.util.StrictModeManager.isStrictModeEnabled(context)) {
                                                 showStrictEndConfirmDialog = true
                                             } else {
@@ -689,6 +749,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         // v1.1: Pomodoro engine.
                                         pomodoroState = pomodoroState,
                                         onStartPomodoro = { config -> viewModel.requestPomodoroStart(config) },
+                                        // v1.2.3: pomodoro-run slot controls.
+                                        onStopPomodoro = { viewModel.stopPomodoro() },
+                                        onSkipPomodoroFocus = { viewModel.skipPomodoroFocusPhase() },
                                         // v1.1: dedicated blocked-apps list.
                                         onRemoveBlockedApp = { pkg -> viewModel.removeBlockedApp(pkg) },
                                         onSaveBlockedApps = { pkgs -> viewModel.updateBlockedAppsList(pkgs) }
@@ -700,7 +763,6 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         currentUserName = userPreferences?.currentUserName ?: "You",
                                         currentUserPhotoUrl = userPreferences?.currentUserPhotoUrl,
                                         currentUserPoints = userPreferences?.focusPoints ?: 0,
-                                        currentUserStreak = userPreferences?.currentStreak ?: 1,
                                         sessions = sessions,
                                         onRefresh = { viewModel.refreshLeaderboard() }
                                     )
@@ -782,6 +844,17 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     )
                 }
 
+                // v1.2.3 (final assembly) — Motion Lab "Lock-in start":
+                // study-start transition showing the user's real blocked
+                // apps locking in; the timer starts when it completes.
+                if (showLockInStart) {
+                    com.example.ui.components.LockInStartOverlay(
+                        blockedPackages = lockInBlockedPackages,
+                        onComplete = { viewModel.proceedAfterLockInAnimation() },
+                        onDismiss = { viewModel.dismissLockInStart() }
+                    )
+                }
+
                 // Full-screen Completion Moment Screen
                 if (showCompletionScreen && completedSessionSummary != null) {
                     SessionCompleteScreen(
@@ -799,10 +872,15 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     )
                 }
 
-                // v1.2.2 — strict-mode uninstall attempt popup (owner spec copy).
+                // v1.2.3 — premium animated uninstall-blocked overlay (owner spec):
+                // shows when an uninstall is attempted while Strict Mode
+                // blocks it. Replaces the static dialog.
                 val showStrictUninstallBlocked by viewModel.showStrictUninstallBlocked.collectAsState()
                 if (showStrictUninstallBlocked) {
-                    com.example.ui.components.StrictUninstallBlockedDialog(
+                    val uninstallCtx = androidx.compose.ui.platform.LocalContext.current
+                    val strictRem = com.example.service.FocusShieldService.getRemainingSeconds(uninstallCtx)
+                    com.example.ui.components.StrictUninstallBlockedOverlay(
+                        remainingSeconds = strictRem,
                         onDismiss = { viewModel.dismissStrictUninstallBlocked() }
                     )
                 }
@@ -959,10 +1037,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 }
 
                 // Full-screen Past Focus Sessions Log Screen (Firestore Cloud Storage)
+                // v1.2.3: system Back is handled by the centralized handler
+                // (top of this composable) — no local handler needed.
                 if (isSessionLogOpen) {
-                    androidx.activity.compose.BackHandler {
-                        isSessionLogOpen = false
-                    }
                     FocusSessionLogScreen(
                         sessions = sessions,
                         onBack = { isSessionLogOpen = false },
@@ -1005,14 +1082,12 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     )
                 }
 
-                // v1.3.1: strict-mode end-early confirmation (Regain parity).
+                // v1.2.3 (Task 10): strict-mode FULL lock-in (Regain parity).
+                // When strict is on, tapping Stop never ends the session —
+                // StrictLockDialog explains why (animated text + mascot).
                 if (showStrictEndConfirmDialog) {
-                    com.example.ui.components.StrictEndSessionDialog(
-                        onDismiss = { showStrictEndConfirmDialog = false },
-                        onConfirmEnd = {
-                            showStrictEndConfirmDialog = false
-                            viewModel.finishSessionEarly()
-                        }
+                    com.example.ui.components.StrictLockDialog(
+                        onDismiss = { showStrictEndConfirmDialog = false }
                     )
                 }
 

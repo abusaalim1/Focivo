@@ -595,6 +595,11 @@ class FocusShieldService : Service() {
             .putLong(PREF_KEY_SHIELD_END_TIME, 0L)
             .putBoolean(PREF_KEY_IS_PUNISHMENT, false)
             .putString(PREF_KEY_PUNISHED_PACKAGE, "")
+            // v1.2.3 phantom-lock fix (RC4): never leave a stale blocked list
+            // behind — dead sessions' packages would keep feeding the
+            // intercept paths whenever isStudyPeriodActive is spuriously
+            // true. Schedule-derived packages are re-derived live anyway.
+            .putString(PREF_KEY_BLOCKED_LIST, "")
             .apply()
 
         val finishIntent = Intent(this, MainActivity::class.java).apply {
@@ -639,6 +644,9 @@ class FocusShieldService : Service() {
             .putLong(PREF_KEY_SHIELD_END_TIME, 0L)
             .putBoolean(PREF_KEY_IS_PUNISHMENT, false)
             .putString(PREF_KEY_PUNISHED_PACKAGE, "")
+            // v1.2.3 phantom-lock fix (RC4): clear the blocked list on stop
+            // too — see onShieldTimerComplete for the rationale.
+            .putString(PREF_KEY_BLOCKED_LIST, "")
             .apply()
 
         try {

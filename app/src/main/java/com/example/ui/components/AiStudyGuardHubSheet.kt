@@ -63,12 +63,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.example.R
 import com.example.ui.components.FeatureIcon
 import com.example.ui.theme.BalooBrandFontFamily
+import com.example.ui.theme.focivoTokens
+import com.example.ui.theme.SerifItalicFontFamily
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.util.AiStudyGuardManager
+import com.example.util.GeminiContentClassifier
 import com.example.util.PermissionUtils
 import com.example.util.ShortsLockManager
 import com.example.util.StrictModeManager
@@ -101,6 +104,10 @@ fun AiStudyGuardHubSheet(
     var isStudyActiveNow by remember { mutableStateOf(AiStudyGuardManager.isStudyPeriodActive(context)) }
     var batteryExempt by remember { mutableStateOf(PermissionUtils.isBatteryOptimizationDisabled(context)) }
     var notifGranted by remember { mutableStateOf(PermissionUtils.hasNotificationPermission(context)) }
+    // v1.2.3 (owner 2026-10-16): consolidated "Guard state" row inputs —
+    // every switch that decides whether the guard can fire, in one glance.
+    var ytFilterEffective by remember { mutableStateOf(YouTubeStudyGuardManager.isFilterEnabled(context)) }
+    var geminiKeyPresent by remember { mutableStateOf(GeminiContentClassifier.isApiKeyPresent()) }
     var showAutostartGuide by remember { mutableStateOf(false) }
     var showOptInDialog by remember { mutableStateOf(false) }
 
@@ -128,6 +135,8 @@ fun AiStudyGuardHubSheet(
                 notifGranted = PermissionUtils.hasNotificationPermission(context)
                 ShortsLockManager.init(context)
                 YouTubeStudyGuardManager.init(context)
+                ytFilterEffective = YouTubeStudyGuardManager.isFilterEnabled(context)
+                geminiKeyPresent = GeminiContentClassifier.isApiKeyPresent()
                 AiStudyGuardManager.loadLocalLogs(context)
                 // v1.1.9: refresh the diagnostic activity log
                 AiStudyGuardManager.loadGuardActivity(context)
@@ -137,11 +146,12 @@ fun AiStudyGuardHubSheet(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val isDark = isAppInDarkTheme()
-    val sheetBackground = if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val accentLime = if (isDark) RegainLimePrimary else RegainLimeDeepText
+    val T = focivoTokens()
+    val isDark = T.isDark
+    val sheetBackground = T.bg
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val accentLime = T.accentText
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -477,7 +487,7 @@ fun AiStudyGuardHubSheet(
                     GuardSectionTitle("Test", textPrimary)
                     GuardCard {
                         Text(
-                            text = "Runs the REAL warning → 3-hour lock pipeline with a fake test message — classifier ki zaroorat nahi. AI Guard master switch ON hona chahiye.",
+                            text = "Runs the real warning-to-3-hour-lock pipeline with a fake test message — no classifier needed. The AI Guard master switch must be ON.",
                             fontSize = 12.5.sp,
                             lineHeight = 17.sp,
                             color = textSecondary
@@ -500,14 +510,14 @@ fun AiStudyGuardHubSheet(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "▶ Test Guard Pipeline",
+                                text = "Test Guard Pipeline",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
                         }
                         Text(
-                            text = "1st tap → mascot warning. Tapping again after the warning locks the test app for 3 hours.",
+                            text = "First tap shows the mascot warning. Tapping again after the warning locks the test app for 3 hours.",
                             fontSize = 11.5.sp,
                             color = textSecondary,
                             modifier = Modifier.padding(top = 8.dp)
@@ -515,9 +525,14 @@ fun AiStudyGuardHubSheet(
                     }
                 }
 
-                // Live guard status — last: glanceable diagnosis of why the guard may not fire
+                // v1.2.3 (owner 2026-10-16): single consolidated "Guard state"
+                // block — every switch that decides whether the guard can
+                // fire, in one glance. The YouTube content filter row shows
+                // the EFFECTIVE state (toggle + permission + study period);
+                // the toggle itself lives in the Focus Shield hub and is
+                // never auto-enabled. Gemini key is boolean-only, never the key.
                 item {
-                    GuardSectionTitle("Guard Status", textPrimary)
+                    GuardSectionTitle("Guard state", textPrimary)
                     GuardCard {
                         GuardStatusRow(
                             label = "Accessibility service",
@@ -557,10 +572,60 @@ fun AiStudyGuardHubSheet(
                             textSecondary = textSecondary,
                             accentLime = accentLime
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        GuardStatusRow(
+                            label = "AI Guard master",
+                            stateText = if (isAiGuardEnabled) "ON" else "OFF",
+                            ok = isAiGuardEnabled,
+                            textPrimary = textPrimary,
+                            textSecondary = textSecondary,
+                            accentLime = accentLime
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        GuardStatusRow(
+                            label = "YouTube content filter",
+                            stateText = if (ytFilterEffective) "ON" else "OFF",
+                            ok = ytFilterEffective,
+                            textPrimary = textPrimary,
+                            textSecondary = textSecondary,
+                            accentLime = accentLime
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Separate toggle in the Focus Shield hub — never auto-enabled.",
+                            fontSize = 11.5.sp,
+                            color = textSecondary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        GuardStatusRow(
+                            label = "Shorts & Reels lock",
+                            stateText = if (isShortsReelsBlocked) "ON" else "OFF",
+                            ok = isShortsReelsBlocked,
+                            textPrimary = textPrimary,
+                            textSecondary = textSecondary,
+                            accentLime = accentLime
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        GuardStatusRow(
+                            label = "Gemini key",
+                            stateText = if (geminiKeyPresent) "Present" else "Unavailable",
+                            ok = geminiKeyPresent,
+                            textPrimary = textPrimary,
+                            textSecondary = textSecondary,
+                            accentLime = accentLime
+                        )
+                        if (!geminiKeyPresent) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Uncertain titles are allowed (fail-open) until a key is present.",
+                                fontSize = 11.5.sp,
+                                color = textSecondary
+                            )
+                        }
                         if (isAiGuardEnabled && !hasAccessibility) {
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = "Accessibility OFF hai — Guard kaam nahi karega",
+                                text = "Accessibility is OFF — the guard will not work",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFE05252)
@@ -574,6 +639,74 @@ fun AiStudyGuardHubSheet(
                                 modifier = Modifier.clickable {
                                     AiStudyGuardManager.openAccessibilitySettings(context)
                                 }
+                            )
+                        }
+                    }
+                }
+
+                // v1.2.3 (owner 2026-10-16): the single most recent YouTube
+                // title evaluation — what the chain last decided, glanceable.
+                item {
+                    GuardSectionTitle("Last YouTube evaluation", textPrimary)
+                    GuardCard {
+                        val lastEval by AiStudyGuardManager.lastYouTubeEvaluation.collectAsState()
+                        if (lastEval.ts == 0L) {
+                            Text(
+                                text = "No YouTube evaluation yet. Play a video during an active study period with the YouTube content filter on.",
+                                fontSize = 12.5.sp,
+                                lineHeight = 17.sp,
+                                color = textSecondary
+                            )
+                        } else {
+                            Text(
+                                text = lastEval.title.ifBlank { "(no title extracted)" },
+                                fontFamily = SerifItalicFontFamily,
+                                fontSize = 16.sp,
+                                lineHeight = 21.sp,
+                                color = textPrimary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            GuardEvalRow(
+                                label = "Player evidence",
+                                value = if (lastEval.playerEvidence) "Yes" else "No",
+                                valueColor = if (lastEval.playerEvidence) textPrimary else Color(0xFFE05252),
+                                textSecondary = textSecondary
+                            )
+                            GuardEvalRow(
+                                label = "Title source",
+                                value = lastEval.titleSource.ifBlank { "—" },
+                                valueColor = textPrimary,
+                                textSecondary = textSecondary
+                            )
+                            GuardEvalRow(
+                                label = "p_ent band",
+                                value = lastEval.pEntBand.ifBlank { "—" },
+                                valueColor = textPrimary,
+                                textSecondary = textSecondary
+                            )
+                            GuardEvalRow(
+                                label = "Verdict",
+                                value = lastEval.verdict.ifBlank { "—" },
+                                valueColor = when (lastEval.verdict) {
+                                    "NON_STUDY" -> Color(0xFFE05252)
+                                    "STUDY" -> accentLime
+                                    else -> Color(0xFFFF8A65)
+                                },
+                                textSecondary = textSecondary
+                            )
+                            GuardEvalRow(
+                                label = "Action",
+                                value = lastEval.action.ifBlank { "—" },
+                                valueColor = textPrimary,
+                                textSecondary = textSecondary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Evaluated at " + try {
+                                    SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(lastEval.ts))
+                                } catch (_: Exception) { "--:--" },
+                                fontSize = 11.sp,
+                                color = textSecondary
                             )
                         }
                     }
@@ -711,6 +844,34 @@ private fun GuardStatusRow(
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             color = if (ok) textPrimary else Color(0xFFE05252)
+        )
+    }
+}
+
+@Composable
+private fun GuardEvalRow(
+    label: String,
+    value: String,
+    valueColor: Color,
+    textSecondary: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.5.sp,
+            color = textSecondary,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = value,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = valueColor
         )
     }
 }

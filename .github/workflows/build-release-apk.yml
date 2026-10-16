@@ -86,10 +86,16 @@ jobs:
           fi
           if [ -n "$GEMINI_API_KEY" ]; then
             echo "Injecting real GEMINI_API_KEY into .env for the AI Study Guard..."
+            echo "GEMINI_API_KEY secret is set (length ${#GEMINI_API_KEY} chars; value never printed)."
             if grep -q "^GEMINI_API_KEY=" .env; then
               sed -i "s|^GEMINI_API_KEY=.*|GEMINI_API_KEY=$GEMINI_API_KEY|" .env
             else
               echo "GEMINI_API_KEY=$GEMINI_API_KEY" >> .env
+            fi
+            if grep -q '^GEMINI_API_KEY=<redacted>$' .env; then
+              echo "WARNING: .env still has the GEMINI_API_KEY placeholder after injection - the secret value itself may be placeholder text. AI Guard will be unavailable in this build."
+            else
+              echo "GEMINI_API_KEY placeholder replaced in .env - AI Guard key will be packaged."
             fi
           else
             echo "WARNING: GEMINI_API_KEY secret is not set - AI Guard will use on-device classification only."

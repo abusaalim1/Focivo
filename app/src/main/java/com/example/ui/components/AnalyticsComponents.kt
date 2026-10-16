@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.LavenderSoft
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.ui.theme.SecondaryTextLight
@@ -58,7 +59,7 @@ fun MetricCard(
 ) {
     val isDark = isAppInDarkTheme()
     // v1.4.2: explicit secondary text (colorScheme.onSurfaceVariant renders dark on dark cards)
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textSecondary = focivoTokens().muted
 
     GlassCard(
         modifier = modifier,
@@ -124,7 +125,7 @@ fun WeeklyFocusChart(
 ) {
     val isDark = isAppInDarkTheme()
     // v1.4.2: explicit secondary text (colorScheme.onSurfaceVariant renders dark on dark cards)
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textSecondary = focivoTokens().muted
 
     LiquidGlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -166,7 +167,7 @@ fun WeeklyFocusChart(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (isDark) Color(0x228B7CFF) else Color(0x148B7CFF))
+                        .background(focivoTokens().accent.copy(alpha = 0.15f))
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Text(
@@ -227,7 +228,7 @@ fun WeeklyFocusChart(
                                 .width(20.dp)
                                 .height(90.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(if (isDark) Color(0x14FFFFFF) else Color(0x10000000)),
+                                .background(focivoTokens().line),
                             contentAlignment = Alignment.BottomCenter
                         ) {
                             Box(
@@ -276,7 +277,7 @@ fun ProductivityHeatmap(
 ) {
     val isDark = isAppInDarkTheme()
     // v1.4.2: explicit secondary text (colorScheme.onSurfaceVariant renders dark on dark cards)
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    val textSecondary = focivoTokens().muted
 
     GlassCard(
         modifier = modifier.fillMaxWidth(),
@@ -314,7 +315,7 @@ fun ProductivityHeatmap(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(if (isDark) Color(0x1A8CE000) else Color(0x108CE000))
+                    .background(focivoTokens().accent.copy(alpha = 0.1f))
                     .border(
                         1.dp,
                         RegainLimePrimary.copy(alpha = 0.3f),
@@ -368,7 +369,7 @@ fun ProductivityHeatmap(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(if (isDark) Color(0x18FFFFFF) else Color(0x0C000000))
+                            .background(focivoTokens().surface2)
                             .padding(12.dp)
                     ) {
                         Column {
@@ -393,7 +394,7 @@ fun ProductivityHeatmap(
                                     .fillMaxWidth()
                                     .height(4.dp)
                                     .clip(CircleShape)
-                                    .background(if (isDark) Color(0x22FFFFFF) else Color(0x18000000))
+                                    .background(focivoTokens().line)
                             ) {
                                 Box(
                                     modifier = Modifier
@@ -412,90 +413,6 @@ fun ProductivityHeatmap(
 }
 
 @Composable
-fun StreakCalendarCard(
-    currentStreak: Int = 12,
-    bestStreak: Int = 18,
-    modifier: Modifier = Modifier
-) {
-    val isDark = isAppInDarkTheme()
-    // v1.4.2: explicit secondary text (colorScheme.onSurfaceVariant renders dark on dark cards)
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-
-    GlassCard(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.LocalFireDepartment,
-                        contentDescription = "Streak",
-                        tint = RegainLimePrimary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "$currentStreak DAY STREAK",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = RegainLimePrimary,
-                            fontSize = 16.sp
-                        )
-                    )
-                }
-
-                Text(
-                    text = "Best: $bestStreak days",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = textSecondary,
-                        fontSize = 11.sp
-                    )
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Calendar dots (last 14 days)
-            Text(
-                text = "Recent Daily Consistency",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    color = textSecondary,
-                    fontSize = 11.sp
-                )
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                val pastDays = (1..14).map { it <= 12 } // 12 active days
-                pastDays.forEachIndexed { idx, completed ->
-                    Box(
-                        modifier = Modifier
-                            .size(16.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (completed) RegainLimePrimary else (if (isDark) Color(0x22FFFFFF) else Color(0x18000000))
-                            )
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun WeeklyReflectionCard(
     totalHours: String = "18h 42m",
     bestDay: String = "Wednesday",
@@ -506,8 +423,8 @@ fun WeeklyReflectionCard(
 ) {
     val isDark = isAppInDarkTheme()
     // v1.4.2: explicit secondary text (colorScheme.onSurfaceVariant renders dark on dark cards)
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = focivoTokens().muted
+    val textPrimary = focivoTokens().text
     var reflectionText by remember { mutableStateOf(initialReflection) }
     var isSaved by remember { mutableStateOf(initialReflection.isNotBlank()) }
 
@@ -589,7 +506,7 @@ fun WeeklyReflectionCard(
                 maxLines = 3,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = RegainLimePrimary,
-                    unfocusedBorderColor = if (isDark) Color(0x22FFFFFF) else Color(0x18000000)
+                    unfocusedBorderColor = focivoTokens().line
                 )
             )
 

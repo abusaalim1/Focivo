@@ -19,10 +19,30 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * Data-driven: adding a theme = one entry in THEMES + its two assets.
  */
+/**
+ * Ambient themes (v1.5.0): code-drawn living backdrops — see
+ * [com.example.ui.components.AmbientBackdrop]. No drawable assets, so
+ * these themes add zero bytes of image data and keep the APK small.
+ */
+enum class AmbientKind {
+    SAKURA_DRIFT,
+    FIREFLY_FOREST,
+    SUNSET_DUNES,
+    AURORA_VEIL,
+    MONSOON_RAIN,
+    EMBER_RISE
+}
+
 data class TimerTheme(
     val id: String,
     val name: String,
     @DrawableRes val backdropRes: Int?,
+    /**
+     * v1.5.0: when set, the backdrop is a live code-drawn canvas
+     * (AmbientBackdrop) instead of an image/Aurora asset.
+     * ThemedScreenBackground checks this FIRST.
+     */
+    val ambientKind: AmbientKind? = null,
     val mascotPose: MascotPose,
     val arcColors: List<Color>,
     val glowColor: Color,
@@ -47,7 +67,7 @@ data class TimerTheme(
      */
     val onBackdropContent: Color = Color(0xFFF7F8F4)
 ) {
-    // v1.2 test build: ALL_CONTENT_UNLOCKED frees every timer theme.
+    // Content lock model (points never spent): ALL_CONTENT_UNLOCKED frees every timer theme.
     fun isUnlocked(userPoints: Int): Boolean =
         ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
 }
@@ -167,7 +187,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFF69F0AE), Color(0xFFB9F6CA), Color(0xFF00C853)),
             glowColor = Color(0xFF69F0AE),
             accent = Color(0xFF69F0AE),
-            unlockPoints = 0
+            unlockPoints = 2750
         ),
         // Round-4b: 12 new distinct premium themes (runtime-resolved assets).
         TimerTheme(
@@ -289,6 +309,75 @@ object TimerThemeManager {
             glowColor = Color(0xFFFFB74D),
             accent = Color(0xFFFFB74D),
             unlockPoints = 15000
+        ),
+        // v1.5.0: Ambient round — living code-drawn backdrops (no image
+        // assets, zero APK weight). Each reuses an existing mascot pose so
+        // the theme_mascot_<pose> assets resolve; backdrop is a live canvas.
+        TimerTheme(
+            id = "sakura_drift",
+            name = "Sakura Drift",
+            backdropRes = null,
+            ambientKind = AmbientKind.SAKURA_DRIFT,
+            mascotPose = MascotPose.SAKURA,
+            arcColors = listOf(Color(0xFFF8BBD0), Color(0xFFF48FB1), Color(0xFFD81B60)),
+            glowColor = Color(0xFFF48FB1),
+            accent = Color(0xFFF48FB1),
+            unlockPoints = 18000
+        ),
+        TimerTheme(
+            id = "firefly_forest",
+            name = "Firefly Forest",
+            backdropRes = null,
+            ambientKind = AmbientKind.FIREFLY_FOREST,
+            mascotPose = MascotPose.FOREST,
+            arcColors = listOf(Color(0xFFC5E1A5), Color(0xFF9CCC65), Color(0xFF558B2F)),
+            glowColor = Color(0xFF9CCC65),
+            accent = Color(0xFF9CCC65),
+            unlockPoints = 22000
+        ),
+        TimerTheme(
+            id = "sunset_dunes",
+            name = "Sunset Dunes",
+            backdropRes = null,
+            ambientKind = AmbientKind.SUNSET_DUNES,
+            mascotPose = MascotPose.SUNSET,
+            arcColors = listOf(Color(0xFFFFCC80), Color(0xFFFFB74D), Color(0xFFE65100)),
+            glowColor = Color(0xFFFFB74D),
+            accent = Color(0xFFFFB74D),
+            unlockPoints = 26000
+        ),
+        TimerTheme(
+            id = "aurora_veil",
+            name = "Aurora Veil",
+            backdropRes = null,
+            ambientKind = AmbientKind.AURORA_VEIL,
+            mascotPose = MascotPose.MIDNIGHT,
+            arcColors = listOf(Color(0xFFB39DDB), Color(0xFF4DD0E1), Color(0xFF5E35B1)),
+            glowColor = Color(0xFF7C4DFF),
+            accent = Color(0xFF7C4DFF),
+            unlockPoints = 30000
+        ),
+        TimerTheme(
+            id = "monsoon_rain",
+            name = "Monsoon Rain",
+            backdropRes = null,
+            ambientKind = AmbientKind.MONSOON_RAIN,
+            mascotPose = MascotPose.RAIN,
+            arcColors = listOf(Color(0xFFB3D5F0), Color(0xFF90CAF9), Color(0xFF4A6E8C)),
+            glowColor = Color(0xFF90CAF9),
+            accent = Color(0xFF90CAF9),
+            unlockPoints = 35000
+        ),
+        TimerTheme(
+            id = "ember_rise",
+            name = "Ember Rise",
+            backdropRes = null,
+            ambientKind = AmbientKind.EMBER_RISE,
+            mascotPose = MascotPose.EMBER,
+            arcColors = listOf(Color(0xFFFFCC80), Color(0xFFFF6E40), Color(0xFFBF360C)),
+            glowColor = Color(0xFFFF6E40),
+            accent = Color(0xFFFF6E40),
+            unlockPoints = 40000
         )
     )
 

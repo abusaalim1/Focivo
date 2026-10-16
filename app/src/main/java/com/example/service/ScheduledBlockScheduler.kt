@@ -71,6 +71,12 @@ object ScheduledBlockScheduler {
 
         Log.i(TAG, "[ScheduledBlockWrite] [$triggerSource] Upserting schedule id=${fixedSchedule.id}, label='${fixedSchedule.label}', is_enabled=${fixedSchedule.is_enabled}, user_id=${fixedSchedule.user_id}")
 
+        // v1.2.3 (Task 13.1): editing a locked schedule drops the stale
+        // pre-lock — the refresh below re-derives it from the new values.
+        if (StrictLockInManager.isScheduleLocked(context, fixedSchedule.id)) {
+            StrictLockInManager.clearLock(context)
+        }
+
         val current = getLocalSchedules(context).toMutableList()
         val index = current.indexOfFirst { it.id == fixedSchedule.id }
         if (index >= 0) {
@@ -79,7 +85,7 @@ object ScheduledBlockScheduler {
             current.add(0, fixedSchedule)
         }
         saveLocalSchedules(context, current)
-        refreshReminderAlarms(context) // v1.4.3: 10-min reminder + streak-saver
+        refreshReminderAlarms(context) // v1.4.3: 10-min reminder
 
         // Sync with Supabase
         if (fixedSchedule.user_id.isNotBlank() && fixedSchedule.user_id != "anonymous" && fixedSchedule.user_id != "local_user") {
@@ -102,9 +108,14 @@ object ScheduledBlockScheduler {
 
     fun deleteScheduleLocalAndRemote(context: Context, scheduleId: String, triggerSource: String = "USER_DELETE") {
         Log.i(TAG, "[ScheduledBlockWrite] [$triggerSource] Deleting schedule id=$scheduleId")
+        // v1.2.3 (Task 13.1): never leave a stale strict pre-lock or warning alarm.
+        StrictLockInManager.cancelWarning(context, scheduleId)
+        if (StrictLockInManager.getLockedScheduleId(context) == scheduleId) {
+            StrictLockInManager.clearLock(context)
+        }
         val current = getLocalSchedules(context).filterNot { it.id == scheduleId }
         saveLocalSchedules(context, current)
-        refreshReminderAlarms(context) // v1.4.3: 10-min reminder + streak-saver
+        refreshReminderAlarms(context) // v1.4.3: 10-min reminder
 
         ioScope.launch {
             try {
@@ -121,6 +132,13 @@ object ScheduledBlockScheduler {
     }
 
     fun toggleSchedule(context: Context, scheduleId: String, isEnabled: Boolean, triggerSource: String = "USER_TOGGLE") {
+        // v1.2.3 (Task 13.1): a pre-locked strict schedule cannot be turned
+        // off — the 10-minute warning already fired. Belt-and-braces logic
+        // guard (the UI intercepts locked taps first and shows the reason).
+        if (!isEnabled && StrictLockInManager.isScheduleLocked(context, scheduleId)) {
+            Log.w(TAG, "[StrictLockIn] toggle REFUSED for pre-locked schedule id=$scheduleId")
+            return
+        }
         val uid = SupabaseService.getInstance().getCurrentUserId() ?: ""
         val current = getLocalSchedules(context).toMutableList()
         val index = current.indexOfFirst { it.id == scheduleId }
@@ -131,7 +149,7 @@ object ScheduledBlockScheduler {
             val updated = oldItem.copy(is_enabled = isEnabled, user_id = finalUserId)
             current[index] = updated
             saveLocalSchedules(context, current)
-            refreshReminderAlarms(context) // v1.4.3: 10-min reminder + streak-saver
+            refreshReminderAlarms(context) // v1.4.3: 10-min reminder
 
             Log.i(TAG, "[ScheduledBlockWrite] [$triggerSource] Toggled schedule id=$scheduleId from is_enabled=${oldItem.is_enabled} -> $isEnabled, user_id=$finalUserId")
 
@@ -199,7 +217,7 @@ object ScheduledBlockScheduler {
 
         val finalList = mergedMap.values.toList()
         saveLocalSchedules(context, finalList)
-        refreshReminderAlarms(context) // v1.4.3: 10-min reminder + streak-saver
+        refreshReminderAlarms(context) // v1.4.3: 10-min reminder
         return finalList
     }
 
@@ -596,6 +614,9 @@ object ScheduledBlockScheduler {
      * Evaluates current state across all schedules and updates AlarmManager and FocusShieldService.
      */
     fun evaluateAndReschedule(context: Context) {
+        // v1.2.3 (Task 13.1): no stale strict pre-locks — the lock clears the
+        // moment its schedule's window starts (or passes).
+        StrictLockInManager.clearExpiredLocks(context)
         val isAnyActive = isAnyScheduleCurrentlyActive(context)
         val isBreakActive = isBreakCurrentlyActive(context)
         val activePackages = getCurrentlyActiveBlockedPackages(context)
@@ -689,7 +710,7 @@ object ScheduledBlockScheduler {
             }
         }
 
-        // v1.4.3: 10-minute heads-up + daily streak-saver alarms
+        // v1.4.3: 10-minute heads-up alarm
         refreshReminderAlarms(context)
 
         // Schedule the next transition alarm
@@ -774,40 +795,21 @@ object ScheduledBlockScheduler {
      * v1.4.3: next upcoming study-block START (not end/break) across enabled
      * schedules. Returns (startMillis, subject). Used for the 10-minute
      * heads-up reminder.
+     *
+     * v1.2.3 (Task 13.1): strict schedules are skipped by default — they get
+     * their own premium 10-minute lock-in warning (StrictLockInManager), not
+     * the plain notification. Non-strict behavior is exactly unchanged.
      */
-    fun getNextStudyStartMillis(context: Context): Pair<Long, String?>? {
+    fun getNextStudyStartMillis(context: Context, skipStrict: Boolean = true): Pair<Long, String?>? {
         return try {
-            val schedules = getLocalSchedules(context).filter { it.is_enabled }
+            val schedules = getLocalSchedules(context)
+                .filter { it.is_enabled && (!skipStrict || !it.is_strict_mode) }
             if (schedules.isEmpty()) return null
-            val now = Calendar.getInstance()
-            val nowMillis = now.timeInMillis
-            val dayMap = mapOf(
-                "Mon" to Calendar.MONDAY, "Tue" to Calendar.TUESDAY,
-                "Wed" to Calendar.WEDNESDAY, "Thu" to Calendar.THURSDAY,
-                "Fri" to Calendar.FRIDAY, "Sat" to Calendar.SATURDAY,
-                "Sun" to Calendar.SUNDAY
-            )
             var best: Pair<Long, String?>? = null
-            for (dayOffset in 0..7) {
-                val dayCal = (now.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, dayOffset) }
-                val calDayOfWeek = dayCal.get(Calendar.DAY_OF_WEEK)
-                for (schedule in schedules) {
-                    val activeDays = schedule.days_active.split(",").map { it.trim() }
-                    if (activeDays.none { dayMap[it] == calDayOfWeek }) continue
-                    val parts = schedule.start_time.split(":")
-                    if (parts.size < 2) continue
-                    val h = parts[0].toIntOrNull() ?: continue
-                    val m = parts[1].toIntOrNull() ?: continue
-                    val eventCal = (dayCal.clone() as Calendar).apply {
-                        set(Calendar.HOUR_OF_DAY, h)
-                        set(Calendar.MINUTE, m)
-                        set(Calendar.SECOND, 0)
-                        set(Calendar.MILLISECOND, 0)
-                    }
-                    val eventMillis = eventCal.timeInMillis
-                    if (eventMillis > nowMillis && (best == null || eventMillis < best!!.first)) {
-                        best = Pair(eventMillis, schedule.subject?.takeIf { it.isNotBlank() } ?: schedule.label.takeIf { it.isNotBlank() })
-                    }
+            for (schedule in schedules) {
+                val startMs = getNextStartMillisForSchedule(context, schedule) ?: continue
+                if (best == null || startMs < best!!.first) {
+                    best = Pair(startMs, schedule.subject?.takeIf { it.isNotBlank() } ?: schedule.label.takeIf { it.isNotBlank() })
                 }
             }
             best
@@ -817,15 +819,61 @@ object ScheduledBlockScheduler {
     }
 
     /**
-     * v1.4.3: refresh the 10-minute study reminder + daily streak-saver alarm.
+     * v1.2.3 (Task 13.1): next upcoming START epoch ms for ONE schedule
+     * across its active days (8-day scan), or null when none. Shared by the
+     * plain reminder path and the strict warning arming.
+     */
+    fun getNextStartMillisForSchedule(
+        context: Context,
+        schedule: SupabaseScheduledBlockDto
+    ): Long? {
+        return try {
+            val now = Calendar.getInstance()
+            val nowMillis = now.timeInMillis
+            val dayMap = mapOf(
+                "Mon" to Calendar.MONDAY, "Tue" to Calendar.TUESDAY,
+                "Wed" to Calendar.WEDNESDAY, "Thu" to Calendar.THURSDAY,
+                "Fri" to Calendar.FRIDAY, "Sat" to Calendar.SATURDAY,
+                "Sun" to Calendar.SUNDAY
+            )
+            var best: Long? = null
+            for (dayOffset in 0..7) {
+                val dayCal = (now.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, dayOffset) }
+                val calDayOfWeek = dayCal.get(Calendar.DAY_OF_WEEK)
+                val activeDays = schedule.days_active.split(",").map { it.trim() }
+                if (activeDays.none { dayMap[it] == calDayOfWeek }) continue
+                val parts = schedule.start_time.split(":")
+                if (parts.size < 2) continue
+                val h = parts[0].toIntOrNull() ?: continue
+                val m = parts[1].toIntOrNull() ?: continue
+                val eventCal = (dayCal.clone() as Calendar).apply {
+                    set(Calendar.HOUR_OF_DAY, h)
+                    set(Calendar.MINUTE, m)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                val eventMillis = eventCal.timeInMillis
+                if (eventMillis > nowMillis && (best == null || eventMillis < best)) {
+                    best = eventMillis
+                }
+            }
+            best
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * v1.4.3: refresh the 10-minute study reminder alarm.
      * Call after any schedule mutation and on evaluate/boot.
+     *
+     * v1.2.3 (Task 13.1): also re-arms the strict lock-in warning alarms
+     * (StrictLockInManager) — still one flow, no parallel engine.
      */
     fun refreshReminderAlarms(context: Context) {
         try {
             FocivoNotifications.scheduleStudyReminder(context)
-        } catch (_: Exception) { }
-        try {
-            FocivoNotifications.scheduleStreakSaverDaily(context)
+            StrictLockInManager.refreshStrictWarnings(context)
         } catch (_: Exception) { }
     }
 

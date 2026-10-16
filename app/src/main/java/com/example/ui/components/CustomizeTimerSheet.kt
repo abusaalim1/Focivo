@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,13 +39,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -54,11 +59,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.FocuslyRepository
-import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
-import com.example.ui.theme.SecondaryTextLight
-import com.example.ui.theme.isAppInDarkTheme
+import com.example.ui.theme.focivoTokens
 import com.example.util.PomodoroConfig
+import com.example.util.PomodoroStyleManager
 import com.example.util.TimerFaceManager
 import com.example.util.TimerTheme
 import com.example.util.TimerThemeManager
@@ -76,9 +80,10 @@ import com.example.util.loadPomodoroConfig
  * / "Long Break" mode drives the timer's break presentation (phase pill +
  * ring color shift); the user starts it with the normal Start button.
  */
-private val CustomizeAccent = Color(0xFF8FD400)
+// v1.2.3 design-unification — owner clean-redesign accent (#B6F13A) now comes
+// from focivoTokens(); see the composable body below.
 
-private val CustomizeSounds = listOf("Silent", "Rain", "White noise", "Cafe", "Forest", "Ocean")
+// v1.2.3 (Task 12): replaced by BuiltInSounds (procedural + OGG loops) below.
 
 private val PresetSubjects = listOf(
     "Deep Study",
@@ -111,18 +116,28 @@ fun CustomizeTimerSheet(
     // v1.1: starts a pomodoro run (goes through the same session-start gate
     // as the classic timer — pre-study block sheet included).
     onStartPomodoro: (PomodoroConfig) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // v1.2.3: test hook — screenshot tests pre-scroll the Timer Style row.
+    timerFaceScrollState: ScrollState? = null
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val isDark = isAppInDarkTheme()
-    val sheetBackground = if (isDark) Color(0xFF0F1410) else Color(0xFFFAFBF7)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val cardBg = if (isDark) Color(0xFF1D221C) else Color.White
-    val cardBorder = if (isDark) Color(0x228CE000) else Color(0xFFDCE6D2)
-    val selectedBg = if (isDark) Color(0xFF2A331F) else Color(0xFFF1F8E4)
+    // v1.2.3 (Task 11): stop any alarm-tone preview when the sheet closes.
+    DisposableEffect(Unit) {
+        onDispose { com.example.util.SoundFx.stopAlarmPreview() }
+    }
+
+    val T = focivoTokens()
+    val isDark = T.isDark
+    // v1.2.3 design-unification: dark surfaces follow the owner
+    // clean-redesign tokens (#0A0A0B bg / #131315 cards / #1F1F22 lines).
+    val sheetBackground = T.bg
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val cardBg = T.surface
+    val cardBorder = T.line
+    val selectedBg = T.softAccent
 
     var selectedSubject by remember { mutableStateOf(currentSubject.ifBlank { "Deep Study" }) }
     var customSubjectInput by remember { mutableStateOf("") }
@@ -145,6 +160,71 @@ fun CustomizeTimerSheet(
     val prefsFlow = remember(context) { FocuslyRepository.getInstance(context).userPreferences }
     val prefs by prefsFlow.collectAsState(initial = null)
     val focusPoints = prefs?.focusPoints ?: 0
+
+    // Motion Lab "Theme unlock": celebrate genuinely-new threshold crossings
+    // for timer themes AND timer faces (threshold model — an unlock moment =
+    // lifetime Focus Points newly reaching a tier; points are never spent).
+    // First observation seeds silently (persisted), so only real crossings
+    // celebrate. The first queued item shows; the rest wait their turn.
+    val themeUnlocks = rememberNewlyUnlockedIds(
+        allIds = TimerThemeManager.THEMES.map { it.id },
+        isUnlocked = { id -> TimerThemeManager.getTheme(id).isUnlocked(focusPoints) },
+        focusPoints = focusPoints,
+        seenKey = "unlock_seen_timer_themes"
+    )
+    val faceUnlocks = rememberNewlyUnlockedIds(
+        allIds = TimerFaceManager.FACES.map { it.id },
+        isUnlocked = { id -> TimerFaceManager.getFace(id).isUnlocked(focusPoints) },
+        focusPoints = focusPoints,
+        seenKey = "unlock_seen_timer_faces"
+    )
+    var unlockQueue by remember { mutableStateOf(listOf<PendingUnlock>()) }
+    var activeUnlock by remember { mutableStateOf<PendingUnlock?>(null) }
+
+    LaunchedEffect(themeUnlocks.newlyUnlocked, faceUnlocks.newlyUnlocked) {
+        val fresh = buildList {
+            themeUnlocks.newlyUnlocked.forEach { id ->
+                TimerThemeManager.THEMES.find { it.id == id }?.let { theme ->
+                    add(
+                        PendingUnlock(
+                            title = theme.name,
+                            subtitle = "${formatPoints(theme.unlockPoints)} Focus Points reached",
+                            accent = theme.accent,
+                            preview = { ThemeUnlockPreview(theme) }
+                        )
+                    )
+                }
+            }
+            faceUnlocks.newlyUnlocked.forEach { id ->
+                TimerFaceManager.FACES.find { it.id == id }?.let { face ->
+                    add(
+                        PendingUnlock(
+                            title = face.name,
+                            subtitle = "${formatPoints(face.unlockPoints)} Focus Points reached",
+                            accent = Color(0xFFB6F13A),
+                            preview = {
+                                TimerFaceThumbnail(
+                                    faceId = face.id,
+                                    modifier = Modifier.width(150.dp)
+                                )
+                            }
+                        )
+                    )
+                }
+            }
+        }
+        if (fresh.isNotEmpty()) {
+            unlockQueue = unlockQueue + fresh
+            themeUnlocks.consume()
+            faceUnlocks.consume()
+        }
+    }
+    LaunchedEffect(unlockQueue, activeUnlock) {
+        if (activeUnlock == null && unlockQueue.isNotEmpty()) {
+            activeUnlock = unlockQueue.first()
+            unlockQueue = unlockQueue.drop(1)
+        }
+    }
 
     lockedDialogTheme?.let { lockedTheme ->
         LockedThemeDialog(
@@ -321,26 +401,38 @@ fun CustomizeTimerSheet(
                         color = textSecondary
                     )
                     Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CustomizeSounds.forEach { sound ->
-                            val isChosen = sound == ambientSound
-                            CustomizeChip(
-                                text = sound,
-                                selected = isChosen,
-                                onClick = { onSelectAmbientSound(sound) },
-                                textPrimary = textPrimary,
-                                cardBg = cardBg,
-                                cardBorder = cardBorder,
-                                selectedBg = selectedBg,
-                                testTag = "customize_sound_${sound.lowercase().replace(" ", "_")}"
-                            )
-                        }
-                    }
+                    SoundscapePicker(
+                        ambientSound = ambientSound,
+                        onSelectAmbientSound = onSelectAmbientSound,
+                        textPrimary = textPrimary,
+                        textSecondary = textSecondary,
+                        cardBg = cardBg,
+                        cardBorder = cardBorder,
+                        selectedBg = selectedBg
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Alarm tone",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        color = textSecondary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Plays when your timer ends. Tap to preview.",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Normal,
+                        fontSize = 11.sp,
+                        color = textSecondary.copy(alpha = 0.75f)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    AlarmTonePicker(
+                        textPrimary = textPrimary,
+                        cardBg = cardBg,
+                        cardBorder = cardBorder,
+                        selectedBg = selectedBg
+                    )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = "Theme",
@@ -365,7 +457,7 @@ fun CustomizeTimerSheet(
                                     .background(if (isSelected) selectedBg else cardBg)
                                     .border(
                                         1.dp,
-                                        if (isSelected) CustomizeAccent else cardBorder,
+                                        if (isSelected) T.accent else cardBorder,
                                         RoundedCornerShape(14.dp)
                                     )
                                     .pressFeedback()
@@ -383,7 +475,7 @@ fun CustomizeTimerSheet(
                                     Icon(
                                         imageVector = Icons.Default.Lock,
                                         contentDescription = "Locked",
-                                        tint = Color(0xFFFFD54F),
+                                        tint = T.warning,
                                         modifier = Modifier.size(13.dp)
                                     )
                                 } else {
@@ -408,7 +500,7 @@ fun CustomizeTimerSheet(
                                         text = "${theme.unlockPoints}",
                                         fontFamily = PoppinsFontFamily,
                                         fontSize = 10.sp,
-                                        color = Color(0xFFFFD54F)
+                                        color = T.warning
                                     )
                                 }
                             }
@@ -438,7 +530,7 @@ fun CustomizeTimerSheet(
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
-                            color = if (isDark) CustomizeAccent else Color(0xFF4A7A00)
+                            color = T.accentText
                         )
                     }
                     TimerFacePicker(
@@ -451,6 +543,22 @@ fun CustomizeTimerSheet(
                                 TimerFaceManager.trySelectFace(context, face.id, focusPoints)
                             }
                         },
+                        textPrimary = textPrimary,
+                        cardBorder = cardBorder,
+                        scrollState = timerFaceScrollState ?: rememberScrollState()
+                    )
+                }
+
+                // v1.2.3: Pomodoro design — four free designs with live
+                // previews, persisted as the enum name (TICK_RING default).
+                // Applies to the Focus screen while a pomodoro run is active.
+                item {
+                    CustomizeSectionLabel(text = "Pomodoro design", textSecondary = textSecondary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val pomoDesign by PomodoroStyleManager.selectedStyle.collectAsState()
+                    PomodoroDesignPicker(
+                        selectedStyle = pomoDesign,
+                        onStyleTap = { PomodoroStyleManager.selectStyle(context, it) },
                         textPrimary = textPrimary,
                         cardBorder = cardBorder
                     )
@@ -465,8 +573,8 @@ fun CustomizeTimerSheet(
                             onDismiss()
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = CustomizeAccent,
-                            contentColor = Color.Black
+                            containerColor = T.accent,
+                            contentColor = T.onAccent
                         ),
                         shape = RoundedCornerShape(20.dp),
                         modifier = Modifier
@@ -506,7 +614,7 @@ fun CustomizeTimerSheet(
                                 fontFamily = PoppinsFontFamily,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
-                                color = if (isDark) CustomizeAccent else Color(0xFF4A7A00)
+                                color = T.accentText
                             )
                         }
                         TextButton(
@@ -523,7 +631,7 @@ fun CustomizeTimerSheet(
                                 fontFamily = PoppinsFontFamily,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
-                                color = if (isDark) CustomizeAccent else Color(0xFF4A7A00)
+                                color = T.accentText
                             )
                         }
                     }
@@ -533,16 +641,31 @@ fun CustomizeTimerSheet(
             }
         }
     }
+
+    // Unlock celebration overlay — draws above the sheet; LockedThemeDialog /
+    // LockedTimerFaceDialog above are unchanged (they explain locked items,
+    // this celebrates actual unlocks).
+    activeUnlock?.let { unlock ->
+        UnlockCelebrationOverlay(
+            title = unlock.title,
+            subtitle = unlock.subtitle,
+            accent = unlock.accent,
+            preview = unlock.preview,
+            onDone = { activeUnlock = null }
+        )
+    }
 }
 
 @Composable
 private fun CustomizeSectionLabel(text: String, textSecondary: Color) {
+    // v1.2.3 design-unification: same eyebrow rhythm as Focus Shield —
+    // 11sp semibold uppercase, 1.76sp tracking, muted.
     Text(
         text = text.uppercase(),
         fontFamily = PoppinsFontFamily,
-        fontWeight = FontWeight.Bold,
-        fontSize = 10.sp,
-        letterSpacing = 1.5.sp,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 11.sp,
+        letterSpacing = 1.76.sp,
         color = textSecondary,
         modifier = Modifier.padding(start = 4.dp)
     )
@@ -566,7 +689,7 @@ private fun CustomizeChip(
             .background(if (selected) selectedBg else cardBg)
             .border(
                 1.dp,
-                if (selected) CustomizeAccent else cardBorder,
+                if (selected) focivoTokens().accent else cardBorder,
                 RoundedCornerShape(14.dp)
             )
             .pressFeedback()
@@ -582,6 +705,211 @@ private fun CustomizeChip(
             fontSize = 12.sp,
             color = textPrimary
         )
+    }
+}
+
+/**
+ * v1.2.3 (Task 12) — Session Soundscape picker: built-in sounds (procedural
+ * + new OGG loops), user-imported audio (SAF, no storage permission), and an
+ * import entry point. Imported entries can be removed; revoked/broken URIs
+ * render as unavailable instead of crashing.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SoundscapePicker(
+    ambientSound: String,
+    onSelectAmbientSound: (String) -> Unit,
+    textPrimary: Color,
+    textSecondary: Color,
+    cardBg: Color,
+    cardBorder: Color,
+    selectedBg: Color
+) {
+    val context = LocalContext.current
+    var importVersion by remember { mutableIntStateOf(0) }
+    val importedTracks = remember(importVersion) {
+        com.example.util.ImportedAudioManager.getTracks(context)
+    }
+    val accentColor = focivoTokens().accent
+
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            if (uri != null) {
+                val name = com.example.util.ImportedAudioManager.queryDisplayName(context, uri)
+                    ?: "Imported audio"
+                if (com.example.util.ImportedAudioManager.addTrack(context, uri, name)) {
+                    importVersion++
+                    onSelectAmbientSound(uri.toString())
+                }
+            }
+        }
+    )
+
+    // Built-in sounds.
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        BuiltInSounds.forEach { sound ->
+            val isChosen = sound == ambientSound
+            CustomizeChip(
+                text = sound,
+                selected = isChosen,
+                onClick = { onSelectAmbientSound(sound) },
+                textPrimary = textPrimary,
+                cardBg = cardBg,
+                cardBorder = cardBorder,
+                selectedBg = selectedBg,
+                testTag = "customize_sound_${sound.lowercase().replace(" ", "_")}"
+            )
+        }
+    }
+
+    // User-imported audio.
+    if (importedTracks.isNotEmpty()) {
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = "Your audio",
+            fontFamily = PoppinsFontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp,
+            color = textSecondary
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            importedTracks.forEach { track ->
+                val available = com.example.util.ImportedAudioManager.isTrackAvailable(context, track.uriString)
+                val isChosen = track.uriString == ambientSound
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (isChosen && available) selectedBg else cardBg)
+                        .border(
+                            1.dp,
+                            if (isChosen && available) accentColor else cardBorder,
+                            RoundedCornerShape(14.dp)
+                        )
+                        .alpha(if (available) 1f else 0.45f)
+                        .clickable(enabled = available) { onSelectAmbientSound(track.uriString) }
+                        .padding(start = 12.dp, top = 9.dp, bottom = 9.dp, end = 4.dp)
+                ) {
+                    Text(
+                        text = if (available) track.displayName else "${track.displayName} (Unavailable)",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = if (isChosen) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 12.sp,
+                        color = textPrimary
+                    )
+                    androidx.compose.material3.IconButton(
+                        onClick = {
+                            com.example.util.ImportedAudioManager.removeTrack(context, track.uriString)
+                            if (ambientSound == track.uriString) onSelectAmbientSound("Silent")
+                            importVersion++
+                        },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Close,
+                            contentDescription = "Remove ${track.displayName}",
+                            tint = textSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Import entry point.
+    Spacer(modifier = Modifier.height(8.dp))
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(cardBg)
+            .border(1.dp, cardBorder.copy(alpha = 0.7f), RoundedCornerShape(14.dp))
+            .clickable { importLauncher.launch(arrayOf("audio/*")) }
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = androidx.compose.material.icons.Icons.Default.Add,
+                contentDescription = null,
+                tint = focivoTokens().accent,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = "Import audio from your library",
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.Medium,
+                fontSize = 12.sp,
+                color = textPrimary
+            )
+        }
+    }
+    Spacer(modifier = Modifier.height(2.dp))
+    Text(
+        text = "Your files stay on your device and play under the timer like built-in sounds.",
+        fontFamily = PoppinsFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.sp,
+        color = textSecondary.copy(alpha = 0.75f)
+    )
+}
+
+private val BuiltInSounds = listOf(
+    "Silent", "Rain", "White noise", "Cafe", "Forest", "Ocean",
+    "Night Breeze", "Ambient Pad", "Gentle Stream", "Distant Thunder"
+)
+
+/**
+ * v1.2.3 (Task 11) — alarm-tone picker: all tones as chips, tap selects AND
+ * previews the tone. Selection persists via [AlarmToneManager]; the
+ * timer-end alarm plays the selected tone.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AlarmTonePicker(
+    textPrimary: Color,
+    cardBg: Color,
+    cardBorder: Color,
+    selectedBg: Color
+) {
+    val context = LocalContext.current
+    var selectedId by remember { mutableStateOf(com.example.util.AlarmToneManager.getSelectedId(context)) }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        com.example.util.AlarmToneManager.TONES.forEach { tone ->
+            val isChosen = tone.id == selectedId
+            CustomizeChip(
+                text = tone.displayName,
+                selected = isChosen,
+                onClick = {
+                    com.example.util.AlarmToneManager.setSelectedId(context, tone.id)
+                    selectedId = tone.id
+                    com.example.util.SoundFx.playAlarmPreview(context, tone.resId)
+                },
+                textPrimary = textPrimary,
+                cardBg = cardBg,
+                cardBorder = cardBorder,
+                selectedBg = selectedBg,
+                testTag = "customize_alarm_tone_${tone.id}"
+            )
+        }
     }
 }
 

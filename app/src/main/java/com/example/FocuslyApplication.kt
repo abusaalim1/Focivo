@@ -33,6 +33,12 @@ class FocuslyApplication : Application() {
         } catch (e: Throwable) {
             Log.e("FocuslyApplication", "Failed to initialize TimerFaceManager: ${e.message}", e)
         }
+        // v1.2.3: pomodoro design picker — same init pattern.
+        try {
+            com.example.util.PomodoroStyleManager.init(this)
+        } catch (e: Throwable) {
+            Log.e("FocuslyApplication", "Failed to initialize PomodoroStyleManager: ${e.message}", e)
+        }
         try {
             com.example.util.MascotWardrobe.init(this)
         } catch (e: Throwable) {
@@ -88,6 +94,12 @@ class FocuslyApplication : Application() {
         }
 
         try {
+            com.example.util.BlockedChannelsManager.init(this)
+        } catch (e: Throwable) {
+            Log.e("FocuslyApplication", "Failed to initialize BlockedChannelsManager: ${e.message}", e)
+        }
+
+        try {
             com.example.util.DeepFocusManager.init(this)
         } catch (e: Throwable) {
             Log.e("FocuslyApplication", "Failed to initialize DeepFocusManager: ${e.message}", e)
@@ -99,7 +111,7 @@ class FocuslyApplication : Application() {
             Log.e("FocuslyApplication", "Failed to initialize ScheduledBlockScheduler: ${e.message}", e)
         }
 
-        // v1.4.3: refresh the study-reminder + daily 19:00 streak-saver alarms
+        // v1.4.3: refresh the study-reminder alarms
         // on every process start (evaluateAndReschedule covers this too; belt
         // and braces so the alarms exist even if evaluate throws early).
         // v1.1: + Sunday recap, update check, comeback — all survival alarms

@@ -14,7 +14,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
@@ -44,7 +46,7 @@ private val Body = FontFamily.SansSerif     // -> FontFamily(Font(R.font.outfit_
 private val BgDark = Color(0xFF0D110E)
 private val Lime = Color(0xFF8CE000)
 
-enum class SplashVariant(val totalMs: Int) { NEW_USER(8400), RETURNING(2800) }
+enum class SplashVariant(val totalMs: Int) { NEW_USER(8400), RETURNING(3000) }
 
 private class AppDot(val res: Int, val angle: Float, val frac: Float)
 private val dots = listOf(
@@ -65,6 +67,7 @@ private fun seg(p: Float, a: Float, b: Float) = eo(cl((p - a) / (b - a)))
 @Composable
 fun FocivoSplash(
     variant: SplashVariant,
+    welcome: WelcomeInfo = WelcomeInfo(),
     /**
      * v1.2.1 screenshot-test seam: when non-null the clock animation is
      * skipped and the scene renders at this fixed progress (0..1).
@@ -75,7 +78,7 @@ fun FocivoSplash(
     onFinished: (openCreateAccount: Boolean) -> Unit
 ) {
     val progress = remember { Animatable(0f) }
-    LaunchedEffect(variant, testProgress) {
+    LaunchedEffect(variant, welcome, testProgress) {
         if (testProgress == null) {
             progress.animateTo(1f, tween(variant.totalMs, easing = LinearEasing))
             onFinished(variant == SplashVariant.NEW_USER)
@@ -88,9 +91,10 @@ fun FocivoSplash(
     BoxWithConstraints(Modifier.fillMaxSize().background(BgDark)) {
         val W = maxWidth
         val cy = maxHeight * 0.43f
-        // v1.2.1: the lime radial background glow is removed (owner) — the
-        // backdrop is the plain dark #0D110E. Animation timing/scenes unchanged.
-        if (variant == SplashVariant.NEW_USER) NewUserScene(p, W, cy) else ReturningScene(p, W, cy)
+        // v1.2.1 (owner order): the lime radial background glow stays REMOVED —
+        // backdrop is plain dark #0D110E in BOTH scenes. The WelcomeScene's own
+        // animated aurora gradients are the new scene's design and stay.
+        if (variant == SplashVariant.NEW_USER) NewUserScene(p, W, cy) else WelcomeScene(p, W, cy, welcome)
     }
 }
 
@@ -150,9 +154,8 @@ private fun BoxWithConstraintsScope.NewUserScene(p: Float, W: Dp, cy: Dp) {
         val ro = seg(p, .2f, .3f) * out
         if (ro > 0f) {
             val c = Offset(size.width / 2, cy.toPx()); val rr = r.dp.toPx() * lerp(.85f, 1f, seg(p, .2f, .3f)) * lerp(.92f, 1f, out)
-            // v1.2.1: the extra filled backdrop circle behind the radar disc is
-            // removed (owner) — the disc rings + sweep draw straight on the
-            // plain dark background.
+            // v1.2.1 (owner order): the extra filled backdrop circle behind the
+            // radar disc stays REMOVED — rings + sweep on the plain dark bg.
             val st = Stroke(1.dp.toPx())
             drawCircle(Lime.copy(alpha = .15f * ro), rr, c, style = st)
             drawCircle(Lime.copy(alpha = .07f * ro), rr * .66f, c, style = st)
@@ -196,55 +199,120 @@ private fun BoxWithConstraintsScope.NewUserScene(p: Float, W: Dp, cy: Dp) {
     }
 }
 
-@Composable
-private fun BoxWithConstraintsScope.ReturningScene(p: Float, W: Dp, cy: Dp) {
-    val li = cl(p / .22f); val ex = 1f - seg(p, .88f, 1f)
-    val ls = .24f * W.value; val radarR = .38f * W.value; val ly = -.04f * W.value
+/** Signed-in user ke real data (naam, aaj ke minutes). Sab optional. */
+data class WelcomeInfo(val name: String? = null, val todayMinutes: Int = 0)
 
-    Canvas(Modifier.fillMaxSize()) {
-        val c = Offset(size.width / 2, cy.toPx() + ly.dp.toPx())
-        // shield ring draws itself
-        val ringR = ls.dp.toPx() * .75f
-        drawArc(Lime.copy(alpha = seg(p, .02f, .2f) * ex), -90f, 360f * seg(p, .05f, .5f), false,
-            Offset(c.x - ringR, c.y - ringR), Size(ringR * 2, ringR * 2), style = Stroke(1.6.dp.toPx(), cap = StrokeCap.Round))
-        // ripples
-        for (i in 0..2) {
-            val t = (p * 2.2f + i / 3f) % 1f
-            drawCircle(Lime.copy(alpha = seg(p, .1f, .3f) * (1 - t) * .3f * ex), ls.dp.toPx() / 2 * lerp(1f, 3.4f, t), c, style = Stroke(1.5.dp.toPx()))
+private fun greeting(): String {
+    val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    return if (h < 12) "Good morning," else if (h < 17) "Good afternoon," else "Good evening,"
+}
+
+/** Signed-in concept: aurora + greeting + today pill. 3s, naye user wale radar se bilkul alag. */
+@Composable
+private fun BoxWithConstraintsScope.WelcomeScene(p: Float, W: Dp, cy: Dp, info: WelcomeInfo) {
+    val ex = 1f - seg(p, .86f, 1f)
+    val sc = lerp(1f, 1.05f, seg(p, .86f, 1f))
+    val li = cl(p / .25f)
+    val t = p * 2f * PI.toFloat()
+    val w = W.value
+
+    // soft moving aurora
+    Canvas(Modifier.fillMaxSize().graphicsLayer { scaleX = sc; scaleY = sc; alpha = seg(p, 0f, .3f) * ex }) {
+        val pw = W.toPx(); val c0 = Offset(size.width / 2, cy.toPx())
+        val c1 = Offset(c0.x + .18f * pw * sin(t), c0.y - .1f * pw + .06f * pw * cos(t * 1.3f))
+        val c2 = Offset(c0.x - .2f * pw * sin(t + 1f), c0.y + .12f * pw + .07f * pw * cos(t))
+        drawCircle(Brush.radialGradient(listOf(Lime.copy(alpha = .34f), Color.Transparent), c1, .6f * pw), .6f * pw, c1)
+        drawCircle(Brush.radialGradient(listOf(Color(0xFF1EBE6E).copy(alpha = .28f), Color.Transparent), c2, .55f * pw), .55f * pw, c2)
+    }
+
+    // logo: blur -> sharp + glass ring
+    Spot(0.dp, (-.12f * w).dp, (.26f * w).dp, 1.38f * sc, li * ex * .25f, cy) {
+        Box(Modifier.fillMaxSize().border(1.dp, Lime, CircleShape))
+    }
+    Spot(0.dp, (-.12f * w).dp, (.26f * w).dp, lerp(.6f, 1f, ob(li)) * sc, li * ex, cy) {
+        Image(painterResource(R.drawable.focivo_logo), "Focivo",
+            Modifier.fillMaxSize().blur(((1f - li) * 10f).dp).clip(RoundedCornerShape(22.dp)))
+    }
+
+    // greeting words blur-in one by one
+    Line((.19f * w).dp - 22.dp, cy, ex) {
+        Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+            greeting().split(" ").forEachIndexed { i, word ->
+                val a = seg(p, .18f + i * .07f, .40f + i * .07f)
+                Text(word, color = Color.White, fontFamily = Display, fontStyle = FontStyle.Italic, fontSize = (.105f * w).sp,
+                    modifier = Modifier.graphicsLayer { alpha = a; translationY = (1 - a) * 14f }.blur(((1 - a) * 8f).dp))
+            }
         }
     }
-    // orbiting, already-blocked apps
-    dots.take(6).forEachIndexed { i, d ->
-        val rv = seg(p, .12f + i * .04f, .3f + i * .04f); val bl = cl((p - .3f - i * .05f) / .15f)
-        val q = (i * 60f + p * 120f) * PI.toFloat() / 180f
-        Spot((radarR * sin(q)).dp, (ly - radarR * cos(q)).dp, (.09f * W.value).dp, lerp(.4f, 1f, rv), rv * (1f - .3f * bl) * ex, cy) {
-            AppDotView(d, (.09f * W.value).dp, rv, bl)
-        }
+    val nm = info.name?.takeIf { it.isNotBlank() } ?: "Welcome back"
+    val na = seg(p, .3f, .5f)
+    Line((.32f * w + (1 - na) * 12).dp - 24.dp, cy, na * ex) {
+        Text(nm, color = Lime, fontFamily = Body, fontWeight = FontWeight.Bold, fontSize = (.115f * w).sp)
     }
-    Spot(0.dp, ly.dp, ls.dp, lerp(.5f, 1f, ob(li)), li * ex, cy) {
-        Image(painterResource(R.drawable.focivo_logo), "Focivo", Modifier.fillMaxSize().clip(RoundedCornerShape(22.dp)))
-    }
-    val a = seg(p, .3f, .5f); val b = seg(p, .45f, .65f)
-    Line((.4f * W.value + (1 - a) * 14).dp - 20.dp, cy, a * ex) {
-        Text("Welcome back", color = Color.White, fontFamily = Display, fontStyle = FontStyle.Italic, fontSize = (.1f * W.value).sp)
-    }
-    Line((.54f * W.value + (1 - b) * 14).dp - 10.dp, cy, b * ex * .8f) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(Lime))
-            Spacer(Modifier.width(8.dp))
-            Text("Your focus shield is on", color = Color(0xFFCCD5CE), fontFamily = Body, fontSize = (.05f * W.value).sp)
+
+    // today pill (count-up)
+    if (info.todayMinutes > 0) {
+        val pa = seg(p, .5f, .68f); val pc = seg(p, .5f, .75f)
+        Line((.5f * w + (1 - pa) * 14).dp - 18.dp, cy, pa * ex) {
+            Row(
+                Modifier.clip(CircleShape).background(Color.White.copy(alpha = .06f)).border(1.dp, Lime.copy(alpha = .25f), CircleShape)
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("${(info.todayMinutes * pc).toInt()}m focused today", color = Color.White.copy(alpha = .85f), fontFamily = Body, fontSize = 13.sp)
+            }
         }
     }
 }
 
-/** Host: auth state check yahan lagao (FirebaseAuth etc.) */
+/** Host: auth state + user data yahan lagao (FirebaseAuth / apna session). */
 @Composable
 fun SplashHost(
     isSignedIn: Boolean,
-    goToCreateAccount: () -> Unit,  // new user -> Auth screen, "Create Account" tab selected
-    goToHome: () -> Unit            // signed-in -> Home
+    welcome: WelcomeInfo = WelcomeInfo(),   // WelcomeInfo(name = user.firstName, todayMinutes = todayFocus)
+    goToCreateAccount: () -> Unit,          // new user -> Auth screen, "Create Account" tab selected
+    goToHome: () -> Unit                    // signed-in -> Home
 ) {
-    FocivoSplash(if (isSignedIn) SplashVariant.RETURNING else SplashVariant.NEW_USER) { createAcc ->
+    FocivoSplash(if (isSignedIn) SplashVariant.RETURNING else SplashVariant.NEW_USER, welcome) { createAcc ->
         if (createAcc) goToCreateAccount() else goToHome()
     }
+}
+
+/** v1.2.3: real-data wiring for the WelcomeScene. Reads the same on-device
+ *  stores the share cards use (synchronous prefs read, no launch delay):
+ *  - name: user_preferences currentUserName (same resolution rules as the
+ *    share cards; first name only for the greeting line)
+ *  - todayMinutes: today's total from focus_sessions (same per-day
+ *    aggregation the share-card "Today" card uses)
+ *  Null/blank name -> the scene falls back to "Welcome back" by itself.
+ */
+internal fun loadSplashWelcomeInfo(context: android.content.Context): WelcomeInfo {
+    return try {
+        val prefs = context.getSharedPreferences("focusly_local_data", android.content.Context.MODE_PRIVATE)
+        val obj = prefs.getString("user_preferences", null)?.let { org.json.JSONObject(it) }
+        val rawName = obj?.optString("currentUserName", "")?.trim().orEmpty()
+        val email = obj?.optString("currentUserEmail", "")?.trim().orEmpty()
+        val name = when {
+            rawName.isNotBlank() && rawName != "Deep Worker" && rawName != "Student" -> rawName.split(" ").first()
+            email.isNotBlank() -> email.substringBefore("@").split(" ").first().takeIf { it.isNotBlank() }
+            else -> null
+        }
+        var todayMinutes = 0
+        try {
+            val arr = org.json.JSONArray(prefs.getString("focus_sessions", "[]") ?: "[]")
+            val cal = java.util.Calendar.getInstance()
+            cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            cal.set(java.util.Calendar.MINUTE, 0)
+            cal.set(java.util.Calendar.SECOND, 0)
+            cal.set(java.util.Calendar.MILLISECOND, 0)
+            val todayStart = cal.timeInMillis
+            var total = 0
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                if (o.optLong("completedAt", 0L) >= todayStart) total += o.optInt("durationSeconds", 0)
+            }
+            todayMinutes = (total / 60).coerceAtLeast(0)
+        } catch (_: Exception) { }
+        WelcomeInfo(name = name, todayMinutes = todayMinutes)
+    } catch (_: Exception) { WelcomeInfo() }
 }

@@ -206,10 +206,10 @@ class V150OnboardingScreenshotsTest {
             id = "notifications",
             rowLabel = "Notification permission",
             bubbleLead = "To ",
-            bubbleAccent = "send you focus reminders and streak alerts",
+            bubbleAccent = "send you focus reminders and timer alerts",
             bubbleTail = ", we need notification access.",
             privacyLine = "Your privacy matters to us. We never share your data.",
-            whyBody = "Reminders for your study windows, streak milestones and timer alerts. Nothing else — no spam, ever.",
+            whyBody = "Reminders for your study windows and timer alerts. Nothing else — no spam, ever.",
             pose = MascotPose.WELCOME
         )
         themed {
@@ -247,5 +247,33 @@ class V150OnboardingScreenshotsTest {
             )
         }
         capture("onboarding_permission_usage_access")
+    }
+
+    // v1.2.3 — granted-state render: the step must visibly show "Granted"
+    // once the system has the permission, never the plain Allow pill.
+    @Test
+    fun onboarding_permission_notifications_granted() {
+        useTheme("midnight")
+        val spec = PermissionSpec(
+            id = "notifications",
+            rowLabel = "Notification permission",
+            bubbleLead = "To ",
+            bubbleAccent = "send you focus reminders and timer alerts",
+            bubbleTail = ", we need notification access.",
+            privacyLine = "Your privacy matters to us. We never share your data.",
+            whyBody = "Reminders for your study windows and timer alerts. Nothing else — no spam, ever.",
+            pose = MascotPose.WELCOME
+        )
+        themed {
+            PermissionGrantContent(
+                spec = spec,
+                progress = 14f / 17f,
+                onAllow = {},
+                onLater = {},
+                onBack = {},
+                granted = true
+            )
+        }
+        capture("onboarding_permission_notifications_granted")
     }
 }

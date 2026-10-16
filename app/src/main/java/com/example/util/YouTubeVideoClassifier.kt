@@ -236,23 +236,31 @@ object YouTubeVideoClassifier {
             )
         }
 
-        // Case B: Explicit Vlog, Gaming, or Entertainment Title Pattern
-        if (cleanTitle.contains("vlog") || cleanTitle.contains("song") || cleanTitle.contains("official video") ||
-            cleanTitle.contains("gameplay") || cleanTitle.contains("gaming") || cleanTitle.contains("game") ||
-            cleanTitle.contains("gta") || cleanTitle.contains("minecraft") || cleanTitle.contains("bgmi") ||
-            cleanTitle.contains("pubg") || cleanTitle.contains("roblox") || cleanTitle.contains("prank") ||
-            cleanTitle.contains("roast") || cleanTitle.contains("comedy") || cleanTitle.contains("funny") ||
-            cleanTitle.contains("trailer") || cleanTitle.contains("movie") || cleanTitle.contains("highlights")
-        ) {
-            // Even if academic keyword is falsely present, e.g. "Funny College Life Vlog"
-            if (!cleanTitle.contains("lecture") && !cleanTitle.contains("chapter") && !cleanTitle.contains("tutorial") && !cleanTitle.contains("ncert")) {
-                return VideoVerdict(
-                    isEducational = false,
-                    confidence = 0.95f,
-                    category = "Entertainment / Gaming / Vlog",
-                    reason = "Non-study entertainment or gaming detected"
-                )
-            }
+        // Case B: Explicit Vlog, Gaming, or Entertainment Title Pattern.
+        // v1.2.3: whole-word / whole-phrase matching ONLY (same B4 rule as
+        // the keyword lists). The old raw contains() here was a false-
+        // positive machine: "game" matched "Game Plan", "song" could match
+        // inside other words, "movie"/"funny" fired on study titles. The
+        // dangerous singles ("game", "song", "movie", "funny") are dropped
+        // from this backstop — "song"/"movie"/"funny" are already covered
+        // whole-word by the entertainment regex above, and "game" alone is
+        // never evidence ("Game Plan" is study vocabulary). Escape hatch:
+        // any real academic signal (>= Case C's 0.40 bar) wins over this
+        // backstop, so "Most Expected Questions Game Plan" is never blocked.
+        val caseBPhrases = listOf(
+            "vlog", "vlogs", "gameplay", "gaming", "gta", "minecraft",
+            "bgmi", "pubg", "roblox", "prank", "roast", "comedy",
+            "trailer", "teaser", "highlights", "official video",
+            "full movie", "movie scene", "dance cover"
+        )
+        val caseBHit = caseBPhrases.any { containsPhrase(fullCombined, it) }
+        if (caseBHit && academicScore < 0.40f) {
+            return VideoVerdict(
+                isEducational = false,
+                confidence = 0.95f,
+                category = "Entertainment / Gaming / Vlog",
+                reason = "Non-study entertainment or gaming detected"
+            )
         }
 
         // Case C: Strong Academic Signal

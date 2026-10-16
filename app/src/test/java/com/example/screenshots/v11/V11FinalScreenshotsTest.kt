@@ -95,7 +95,6 @@ class V11FinalScreenshotsTest {
                 currentUserName = "Abu Saalim",
                 currentUserPhotoUrl = null,
                 currentUserPoints = 320,
-                currentUserStreak = 7,
                 sessions = emptyList(),
                 onRefresh = {}
             )

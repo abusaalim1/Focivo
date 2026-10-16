@@ -32,7 +32,6 @@ data class ShareScreenData(
     val userName: String?,
     val todayTotalMinutes: Int,
     val todaySessions: Int,
-    val streakDays: Int,
     /** 7 entries, oldest..today. */
     val weekMinutes: List<Int>,
     /** 7 single-letter weekday initials, matching weekMinutes. */
@@ -87,7 +86,6 @@ fun loadShareScreenData(context: Context, session: FocusSessionEntity): ShareScr
     // Name: same resolution as ProfileScreen (currentUserName -> email prefix),
     // but "Student"/blank means "no name" for the card headline.
     var userName: String? = null
-    var streakDays = 0
     try {
         val obj = prefs.getString("user_preferences", null)?.let { JSONObject(it) }
         val raw = obj?.optString("currentUserName", "")?.trim().orEmpty()
@@ -97,7 +95,6 @@ fun loadShareScreenData(context: Context, session: FocusSessionEntity): ShareScr
             email.isNotBlank() -> email.substringBefore("@").takeIf { it.isNotBlank() }
             else -> null
         }
-        streakDays = obj?.optInt("currentStreak", 0) ?: 0
     } catch (_: Exception) { }
 
     val sessions = readLocalSessions(prefs).toMutableList()
@@ -140,7 +137,6 @@ fun loadShareScreenData(context: Context, session: FocusSessionEntity): ShareScr
         userName = userName,
         todayTotalMinutes = todayTotalMinutes,
         todaySessions = todaySessions.size,
-        streakDays = streakDays.coerceAtLeast(0),
         weekMinutes = weekMinutes,
         weekLabels = weekLabels,
         blockedApps = blockedApps

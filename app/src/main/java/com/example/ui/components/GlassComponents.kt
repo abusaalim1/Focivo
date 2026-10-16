@@ -73,6 +73,7 @@ import com.example.ui.theme.PureWhite
 import com.example.ui.theme.RegainLimeContainer
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 
@@ -128,9 +129,10 @@ fun LinearGlowCard(
     val isDark = isAppInDarkTheme()
     val interactionSource = remember { MutableInteractionSource() }
 
-    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
-    val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
-    val topHighlight = if (isDark) Color(0x28FFFFFF) else Color(0x90FFFFFF)
+    val cardBg = focivoTokens().surface
+    val cardBorder = focivoTokens().line
+    val glowText = focivoTokens().text
+    val topHighlight = if (isDark) Color(0x1AFFFFFF) else Color(0x0DFFFFFF)
 
     val effectiveBorder = border ?: if (accentBorder) {
         BorderStroke(1.dp, RegainLimePrimary)
@@ -229,9 +231,9 @@ fun GlassCard(
     val interactionSource = remember { MutableInteractionSource() }
 
     // Apple-inspired minimal glass surface
-    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
-    val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
-    val topHighlight = if (isDark) Color(0x28FFFFFF) else Color(0x90FFFFFF)
+    val cardBg = focivoTokens().surface
+    val cardBorder = focivoTokens().line
+    val topHighlight = if (isDark) Color(0x1AFFFFFF) else Color(0x0DFFFFFF)
 
     val effectiveBorder = border ?: if (accentBorder) {
         BorderStroke(1.dp, RegainLimePrimary)
@@ -317,8 +319,9 @@ fun LiquidGlassCard(
             )
     } else Modifier
 
-    val cardBg = if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF)
-    val cardBorder = if (isDark) Color(0x22FFFFFF) else Color(0x12000000)
+    val cardBg = focivoTokens().surface
+    val cardBorder = focivoTokens().line
+    val glowText = focivoTokens().text
 
     val effectiveBorder = border ?: if (accentBorder) {
         BorderStroke(1.dp, RegainLimePrimary)
@@ -331,7 +334,7 @@ fun LiquidGlassCard(
             .shadow(
                 elevation = 8.dp,
                 shape = shape,
-                ambientColor = if (isDark) Color(0x288CE000) else Color(0x0C000000),
+                ambientColor = focivoTokens().accent.copy(alpha = 0.10f),
                 spotColor = if (isDark) Color(0x35000000) else Color(0x14000000)
             )
             .clip(shape)
@@ -342,8 +345,8 @@ fun LiquidGlassCard(
                         brush = Brush.linearGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                Color(0x148CE000),
-                                Color(0x24FFFFFF),
+                                glowText.copy(alpha = 0.05f),
+                                glowText.copy(alpha = 0.10f),
                                 Color.Transparent
                             ),
                             start = Offset(shimmerOffset, 0f),
@@ -378,6 +381,7 @@ fun LiquidGlassCard(
  * Apple-style minimal and premium card container modifier with continuous squircle clipping,
  * ultra-refined hairline border, physical specular highlight refraction, and soft ambient shadow.
  */
+@Composable
 fun Modifier.appleCard(
     shape: Shape = RoundedCornerShape(22.dp),
     isDark: Boolean,
@@ -392,9 +396,9 @@ fun Modifier.appleCard(
         spotColor = if (isDark) Color(0x35000000) else Color(0x0E000000)
     )
     .clip(shape)
-    .background(if (isDark) Color(0xF21C1C1E) else Color(0xFFFFFFFF))
+    .background(focivoTokens().surface)
     .drawBehind {
-        val topHighlight = if (isDark) Color(0x28FFFFFF) else Color(0x90FFFFFF)
+        val topHighlight = if (isDark) Color(0x1AFFFFFF) else Color(0x0DFFFFFF)
         drawLine(
             brush = Brush.horizontalGradient(
                 colors = listOf(
@@ -411,7 +415,7 @@ fun Modifier.appleCard(
     }
     .border(
         width = 0.8.dp,
-        color = if (accentBorder) accentColor.copy(alpha = 0.85f) else (if (isDark) Color(0x22FFFFFF) else Color(0x12000000)),
+        color = if (accentBorder) accentColor.copy(alpha = 0.85f) else focivoTokens().line,
         shape = shape
     )
 
@@ -469,7 +473,7 @@ fun GlassSwitch(
             .background(trackBg)
             .border(
                 width = 1.dp,
-                color = if (checked) RegainLimeDeepText.copy(alpha = 0.25f) else Color(0x18000000),
+                color = if (checked) focivoTokens().accentText.copy(alpha = 0.25f) else focivoTokens().text.copy(alpha = 0.10f),
                 shape = CircleShape
             )
             .clickable(
@@ -519,25 +523,26 @@ fun LinearButton(
     val interactionSource = remember { MutableInteractionSource() }
     val shape = CircleShape
 
+    val T = focivoTokens()
     val bg = when (variant) {
-        LinearButtonVariant.PRIMARY -> if (enabled) RegainLimePrimary else (if (isDark) Color(0xFF232A20) else Color(0xFFE5EBE0))
-        LinearButtonVariant.SECONDARY -> if (isDark) Color(0xEB1C231C) else Color(0xF5FFFFFF)
+        LinearButtonVariant.PRIMARY -> if (enabled) T.accent else T.accent.copy(alpha = 0.35f)
+        LinearButtonVariant.SECONDARY -> T.surface
         LinearButtonVariant.GHOST -> Color.Transparent
-        LinearButtonVariant.DANGER -> if (isDark) Color(0x33EF4444) else Color(0xFFFFEBEE)
+        LinearButtonVariant.DANGER -> T.danger.copy(alpha = 0.14f)
     }
 
     val textColor = when (variant) {
-        LinearButtonVariant.PRIMARY -> if (enabled) NearBlack else (if (isDark) Color(0xFF6A7367) else Color(0xFFA0A89D))
-        LinearButtonVariant.SECONDARY -> if (isDark) Color(0xFFF0F4ED) else NearBlack
-        LinearButtonVariant.GHOST -> if (isDark) Color(0xFFCBD5E1) else SecondaryTextLight
-        LinearButtonVariant.DANGER -> Color(0xFFEF4444)
+        LinearButtonVariant.PRIMARY -> if (enabled) T.onAccent else T.onAccent.copy(alpha = 0.55f)
+        LinearButtonVariant.SECONDARY -> T.text
+        LinearButtonVariant.GHOST -> T.muted
+        LinearButtonVariant.DANGER -> T.danger
     }
 
     val border = when (variant) {
-        LinearButtonVariant.PRIMARY -> if (enabled) BorderStroke(1.dp, RegainLimePrimary) else null
-        LinearButtonVariant.SECONDARY -> BorderStroke(0.8.dp, if (isDark) Color(0x24FFFFFF) else Color(0x14000000))
+        LinearButtonVariant.PRIMARY -> null
+        LinearButtonVariant.SECONDARY -> BorderStroke(1.dp, T.line)
         LinearButtonVariant.GHOST -> null
-        LinearButtonVariant.DANGER -> BorderStroke(1.dp, if (isDark) Color(0x55EF4444) else Color(0xFFFFCDD2))
+        LinearButtonVariant.DANGER -> BorderStroke(1.dp, T.danger.copy(alpha = 0.3f))
     }
 
     Box(
@@ -546,8 +551,8 @@ fun LinearButton(
             .shadow(
                 elevation = if (variant == LinearButtonVariant.PRIMARY && enabled) 3.dp else 0.dp,
                 shape = shape,
-                ambientColor = Color(0x188CE000),
-                spotColor = Color(0x228CE000)
+                ambientColor = T.accent.copy(alpha = 0.10f),
+                spotColor = T.accent.copy(alpha = 0.14f)
             )
             .clip(shape)
             .background(bg)
@@ -614,7 +619,7 @@ fun GlassButton(
             .background(if (isDark) Color(0xD81D221C) else PureWhite)
             .border(
                 width = 1.5.dp,
-                color = if (isDark) RegainLimePrimary else RegainLimeDeepText,
+                color = focivoTokens().accentText,
                 shape = pillShape
             )
     }
@@ -635,7 +640,7 @@ fun GlassButton(
                 elevation = if (isPrimary && enabled) 4.dp else 0.dp,
                 shape = pillShape,
                 ambientColor = Color(0x208CE000),
-                spotColor = Color(0x288CE000)
+                spotColor = focivoTokens().accent.copy(alpha = 0.16f)
             )
             .clip(pillShape)
             .then(backgroundModifier)

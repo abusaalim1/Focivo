@@ -69,6 +69,8 @@ object AiStudyGuardManager {
     private const val KEY_AI_GUARD_ENABLED = "is_ai_study_guard_enabled"
     private const val KEY_PUNISHMENT_LOGS_JSON = "custom_punishment_logs_json"
     private const val KEY_PUNISHMENT_PREFIX = "punishment_lock_"
+    // v1.2.3: the trigger reason persisted alongside the lock end-time.
+    private const val KEY_PUNISHMENT_REASON_PREFIX = "punishment_reason_"
 
     const val CHANNEL_ID_ALERTS = "ai_study_guard_channel"
     private const val NOTIFICATION_ID_GUARD_STATUS = 8000
@@ -259,6 +261,29 @@ object AiStudyGuardManager {
         return if (diff > 0) diff.toInt() else 0
     }
 
+    /**
+     * v1.2.3: the persisted trigger reason for an active punishment lock
+     * (e.g. "Warning ignored: Non-study content detected on YouTube …").
+     * Empty when the lock predates reason persistence.
+     */
+    fun getPunishmentReason(context: Context, packageName: String): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString("$KEY_PUNISHMENT_REASON_PREFIX$packageName", "").orEmpty()
+    }
+
+    /** v1.2.3: lock-screen copy — names the real reason + expiry. */
+    fun punishmentLockReason(context: Context, packageName: String, appName: String): String {
+        val reason = getPunishmentReason(context, packageName)
+        val remainingSec = getPunishmentRemainingSeconds(context, packageName)
+        val mins = remainingSec / 60
+        val expiry = if (mins >= 60) "${mins / 60}h ${mins % 60}m" else "${mins}m"
+        return if (reason.isNotBlank()) {
+            "3-Hour Penalty: $appName locked ($reason) — unlocks in ~$expiry."
+        } else {
+            "3-Hour Penalty: $appName is locked for non-study activity — unlocks in ~$expiry."
+        }
+    }
+
     private val nonStudyMessageCounts = ConcurrentHashMap<String, Int>()
     private var nonStudyFirstDetectedMs = 0L
     private var currentMonitoredPackage: String? = null
@@ -396,19 +421,25 @@ object AiStudyGuardManager {
         // Show High-Priority Heads-up Notification
         showWarningNotification(context, warning)
 
-        // Launch Mascot Warning Dialog overlay on-screen
-        try {
-            val popupIntent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
-                context = context,
-                packageName = packageName,
-                appName = appName,
-                durationSec = GRACE_PERIOD_SECONDS,
-                reason = "Non-study activity detected in $appName. Return to study within 3 minutes or the app locks for 3 hours.",
-                isPunishment = false,
-                guardVariant = com.example.ui.screens.BlockedAppLockActivity.GUARD_VARIANT_WARNING
-            )
-            context.startActivity(popupIntent)
-        } catch (_: Exception) {}
+        // v1.2.3 (owner 2026-10-16): the warning MUST reach the user while
+        // they are inside the offending app. A background startActivity is
+        // silently dropped by Android 10+ background-activity-launch (BAL)
+        // restrictions, so the old path here never showed — the first
+        // visible guard surface was the stage-2 block. Route the warning
+        // through BlockOverlayManager's TYPE_ACCESSIBILITY_OVERLAY layer (no
+        // BAL exemption needed) as a warning variant. If every overlay path
+        // fails, say so in the Guard Hub instead of swallowing it.
+        val warningShown = com.example.service.BlockOverlayManager.showWarningOverlay(
+            context = context,
+            packageName = packageName,
+            appName = appName,
+            durationSec = GRACE_PERIOD_SECONDS,
+            reason = "Non-study activity detected in $appName. Return to study within 3 minutes or the app locks for 3 hours."
+        )
+        if (!warningShown) {
+            Log.w(TAG, "[AiGuard] Stage-1 warning UI failed on every overlay path for $appName.")
+            logGuardActivity(context, appName, "warning", "SKIPPED", "stage1-overlay-failed")
+        }
 
         // Log to Supabase and Local Storage
         val validUid = resolveValidUserId(context)
@@ -471,6 +502,13 @@ object AiStudyGuardManager {
         // Enforce lock in preferences
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putLong("$KEY_PUNISHMENT_PREFIX${warning.packageName}", lockEndTime).apply()
+        // v1.2.3: persist the real trigger reason so the lock screen can name
+        // it (owner: "a lock screen shows where no lock should exist" — the
+        // screen must say WHY, with expiry).
+        prefs.edit().putString(
+            "$KEY_PUNISHMENT_REASON_PREFIX${warning.packageName}",
+            "Warning ignored: $repeatReason"
+        ).apply()
 
         // Kick user out of the blocked app immediately
         try {
@@ -580,6 +618,13 @@ object AiStudyGuardManager {
             message = "Good — no block applied! You stayed disciplined and got back on track."
         )
         _activeResolved.value = resolvedState
+
+        // v1.2.3 (owner 2026-10-16): the user complied — take down the
+        // stage-1 warning overlay if it is still the one we showed. Never
+        // touches an overlay that has since become a real block.
+        try {
+            com.example.service.BlockOverlayManager.hideWarningOverlay(context, warning.packageName)
+        } catch (_: Exception) { }
 
         // High priority positive confirmation notification
         showResolvedNotification(context, resolvedState)
@@ -872,7 +917,10 @@ object AiStudyGuardManager {
     )
 
     private const val KEY_GUARD_ACTIVITY_JSON = "guard_activity_log_json"
-    private const val GUARD_ACTIVITY_CAP = 20
+    // v1.2.3 (owner 2026-10-16): 20 -> 50. Skips ("no-player-evidence",
+    // "title-null", …) are the diagnostic proof the scan ran; with cap 20
+    // they churned out before the owner could screenshot them.
+    private const val GUARD_ACTIVITY_CAP = 50
     private const val GUARD_ACTIVITY_PERSIST_MS = 5000L
     private const val GUARD_ACTIVITY_SKIP_THROTTLE_MS = 30000L
 
@@ -909,7 +957,16 @@ object AiStudyGuardManager {
             val snapshot: List<GuardActivityEntry>
             synchronized(guardActivityLock) {
                 guardActivityBuffer.addLast(entry)
-                while (guardActivityBuffer.size > GUARD_ACTIVITY_CAP) guardActivityBuffer.removeFirst()
+                // v1.2.3 (owner 2026-10-16): never evict the most recent skip
+                // per key — skips are the "scan ran and saw X" proof the
+                // owner's device test needs. Evict the oldest entry that is
+                // NOT a newest-skip instead.
+                while (guardActivityBuffer.size > GUARD_ACTIVITY_CAP) {
+                    val ordered = guardActivityBuffer.toList()
+                    val evictIdx = ordered.indexOfFirst { !isNewestSkipOfKey(it, ordered) }
+                    if (evictIdx >= 0) guardActivityBuffer.removeAt(evictIdx)
+                    else guardActivityBuffer.removeFirst()
+                }
                 snapshot = guardActivityBuffer.toList()
             }
             _guardActivity.value = snapshot.asReversed()
@@ -924,6 +981,21 @@ object AiStudyGuardManager {
                 } catch (_: Throwable) {}
             }
         } catch (_: Throwable) {}
+    }
+
+    /**
+     * v1.2.3 (owner 2026-10-16): true when [entry] is the newest SKIPPED
+     * entry for its app|stage|reason key in [ordered] (chronological). Such
+     * entries are protected from buffer eviction — the hub must keep showing
+     * the latest "scan ran but skipped because X" evidence.
+     */
+    private fun isNewestSkipOfKey(entry: GuardActivityEntry, ordered: List<GuardActivityEntry>): Boolean {
+        if (entry.verdict != "SKIPPED") return false
+        val key = "${entry.app}|${entry.stage}|${entry.reason}"
+        val newest = ordered.lastOrNull {
+            it.verdict == "SKIPPED" && "${it.app}|${it.stage}|${it.reason}" == key
+        }
+        return newest === entry
     }
 
     /**
@@ -969,6 +1041,33 @@ object AiStudyGuardManager {
             _guardActivity.value = emptyList()
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
                 .remove(KEY_GUARD_ACTIVITY_JSON).apply()
+        } catch (_: Throwable) {}
+    }
+
+    /**
+     * v1.2.3 (owner 2026-10-16): the single most recent YouTube title
+     * evaluation — the Guard Hub's "Last YouTube evaluation" card reads
+     * this. Written by AiStudyAccessibilityService at every terminal
+     * decision point of the YouTube chain (doubt gate, blocklist,
+     * allowlist, local classifier, knowledge, quick, Gemini) plus the
+     * no-player-evidence / title-null skip paths.
+     */
+    data class LastYouTubeEvaluation(
+        val ts: Long = 0L,
+        val playerEvidence: Boolean = false,
+        val titleSource: String = "",
+        val title: String = "",
+        val pEntBand: String = "",
+        val verdict: String = "",
+        val action: String = ""
+    )
+
+    private val _lastYouTubeEvaluation = MutableStateFlow(LastYouTubeEvaluation())
+    val lastYouTubeEvaluation: StateFlow<LastYouTubeEvaluation> = _lastYouTubeEvaluation.asStateFlow()
+
+    fun recordYouTubeEvaluation(eval: LastYouTubeEvaluation) {
+        try {
+            _lastYouTubeEvaluation.value = eval
         } catch (_: Throwable) {}
     }
 

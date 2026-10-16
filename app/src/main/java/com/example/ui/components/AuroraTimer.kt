@@ -52,10 +52,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -337,6 +342,38 @@ fun AuroraTimer(
             // Atmospheric Phase Pill (Deep Focus / Break / Sprint / Custom Subject)
             // v1.1: capped at 70% of the dial width with ellipsis so the chip
             // always sits FULLY INSIDE the ring, even for long subject names.
+            // 1.2.3 STEP 0 hotfix: shrink-to-fit subject text. The pill keeps its
+            // exact max width; the text font scales down (10sp -> 6sp) until the
+            // full subject name fits instead of being clipped/ellipsized away.
+            val pillSubjectText = if (isBreak) "SOOTHING BREAK" else subjectTitle.uppercase()
+            val pillDensity = LocalDensity.current
+            val pillMeasurer = rememberTextMeasurer()
+            val pillIconReserve = if (!isRunning && onTagClick != null && !isBreak) 15.dp else 0.dp
+            val pillFontSize = remember(pillSubjectText, dialSize, pillIconReserve) {
+                val maxTextPx = with(pillDensity) {
+                    (dialSize * 0.7f - 10.dp - 10.dp - 6.dp - 6.dp - pillIconReserve).toPx()
+                        .coerceAtLeast(40f)
+                }
+                val probeStyle = TextStyle(
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                var fs = 10f
+                while (fs > 6f) {
+                    val r = pillMeasurer.measure(
+                        text = AnnotatedString(pillSubjectText),
+                        style = probeStyle.copy(fontSize = fs.sp),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        constraints = Constraints(maxWidth = maxTextPx.toInt())
+                    )
+                    if (!r.hasVisualOverflow) break
+                    fs -= 0.5f
+                }
+                fs.sp
+            }
             Box(
                 modifier = Modifier
                     .widthIn(max = dialSize * 0.7f)
@@ -375,10 +412,10 @@ fun AuroraTimer(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (isBreak) "SOOTHING BREAK" else subjectTitle.uppercase(),
+                        text = pillSubjectText,
                         fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp,
+                        fontSize = pillFontSize,
                         letterSpacing = 1.sp,
                         color = if (isBreak) {
                             if (isDark) Color(0xFF69F0AE) else Color(0xFF2E7D32)

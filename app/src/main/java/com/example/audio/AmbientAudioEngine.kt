@@ -1,9 +1,14 @@
 package com.example.audio
 
+import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.MediaPlayer
+import android.net.Uri
 import android.util.Log
+import com.example.R
+import com.example.util.ImportedAudioManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -18,6 +23,132 @@ class AmbientAudioEngine {
     private val scope = CoroutineScope(Dispatchers.Default)
     private var isPlaying = false
     private var currentSound = "Silent"
+
+    /** Built-in file tracks (v1.2.3 Task 12 — DSP-generated OGG loops). */
+    private val fileTracks: Map<String, Int> = mapOf(
+        "Night Breeze" to R.raw.soundscape_night_breeze,
+        "Ambient Pad" to R.raw.soundscape_ambient_pad,
+        "Gentle Stream" to R.raw.soundscape_gentle_stream,
+        "Distant Thunder" to R.raw.soundscape_distant_thunder
+    )
+
+    /** All built-in sound names for pickers (procedural + file tracks). */
+    val builtInSounds: List<String> =
+        listOf("Silent", "Rain", "White noise", "Cafe", "Forest", "Ocean") + fileTracks.keys
+
+    private var filePlayer: MediaPlayer? = null
+    private val filePlayerLock = Any()
+
+    /**
+     * Unified soundscape entry (v1.2.3 Task 12). Routes by id:
+     *  - "Silent" -> stop
+     *  - procedural names -> the code-generated AudioTrack path
+     *  - built-in file tracks -> looping MediaPlayer from res/raw
+     *  - content:// URIs (user imports) -> looping MediaPlayer from the URI;
+     *    revoked/broken URIs stop quietly instead of crashing.
+     *
+     * Imported audio follows the same session rules as built-ins: it plays
+     * under the timer and [stop] ends it with the session.
+     */
+    fun playSound(context: Context, soundId: String) {
+        currentSound = soundId
+        stop()
+
+        if (soundId == "Silent") {
+            isPlaying = false
+            return
+        }
+
+        val fileResId = fileTracks[soundId]
+        if (fileResId != null) {
+            playRawLoop(context.applicationContext, fileResId)
+            return
+        }
+
+        if (soundId.startsWith("content://")) {
+            if (!ImportedAudioManager.isTrackAvailable(context.applicationContext, soundId)) {
+                Log.w("AmbientAudioEngine", "Imported track unavailable, skipping: $soundId")
+                isPlaying = false
+                return
+            }
+            playUriLoop(context.applicationContext, Uri.parse(soundId))
+            return
+        }
+
+        // Procedural path (existing behavior).
+        play(soundId)
+    }
+
+    private fun playRawLoop(appContext: Context, resId: Int) {
+        try {
+            val afd = appContext.resources.openRawResourceFd(resId)
+            startLoopPlayer(appContext) { mp ->
+                try {
+                    mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                } finally {
+                    try { afd.close() } catch (_: Exception) {}
+                }
+            }
+        } catch (t: Throwable) {
+            Log.w("AmbientAudioEngine", "playRawLoop failed: ${t.message}")
+        }
+    }
+
+    private fun playUriLoop(appContext: Context, uri: Uri) {
+        try {
+            startLoopPlayer(appContext) { mp -> mp.setDataSource(appContext, uri) }
+        } catch (t: Throwable) {
+            Log.w("AmbientAudioEngine", "playUriLoop failed: ${t.message}")
+        }
+    }
+
+    private fun startLoopPlayer(appContext: Context, setSource: (MediaPlayer) -> Unit) {
+        Thread {
+            synchronized(filePlayerLock) {
+                stopFilePlayerLocked()
+                try {
+                    val attrs = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                    val player = MediaPlayer().apply {
+                        setAudioAttributes(attrs)
+                        setSource(this)
+                        isLooping = true
+                        setVolume(0.8f, 0.8f)
+                        setOnCompletionListener { /* looping — not expected */ }
+                        setOnErrorListener { mp, _, _ ->
+                            try { mp.release() } catch (_: Exception) {}
+                            synchronized(filePlayerLock) {
+                                if (filePlayer === mp) filePlayer = null
+                            }
+                            true
+                        }
+                        prepare()
+                        start()
+                    }
+                    filePlayer = player
+                    isPlaying = true
+                } catch (t: Throwable) {
+                    Log.w("AmbientAudioEngine", "startLoopPlayer failed: ${t.message}")
+                    isPlaying = false
+                }
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun stopFilePlayerLocked() {
+        try {
+            filePlayer?.let {
+                try { if (it.isPlaying) it.stop() } catch (_: Exception) {}
+                try { it.release() } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {}
+        filePlayer = null
+    }
 
     fun play(sound: String) {
         currentSound = sound
@@ -167,5 +298,6 @@ class AmbientAudioEngine {
             }
         } catch (_: Exception) {}
         audioTrack = null
+        synchronized(filePlayerLock) { stopFilePlayerLocked() }
     }
 }

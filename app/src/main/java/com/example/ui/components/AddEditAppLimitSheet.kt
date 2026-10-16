@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AppDailyLimitEntity
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.RegainLimePrimary
 import com.example.util.AppIconView
 import com.example.util.DeviceAppInfo
@@ -128,8 +129,8 @@ fun AddEditAppLimitSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF141814),
-        contentColor = Color(0xFFF0F4ED)
+        containerColor = focivoTokens().bg,
+        contentColor = focivoTokens().text
     ) {
         Column(
             modifier = Modifier
@@ -149,11 +150,11 @@ fun AddEditAppLimitSheet(
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFFF0F4ED)
+                        color = focivoTokens().text
                     )
                 )
                 IconButton(onClick = onDismiss) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFA0A89E))
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = focivoTokens().muted)
                 }
             }
 
@@ -174,16 +175,16 @@ fun AddEditAppLimitSheet(
                 OutlinedTextField(
                     value = appSearchQuery,
                     onValueChange = { appSearchQuery = it },
-                    placeholder = { Text("Search installed apps...", fontFamily = PoppinsFontFamily, color = Color(0xFFA0A89E)) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFFA0A89E)) },
+                    placeholder = { Text("Search installed apps...", fontFamily = PoppinsFontFamily, color = focivoTokens().muted) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = focivoTokens().muted) },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFF1B201B),
-                        unfocusedContainerColor = Color(0xFF1B201B),
+                        focusedContainerColor = focivoTokens().surface2,
+                        unfocusedContainerColor = focivoTokens().surface2,
                         focusedBorderColor = RegainLimePrimary,
                         unfocusedBorderColor = Color(0x358CE000),
-                        focusedTextColor = Color(0xFFF0F4ED),
-                        unfocusedTextColor = Color(0xFFF0F4ED)
+                        focusedTextColor = focivoTokens().text,
+                        unfocusedTextColor = focivoTokens().text
                     ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -204,7 +205,7 @@ fun AddEditAppLimitSheet(
 
                             item(key = "cat_header_$category") {
                                 Surface(
-                                    color = Color(0xFF1D221C),
+                                    color = focivoTokens().surface2,
                                     shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -283,7 +284,7 @@ fun AddEditAppLimitSheet(
                                                     text = app.appName,
                                                     style = MaterialTheme.typography.bodyMedium.copy(
                                                         fontFamily = PoppinsFontFamily,
-                                                        color = Color(0xFFF0F4ED),
+                                                        color = focivoTokens().text,
                                                         fontWeight = FontWeight.SemiBold
                                                     )
                                                 )
@@ -291,7 +292,7 @@ fun AddEditAppLimitSheet(
                                                     text = app.packageName,
                                                     style = MaterialTheme.typography.bodySmall.copy(
                                                         fontFamily = PoppinsFontFamily,
-                                                        color = Color(0xFFA0A89E),
+                                                        color = focivoTokens().muted,
                                                         fontSize = 11.sp
                                                     )
                                                 )
@@ -335,7 +336,7 @@ fun AddEditAppLimitSheet(
                                     text = selectedAppName,
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        color = Color(0xFFF0F4ED),
+                                        color = focivoTokens().text,
                                         fontWeight = FontWeight.Bold
                                     )
                                 )
@@ -343,7 +344,7 @@ fun AddEditAppLimitSheet(
                                     text = selectedAppPackage,
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        color = Color(0xFFA0A89E),
+                                        color = focivoTokens().muted,
                                         fontSize = 11.sp
                                     )
                                 )
@@ -370,7 +371,7 @@ fun AddEditAppLimitSheet(
                     text = "Daily Time Budget",
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontFamily = PoppinsFontFamily,
-                        color = Color(0xFFF0F4ED),
+                        color = focivoTokens().text,
                         fontWeight = FontWeight.Bold
                     )
                 )
@@ -387,8 +388,8 @@ fun AddEditAppLimitSheet(
                         val label = if (mins < 60) "${mins}m" else if (mins % 60 == 0) "${mins/60}h" else "${mins/60}h ${mins%60}m"
 
                         Surface(
-                            color = if (isSelected) RegainLimePrimary else Color(0xFF1D221C),
-                            contentColor = if (isSelected) Color(0xFF021207) else Color(0xFFF0F4ED),
+                            color = if (isSelected) focivoTokens().accentText else focivoTokens().text,
+                            contentColor = if (isSelected) focivoTokens().onAccent else focivoTokens().text,
                             shape = RoundedCornerShape(12.dp),
                             border = androidx.compose.foundation.BorderStroke(
                                 1.dp,
@@ -420,7 +421,7 @@ fun AddEditAppLimitSheet(
                         text = "Custom minutes:",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = PoppinsFontFamily,
-                            color = Color(0xFFA0A89E)
+                            color = focivoTokens().muted
                         )
                     )
 
@@ -429,7 +430,7 @@ fun AddEditAppLimitSheet(
                             onClick = { if (limitMinutes > 5) limitMinutes -= 5 },
                             modifier = Modifier
                                 .clip(CircleShape)
-                                .background(Color(0xFF1D221C))
+                                .background(focivoTokens().surface2)
                         ) {
                             Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = RegainLimePrimary)
                         }
@@ -452,7 +453,7 @@ fun AddEditAppLimitSheet(
                             onClick = { if (limitMinutes < 720) limitMinutes += 5 },
                             modifier = Modifier
                                 .clip(CircleShape)
-                                .background(Color(0xFF1D221C))
+                                .background(focivoTokens().surface2)
                         ) {
                             Icon(Icons.Default.Add, contentDescription = "Increase", tint = RegainLimePrimary)
                         }
@@ -472,7 +473,7 @@ fun AddEditAppLimitSheet(
                             text = "Daily Emergency Passes",
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFFF0F4ED),
+                                color = focivoTokens().text,
                                 fontWeight = FontWeight.Bold
                             )
                         )
@@ -480,7 +481,7 @@ fun AddEditAppLimitSheet(
                             text = "15-minute extensions allowed per day",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFFA0A89E),
+                                color = focivoTokens().muted,
                                 fontSize = 11.sp
                             )
                         )
@@ -491,7 +492,7 @@ fun AddEditAppLimitSheet(
                             onClick = { if (emergencyAllowed > 0) emergencyAllowed-- },
                             modifier = Modifier
                                 .clip(CircleShape)
-                                .background(Color(0xFF1D221C))
+                                .background(focivoTokens().surface2)
                         ) {
                             Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = RegainLimePrimary)
                         }
@@ -500,7 +501,7 @@ fun AddEditAppLimitSheet(
                             text = "$emergencyAllowed",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = Color(0xFFF0F4ED),
+                                color = focivoTokens().text,
                                 fontWeight = FontWeight.Bold
                             ),
                             modifier = Modifier.padding(horizontal = 12.dp)
@@ -510,7 +511,7 @@ fun AddEditAppLimitSheet(
                             onClick = { if (emergencyAllowed < 5) emergencyAllowed++ },
                             modifier = Modifier
                                 .clip(CircleShape)
-                                .background(Color(0xFF1D221C))
+                                .background(focivoTokens().surface2)
                         ) {
                             Icon(Icons.Default.Add, contentDescription = "Increase", tint = RegainLimePrimary)
                         }
@@ -535,7 +536,7 @@ fun AddEditAppLimitSheet(
                                     text = "Show Warnings & Reminders",
                                     style = MaterialTheme.typography.bodyMedium.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        color = Color(0xFFF0F4ED),
+                                        color = focivoTokens().text,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                 )
@@ -543,7 +544,7 @@ fun AddEditAppLimitSheet(
                                     text = "Notifies at 80% usage and ~15m remaining",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        color = Color(0xFFA0A89E),
+                                        color = focivoTokens().muted,
                                         fontSize = 11.sp
                                     )
                                 )
@@ -552,10 +553,10 @@ fun AddEditAppLimitSheet(
                                 checked = showReminders,
                                 onCheckedChange = { showReminders = it },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color(0xFF021207),
+                                    checkedThumbColor = focivoTokens().onAccent,
                                     checkedTrackColor = RegainLimePrimary,
-                                    uncheckedThumbColor = Color(0xFFA0A89E),
-                                    uncheckedTrackColor = Color(0xFF262C24)
+                                    uncheckedThumbColor = focivoTokens().thumbOff,
+                                    uncheckedTrackColor = focivoTokens().trackOff
                                 )
                             )
                         }
@@ -572,7 +573,7 @@ fun AddEditAppLimitSheet(
                                     text = "Strict Blocking Overlay",
                                     style = MaterialTheme.typography.bodyMedium.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        color = Color(0xFFF0F4ED),
+                                        color = focivoTokens().text,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                 )
@@ -580,7 +581,7 @@ fun AddEditAppLimitSheet(
                                     text = "Forcefully blocks app screen when limit is reached",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        color = Color(0xFFA0A89E),
+                                        color = focivoTokens().muted,
                                         fontSize = 11.sp
                                     )
                                 )
@@ -589,10 +590,10 @@ fun AddEditAppLimitSheet(
                                 checked = strictModeEnabled,
                                 onCheckedChange = { strictModeEnabled = it },
                                 colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color(0xFF021207),
+                                    checkedThumbColor = focivoTokens().onAccent,
                                     checkedTrackColor = RegainLimePrimary,
-                                    uncheckedThumbColor = Color(0xFFA0A89E),
-                                    uncheckedTrackColor = Color(0xFF262C24)
+                                    uncheckedThumbColor = focivoTokens().thumbOff,
+                                    uncheckedTrackColor = focivoTokens().trackOff
                                 )
                             )
                         }
@@ -609,8 +610,8 @@ fun AddEditAppLimitSheet(
                     if (limitToEdit != null) {
                         OutlinedButton(
                             onClick = { onDelete(limitToEdit.id) },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444)),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = focivoTokens().danger),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, focivoTokens().danger),
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.weight(1f)
                         ) {
@@ -644,7 +645,7 @@ fun AddEditAppLimitSheet(
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = RegainLimePrimary,
-                            contentColor = Color(0xFF021207)
+                            contentColor = focivoTokens().onAccent
                         ),
                         shape = RoundedCornerShape(14.dp),
                         enabled = selectedAppPackage.isNotBlank(),

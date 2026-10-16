@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import com.example.audio.RingtoneCatalog
 import com.example.data.model.AlarmItem
 import com.example.ui.theme.MutedBorderLight
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.RegainLimeDeepText
 import com.example.ui.theme.RegainLimePrimary
@@ -80,16 +81,17 @@ fun AlarmHubSheet(
     val isDark = isAppInDarkTheme()
 
     // High-contrast Theme Tokens
-    val sheetBg = if (isDark) Color(0xFF13151C) else Color(0xFFFAF9F6)
-    val cardBg = if (isDark) Color(0xFF1E212B) else Color(0xFFFFFFFF)
-    val cardBorder = if (isDark) Color(0x358CE000) else Color(0xFFE2EBD6)
+    val T = focivoTokens()
+    val sheetBg = T.bg
+    val cardBg = T.surface
+    val cardBorder = T.accent.copy(alpha = 0.2f)
 
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val textMuted = if (isDark) Color(0xFF80887E) else Color(0xFF718096)
+    val textPrimary = T.text
+    val textSecondary = T.muted
+    val textMuted = T.muted
 
-    val limeAccent = RegainLimePrimary
-    val limeText = if (isDark) RegainLimePrimary else RegainLimeDeepText
+    val limeAccent = T.accent
+    val limeText = T.accentText
 
     var isCreatingAlarm by remember { mutableStateOf(false) }
 
@@ -111,7 +113,7 @@ fun AlarmHubSheet(
                     .width(36.dp)
                     .height(4.dp)
                     .clip(CircleShape)
-                    .background(if (isDark) Color(0x40FFFFFF) else Color(0x20000000))
+                    .background(focivoTokens().line)
             )
         }
     ) {
@@ -177,7 +179,7 @@ fun AlarmHubSheet(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(if (isDark) Color(0x28FFFFFF) else Color(0x10000000))
+                                .background(focivoTokens().surface2)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
@@ -296,7 +298,7 @@ fun AlarmHubSheet(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(if (isDark) Color(0x28FFFFFF) else Color(0x0F000000))
+                                            .background(focivoTokens().surface2)
                                             .padding(8.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
@@ -360,7 +362,7 @@ fun AlarmHubSheet(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(if (isDark) Color(0x28FFFFFF) else Color(0x0F000000))
+                                            .background(focivoTokens().surface2)
                                             .padding(8.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
@@ -415,7 +417,7 @@ fun AlarmHubSheet(
                                     Row(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(if (isDark) Color(0x28FFFFFF) else Color(0x0F000000))
+                                            .background(focivoTokens().surface2)
                                             .padding(4.dp),
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {

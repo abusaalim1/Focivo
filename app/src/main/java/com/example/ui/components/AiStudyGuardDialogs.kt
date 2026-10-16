@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.ui.theme.LinearDarkCardBg
+import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.RegainLimePrimary
 import com.example.util.ActiveAiBlock
@@ -75,8 +76,8 @@ fun AiStudyWarningDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
-                .background(LinearDarkCardBg)
-                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(28.dp))
+                .background(focivoTokens().surface)
+                .border(1.dp, focivoTokens().line, RoundedCornerShape(28.dp))
                 .padding(horizontal = 28.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -92,7 +93,7 @@ fun AiStudyWarningDialog(
                 text = "Study warning",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = focivoTokens().text,
                 textAlign = TextAlign.Center
             )
 
@@ -102,7 +103,7 @@ fun AiStudyWarningDialog(
                 text = warning.appName,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = RegainLimePrimary,
+                color = focivoTokens().accentText,
                 textAlign = TextAlign.Center
             )
 
@@ -111,7 +112,7 @@ fun AiStudyWarningDialog(
             Text(
                 text = "Non-study activity detected.",
                 fontSize = 14.sp,
-                color = Color(0xFFB9C4B9),
+                color = focivoTokens().muted,
                 textAlign = TextAlign.Center,
                 lineHeight = 21.sp
             )
@@ -129,7 +130,7 @@ fun AiStudyWarningDialog(
                         text = "$timeFormatted left to get back on track",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = RegainLimePrimary
+                        color = focivoTokens().accentText
                     )
                 }
             }
@@ -139,8 +140,8 @@ fun AiStudyWarningDialog(
             Button(
                 onClick = onReturnToStudy,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = RegainLimePrimary,
-                    contentColor = NearBlack
+                    containerColor = focivoTokens().accent,
+                    contentColor = focivoTokens().onAccent
                 ),
                 shape = RoundedCornerShape(50),
                 modifier = Modifier
@@ -149,7 +150,7 @@ fun AiStudyWarningDialog(
                     .shadow(
                         elevation = 8.dp,
                         shape = RoundedCornerShape(50),
-                        spotColor = RegainLimePrimary.copy(alpha = 0.35f)
+                        spotColor = focivoTokens().accent.copy(alpha = 0.35f)
                     ),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
             ) {
@@ -169,7 +170,7 @@ fun AiStudyWarningDialog(
             ) {
                 Text(
                     text = "Dismiss",
-                    color = Color(0xFF8A978B),
+                    color = focivoTokens().muted,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -188,8 +189,8 @@ fun AiStudyBlockedDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
-                .background(LinearDarkCardBg)
-                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(28.dp))
+                .background(focivoTokens().surface)
+                .border(1.dp, focivoTokens().line, RoundedCornerShape(28.dp))
                 .padding(horizontal = 28.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -205,7 +206,7 @@ fun AiStudyBlockedDialog(
                 text = "App blocked",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = focivoTokens().text,
                 textAlign = TextAlign.Center
             )
 
@@ -224,7 +225,7 @@ fun AiStudyBlockedDialog(
             Text(
                 text = "Locked for 3 hours.",
                 fontSize = 14.sp,
-                color = Color(0xFFB9C4B9),
+                color = focivoTokens().muted,
                 textAlign = TextAlign.Center,
                 lineHeight = 21.sp
             )
@@ -234,8 +235,8 @@ fun AiStudyBlockedDialog(
             Button(
                 onClick = onDismiss,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = RegainLimePrimary,
-                    contentColor = NearBlack
+                    containerColor = focivoTokens().accent,
+                    contentColor = focivoTokens().onAccent
                 ),
                 shape = RoundedCornerShape(50),
                 modifier = Modifier
@@ -244,7 +245,7 @@ fun AiStudyBlockedDialog(
                     .shadow(
                         elevation = 8.dp,
                         shape = RoundedCornerShape(50),
-                        spotColor = RegainLimePrimary.copy(alpha = 0.35f)
+                        spotColor = focivoTokens().accent.copy(alpha = 0.35f)
                     ),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
             ) {
@@ -269,8 +270,8 @@ fun AiStudyResolvedDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
-                .background(LinearDarkCardBg)
-                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(28.dp))
+                .background(focivoTokens().surface)
+                .border(1.dp, focivoTokens().line, RoundedCornerShape(28.dp))
                 .padding(horizontal = 28.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -286,7 +287,7 @@ fun AiStudyResolvedDialog(
                 text = "No block applied",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = focivoTokens().text,
                 textAlign = TextAlign.Center
             )
 
@@ -305,7 +306,7 @@ fun AiStudyResolvedDialog(
             Text(
                 text = "Back on track. Keep going.",
                 fontSize = 14.sp,
-                color = Color(0xFFB9C4B9),
+                color = focivoTokens().muted,
                 textAlign = TextAlign.Center,
                 lineHeight = 21.sp
             )
@@ -315,8 +316,8 @@ fun AiStudyResolvedDialog(
             Button(
                 onClick = onDismiss,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = RegainLimePrimary,
-                    contentColor = NearBlack
+                    containerColor = focivoTokens().accent,
+                    contentColor = focivoTokens().onAccent
                 ),
                 shape = RoundedCornerShape(50),
                 modifier = Modifier
@@ -325,7 +326,7 @@ fun AiStudyResolvedDialog(
                     .shadow(
                         elevation = 8.dp,
                         shape = RoundedCornerShape(50),
-                        spotColor = RegainLimePrimary.copy(alpha = 0.35f)
+                        spotColor = focivoTokens().accent.copy(alpha = 0.35f)
                     ),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
             ) {

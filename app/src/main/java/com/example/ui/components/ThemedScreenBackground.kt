@@ -27,12 +27,42 @@ import com.example.util.TimerTheme
  * top: stronger at the top and bottom edges, open in the middle so the
  * theme artwork breathes through while text stays crisp.
  *
+ * v1.5.0: themes with [TimerTheme.ambientKind] draw a live code-drawn
+ * canvas ([AmbientBackdrop]) instead of an image — checked FIRST, before
+ * the drawable fallback.
+ *
  * Aurora (default) keeps the code-drawn [AuroraBackground] unchanged.
  */
 @Composable
 fun ThemedScreenBackground(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val theme by TimerThemeManager.selectedTheme.collectAsState()
+
+    // v1.5.0 Ambient themes: live code-drawn backdrop + readability scrim.
+    val ambientKind = theme.ambientKind
+    if (ambientKind != null) {
+        Box(modifier = modifier) {
+            AmbientBackdrop(
+                kind = ambientKind,
+                modifier = Modifier.fillMaxSize()
+            )
+            // Readability scrim: strong at the edges, open in the middle.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.0f to Color(0xCC000000),
+                            0.35f to Color(0x99000000),
+                            0.65f to Color(0x99000000),
+                            1.0f to Color(0xCC000000)
+                        )
+                    )
+            )
+        }
+        return
+    }
+
     val backdropRes = remember(theme.id) { resolveThemeBackdropRes(context, theme) }
     if (backdropRes != null) {
         Box(modifier = modifier) {

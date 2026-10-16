@@ -6,7 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,20 +16,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -39,7 +36,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,38 +43,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.R
 import com.example.data.LeaderboardDateUtils
 import com.example.data.LeaderboardUser
 import com.example.data.model.FocusSessionEntity
-import com.example.R
-import com.example.ui.components.FeatureIcon
-import com.example.ui.components.MascotPose
-import com.example.ui.components.RegainMascotView
 import com.example.ui.theme.BottomNavClearance
-import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
-import com.example.ui.theme.RegainGoldStar
-import com.example.ui.theme.LocalAppAccent
-import com.example.ui.theme.themedCardBackground
-import com.example.ui.theme.backdropContentColor
-import com.example.ui.theme.backdropTitleShadow
-import com.example.util.TimerThemeManager
-import com.example.ui.theme.RegainLimePrimary
-import com.example.ui.theme.SecondaryTextLight
-import com.example.ui.theme.isAppInDarkTheme
+import com.example.ui.theme.SerifItalicFontFamily
+import com.example.ui.theme.focivoEyebrow
+import com.example.ui.theme.focivoTokens
 import java.util.Calendar
+import java.util.Locale
+
+// Medal colors are categorical (same in both modes).
+private val MedalGold = Color(0xFFFFB400)
+private val MedalSilver = Color(0xFF9AA4AE)
+private val MedalBronze = Color(0xFFF2762E)
 
 @Composable
 fun LeaderboardAvatar(
@@ -86,7 +75,8 @@ fun LeaderboardAvatar(
     displayName: String,
     modifier: Modifier = Modifier,
     isCurrentUser: Boolean = false,
-    textSizeSp: Int = 15
+    textSizeSp: Int = 15,
+    initialsColor: Color? = null
 ) {
     val bitmap = remember(avatarUrl) {
         if (!avatarUrl.isNullOrBlank() && !avatarUrl.startsWith("http://") && !avatarUrl.startsWith("https://")) {
@@ -112,10 +102,7 @@ fun LeaderboardAvatar(
         }
     }
 
-    // v1.1 final: initials are ALWAYS drawn as the background layer, with the
-    // avatar image stacked on top. If the URL is blank, broken, or fails to
-    // load, the initials show through instead of a blank circle — so every
-    // user gets a visible avatar identity.
+    // Initials are always the background layer; the avatar image stacks on top.
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -127,7 +114,7 @@ fun LeaderboardAvatar(
             style = MaterialTheme.typography.titleMedium.copy(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = if (isCurrentUser) Color(0xFF0D1B05) else Color.White,
+                color = initialsColor ?: if (isCurrentUser) Color(0xFF0D1B05) else Color.White,
                 fontSize = textSizeSp.sp
             )
         )
@@ -149,36 +136,29 @@ fun LeaderboardAvatar(
     }
 }
 
+/**
+ * Leaderboard — owner's Full App Redesign (2026-10-16).
+ * Serif headline, segmented Today / This week / All time control, mockup
+ * podium (medal blocks), grouped ranking rows. All values real.
+ */
 @Composable
 fun LeaderboardScreen(
     users: List<LeaderboardUser>,
     currentUserName: String,
     currentUserPhotoUrl: String? = null,
     currentUserPoints: Int,
-    currentUserStreak: Int,
     sessions: List<FocusSessionEntity> = emptyList(),
     onRefresh: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val isDark = isAppInDarkTheme()
-    val appAccent = LocalAppAccent.current // v1.4.0-round2 theme accent
-    val cardBg = themedCardBackground() // round-3: translucent so the theme backdrop breathes through
-    val cardBorder = if (isDark) Color(0x358CE000) else Color(0xFFDCE6D2)
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    // v1.4.2: header text sits directly on the full-bleed theme backdrop, so it
-    // follows the selected theme (not the app dark/light mode).
-    val theme by TimerThemeManager.selectedTheme.collectAsState()
-    val onBackdrop = theme.onBackdropContent
-    val titleShadow = backdropTitleShadow(onBackdrop)
+    val T = focivoTokens()
 
-    var selectedFilter by remember { mutableStateOf("This Week") }
+    var selectedFilter by remember { mutableStateOf("This week") }
 
     LaunchedEffect(Unit) {
         onRefresh()
     }
 
-    // Time boundaries for Today and This Week
     val todayStart = remember {
         val cal = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -202,38 +182,26 @@ fun LeaderboardScreen(
         cal.timeInMillis
     }
 
-    val currentMonday = remember {
-        LeaderboardDateUtils.getCurrentWeekMonday()
-    }
+    val currentMonday = remember { LeaderboardDateUtils.getCurrentWeekMonday() }
 
-    // Calculate current user's local study seconds based strictly on real sessions
     val myTodayStudySeconds = remember(sessions, todayStart) {
         sessions.filter { it.completedAt >= todayStart }.sumOf { it.durationSeconds.toLong() }
     }
-
     val myWeeklyStudySeconds = remember(sessions, weekStartTimestamp) {
         sessions.filter { it.completedAt >= weekStartTimestamp }.sumOf { it.durationSeconds.toLong() }
     }
-
     val myAllTimeStudySeconds = remember(sessions) {
         sessions.sumOf { it.durationSeconds.toLong() }
     }
 
     val currentEntry = remember(
-        currentUserName,
-        currentUserPhotoUrl,
-        currentUserPoints,
-        currentUserStreak,
-        myTodayStudySeconds,
-        myWeeklyStudySeconds,
-        myAllTimeStudySeconds,
-        users
+        currentUserName, currentUserPhotoUrl, currentUserPoints,
+        myTodayStudySeconds, myWeeklyStudySeconds, myAllTimeStudySeconds, users
     ) {
         val remoteMe = users.firstOrNull { it.isCurrentUser || it.displayName.equals(currentUserName, ignoreCase = true) }
         val effectiveAllTime = if (myAllTimeStudySeconds > 0) myAllTimeStudySeconds else (remoteMe?.studySeconds ?: 0L)
         val effectiveWeekly = if (myWeeklyStudySeconds > 0) myWeeklyStudySeconds else (remoteMe?.weeklyStudySeconds ?: 0L)
         val effectiveToday = if (myTodayStudySeconds > 0) myTodayStudySeconds else (remoteMe?.todayStudySeconds ?: 0L)
-
         LeaderboardUser(
             id = remoteMe?.id ?: "current_user",
             displayName = currentUserName.ifBlank { "You" },
@@ -241,7 +209,7 @@ fun LeaderboardScreen(
             weeklyStudySeconds = effectiveWeekly,
             todayStudySeconds = effectiveToday,
             currentWeekStart = currentMonday,
-            streak = maxOf(remoteMe?.streak ?: 1, currentUserStreak.coerceAtLeast(1)),
+            streak = remoteMe?.streak ?: 1,
             subjectTag = remoteMe?.subjectTag ?: "Active Focus",
             avatarUrl = currentUserPhotoUrl ?: remoteMe?.avatarUrl,
             isCurrentUser = true
@@ -251,11 +219,10 @@ fun LeaderboardScreen(
     val effectiveUsers = remember(users, currentEntry, selectedFilter) {
         val remoteWithoutMe = users.filterNot { it.isCurrentUser || it.displayName.equals(currentUserName, ignoreCase = true) }
         val allUsers = listOf(currentEntry) + remoteWithoutMe
-
         when (selectedFilter) {
             "Today" -> allUsers.sortedByDescending { it.todayStudySeconds }
-            "This Week" -> allUsers.sortedByDescending { it.weeklyStudySeconds }
-            "All Time" -> allUsers.sortedByDescending { it.studySeconds }
+            "This week" -> allUsers.sortedByDescending { it.weeklyStudySeconds }
+            "All time" -> allUsers.sortedByDescending { it.studySeconds }
             else -> allUsers.sortedByDescending { it.weeklyStudySeconds }
         }
     }
@@ -266,16 +233,16 @@ fun LeaderboardScreen(
     val restOfUsers = effectiveUsers.drop(3)
 
     Box(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
+            .background(T.bg)
     ) {
-        // Round-3: theme backdrop is drawn once at the MainActivity shell root.
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-            // Header Row
+            // Header: serif headline + refresh.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -283,191 +250,152 @@ fun LeaderboardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "Leaderboard",
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            // v1.1: title uses fixed light text — theme onBackdropContent
-                            // resolves dark against this screen's dark surface (contrast fix).
-                            color = textPrimary,
-                            shadow = titleShadow,
-                            fontSize = 24.sp
-                        )
+                Text(
+                    text = "Leaderboard",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontFamily = SerifItalicFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = T.text,
+                        fontSize = 30.sp,
+                        lineHeight = 35.sp,
+                        letterSpacing = (-0.6).sp
                     )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                )
+                IconButton(
+                    onClick = onRefresh,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(T.surface)
+                        .border(1.dp, T.line, CircleShape)
                 ) {
-                    // Refresh button
-                    IconButton(
-                        onClick = onRefresh,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(cardBg)
-                            .border(1.dp, cardBorder, CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh Leaderboard",
-                            tint = textSecondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    // Global rank pill
-                                        FeatureIcon(
-                        drawableRes = R.drawable.ic3d_trophy,
-                        contentDescription = "Leaderboard",
-                        size = 52.dp
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh leaderboard",
+                        tint = T.muted,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            // Time Filter Pills: "Today", "This Week", "All Time" (v1.1 final: minimal)
+            // Segmented control: Today / This week / All time.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 22.dp)
+                    .clip(CircleShape)
+                    .background(T.surface)
+                    .border(1.dp, T.line, CircleShape)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                listOf("Today", "This Week", "All Time").forEach { filter ->
+                listOf("Today", "This week", "All time").forEach { filter ->
                     val isSelected = selectedFilter == filter
-                    val pillBg = if (isSelected) {
-                        appAccent
-                    } else {
-                        if (isDark) Color(0xFF1D241C) else Color(0xFFEFF5EA)
-                    }
-                    val pillBorder = if (isSelected) {
-                        appAccent
-                    } else {
-                        if (isDark) Color(0x358CE000) else Color(0xFFD6E2CB)
-                    }
-                    val pillTextColor = if (isSelected) {
-                        Color(0xFF0D1B05)
-                    } else {
-                        if (isDark) Color(0xFFA0A89E) else Color(0xFF4A5546)
-                    }
-
                     Box(
                         modifier = Modifier
+                            .weight(1f)
                             .clip(CircleShape)
-                            .background(pillBg)
-                            .border(1.dp, pillBorder, CircleShape)
-                            .clickable { selectedFilter = filter }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .background(if (isSelected) T.accent else Color.Transparent)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { selectedFilter = filter }
+                            )
+                            .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = filter,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    color = pillTextColor,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                    fontSize = 12.sp
-                                )
+                        Text(
+                            text = filter,
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontFamily = PoppinsFontFamily,
+                                color = if (isSelected) T.onAccent else T.muted,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
                             )
-                        }
+                        )
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Main Content Area — v1.1 final: only essentials (podium + ranked list)
-            run {
-                // Podium + Ranked List for Today, This Week, All Time
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = BottomNavClearance),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Podium Section (Top 3)
-                    item {
-                        PodiumSection(
-                            top1 = top1,
-                            top2 = top2,
-                            top3 = top3,
-                            selectedFilter = selectedFilter
-                        )
-                    }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = BottomNavClearance),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item {
+                    PodiumSection(top1 = top1, top2 = top2, top3 = top3, selectedFilter = selectedFilter)
+                }
 
-                    // Explanatory note if brand new week and top 1 is at 0
-                    if (selectedFilter == "This Week" && (top1?.weeklyStudySeconds ?: 0L) == 0L) {
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isDark) Color(0xFF1F271D) else Color(0xFFF2F8EC)
-                                ),
-                                border = BorderStroke(1.dp, if (isDark) Color(0x408CE000) else Color(0xFFD4E7C3))
+                if (selectedFilter == "This week" && (top1?.weeklyStudySeconds ?: 0L) == 0L) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = T.surface),
+                            border = BorderStroke(1.dp, T.line)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.EmojiEvents,
-                                        contentDescription = null,
-                                        tint = Color(0xFFFFB300),
-                                        modifier = Modifier.size(20.dp)
+                                Image(
+                                    painter = painterResource(id = R.drawable.emoji3d_crown),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "A new week has begun! Study this week to claim the #1 spot.",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        color = T.text,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
                                     )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = "A new week has begun! Study this week to claim the #1 spot.",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontFamily = PoppinsFontFamily,
-                                            color = textPrimary,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    )
-                                }
+                                )
                             }
                         }
                     }
+                }
 
-                    item {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "RANKINGS",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                // v1.1: fixed muted light text (contrast fix, see header title).
-                                color = textSecondary,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.4.sp,
-                                fontSize = 11.sp
+                item {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = "Rankings".uppercase(Locale.getDefault()),
+                        style = focivoEyebrow()
+                    )
+                }
+
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(T.surface)
+                            .border(1.dp, T.line, RoundedCornerShape(24.dp))
+                            .padding(horizontal = 18.dp)
+                    ) {
+                        restOfUsers.forEachIndexed { index, user ->
+                            val userSeconds = when (selectedFilter) {
+                                "Today" -> user.todayStudySeconds
+                                "This week" -> user.weeklyStudySeconds
+                                "All time" -> user.studySeconds
+                                else -> user.weeklyStudySeconds
+                            }
+                            LeaderboardUserRow(
+                                rank = index + 4,
+                                user = user,
+                                displaySeconds = userSeconds,
+                                isCurrentUser = user.isCurrentUser,
+                                showDivider = index < restOfUsers.lastIndex
                             )
-                        )
-                    }
-
-                    // Ranked List for rank 4+
-                    itemsIndexed(restOfUsers) { index, user ->
-                        val userSeconds = when (selectedFilter) {
-                            "Today" -> user.todayStudySeconds
-                            "This Week" -> user.weeklyStudySeconds
-                            "All Time" -> user.studySeconds
-                            else -> user.weeklyStudySeconds
                         }
-                        LeaderboardUserRow(
-                            rank = index + 4,
-                            user = user,
-                            displaySeconds = userSeconds,
-                            isCurrentUser = user.isCurrentUser,
-                            selectedFilter = selectedFilter
-                        )
                     }
                 }
             }
@@ -482,72 +410,45 @@ private fun PodiumSection(
     top3: LeaderboardUser?,
     selectedFilter: String
 ) {
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
-        contentAlignment = Alignment.BottomCenter
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Bottom
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Bottom
-        ) {
-            // Rank 2 (Left)
-            top2?.let { user ->
-                val seconds = when (selectedFilter) {
-                    "Today" -> user.todayStudySeconds
-                    "This Week" -> user.weeklyStudySeconds
-                    "All Time" -> user.studySeconds
-                    else -> user.weeklyStudySeconds
-                }
-                PodiumColumn(
-                    user = user,
-                    rank = 2,
-                    displaySeconds = seconds,
-                    podiumHeight = 115.dp,
-                    selectedFilter = selectedFilter,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            // Rank 1 (Center - Tallest)
-            top1?.let { user ->
-                val seconds = when (selectedFilter) {
-                    "Today" -> user.todayStudySeconds
-                    "This Week" -> user.weeklyStudySeconds
-                    "All Time" -> user.studySeconds
-                    else -> user.weeklyStudySeconds
-                }
-                PodiumColumn(
-                    user = user,
-                    rank = 1,
-                    displaySeconds = seconds,
-                    podiumHeight = 150.dp,
-                    selectedFilter = selectedFilter,
-                    modifier = Modifier.weight(1.15f)
-                )
-            }
-
-            // Rank 3 (Right)
-            top3?.let { user ->
-                val seconds = when (selectedFilter) {
-                    "Today" -> user.todayStudySeconds
-                    "This Week" -> user.weeklyStudySeconds
-                    "All Time" -> user.studySeconds
-                    else -> user.weeklyStudySeconds
-                }
-                PodiumColumn(
-                    user = user,
-                    rank = 3,
-                    displaySeconds = seconds,
-                    podiumHeight = 95.dp,
-                    selectedFilter = selectedFilter,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+        top2?.let { user ->
+            PodiumColumn(
+                user = user, rank = 2,
+                displaySeconds = secondsFor(user, selectedFilter),
+                selectedFilter = selectedFilter,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        top1?.let { user ->
+            PodiumColumn(
+                user = user, rank = 1,
+                displaySeconds = secondsFor(user, selectedFilter),
+                selectedFilter = selectedFilter,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        top3?.let { user ->
+            PodiumColumn(
+                user = user, rank = 3,
+                displaySeconds = secondsFor(user, selectedFilter),
+                selectedFilter = selectedFilter,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
+}
+
+private fun secondsFor(user: LeaderboardUser, filter: String): Long = when (filter) {
+    "Today" -> user.todayStudySeconds
+    "This week" -> user.weeklyStudySeconds
+    "All time" -> user.studySeconds
+    else -> user.weeklyStudySeconds
 }
 
 @Composable
@@ -555,119 +456,90 @@ private fun PodiumColumn(
     user: LeaderboardUser,
     rank: Int,
     displaySeconds: Long,
-    podiumHeight: androidx.compose.ui.unit.Dp,
     selectedFilter: String,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isAppInDarkTheme()
-    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    // v1.4.2: podium names sit on the theme backdrop — follow the theme.
-    val podiumTheme by TimerThemeManager.selectedTheme.collectAsState()
-    val podiumOnBackdrop = podiumTheme.onBackdropContent
-    val podiumShadow = backdropTitleShadow(podiumOnBackdrop)
-    val podiumTimeColor = if (podiumOnBackdrop.luminance() < 0.5f) RegainLimePrimary else Color(0xFF2E6300)
-
-    // Celebratory badge for current week's leader while week is in progress
-    val isLeadingThisWeek = selectedFilter == "This Week" && rank == 1 && displaySeconds > 0
+    val T = focivoTokens()
+    val medal = when (rank) {
+        1 -> MedalGold
+        2 -> MedalSilver
+        else -> MedalBronze
+    }
+    val blockHeight = when (rank) {
+        1 -> 128.dp
+        2 -> 84.dp
+        else -> 64.dp
+    }
+    val isLeadingThisWeek = selectedFilter == "This week" && rank == 1 && displaySeconds > 0
 
     Column(
-        modifier = modifier.padding(horizontal = 2.dp),
+        modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Crown for 1st place
-        if (rank == 1) {
-            Icon(
-                imageVector = Icons.Default.EmojiEvents,
-                contentDescription = null,
-                tint = Color(0xFFFFB300),
-                modifier = Modifier.size(26.dp)
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-        } else {
-            Spacer(modifier = Modifier.height(18.dp))
-        }
-
-        // Avatar with rich gradient ring
         Box(
             modifier = Modifier
-                .size(if (rank == 1) 52.dp else 44.dp)
+                .size(if (rank == 1) 62.dp else 54.dp)
                 .clip(CircleShape)
-                .background(
-                    when (rank) {
-                        1 -> Brush.linearGradient(listOf(Color(0xFFFFD54F), Color(0xFFFFA000)))
-                        2 -> Brush.linearGradient(listOf(Color(0xFFCFD8DC), Color(0xFF78909C)))
-                        else -> Brush.linearGradient(listOf(Color(0xFFFFCC80), Color(0xFFE65100)))
-                    }
-                )
-                .border(2.dp, if (isDark) Color(0xFF1B221B) else Color.White, CircleShape),
+                .background(if (user.isCurrentUser) T.accent else medal),
             contentAlignment = Alignment.Center
         ) {
             LeaderboardAvatar(
                 avatarUrl = user.avatarUrl,
                 displayName = user.displayName,
                 isCurrentUser = user.isCurrentUser,
-                textSizeSp = if (rank == 1) 18 else 15
+                textSizeSp = 20,
+                initialsColor = T.onAccent
             )
         }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Name
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = if (user.isCurrentUser) "You" else user.displayName,
-            style = MaterialTheme.typography.labelMedium.copy(
+            style = MaterialTheme.typography.titleSmall.copy(
                 fontFamily = PoppinsFontFamily,
-                fontWeight = FontWeight.Bold,
-                // v1.1: fixed light text — theme onBackdropContent resolves dark
-                // against this screen's dark surface (contrast fix).
-                color = textPrimary,
-                shadow = podiumShadow,
-                fontSize = 12.sp
+                fontWeight = FontWeight.SemiBold,
+                color = T.text,
+                fontSize = 13.sp
             ),
             maxLines = 1
         )
-
-        // Subject Tag
         Text(
             text = user.subjectTag,
             style = MaterialTheme.typography.labelSmall.copy(
                 fontFamily = PoppinsFontFamily,
-                color = textSecondary,
+                color = T.muted,
                 fontSize = 10.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Normal,
+                lineHeight = 13.sp
             ),
-            maxLines = 1
+            maxLines = 2,
+            modifier = Modifier.heightIn(min = 26.dp)
         )
-
-        // Time
         Text(
             text = formatHoursMins(displaySeconds),
-            style = MaterialTheme.typography.bodySmall.copy(
+            style = MaterialTheme.typography.titleSmall.copy(
                 fontFamily = PoppinsFontFamily,
-                color = podiumTimeColor,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
+                color = T.accentText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            ),
+            modifier = Modifier.padding(vertical = 2.dp)
         )
-
-        // Real-time Celebratory acknowledgment for current week leader
         if (isLeadingThisWeek) {
             Surface(
                 shape = CircleShape,
-                color = if (isDark) Color(0x35FFA000) else Color(0xFFFFF3CD),
-                border = BorderStroke(1.dp, Color(0xFFFFB300)),
-                modifier = Modifier.padding(top = 2.dp)
+                color = T.softAccent,
+                border = BorderStroke(1.dp, medal.copy(alpha = 0.5f)),
+                modifier = Modifier.padding(bottom = 4.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "Leader",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontFamily = PoppinsFontFamily,
-                            color = if (isDark) Color(0xFFFFD54F) else Color(0xFFB45309),
+                            color = T.accentText,
                             fontWeight = FontWeight.Bold,
                             fontSize = 9.sp
                         )
@@ -681,84 +553,36 @@ private fun PodiumColumn(
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // Distinct Podium Pedestal with High-Contrast Finish
-        val pedestalGradient = when (rank) {
-            1 -> if (isDark) {
-                Brush.verticalGradient(listOf(Color(0x40FFD54F), Color(0xFF1E251D)))
-            } else {
-                Brush.verticalGradient(listOf(Color(0xFFFFF7DB), Color(0xFFFFECC0)))
-            }
-            2 -> if (isDark) {
-                Brush.verticalGradient(listOf(Color(0x35CFD8DC), Color(0xFF1E251D)))
-            } else {
-                Brush.verticalGradient(listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0)))
-            }
-            else -> if (isDark) {
-                Brush.verticalGradient(listOf(Color(0x35FFCC80), Color(0xFF1E251D)))
-            } else {
-                Brush.verticalGradient(listOf(Color(0xFFFFF0DC), Color(0xFFFFDFC0)))
-            }
-        }
-
-        val pedestalBorderColor = when (rank) {
-            1 -> if (isDark) Color(0xFFFFD54F).copy(alpha = 0.6f) else Color(0xFFFFB300)
-            2 -> if (isDark) Color(0xFFCFD8DC).copy(alpha = 0.5f) else Color(0xFF94A3B8)
-            else -> if (isDark) Color(0xFFFFCC80).copy(alpha = 0.5f) else Color(0xFFFF9800)
-        }
-
-        val pedestalRankNumberColor = when (rank) {
-            1 -> if (isDark) Color(0xFFFFD54F) else Color(0xFF996B00)
-            2 -> if (isDark) Color(0xFFCFD8DC) else Color(0xFF334155)
-            else -> if (isDark) Color(0xFFFFCC80) else Color(0xFFB43B08)
-        }
-
+        Spacer(modifier = Modifier.height(4.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(podiumHeight)
-                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                .background(pedestalGradient)
+                .height(blockHeight)
+                .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 8.dp, bottomEnd = 8.dp))
+                .background(T.surface)
                 .border(
-                    width = 1.5.dp,
-                    color = pedestalBorderColor,
-                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                    width = 1.dp,
+                    color = T.line,
+                    shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
                 ),
-            contentAlignment = Alignment.TopCenter
+            contentAlignment = Alignment.Center
         ) {
-            Column(
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Top Color Indicator Line
-                Box(
-                    modifier = Modifier
-                        .height(4.dp)
-                        .fillMaxWidth(0.5f)
-                        .clip(CircleShape)
-                        .background(
-                            when (rank) {
-                                1 -> Color(0xFFFFB300)
-                                2 -> Color(0xFF78909C)
-                                else -> Color(0xFFE65100)
-                            }
-                        )
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .background(medal)
+            )
+            Text(
+                text = "#$rank",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    color = medal,
+                    fontSize = 22.sp
                 )
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = "#$rank",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        color = pedestalRankNumberColor,
-                        fontSize = if (rank == 1) 24.sp else 20.sp
-                    )
-                )
-            }
+            )
         }
     }
 }
@@ -769,134 +593,87 @@ private fun LeaderboardUserRow(
     user: LeaderboardUser,
     displaySeconds: Long,
     isCurrentUser: Boolean,
-    selectedFilter: String
+    showDivider: Boolean
 ) {
-    val isDark = isAppInDarkTheme()
-
-    val rowBg = if (isCurrentUser) {
-        if (isDark) Color(0xFF1D2A1B) else Color(0xFFF3FBE8)
-    } else {
-        if (isDark) Color(0xFF1B221B) else Color(0xFFFFFFFF)
-    }
-
-    val rowBorderColor = if (isCurrentUser) {
-        if (isDark) RegainLimePrimary else Color(0xFF76C400)
-    } else {
-        if (isDark) Color(0x30FFFFFF) else Color(0xFFE0EAD4)
-    }
-
-    val rankTextColor = if (isCurrentUser) {
-        if (isDark) RegainLimePrimary else Color(0xFF2E6300)
-    } else {
-        if (isDark) Color(0xFFA0A89E) else Color(0xFF556050)
-    }
-
-    val nameTextColor = if (isDark) Color(0xFFF0F4ED) else NearBlack
-    val subjectTextColor = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
-    val timeTextColor = if (isCurrentUser) {
-        if (isDark) RegainLimePrimary else Color(0xFF2E6300)
-    } else {
-        if (isDark) Color(0xFFF0F4ED) else NearBlack
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("leaderboard_row_$rank"),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = rowBg),
-        border = BorderStroke(
-            width = if (isCurrentUser) 1.5.dp else 1.dp,
-            color = rowBorderColor
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 0.dp else 1.5.dp)
-    ) {
+    val T = focivoTokens()
+    Column(modifier = Modifier.testTag("leaderboard_row_$rank")) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 13.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                // Rank number
-                Text(
-                    text = "$rank",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        color = rankTextColor,
-                        fontSize = 15.sp
+            Text(
+                text = "$rank",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    color = T.muted,
+                    fontSize = 14.sp
+                ),
+                modifier = Modifier.width(18.dp)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(if (isCurrentUser) T.accent else T.surface2)
+                    .then(
+                        if (isCurrentUser) Modifier.border(1.dp, T.accent, CircleShape)
+                        else Modifier
                     ),
-                    modifier = Modifier.width(26.dp)
+                contentAlignment = Alignment.Center
+            ) {
+                LeaderboardAvatar(
+                    avatarUrl = user.avatarUrl,
+                    displayName = user.displayName,
+                    isCurrentUser = isCurrentUser,
+                    textSizeSp = 15,
+                    initialsColor = if (isCurrentUser) T.onAccent else T.text
                 )
-
-                // Avatar Circle
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (isCurrentUser) {
-                                RegainLimePrimary
-                            } else {
-                                if (isDark) Color(0xFF2B3628) else Color(0xFFE8EFE2)
-                            }
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    LeaderboardAvatar(
-                        avatarUrl = user.avatarUrl,
-                        displayName = user.displayName,
-                        isCurrentUser = isCurrentUser,
-                        textSizeSp = 14
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = if (isCurrentUser) "${user.displayName} (You)" else user.displayName,
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                color = nameTextColor,
-                                fontSize = 14.sp
-                            )
-                        )
-                    }
-                    Text(
-                        text = user.subjectTag,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = PoppinsFontFamily,
-                            color = subjectTextColor,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 11.sp
-                        )
-                    )
-                }
             }
-
-            // Formatted Study Time
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isCurrentUser) "${user.displayName} (You)" else user.displayName,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        color = T.text,
+                        fontSize = 14.sp
+                    )
+                )
+                Text(
+                    text = user.subjectTag,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = PoppinsFontFamily,
+                        color = T.muted,
+                        fontSize = 11.sp
+                    )
+                )
+            }
             Text(
                 text = formatHoursMins(displaySeconds),
                 style = MaterialTheme.typography.titleSmall.copy(
                     fontFamily = PoppinsFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    color = timeTextColor,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isCurrentUser) T.accentText else T.text,
                     fontSize = 14.sp
                 )
+            )
+        }
+        if (showDivider) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(T.line)
             )
         }
     }
 }
 
-@Composable
 private fun formatHoursMins(seconds: Long): String {
     if (seconds <= 0) return "0m"
     val totalMins = seconds / 60
@@ -908,4 +685,3 @@ private fun formatHoursMins(seconds: Long): String {
         else -> "${mins}m"
     }
 }
-

@@ -109,6 +109,12 @@ object GeminiContentClassifier {
         return if (key.isBlank() || key == "MY_GEMINI_API_KEY" || key == "<redacted>") "" else key
     }
 
+    /**
+     * v1.2.3 (owner 2026-10-16): boolean-only key presence for the Guard
+     * Hub "Guard state" row — the key itself is never exposed.
+     */
+    fun isApiKeyPresent(): Boolean = resolveApiKey().isNotEmpty()
+
     /** v1.2.2 (B3): fail-open verdict — used whenever Gemini cannot run or fails. Never cached. */
     private fun aiUnavailableAllow(): ContentVerdict = ContentVerdict(
         isStudyAllowed = true,
