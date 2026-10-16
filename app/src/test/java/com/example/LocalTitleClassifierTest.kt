@@ -72,7 +72,7 @@ class LocalTitleClassifierTest {
     @Test
     fun bundleVersionAndThresholdAreV2() {
         assertEquals(
-            LocalTitleClassifier.EXPECTED_BUNDLE_VERSION,
+            LocalTitleClassifier.EXPECTED_TITLE_BUNDLE_VERSION,
             clf.version
         )
         assertEquals(0.65, clf.blockThreshold, 1e-12)

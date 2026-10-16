@@ -12,28 +12,27 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Focivo on-device title classifier (v2, Task 6).
+ * Focivo on-device guard classifiers (Tasks 6 & 9) — two brains, one engine.
  *
- * A fully offline study-vs-entertainment judge for extracted YouTube video
- * titles: TF-IDF (word 1-2 grams + char_wb 3-5 grams) + logistic regression,
- * exported as a ~418 KB JSON bundle (assets/classifier_bundle.json).
- * No API key, no network, no permissions. Typical title scores in <1 ms.
+ * Both brains are fully offline TF-IDF (word 1-2 grams + char_wb 3-5 grams) +
+ * logistic-regression judges sharing the exact Kotlin inference engine below
+ * (same JSON schema, same tokenizer — see inference_spec.md).
  *
- * Trained metrics (v2, Round 2 English expansion, 5,100 titles): held-out
- * 99.71% accuracy with ZERO false-blocks at p_entertainment >= 0.65;
- * English-entertainment recall 99.37%; tricky set ~91%.
+ * BRAIN 1 — video titles (Task 6): assets/classifier_bundle.json (v2,
+ * 14,744 terms, threshold 0.65). First judge for extracted YouTube titles.
+ * BRAIN 2 — screen content (Task 9): assets/classifier_bundle_content.json
+ * (v1, 14,933 terms, threshold 0.80). First judge for general screen text
+ * (the GeminiStudyContentJudge route for non-YouTube screen text).
  *
- * Verdict bands (the block threshold is read from the bundle itself so a
- * retrain never needs a code change; the strong-study band was validated on
- * the 5233-title v2 train+tricky corpus):
- *   p_ent >= blockThreshold (0.65) -> ENTERTAINMENT (block candidate;
- *       zero false-blocks on the 1,020-title held-out set)
- *   p_ent <= STRONG_STUDY_MAX_P_ENT (0.20) -> STRONG_STUDY (allow locally;
- *       zero entertainment titles at or below 0.20 in the whole corpus,
- *       98.7% of study titles decided without a network call)
- *   in between -> UNCERTAIN (caller falls through to the existing
- *       knowledge -> quick -> Gemini chain; Gemini arbitrates when a key
- *       exists, otherwise the existing fail-open rules apply)
+ * Trained metrics — titles: held-out 99.71% acc, zero false-blocks at 0.65;
+ * screen content: held-out 99.89% acc, falseBlock 0.0000 everywhere.
+ *
+ * Verdict bands (block threshold read from each bundle so retrains never need
+ * code changes; the strong-study band was validated per brain):
+ *   p_ent >= blockThreshold -> ENTERTAINMENT / non-study candidate
+ *   p_ent <= STRONG_STUDY_MAX_P_ENT (0.20) -> STRONG_STUDY -> allow locally
+ *   in between -> UNCERTAIN -> caller falls through to Gemini (arbiter when a
+ *       key exists, otherwise the existing fail-open rules apply)
  *
  * INFERENCE PARITY (inference_spec.md): the Kotlin below replicates the
  * Python/sklearn mirror EXACTLY —
@@ -57,7 +56,8 @@ import kotlinx.serialization.json.jsonPrimitive
 object LocalTitleClassifier {
 
     private const val TAG = "LocalTitleClassifier"
-    private const val ASSET_PATH = "classifier_bundle.json"
+    private const val TITLE_ASSET_PATH = "classifier_bundle.json"
+    private const val CONTENT_ASSET_PATH = "classifier_bundle_content.json"
 
     /**
      * Allow locally iff p_entertainment <= this. Zero entertainment titles at
@@ -66,8 +66,9 @@ object LocalTitleClassifier {
      */
     const val STRONG_STUDY_MAX_P_ENT = 0.20
 
-    /** Bundle version this code was verified against (v2). */
-    const val EXPECTED_BUNDLE_VERSION = 2
+    /** Bundle versions this code was verified against. */
+    const val EXPECTED_TITLE_BUNDLE_VERSION = 2
+    const val EXPECTED_CONTENT_BUNDLE_VERSION = 1
 
     enum class TitleDecision { ENTERTAINMENT, STRONG_STUDY, UNCERTAIN }
 
@@ -276,10 +277,11 @@ object LocalTitleClassifier {
     private var loadFailed = false
 
     /**
-     * Returns the shared classifier, loading the asset bundle once on first
-     * use (call off the main thread at service start to warm it). Null when
-     * the bundle cannot be loaded — callers must fall through to the existing
-     * chain (fail-safe: never block on a missing bundle).
+     * Returns the shared TITLE-brain classifier (YouTube titles), loading the
+     * asset bundle once on first use (call off the main thread at service
+     * start to warm it). Null when the bundle cannot be loaded — callers must
+     * fall through to the existing chain (fail-safe: never block on a missing
+     * bundle).
      */
     fun get(context: Context): Classifier? {
         cached?.let { return it }
@@ -288,15 +290,48 @@ object LocalTitleClassifier {
             cached?.let { return it }
             if (loadFailed) return null
             return try {
-                val json = context.applicationContext.assets.open(ASSET_PATH)
+                val json = context.applicationContext.assets.open(TITLE_ASSET_PATH)
                     .bufferedReader().use { it.readText() }
                 loadFromJson(json).also {
                     cached = it
-                    Log.i(TAG, "bundle loaded: v${it.version} threshold=${it.blockThreshold}")
+                    Log.i(TAG, "title bundle loaded: v${it.version} threshold=${it.blockThreshold}")
                 }
             } catch (t: Throwable) {
                 loadFailed = true
-                Log.w(TAG, "bundle load failed; guard falls back to existing chain", t)
+                Log.w(TAG, "title bundle load failed; guard falls back to existing chain", t)
+                null
+            }
+        }
+    }
+
+    @Volatile
+    private var contentCached: Classifier? = null
+
+    @Volatile
+    private var contentLoadFailed = false
+
+    /**
+     * Returns the shared CONTENT-brain classifier (general screen text),
+     * loading assets/classifier_bundle_content.json once on first use. Null
+     * when the bundle cannot be loaded — callers must fall through to the
+     * existing chain (fail-safe: never block on a missing bundle).
+     */
+    fun getContent(context: Context): Classifier? {
+        contentCached?.let { return it }
+        if (contentLoadFailed) return null
+        synchronized(this) {
+            contentCached?.let { return it }
+            if (contentLoadFailed) return null
+            return try {
+                val json = context.applicationContext.assets.open(CONTENT_ASSET_PATH)
+                    .bufferedReader().use { it.readText() }
+                loadFromJson(json).also {
+                    contentCached = it
+                    Log.i(TAG, "content bundle loaded: v${it.version} threshold=${it.blockThreshold}")
+                }
+            } catch (t: Throwable) {
+                contentLoadFailed = true
+                Log.w(TAG, "content bundle load failed; guard falls back to existing chain", t)
                 null
             }
         }

@@ -84,11 +84,12 @@ class AiStudyAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         isServiceConnected = true
         connectedInstance = this
-        // v1.2.3 (Task 6): warm the on-device title classifier off the main
-        // thread so the first YouTube title never pays the bundle-parse cost
-        // on the accessibility callback thread.
+        // v1.2.3 (Tasks 6 & 9): warm both on-device classifier brains off the
+        // main thread so the first title/screen never pays the bundle-parse
+        // cost on the accessibility callback thread.
         serviceScope.launch {
             runCatching { LocalTitleClassifier.get(applicationContext) }
+            runCatching { LocalTitleClassifier.getContent(applicationContext) }
         }
     }
 
@@ -1176,8 +1177,57 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                         reason = quickScreen.reason
                                     )
                                 } else if (quickScreen.confidence < 0.90f) {
-                                    // Ambient screen check with Gemini
-                                    serviceScope.launch {
+                                    // v1.2.3 (Task 9): second brain — the on-device
+                                    // screen-content classifier judges the extracted
+                                    // text BEFORE any network call. Bands per spec:
+                                    //   p_ent >= 0.80 -> non-study candidate ->
+                                    //       same discipline flow as a confident
+                                    //       on-device block.
+                                    //   p_ent < 0.20  -> study -> allow locally
+                                    //       (no Gemini call needed).
+                                    //   middle        -> Gemini arbiter below
+                                    //       (no key -> existing fail-open).
+                                    // Task-5 hard rules stay supreme: quick-block
+                                    // confidence gating, fail-open, and the
+                                    // discipline semantics are unchanged.
+                                    val screenText = buildString {
+                                        if (!extraction.screenTitle.isNullOrBlank()) append(extraction.screenTitle).append(". ")
+                                        extraction.textSnippets.forEach { append(it).append(" ") }
+                                    }.trim()
+                                    val contentClf = LocalTitleClassifier.getContent(applicationContext)
+                                    val contentPEnt = if (contentClf != null && screenText.isNotBlank()) {
+                                        contentClf.pEntertainment(screenText)
+                                    } else null
+                                    val contentThreshold = contentClf?.blockThreshold ?: 0.80
+                                    when {
+                                        contentPEnt != null && contentPEnt >= contentThreshold -> {
+                                            val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
+                                            val reason = "Non-study screen content detected [local-content $pEntStr]"
+                                            Log.w(TAG, "[Browser AI Guard] $reason in $browserLabel")
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "NON_STUDY", "local-content $pEntStr", urlOrTitle)
+                                            AiStudyGuardManager.onNonStudyDetected(
+                                                context = applicationContext,
+                                                packageName = pkg,
+                                                messageText = urlOrTitle.ifBlank { extraction.textSnippets.firstOrNull() ?: "" },
+                                                reason = reason
+                                            )
+                                        }
+                                        contentPEnt != null && contentPEnt < LocalTitleClassifier.STRONG_STUDY_MAX_P_ENT -> {
+                                            val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "STUDY", "local-content $pEntStr", urlOrTitle)
+                                            AiStudyGuardManager.onStudyActivityDetected(
+                                                context = applicationContext,
+                                                packageName = pkg,
+                                                messageText = urlOrTitle
+                                            )
+                                        }
+                                        else -> {
+                                            if (contentPEnt != null) {
+                                                val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
+                                                AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "UNCERTAIN", "local-content $pEntStr->gemini", urlOrTitle)
+                                            }
+                                            // Ambient screen check with Gemini
+                                            serviceScope.launch {
                                         try {
                                             val gv = GeminiContentClassifier.evaluateScreenWithGemini(
                                                 packageName = pkg,
@@ -1213,6 +1263,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                             AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-gemini", "STUDY", "AI check unavailable — allowed", urlOrTitle)
                                         }
                                     }
+                                    }
+                                }
                                 }
                             }
                         } finally {
