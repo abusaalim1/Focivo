@@ -224,7 +224,9 @@ object LocalTitleClassifier {
 
     private fun isWordChar(cp: Int): Boolean {
         if (cp == 0x5F) return true // '_'
-        return when (Character.getType(cp)) {
+        // Note: Character.getType returns Int but the type constants are
+        // Java bytes, so compare in Byte space.
+        return when (Character.getType(cp).toByte()) {
             Character.UPPERCASE_LETTER,
             Character.LOWERCASE_LETTER,
             Character.TITLECASE_LETTER,
