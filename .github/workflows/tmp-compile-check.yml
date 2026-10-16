@@ -26,7 +26,6 @@ jobs:
 
       - name: Run recordRoborazziDebug (exact screenshots-workflow task)
         run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.v123.*" --rerun-tasks --no-configuration-cache --stacktrace
-        continue-on-error: true
 
       - name: Dump test failure stacks
         if: always()
@@ -35,3 +34,11 @@ jobs:
       - name: Locate generated PNGs
         if: always()
         run: find app/src/test/screenshots/v123 -type f 2>/dev/null | head -20; find app/src/test/screenshots/v123 -name '*.png' 2>/dev/null | wc -l
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tmp-test-results
+          path: app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
