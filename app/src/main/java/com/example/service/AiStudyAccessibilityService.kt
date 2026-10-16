@@ -19,6 +19,7 @@ import com.example.util.BlockedChannelsManager
 import com.example.util.DeepFocusManager
 import com.example.util.EssentialAppsGuard
 import com.example.util.GeminiContentClassifier
+import com.example.util.LocalTitleClassifier
 import com.example.util.OnDeviceStudyClassifier
 import com.example.util.ShortsLockManager
 import com.example.util.ShortsSurfaceDetector
@@ -83,6 +84,12 @@ class AiStudyAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         isServiceConnected = true
         connectedInstance = this
+        // v1.2.3 (Task 6): warm the on-device title classifier off the main
+        // thread so the first YouTube title never pays the bundle-parse cost
+        // on the accessibility callback thread.
+        serviceScope.launch {
+            runCatching { LocalTitleClassifier.get(applicationContext) }
+        }
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
@@ -1398,6 +1405,76 @@ class AiStudyAccessibilityService : AccessibilityService() {
         }
 
         // v1.1.8: curated offline knowledge first — instant (<1ms), zero network.
+        // v1.2.3 (Task 6): on-device title classifier is the FIRST title judge,
+        // ahead of the knowledge pack. Fully offline (no key, no network,
+        // <1ms): TF-IDF + logistic regression bundle (assets). Held-out 99.5%
+        // acc with ZERO false-blocks at p_ent >= 0.60.
+        //   p_ent >= 0.60 -> ENTERTAINMENT -> same discipline flow as a
+        //                   high-confidence knowledge NON_STUDY.
+        //   p_ent <= 0.20 -> STRONG_STUDY -> allow locally (zero entertainment
+        //                   titles at/below 0.20 in the 2191-title corpus).
+        //   middle        -> UNCERTAIN -> fall through to the existing
+        //                   knowledge -> quick -> Gemini chain below (Gemini
+        //                   arbitrates when a key exists; no key -> the
+        //                   existing fail-open rules apply).
+        // Hard rules stay supreme: this only ever sees actual-playback titles
+        // (callers gate on player evidence), and user channel lists above win.
+        if (title.isNotBlank()) {
+            val localClassifier = LocalTitleClassifier.get(applicationContext)
+            if (localClassifier == null) {
+                AiStudyGuardManager.logGuardActivity(
+                    applicationContext, "YouTube", "youtube-local", "UNCERTAIN",
+                    "bundle-load-failed->existing-chain", title
+                )
+            } else {
+                val localPEnt = localClassifier.pEntertainment(title)
+                val pEntStr = "p_ent=%.3f".format(Locale.ROOT, localPEnt)
+                when (localClassifier.decide(localPEnt)) {
+                    LocalTitleClassifier.TitleDecision.ENTERTAINMENT -> {
+                        AiStudyGuardManager.logGuardActivity(
+                            applicationContext, "YouTube", "youtube-local", "NON_STUDY",
+                            "local-classifier $pEntStr", title
+                        )
+                        val now = System.currentTimeMillis()
+                        if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
+                            lastYouTubeAiInterceptTimeMs = now
+                            val reason =
+                                "Non-study content detected: \"$title\" [local-classifier $pEntStr]"
+                            Log.w(TAG, "[YouTube Guard] $reason")
+                            YouTubeStudyGuardManager.recordBlockedVideo(
+                                context = applicationContext,
+                                title = title,
+                                channel = channel,
+                                reason = reason
+                            )
+                            pauseMediaPlayback()
+                            AiStudyGuardManager.onNonStudyDetected(
+                                context = applicationContext,
+                                packageName = "com.google.android.youtube",
+                                messageText = title,
+                                reason = reason
+                            )
+                        }
+                        return true
+                    }
+                    LocalTitleClassifier.TitleDecision.STRONG_STUDY -> {
+                        AiStudyGuardManager.logGuardActivity(
+                            applicationContext, "YouTube", "youtube-local", "STUDY",
+                            "local-classifier $pEntStr", title
+                        )
+                        return false
+                    }
+                    LocalTitleClassifier.TitleDecision.UNCERTAIN -> {
+                        AiStudyGuardManager.logGuardActivity(
+                            applicationContext, "YouTube", "youtube-local", "UNCERTAIN",
+                            "local-classifier $pEntStr->existing-chain", title
+                        )
+                    }
+                }
+            }
+        }
+
+        // v1.1.8: curated offline knowledge — instant (<1ms), zero network.
         // v1.2.3 (A): the hard rule — a knowledge NON_STUDY only fires the
         // discipline flow at HIGH confidence (score <= -4.0: a multi-word
         // block phrase or 2+ hits). A weak single-word hit (score -2..-4)
