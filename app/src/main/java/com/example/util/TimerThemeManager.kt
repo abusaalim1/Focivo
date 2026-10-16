@@ -67,7 +67,7 @@ data class TimerTheme(
      */
     val onBackdropContent: Color = Color(0xFFF7F8F4)
 ) {
-    // v1.2 test build: ALL_CONTENT_UNLOCKED frees every timer theme.
+    // Content lock model (points never spent): ALL_CONTENT_UNLOCKED frees every timer theme.
     fun isUnlocked(userPoints: Int): Boolean =
         ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
 }
@@ -187,7 +187,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFF69F0AE), Color(0xFFB9F6CA), Color(0xFF00C853)),
             glowColor = Color(0xFF69F0AE),
             accent = Color(0xFF69F0AE),
-            unlockPoints = 0
+            unlockPoints = 2750
         ),
         // Round-4b: 12 new distinct premium themes (runtime-resolved assets).
         TimerTheme(

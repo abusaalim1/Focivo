@@ -20,7 +20,7 @@ data class TimerFace(
     val tagline: String,
     val unlockPoints: Int = 0
 ) {
-    // v1.2 test build: ALL_CONTENT_UNLOCKED frees every timer face.
+    // Content lock model (points never spent): ALL_CONTENT_UNLOCKED frees every timer face.
     fun isUnlocked(userPoints: Int): Boolean =
         ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
 }
@@ -68,13 +68,13 @@ object TimerFaceManager {
             id = "clock_orbit",
             name = "Orbit",
             tagline = "Thin ring, glowing orbiting dot",
-            unlockPoints = 0
+            unlockPoints = 500
         ),
         TimerFace(
             id = "clock_flip",
             name = "Flip",
             tagline = "Soft flip-clock cards",
-            unlockPoints = 0
+            unlockPoints = 1500
         ),
         TimerFace(
             id = "clock_liquid",
@@ -86,13 +86,13 @@ object TimerFaceManager {
             id = "clock_editorial",
             name = "Editorial Clock",
             tagline = "Huge serif, hairline progress",
-            unlockPoints = 0
+            unlockPoints = 7000
         ),
         TimerFace(
             id = "clock_dial",
             name = "Dial",
             tagline = "Sweeping dial with live wedge",
-            unlockPoints = 0
+            unlockPoints = 2500
         ),
         TimerFace(
             id = "clock_horizon",
@@ -104,7 +104,7 @@ object TimerFaceManager {
             id = "clock_stack",
             name = "Stack",
             tagline = "Minutes over seconds, vertical meter",
-            unlockPoints = 0
+            unlockPoints = 3500
         ),
         TimerFace(
             id = "clock_breathe",
@@ -116,7 +116,7 @@ object TimerFaceManager {
             id = "clock_bars",
             name = "Bars",
             tagline = "Quiet equalizer bars fill up",
-            unlockPoints = 0
+            unlockPoints = 5000
         )
     )
 

@@ -49,6 +49,11 @@ import org.robolectric.annotation.GraphicsMode
  * - Screenshots: real shell (Scaffold + nav) light + dark, the Focus
  *   screen in light mode, and the Lock-in Start overlay at phone size.
  * PNGs land in app/src/test/screenshots/v123/.
+ *
+ * UPDATE (owner order 2026-10-16): the Motion Lab liquid pill effect has
+ * been REMOVED entirely — the nav is back to a simple per-tab active
+ * background. This test now guards the same compactness invariant for the
+ * simplified nav (no pill state, no measurement, no draw-layer).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
