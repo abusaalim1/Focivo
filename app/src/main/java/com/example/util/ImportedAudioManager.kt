@@ -14,7 +14,7 @@ import org.json.JSONObject
  * order 2026-10-16).
  *
  * Import uses the Android document picker (SAF ACTION_OPEN_DOCUMENT,
- * audio/*) — no broad storage permission. We take a persistable read URI
+ * "audio" mime type) — no broad storage permission. We take a persistable read URI
  * permission so the track survives restarts, and store (uri, display name)
  * pairs as JSON in SharedPreferences.
  *

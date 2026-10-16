@@ -730,6 +730,7 @@ private fun SoundscapePicker(
     val importedTracks = remember(importVersion) {
         com.example.util.ImportedAudioManager.getTracks(context)
     }
+    val accentColor = focivoTokens().accent
 
     val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
@@ -793,7 +794,7 @@ private fun SoundscapePicker(
                         .background(if (isChosen && available) selectedBg else cardBg)
                         .border(
                             1.dp,
-                            if (isChosen && available) focivoTokens().accent else cardBorder,
+                            if (isChosen && available) accentColor else cardBorder,
                             RoundedCornerShape(14.dp)
                         )
                         .alpha(if (available) 1f else 0.45f)
