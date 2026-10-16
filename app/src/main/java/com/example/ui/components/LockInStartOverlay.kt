@@ -68,16 +68,21 @@ import kotlin.math.sin
 fun LockInStartOverlay(
     blockedPackages: List<String>,
     onComplete: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    // Screenshot-test hook: freeze the animation at a fixed sweep progress
+    // (0..1). When set, the master clock never starts, so the composition
+    // reaches idleness and Roborazzi can capture a deterministic frame.
+    testFreezeProgress: Float? = null
 ) {
     val context = LocalContext.current
     BackHandler(onBack = onDismiss)
 
     // Ring sweep 0 -> 360 over the first 1.6s; icons pop in staggered.
-    val sweep = remember { Animatable(0f) }
+    val sweep = remember { Animatable(testFreezeProgress ?: 0f) }
     val pulse = remember { Animatable(0f) }
     val shown = remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
+        if (testFreezeProgress != null) return@LaunchedEffect
         shown.value = true
         launch {
             sweep.animateTo(1f, tween(1600, easing = FastOutSlowInEasing))

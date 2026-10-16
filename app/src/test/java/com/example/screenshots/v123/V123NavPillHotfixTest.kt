@@ -175,7 +175,10 @@ class V123NavPillHotfixTest {
                             "com.google.android.youtube"
                         ),
                         onComplete = {},
-                        onDismiss = {}
+                        onDismiss = {},
+                        // Freeze mid-sweep: deterministic frame, and the
+                        // composition can reach idleness (no infinite pulse).
+                        testFreezeProgress = 0.65f
                     )
                 }
             }
