@@ -61,12 +61,14 @@ jobs:
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3584m -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false"
         run: |
+          set -o pipefail
           gradle :app:testDebugUnitTest --tests "com.example.ContentLockTest" --tests "com.example.SplashVariantTest" --rerun-tasks --no-configuration-cache --stacktrace 2>&1 | tee verify-tests.log
 
       - name: Record v124 screenshots
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3584m -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false"
         run: |
+          set -o pipefail
           gradle :app:recordRoborazziDebug --tests "com.example.screenshots.v124.*" --rerun-tasks --no-configuration-cache --stacktrace 2>&1 | tee verify-shots.log
 
       - name: Upload screenshots

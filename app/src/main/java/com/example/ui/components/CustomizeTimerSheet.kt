@@ -586,7 +586,7 @@ fun CustomizeTimerSheet(
                         },
                         textPrimary = textPrimary,
                         cardBorder = cardBorder,
-                        scrollState = timerFaceScrollState ?: rememberScrollState()
+                        scrollState = timerFaceScrollState ?: rememberScrollState(),
                         isAdmin = isAdmin,
                     )
                 }
