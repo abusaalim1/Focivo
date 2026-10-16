@@ -42,4 +42,37 @@ object PomodoroStyleManager {
         _selectedStyle.value = style
         Log.i(TAG, "Pomodoro design selected: ${style.label}")
     }
+
+    /**
+     * v1.2.4 — guarded selection. Returns true and applies only when the
+     * design is unlocked for the user's Focus Points (or the admin account).
+     * Returns false (changes nothing) when locked.
+     */
+    fun trySelectStyle(
+        context: Context,
+        style: PomodoroStyle,
+        userPoints: Int,
+        isAdmin: Boolean = com.example.util.ContentLocks.isAdminUnlocked(context)
+    ): Boolean {
+        if (!style.isUnlocked(userPoints, isAdmin)) {
+            Log.i(TAG, "Pomodoro design ${style.label} is locked ($userPoints/${style.unlockPoints} pts)")
+            return false
+        }
+        selectStyle(context, style)
+        return true
+    }
+
+    /**
+     * v1.2.4 — call when the balance is (re)loaded. If the persisted design
+     * is no longer unlocked (rules changed), fall back to Tick Ring.
+     */
+    fun validateSelection(
+        context: Context,
+        userPoints: Int,
+        isAdmin: Boolean = com.example.util.ContentLocks.isAdminUnlocked(context)
+    ) {
+        if (!_selectedStyle.value.isUnlocked(userPoints, isAdmin)) {
+            selectStyle(context, PomodoroStyle.TICK_RING)
+        }
+    }
 }

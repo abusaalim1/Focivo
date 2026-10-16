@@ -101,18 +101,20 @@ fun MascotScreen(
     val cardBorder = if (isDark) Color(0xFF1F1F22) else Color(0xFFE4E9DE)
     val screenBg = if (isDark) Color(0xFF0A0A0B) else Color(0xFFFAFBF7)
     val lime = MascotLime
+    // v1.2.4: owner admin account unlocks every outfit set — single choke point.
+    val isAdmin = remember { com.example.util.ContentLocks.isAdminUnlocked(androidx.compose.ui.platform.LocalContext.current) }
 
     val savedSetId by MascotWardrobe.equipped.collectAsState()
     // v1.2.1 re-lock: the equipped set can never be a locked one.
     LaunchedEffect(focusPoints) {
-        MascotWardrobe.ensureEquippedUnlocked(focusPoints)
+        MascotWardrobe.ensureEquippedUnlocked(focusPoints, isAdmin)
     }
     // Motion Lab "Theme unlock": celebrate genuinely-new outfit-set threshold
     // crossings (threshold model — points are never spent). First observation
     // seeds silently (persisted), so only real crossings celebrate.
     val outfitUnlocks = rememberNewlyUnlockedIds(
         allIds = OUTFIT_SETS.map { it.id },
-        isUnlocked = { id -> outfitSetById(id)?.isUnlocked(focusPoints) == true },
+        isUnlocked = { id -> outfitSetById(id)?.isUnlocked(focusPoints, isAdmin) == true },
         focusPoints = focusPoints,
         seenKey = "unlock_seen_outfit_sets"
     )
@@ -150,7 +152,7 @@ fun MascotScreen(
     val hasChanges = pendingSetId != savedSetId
     val pendingSet: MascotOutfitSet =
         outfitSetById(pendingSetId) ?: MascotWardrobe.currentSet()
-    val pendingUnlocked = pendingSet.isUnlocked(focusPoints)
+    val pendingUnlocked = pendingSet.isUnlocked(focusPoints, isAdmin)
 
     Column(
         modifier = Modifier
@@ -291,7 +293,7 @@ fun MascotScreen(
             // preview/equipped set).
             items(OUTFIT_SETS, key = { it.id }) { set ->
                 val isEquipped = pendingSetId == set.id
-                val isLocked = !set.isUnlocked(focusPoints)
+                val isLocked = !set.isUnlocked(focusPoints, isAdmin)
                 Column(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))

@@ -1064,7 +1064,9 @@ fun TimerFacePicker(
     textPrimary: Color,
     cardBorder: Color,
     // v1.2.3: test hook — lets screenshot tests pre-scroll the row.
-    scrollState: ScrollState = rememberScrollState()
+    scrollState: ScrollState = rememberScrollState(),
+    // v1.2.4: admin account (owner) unlocks every face.
+    isAdmin: Boolean = false
 ) {
     val isDark = isAppInDarkTheme()
     Column(modifier = modifier.fillMaxWidth()) {
@@ -1103,7 +1105,7 @@ fun TimerFacePicker(
         ) {
             TimerFaceManager.FACES.forEach { face ->
                 val isSelected = face.id == selectedFaceId
-                val isLocked = !face.isUnlocked(focusPoints)
+                val isLocked = !face.isUnlocked(focusPoints, isAdmin)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.clickable { onFaceTap(face, isLocked) }

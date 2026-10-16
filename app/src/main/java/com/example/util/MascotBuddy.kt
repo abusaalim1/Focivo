@@ -85,8 +85,9 @@ data class MascotOutfitSet(
         MascotPose.CELEBRATE -> celebrateRes
     }
 
-    fun isUnlocked(userPoints: Int): Boolean =
-        ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
+    // v1.2.4: isAdmin (owner admin account) frees every set — single choke point.
+    fun isUnlocked(userPoints: Int, isAdmin: Boolean = false): Boolean =
+        isAdmin || ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
 }
 
 /**
@@ -236,9 +237,9 @@ object MascotWardrobe {
      * so this is belt-and-braces — if the saved set is somehow locked for
      * the user's balance, fall back to the free default.
      */
-    fun ensureEquippedUnlocked(userPoints: Int) {
+    fun ensureEquippedUnlocked(userPoints: Int, isAdmin: Boolean = false) {
         val current = outfitSetById(_equipped.value)
-        if (current != null && !current.isUnlocked(userPoints)) {
+        if (current != null && !current.isUnlocked(userPoints, isAdmin)) {
             saveSet(DEFAULT_SET_ID)
         }
     }

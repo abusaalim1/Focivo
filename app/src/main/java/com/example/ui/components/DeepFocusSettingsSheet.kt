@@ -119,6 +119,8 @@ fun DeepFocusSettingsSheet(
     val prefsFlow = remember(context) { FocuslyRepository.getInstance(context).userPreferences }
     val prefs by prefsFlow.collectAsState(initial = null)
     val focusPoints = prefs?.focusPoints ?: 0
+    // v1.2.4: owner admin account unlocks every theme — single choke point.
+    val isAdmin = remember(context) { com.example.util.ContentLocks.isAdminUnlocked(context) }
     var lockedDialogTheme by remember { mutableStateOf<TimerTheme?>(null) }
 
     // Round-4: if the persisted theme is no longer affordable (rules changed),
@@ -276,7 +278,12 @@ fun DeepFocusSettingsSheet(
                         icon = Icons.Default.Palette,
                         icon3dRes = themeTileRes,
                         iconCustom = if (themeTileRes == null) {
-                            { AuroraBackground(modifier = Modifier.fillMaxSize()) }
+                            val ambientKind = selectedTheme.ambientKind
+                            if (ambientKind != null) {
+                                { AmbientBackdrop(kind = ambientKind, modifier = Modifier.fillMaxSize()) }
+                            } else {
+                                { AuroraBackground(modifier = Modifier.fillMaxSize()) }
+                            }
                         } else null,
                         title = "Timer theme",
                         subtitle = selectedTheme.name + " — full-screen backdrop, mascot and glow",
@@ -648,7 +655,7 @@ fun TimerThemePicker(
         ) {
             TimerThemeManager.THEMES.forEach { theme ->
                 val isSelected = theme.id == selectedThemeId
-                val isLocked = !theme.isUnlocked(focusPoints)
+                val isLocked = !theme.isUnlocked(focusPoints, isAdmin)
                 val cardBackdrop = remember(theme.id) {
                     resolveThemeBackdropRes(context, theme)
                 }
@@ -674,6 +681,13 @@ fun TimerThemePicker(
                                 painter = painterResource(id = cardBackdrop),
                                 contentDescription = theme.name,
                                 contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else if (theme.ambientKind != null) {
+                            // v1.5.0 Ambient themes: live mini preview of the
+                            // code-drawn canvas, clipped to the card.
+                            AmbientBackdrop(
+                                kind = theme.ambientKind,
                                 modifier = Modifier.fillMaxSize()
                             )
                         } else {

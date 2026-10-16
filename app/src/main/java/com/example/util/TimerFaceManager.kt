@@ -21,8 +21,10 @@ data class TimerFace(
     val unlockPoints: Int = 0
 ) {
     // Content lock model (points never spent): ALL_CONTENT_UNLOCKED frees every timer face.
-    fun isUnlocked(userPoints: Int): Boolean =
-        ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
+    // v1.2.4: isAdmin (owner admin account) frees everything — consumed via
+    // default param so call sites never scatter email conditionals.
+    fun isUnlocked(userPoints: Int, isAdmin: Boolean = false): Boolean =
+        isAdmin || ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
 }
 
 object TimerFaceManager {
@@ -144,9 +146,9 @@ object TimerFaceManager {
      * Guarded selection — applies only when the user's Focus Points balance
      * meets the face's threshold. Returns false (changes nothing) when locked.
      */
-    fun trySelectFace(context: Context, id: String, userPoints: Int): Boolean {
+    fun trySelectFace(context: Context, id: String, userPoints: Int, isAdmin: Boolean = ContentLocks.isAdminUnlocked(context)): Boolean {
         val face = getFace(id)
-        if (!face.isUnlocked(userPoints)) {
+        if (!face.isUnlocked(userPoints, isAdmin)) {
             Log.i(TAG, "Face ${face.name} is locked ($userPoints/${face.unlockPoints} pts)")
             return false
         }
@@ -158,8 +160,8 @@ object TimerFaceManager {
      * Automatic fallback: if the persisted face is somehow locked
      * (rules changed), fall back to the free Aurora Ring.
      */
-    fun validateSelection(context: Context, userPoints: Int) {
-        if (!_selectedFace.value.isUnlocked(userPoints)) {
+    fun validateSelection(context: Context, userPoints: Int, isAdmin: Boolean = ContentLocks.isAdminUnlocked(context)) {
+        if (!_selectedFace.value.isUnlocked(userPoints, isAdmin)) {
             selectFace(context, "ring")
         }
     }
