@@ -107,25 +107,30 @@ object BlockOverlayManager {
      * v1.2.3 — show through the accessibility service's overlay layer.
      * Synchronous boolean on any thread: the service's view work always runs
      * on the main thread; background callers wait briefly on a latch.
+     *
+     * v1.2.3 (owner 2026-10-16): [warningVariant] renders the Stage-1 guard
+     * warning (lime accent + warning mascot + warning copy — not a
+     * punishment) through this same window-proof layer.
      */
     private fun showViaA11y(
         blockedPackage: String,
         appName: String,
         durationSec: Int,
         reason: String?,
-        isPunishment: Boolean
+        isPunishment: Boolean,
+        warningVariant: Boolean = false
     ): Boolean {
         val svc = AiStudyAccessibilityService.connectedInstance ?: return false
         if (svc.isA11yBlockOverlayShowing()) return true
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            return svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment)
+            return svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant)
         }
         val result = java.util.concurrent.atomic.AtomicBoolean(false)
         val latch = java.util.concurrent.CountDownLatch(1)
         mainHandler.post {
             try {
                 result.set(
-                    svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment)
+                    svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant)
                 )
             } finally {
                 latch.countDown()
@@ -171,7 +176,8 @@ object BlockOverlayManager {
         appName: String,
         durationSec: Int = 0,
         reason: String? = null,
-        isPunishment: Boolean = false
+        isPunishment: Boolean = false,
+        warningVariant: Boolean = false
     ): Boolean {
         if (isShowing()) {
             // Refresh the payload on the already-visible overlay.
@@ -183,7 +189,7 @@ object BlockOverlayManager {
             return true
         }
         if (!Settings.canDrawOverlays(context)) return false
-        show(context.applicationContext, blockedPackage, appName, durationSec, reason, isPunishment)
+        show(context.applicationContext, blockedPackage, appName, durationSec, reason, isPunishment, warningVariant)
         return isShowing()
     }
 
@@ -193,7 +199,8 @@ object BlockOverlayManager {
         appName: String,
         durationSec: Int,
         reason: String?,
-        isPunishment: Boolean
+        isPunishment: Boolean,
+        warningVariant: Boolean = false
     ) {
         runOnMain {
             if (overlayView != null) return@runOnMain
@@ -216,7 +223,8 @@ object BlockOverlayManager {
                                 initialDurationSec = durationState.value,
                                 reason = reasonState.value,
                                 isPunishment = punishmentState.value,
-                                mascotRes = R.drawable.mascot_blocked,
+                                mascotRes = if (warningVariant) R.drawable.mascot_warning_transparent
+                                else R.drawable.mascot_blocked,
                                 onExitApp = { exitToHome(appContext) },
                                 onOpenFocusly = { openFocivo(appContext) }
                             )
@@ -448,6 +456,128 @@ object BlockOverlayManager {
     /** True when any block UI (overlay or legacy Activity) is on screen. */
     fun isBlockUiShowing(): Boolean =
         isShowing() || com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing
+
+    // ------------------------------------------------------------------
+    // v1.2.3 (owner 2026-10-16): Stage-1 guard warning as a WARNING variant
+    // of the block overlay, through the TYPE_ACCESSIBILITY_OVERLAY path.
+    //
+    // ROOT CAUSE: AiStudyGuardManager.triggerStage1Warning launched the
+    // warning Activity with a background startActivity — Android 10+
+    // background activity launch (BAL) restrictions silently drop that
+    // launch while the user is inside the offending app, so the warning
+    // never appeared and the first visible guard surface was the stage-2
+    // block. The accessibility overlay layer needs no BAL exemption: it
+    // renders above the offending app exactly when detection works (the
+    // a11y service is connected).
+    //
+    // The warning shares the block overlay UI as a warning variant (lime
+    // accent, warning mascot, warning reason copy) — never a punishment.
+    // ------------------------------------------------------------------
+
+    /** Package of the currently-shown Stage-1 warning overlay, null when none. */
+    private var warningOverlayPackage: String? = null
+
+    /**
+     * Shows the Stage-1 guard warning. Path priority mirrors [intercept]:
+     * accessibility layer → app overlay → legacy warning Activity.
+     * Returns true when any path rendered, so the caller can log a real
+     * Guard Hub failure instead of swallowing it.
+     */
+    fun showWarningOverlay(
+        context: Context,
+        packageName: String,
+        appName: String,
+        durationSec: Int,
+        reason: String
+    ): Boolean {
+        // A real block UI already on screen wins — never downgrade it to a
+        // warning. The warning state (grace timer, hub entry) still applies.
+        if (isShowing()) {
+            warningOverlayPackage = packageName
+            try {
+                com.example.util.AiStudyGuardManager.logGuardActivity(
+                    context, appName, "warning-overlay", "shown", "kept-existing-block-ui"
+                )
+            } catch (_: Exception) { }
+            return true
+        }
+        var shown = false
+        var usedPath = "none"
+        if (AiStudyAccessibilityService.connectedInstance != null) {
+            shown = showViaA11y(packageName, appName, durationSec, reason, isPunishment = false, warningVariant = true)
+            if (shown) usedPath = "a11y"
+        }
+        if (!shown && Settings.canDrawOverlays(context)) {
+            shown = showIfPermitted(context, packageName, appName, durationSec, reason, isPunishment = false, warningVariant = true)
+            if (shown) usedPath = "app"
+        }
+        if (!shown) {
+            shown = launchLegacyWarningActivity(context, packageName, appName, durationSec, reason)
+            if (shown) usedPath = "activity"
+        }
+        if (shown) {
+            warningOverlayPackage = packageName
+            try {
+                com.example.util.AiStudyGuardManager.logGuardActivity(
+                    context, appName, "warning-overlay", "shown", "path=$usedPath"
+                )
+            } catch (_: Exception) { }
+        } else {
+            Log.e(TAG, "Stage-1 warning: every overlay path failed for $packageName")
+        }
+        return shown
+    }
+
+    /**
+     * Dismisses the Stage-1 warning overlay ONLY when it is still the
+     * warning this package showed (stage-3 resolve). Never touches an
+     * overlay that has since become a real block for another package.
+     */
+    fun hideWarningOverlay(context: Context, packageName: String) {
+        val expected = warningOverlayPackage ?: return
+        if (!expected.equals(packageName, ignoreCase = true)) return
+        warningOverlayPackage = null
+        val currentPkg = currentOverlayPackage()
+        if (currentPkg != null && !currentPkg.equals(packageName, ignoreCase = true)) return
+        hide(context)
+        dismissBracesActivity()
+    }
+
+    /** Package currently named by the block/warning overlay, or null when hidden. */
+    private fun currentOverlayPackage(): String? {
+        val a11yPkg = try {
+            AiStudyAccessibilityService.connectedInstance?.a11yBlockOverlayPackage()
+        } catch (_: Exception) { null }
+        if (!a11yPkg.isNullOrBlank()) return a11yPkg
+        val appPkg = blockedPackageState.value
+        return appPkg.ifBlank { null }
+    }
+
+    /** Last-resort warning surface: the legacy warning Activity (may be BAL-dropped). */
+    private fun launchLegacyWarningActivity(
+        context: Context,
+        packageName: String,
+        appName: String,
+        durationSec: Int,
+        reason: String
+    ): Boolean {
+        return try {
+            val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+                context = context,
+                packageName = packageName,
+                appName = appName,
+                durationSec = durationSec,
+                reason = reason,
+                isPunishment = false,
+                guardVariant = com.example.ui.screens.BlockedAppLockActivity.GUARD_VARIANT_WARNING
+            )
+            context.startActivity(intent)
+            true
+        } catch (t: Throwable) {
+            Log.e(TAG, "Stage-1 warning: legacy Activity fallback failed: ${t.message}")
+            false
+        }
+    }
 
     // ------------------------------------------------------------------
     // v1.2.2 (C): Shorts & Reels surface overlay.

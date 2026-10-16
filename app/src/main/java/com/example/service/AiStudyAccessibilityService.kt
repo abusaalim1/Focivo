@@ -203,6 +203,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
     /** True when the accessibility-layer block overlay is on screen. */
     fun isA11yBlockOverlayShowing(): Boolean = a11yBlockView != null
 
+    /**
+     * v1.2.3 (owner 2026-10-16): package currently named by the
+     * accessibility-layer block/warning overlay ("" when hidden). Lets
+     * BlockOverlayManager dismiss exactly the warning it showed without
+     * touching an unrelated block overlay.
+     */
+    fun a11yBlockOverlayPackage(): String = a11yBlockedPackage.value
+
     /** True when the accessibility-layer Shorts overlay is on screen. */
     fun isA11yShortsOverlayShowing(): Boolean = a11yShortsView != null
 
@@ -235,13 +243,20 @@ class AiStudyAccessibilityService : AccessibilityService() {
      * Shows the block overlay on the accessibility layer. Must be called on
      * the main thread (BlockOverlayManager routes here via Handler).
      * Returns true when the overlay is (now) showing.
+     *
+     * v1.2.3 (owner 2026-10-16): [warningVariant] renders the Stage-1 guard
+     * warning through this same window-proof layer (Android 10+ silently
+     * drops the old background startActivity, so the warning never
+     * appeared). Lime accent + warning mascot + warning reason copy — not a
+     * punishment.
      */
     fun showA11yBlockOverlay(
         blockedPackage: String,
         appName: String,
         durationSec: Int = 0,
         reason: String? = null,
-        isPunishment: Boolean = false
+        isPunishment: Boolean = false,
+        warningVariant: Boolean = false
     ): Boolean {
         if (a11yBlockView != null) {
             a11yBlockedPackage.value = blockedPackage
@@ -269,7 +284,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
                             initialDurationSec = a11yDurationSec.value,
                             reason = a11yReason.value,
                             isPunishment = a11yPunishment.value,
-                            mascotRes = com.example.R.drawable.mascot_blocked,
+                            mascotRes = if (warningVariant) com.example.R.drawable.mascot_warning_transparent
+                            else com.example.R.drawable.mascot_blocked,
                             onExitApp = { a11yExitToHome() },
                             onOpenFocusly = { a11yOpenFocivo() }
                         )
@@ -660,6 +676,58 @@ class AiStudyAccessibilityService : AccessibilityService() {
         } catch (_: Exception) { }
     }
 
+    // v1.2.3 (owner 2026-10-16): player evidence is a REAL Guard Hub entry —
+    // unthrottled but meaningful: it is written only when the evidence state
+    // CHANGES (playing <-> not-playing), so the feed shows exactly when the
+    // chain considered a video "playing" without drowning in per-event spam.
+    private var lastYouTubePlayerEvidence: Boolean? = null
+
+    private fun logPlayerEvidence(hasPlayer: Boolean, signals: String) {
+        if (lastYouTubePlayerEvidence == hasPlayer) return
+        lastYouTubePlayerEvidence = hasPlayer
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, "YouTube", "youtube-player-evidence",
+                if (hasPlayer) "seen" else "not-detected", signals
+            )
+        } catch (_: Exception) { }
+    }
+
+    /**
+     * v1.2.3 (owner 2026-10-16): feeds the Guard Hub "Last YouTube
+     * evaluation" card — one glanceable row of what the YouTube chain last
+     * decided (player evidence, title source, p_ent band, verdict, action).
+     */
+    private fun recordYouTubeEval(
+        titleSource: String,
+        title: String,
+        playerEvidence: Boolean = true,
+        pEntBand: String = "",
+        verdict: String = "",
+        action: String = ""
+    ) {
+        try {
+            AiStudyGuardManager.recordYouTubeEvaluation(
+                AiStudyGuardManager.LastYouTubeEvaluation(
+                    ts = System.currentTimeMillis(),
+                    playerEvidence = playerEvidence,
+                    titleSource = titleSource,
+                    title = title.take(60),
+                    pEntBand = pEntBand,
+                    verdict = verdict,
+                    action = action
+                )
+            )
+        } catch (_: Exception) { }
+    }
+
+    /** p_ent band label for the hub card (title bundle: study <= 0.20, block >= threshold). */
+    private fun pEntBandLabel(pEnt: Double, blockThreshold: Double): String = when {
+        pEnt >= blockThreshold -> ">= %.2f entertainment".format(Locale.ROOT, blockThreshold)
+        pEnt <= LocalTitleClassifier.STRONG_STUDY_MAX_P_ENT -> "<= 0.20 study"
+        else -> "0.20-%.2f uncertain".format(Locale.ROOT, blockThreshold)
+    }
+
     @Suppress("DEPRECATION")
     private fun getDisplaySizePx(): Pair<Int, Int> {
         return try {
@@ -999,9 +1067,20 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                 // what the recommendations say.
                                 val (dispW, _) = getDisplaySizePx()
                                 val watchScreen = ShortsSurfaceDetector.hasYouTubeWatchScreen(rootNode)
-                                if (!ShortsSurfaceDetector.isYouTubeVideoPlayerSurface(rootNode, dispW)) {
+                                val hasPlayer = ShortsSurfaceDetector.isYouTubeVideoPlayerSurface(rootNode, dispW)
+                                // v1.2.3 (owner 2026-10-16): player evidence is
+                                // a real, unthrottled hub entry (state-change
+                                // only) — the owner sees exactly when the
+                                // chain considered a video "playing".
+                                logPlayerEvidence(hasPlayer, ShortsSurfaceDetector.debugYouTubeSignals(rootNode))
+                                if (!hasPlayer) {
                                     // v1.1.9 diagnostic
                                     AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-title", "no-player-evidence")
+                                    recordYouTubeEval(
+                                        titleSource = "no-player", title = "",
+                                        playerEvidence = false, verdict = "SKIPPED",
+                                        action = "not evaluated"
+                                    )
                                 } else {
                                     val activeVideo = extractPlayingYouTubeVideo(rootNode, watchScreen)
                                     // v1.2.3 (B3): channel-extraction evidence for the hub.
@@ -1014,7 +1093,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                         )
                                     } catch (_: Exception) { }
                                     if (activeVideo != null && activeVideo.title.isNotBlank() && activeVideo.title.length >= 4) {
-                                        val blocked = processYouTubeVideoTitle(activeVideo.title, activeVideo.channel, activeVideo.metadata)
+                                        val sourceTag = if (watchScreen) "watch-screen" else "miniplayer/shorts"
+                                        val blocked = processYouTubeVideoTitle(activeVideo.title, activeVideo.channel, activeVideo.metadata, sourceTag)
                                         if (blocked) return
                                     } else {
                                         // v1.1.6 fallback: title view-ids not exposed (e.g. fullscreen/custom player).
@@ -1022,11 +1102,15 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                         val fallbackTitle = extractFallbackVideoTitle(rootNode)
                                         if (!fallbackTitle.isNullOrBlank()) {
                                             Log.d(TAG, "[YouTube AI Guard] Primary title extraction missed; using fallback title: '$fallbackTitle'")
-                                            val blocked = processYouTubeVideoTitle(fallbackTitle, null, "fallback_title_scan")
+                                            val blocked = processYouTubeVideoTitle(fallbackTitle, null, "fallback_title_scan", "fallback-scan")
                                             if (blocked) return
                                         } else {
                                             // v1.1.9 diagnostic: nothing title-like on screen.
                                             AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-title", "title-null")
+                                            recordYouTubeEval(
+                                                titleSource = "title-null", title = "",
+                                                verdict = "SKIPPED", action = "allowed (fail-open)"
+                                            )
                                         }
                                     }
                                 }
@@ -1591,7 +1675,23 @@ class AiStudyAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun processYouTubeVideoTitle(title: String, channel: String?, metadata: String?): Boolean {
+    private fun processYouTubeVideoTitle(title: String, channel: String?, metadata: String?, titleSource: String = ""): Boolean {
+        // v1.2.3 (owner 2026-10-16): study-doubt gate FIRST — mirrors the
+        // browser path. A doubt phrasing ("doubt class", "I don't understand
+        // ...", "how is X different from Y") is STUDY and can never block,
+        // before any classifier or knowledge rule sees the title.
+        if (OnDeviceStudyClassifier.isStudyDoubt(title)) {
+            Log.i(TAG, "[YouTube Guard] Study doubt in title — allowing: '$title'")
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, "YouTube", "youtube-doubt", "STUDY", "study-doubt-allow", title
+            )
+            recordYouTubeEval(
+                titleSource = titleSource, title = title,
+                pEntBand = "doubt", verdict = "STUDY", action = "allowed"
+            )
+            return false
+        }
+
         // v1.2.3 (B): the user's channel BLOCKLIST beats everything — an
         // explicitly blocked channel is blocked outright whenever its video
         // plays during study. Same semantics as the app blocklist: immediate,
@@ -1619,6 +1719,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     isPunishment = false
                 )
             }
+            recordYouTubeEval(titleSource = titleSource, title = title, verdict = "NON_STUDY", action = "blocked (channel blocklist)")
             return true
         }
 
@@ -1626,6 +1727,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
         // a channel they explicitly trust is never verdict-scored.
         if (StudyAllowlistManager.isStudyChannel(applicationContext, channel)) {
             AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-allowlist", "STUDY", "allowlisted-channel", title)
+            recordYouTubeEval(titleSource = titleSource, title = title, verdict = "STUDY", action = "allowed (channel allowlist)")
             return false
         }
 
@@ -1661,6 +1763,11 @@ class AiStudyAccessibilityService : AccessibilityService() {
                             applicationContext, "YouTube", "youtube-local", "NON_STUDY",
                             "local-classifier $pEntStr", title
                         )
+                        recordYouTubeEval(
+                            titleSource = titleSource, title = title,
+                            pEntBand = pEntBandLabel(localPEnt, localClassifier.blockThreshold),
+                            verdict = "NON_STUDY", action = "stage-1 warning"
+                        )
                         val now = System.currentTimeMillis()
                         if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
                             lastYouTubeAiInterceptTimeMs = now
@@ -1688,6 +1795,11 @@ class AiStudyAccessibilityService : AccessibilityService() {
                             applicationContext, "YouTube", "youtube-local", "STUDY",
                             "local-classifier $pEntStr", title
                         )
+                        recordYouTubeEval(
+                            titleSource = titleSource, title = title,
+                            pEntBand = pEntBandLabel(localPEnt, localClassifier.blockThreshold),
+                            verdict = "STUDY", action = "allowed"
+                        )
                         return false
                     }
                     LocalTitleClassifier.TitleDecision.UNCERTAIN -> {
@@ -1711,6 +1823,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 Log.d(TAG, "[StudyGuardKnowledge] Study video allowed: '$title' ($channel) [${detailed.evidence}]")
                 // v1.1.9 diagnostic
                 AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-knowledge", "STUDY", detailed.evidence, title)
+                recordYouTubeEval(titleSource = titleSource, title = title, verdict = "STUDY", action = "allowed")
                 return false
             }
             StudyGuardKnowledge.Verdict.NON_STUDY -> {
@@ -1741,6 +1854,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                             reason = "Non-study content detected on YouTube: \"$title\" [${detailed.evidence}]"
                         )
                     }
+                    recordYouTubeEval(titleSource = titleSource, title = title, verdict = "NON_STUDY", action = "stage-1 warning")
                     return true
                 }
             }
@@ -1787,6 +1901,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     reason = quickVerdict.reason
                 )
             }
+            recordYouTubeEval(titleSource = titleSource, title = title, verdict = "NON_STUDY", action = "stage-1 warning")
             return true
         } else {
             // v1.1.9 diagnostic
@@ -1805,6 +1920,10 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     AiStudyGuardManager.logGuardActivity(
                         applicationContext, "YouTube", "youtube-gemini", "STUDY",
                         "AI check unavailable — allowed", title
+                    )
+                    recordYouTubeEval(
+                        titleSource = titleSource, title = title,
+                        verdict = "STUDY", action = "allowed (fail-open: AI unavailable)"
                     )
                     return@launch
                 }
@@ -1834,13 +1953,25 @@ class AiStudyAccessibilityService : AccessibilityService() {
                             reason = geminiVerdict.reason
                         )
                     }
+                    recordYouTubeEval(
+                        titleSource = titleSource, title = title,
+                        verdict = "NON_STUDY", action = "stage-1 warning"
+                    )
                 } else {
                     // v1.1.9 diagnostic — v1.2.2: honest source label.
                     val allowStage = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) "youtube-gemini" else "youtube-quick"
                     val allowReason = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) "gemini-allow" else "quick-allow"
                     AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", allowStage, "STUDY", allowReason, title)
+                    recordYouTubeEval(
+                        titleSource = titleSource, title = title,
+                        verdict = "STUDY", action = "allowed"
+                    )
                 }
             }
+            recordYouTubeEval(
+                titleSource = titleSource, title = title,
+                verdict = "UNCERTAIN", action = "gemini check pending"
+            )
             return false
         }
     }
@@ -1878,12 +2009,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
     /**
      * v1.2.3: scoped, multi-pattern extraction.
      *
-     * SCOPE: on the dedicated watch screen (or a Shorts player — the whole
-     * screen is player context) the full tree is searched. Otherwise
-     * (miniplayer floating over a browse surface) ONLY the miniplayer subtree
-     * may contribute a title/channel — a home-feed recommendation card must
-     * never be verdict-scored as "the playing video" (owner false-block
-     * report 2026-10-16).
+     * SCOPE (v1.2.3, owner 2026-10-16): on the dedicated watch screen the
+     * search is constrained to the PLAYER subtree (the outermost
+     * watch/player fragment node) — never the full tree, whose
+     * first-match-wins pass was grabbing recommendation cards below the
+     * player. Recommendation containers are additionally excluded in every
+     * pass as a safety net. On non-watch surfaces (miniplayer floating over
+     * a browse surface, Shorts player) the previous scoping stands: only the
+     * miniplayer subtree, or the Shorts player screen, may contribute.
      *
      * CHANNEL (priority): viewId patterns → Subscribe-button sibling →
      * description patterns (" by " split, @handle). The matched source is
@@ -1891,7 +2024,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
      */
     private fun extractPlayingYouTubeVideo(rootNode: AccessibilityNodeInfo, watchScreen: Boolean): YouTubeActiveVideoInfo? {
         val scopeRoot: AccessibilityNodeInfo = if (watchScreen) {
-            rootNode
+            findWatchPlayerSubtree(rootNode) ?: rootNode
         } else {
             val mini = findMiniplayerRoot(rootNode)
             if (mini != null) {
@@ -1920,6 +2053,10 @@ class AiStudyAccessibilityService : AccessibilityService() {
         fun traversePass1(node: AccessibilityNodeInfo, depth: Int) {
             if (depth > 12 || (foundTitle != null && foundChannel != null)) return
             val viewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
+            // v1.2.3 (owner 2026-10-16): recommendation containers can never
+            // contribute the playing title — first-match-wins was verdict-
+            // scoring rec cards below the player on the watch screen.
+            if (isRecommendationsContainer(viewId)) return
             val text = node.text?.toString()?.trim()
             val desc = node.contentDescription?.toString()?.trim()
 
@@ -1960,6 +2097,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
         if (foundChannel == null) {
             fun traversePass2(node: AccessibilityNodeInfo, depth: Int) {
                 if (depth > 12 || foundChannel != null) return
+                // v1.2.3: recommendation containers are excluded here too.
+                val p2ViewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
+                if (isRecommendationsContainer(p2ViewId)) return
                 val text = node.text?.toString()?.trim()?.lowercase(Locale.ROOT) ?: ""
                 val desc = node.contentDescription?.toString()?.trim()?.lowercase(Locale.ROOT) ?: ""
                 val isSubscribe = (text == "subscribe" || desc == "subscribe")
@@ -1998,6 +2138,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
         if (foundTitle == null || foundChannel == null) {
             fun traversePass3(node: AccessibilityNodeInfo, depth: Int) {
                 if (depth > 12) return
+                // v1.2.3: recommendation containers are excluded here too.
+                val p3ViewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
+                if (isRecommendationsContainer(p3ViewId)) return
                 val desc = node.contentDescription?.toString()?.trim()
                 if (!desc.isNullOrBlank() && desc.length >= 10) {
                     val lowerDesc = desc.lowercase(Locale.ROOT)
@@ -2057,6 +2200,51 @@ class AiStudyAccessibilityService : AccessibilityService() {
         } else {
             null
         }
+    }
+
+    /**
+     * v1.2.3 (owner 2026-10-16): viewId fragments of recommendation / browse
+     * containers whose subtrees must NEVER contribute the playing-video
+     * title. Kept tight on purpose — the playing video's own metadata
+     * container must not match.
+     */
+    private fun isRecommendationsContainer(viewId: String): Boolean {
+        return viewId.contains("recommend") || viewId.contains("related_video") ||
+                viewId.contains("watch_next") || viewId.contains("up_next") ||
+                viewId.contains("compact_video")
+    }
+
+    /**
+     * v1.2.3 (owner 2026-10-16): finds the outermost watch/player fragment
+     * node — the playing-video context on the watch screen. Pre-order DFS
+     * returns the shallowest match, so a full watch-page container wins
+     * over the bare video surface inside it (the title lives next to the
+     * player, not inside the surface). Null when no fragment id is exposed.
+     */
+    private fun findWatchPlayerSubtree(rootNode: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        var result: AccessibilityNodeInfo? = null
+        fun traverse(node: AccessibilityNodeInfo, depth: Int) {
+            if (result != null || depth > 10) return
+            val viewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
+            if (viewId.contains("watch_fragment") || viewId.contains("player_fragment") ||
+                viewId.contains("watch_player") || viewId.contains("watch_while") ||
+                viewId.contains("miniplayer") || viewId.contains("mini_player")) {
+                result = node
+                return
+            }
+            val count = node.childCount
+            for (i in 0 until count) {
+                val child = node.getChild(i) ?: continue
+                traverse(child, depth + 1)
+                // NOTE: do not recycle children here — the found subtree root
+                // must stay usable by the caller.
+                if (result == null) {
+                    try { child.recycle() } catch (_: Exception) {}
+                }
+            }
+        }
+        traverse(rootNode, 0)
+        return result
     }
 
     /** Finds the miniplayer subtree root (viewId contains miniplayer/watch_while). */

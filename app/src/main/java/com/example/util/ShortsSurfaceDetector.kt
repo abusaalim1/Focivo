@@ -244,7 +244,16 @@ object ShortsSurfaceDetector {
         fun traverse(node: AccessibilityNodeInfo, depth: Int) {
             if (found || depth > 12) return
             val viewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
-            if (YT_WATCH_GENERIC_IDS.any { viewId.contains(it) }) {
+            val cls = try { node.className?.toString()?.lowercase(Locale.ROOT) } catch (_: Exception) { null } ?: ""
+            // v1.2.3 (owner 2026-10-16): generalized player evidence. Beyond
+            // the hardcoded generic ids, ANY node whose class name contains
+            // "player"/"video" AND whose bounds are >= 55% of the display
+            // width counts as player evidence — OEM/app versions rename
+            // viewIds freely, but a large player-shaped surface is stable.
+            // The width gate keeps muted feed-preview cards from counting.
+            val looksLikePlayer = YT_WATCH_GENERIC_IDS.any { viewId.contains(it) } ||
+                    cls.contains("player") || cls.contains("video")
+            if (looksLikePlayer) {
                 try {
                     node.getBoundsInScreen(rect)
                     if (rect.width() >= minW) found = true
