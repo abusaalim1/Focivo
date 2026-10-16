@@ -172,7 +172,7 @@ fun FloatingNavigation(
         ) {
             // Coordinate space for the liquid pill.
             Box(
-                modifier = Modifier.onGloballyPositioned { navOriginX = it.positionInRoot().x }
+                modifier = Modifier.onGloballyPositioned { navOriginX = it.boundsInRoot().left }
             ) {
                 // Single liquid pill drawn BEHIND the tabs (first child = back).
                 // It has no click handling, so tabs on top receive all touches.
@@ -218,8 +218,8 @@ fun FloatingNavigation(
                                     scaleY = scale
                                 }
                                 .onGloballyPositioned { coords ->
-                                    val pos = coords.positionInRoot()
-                                    tabLayout[tab] = pos.x to coords.size.width.toFloat()
+                                    val pos = coords.boundsInRoot().left
+                                    tabLayout[tab] = pos to coords.size.width.toFloat()
                                 }
                                 .clickable(
                                     interactionSource = interactionSource,

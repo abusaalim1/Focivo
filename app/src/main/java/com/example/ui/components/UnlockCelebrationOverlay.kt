@@ -28,7 +28,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -576,7 +575,7 @@ fun rememberNewlyUnlockedIds(
     seenKey: String? = null
 ): UnlockTracker {
     val context = LocalContext.current
-    val seenIds = remember(seenKey) { mutableStateSetOf<String>() }
+    val seenIds = remember(seenKey) { mutableSetOf<String>() }
     var pending by remember(seenKey) { mutableStateOf(listOf<String>()) }
     var seeded by remember(seenKey) { mutableStateOf(false) }
 
