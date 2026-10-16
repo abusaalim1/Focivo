@@ -1,4 +1,4 @@
-name: TMP Full Unit Tests (delete after verify)
+name: TMP Record Log Capture (delete after verify)
 
 on:
   push:
@@ -24,9 +24,8 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Run FULL unit test suite
-        run: gradle :app:testDebugUnitTest --rerun-tasks --no-configuration-cache --stacktrace
-        continue-on-error: true
+      - name: Run recordRoborazziDebug with full log capture
+        run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.v123.*" --rerun-tasks --no-configuration-cache --stacktrace > /tmp/roborazzi.log 2>&1; echo "EXIT=$?" >> /tmp/roborazzi.log; tail -100 /tmp/roborazzi.log
 
       - name: Dump test failure stacks
         if: always()
@@ -36,10 +35,10 @@ jobs:
         if: always()
         run: find app/src/test/screenshots/v123 -type f 2>/dev/null | head -20; find app/src/test/screenshots/v123 -name '*.png' 2>/dev/null | wc -l
 
-      - name: Upload test results
+      - name: Upload gradle log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tmp-test-results
-          path: app/build/test-results/testDebugUnitTest/
+          name: tmp-roborazzi-log
+          path: /tmp/roborazzi.log
           if-no-files-found: warn
