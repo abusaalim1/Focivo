@@ -1407,12 +1407,12 @@ class AiStudyAccessibilityService : AccessibilityService() {
         // v1.1.8: curated offline knowledge first — instant (<1ms), zero network.
         // v1.2.3 (Task 6): on-device title classifier is the FIRST title judge,
         // ahead of the knowledge pack. Fully offline (no key, no network,
-        // <1ms): TF-IDF + logistic regression bundle (assets). Held-out 99.5%
-        // acc with ZERO false-blocks at p_ent >= 0.60.
-        //   p_ent >= 0.60 -> ENTERTAINMENT -> same discipline flow as a
+        // <1ms): TF-IDF + logistic regression bundle (assets, v2: 14,744
+        // terms). Held-out 99.71% acc with ZERO false-blocks at p_ent >= 0.65.
+        //   p_ent >= 0.65 -> ENTERTAINMENT -> same discipline flow as a
         //                   high-confidence knowledge NON_STUDY.
         //   p_ent <= 0.20 -> STRONG_STUDY -> allow locally (zero entertainment
-        //                   titles at/below 0.20 in the 2191-title corpus).
+        //                   titles at/below 0.20 in the 5233-title corpus).
         //   middle        -> UNCERTAIN -> fall through to the existing
         //                   knowledge -> quick -> Gemini chain below (Gemini
         //                   arbitrates when a key exists; no key -> the

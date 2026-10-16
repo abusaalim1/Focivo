@@ -12,22 +12,25 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Focivo on-device title classifier (v1, Task 6).
+ * Focivo on-device title classifier (v2, Task 6).
  *
  * A fully offline study-vs-entertainment judge for extracted YouTube video
  * titles: TF-IDF (word 1-2 grams + char_wb 3-5 grams) + logistic regression,
- * exported as a 360 KB JSON bundle (assets/classifier_bundle.json).
+ * exported as a ~418 KB JSON bundle (assets/classifier_bundle.json).
  * No API key, no network, no permissions. Typical title scores in <1 ms.
  *
- * Trained metrics (see focivo-local-ai/report.md): held-out 99.5% accuracy
- * with ZERO false-blocks at p_entertainment >= 0.60; tricky set 98.9%.
+ * Trained metrics (v2, Round 2 English expansion, 5,100 titles): held-out
+ * 99.71% accuracy with ZERO false-blocks at p_entertainment >= 0.65;
+ * English-entertainment recall 99.37%; tricky set ~91%.
  *
- * Verdict bands (data-justified on the 2191-title train+tricky corpus):
- *   p_ent >= BLOCK_THRESHOLD (0.60) -> ENTERTAINMENT (block candidate;
- *       zero false-blocks on the 420-title held-out set)
+ * Verdict bands (the block threshold is read from the bundle itself so a
+ * retrain never needs a code change; the strong-study band was validated on
+ * the 5233-title v2 train+tricky corpus):
+ *   p_ent >= blockThreshold (0.65) -> ENTERTAINMENT (block candidate;
+ *       zero false-blocks on the 1,020-title held-out set)
  *   p_ent <= STRONG_STUDY_MAX_P_ENT (0.20) -> STRONG_STUDY (allow locally;
  *       zero entertainment titles at or below 0.20 in the whole corpus,
- *       97.7% of study titles decided without a network call)
+ *       98.7% of study titles decided without a network call)
  *   in between -> UNCERTAIN (caller falls through to the existing
  *       knowledge -> quick -> Gemini chain; Gemini arbitrates when a key
  *       exists, otherwise the existing fail-open rules apply)
@@ -56,15 +59,15 @@ object LocalTitleClassifier {
     private const val TAG = "LocalTitleClassifier"
     private const val ASSET_PATH = "classifier_bundle.json"
 
-    /** Block iff p_entertainment >= this (bundle threshold; zero held-out false-blocks). */
-    const val BLOCK_THRESHOLD = 0.60
-
     /**
      * Allow locally iff p_entertainment <= this. Zero entertainment titles at
-     * or below 0.20 across the 2191-title train+tricky corpus, so the
+     * or below 0.20 across the 5233-title v2 train+tricky corpus, so the
      * allow-side is fail-safe by construction.
      */
     const val STRONG_STUDY_MAX_P_ENT = 0.20
+
+    /** Bundle version this code was verified against (v2). */
+    const val EXPECTED_BUNDLE_VERSION = 2
 
     enum class TitleDecision { ENTERTAINMENT, STRONG_STUDY, UNCERTAIN }
 
@@ -75,7 +78,13 @@ object LocalTitleClassifier {
      * [loadFromJson]; unit-testable on its own.
      */
     class Classifier internal constructor(
+        val version: Int,
         val intercept: Double,
+        /**
+         * Block threshold, read from the bundle's own "threshold" field
+         * (v2: 0.65) so a retrained bundle never needs a code change.
+         */
+        val blockThreshold: Double,
         private val wordTerms: Map<String, TermEntry>,
         private val charTerms: Map<String, TermEntry>
     ) {
@@ -135,7 +144,7 @@ object LocalTitleClassifier {
 
         /** Band decision for a p_entertainment value. */
         fun decide(pEntertainment: Double): TitleDecision = when {
-            pEntertainment >= BLOCK_THRESHOLD -> TitleDecision.ENTERTAINMENT
+            pEntertainment >= blockThreshold -> TitleDecision.ENTERTAINMENT
             pEntertainment <= STRONG_STUDY_MAX_P_ENT -> TitleDecision.STRONG_STUDY
             else -> TitleDecision.UNCERTAIN
         }
@@ -245,7 +254,9 @@ object LocalTitleClassifier {
      */
     fun loadFromJson(json: String): Classifier {
         val root = kotlinx.serialization.json.Json.parseToJsonElement(json).jsonObject
+        val version = root.getValue("version").jsonPrimitive.int
         val intercept = root.getValue("intercept").jsonPrimitive.double
+        val blockThreshold = root.getValue("threshold").jsonPrimitive.double
         val wordTerms = HashMap<String, TermEntry>(9000)
         val charTerms = HashMap<String, TermEntry>(9000)
         for (row in root.getValue("terms").jsonArray) {
@@ -255,7 +266,7 @@ object LocalTitleClassifier {
             val entry = TermEntry(isWord, a[2].jsonPrimitive.double, a[3].jsonPrimitive.double)
             if (isWord) wordTerms[term] = entry else charTerms[term] = entry
         }
-        return Classifier(intercept, wordTerms, charTerms)
+        return Classifier(version, intercept, blockThreshold, wordTerms, charTerms)
     }
 
     @Volatile
@@ -281,7 +292,7 @@ object LocalTitleClassifier {
                     .bufferedReader().use { it.readText() }
                 loadFromJson(json).also {
                     cached = it
-                    Log.i(TAG, "bundle loaded")
+                    Log.i(TAG, "bundle loaded: v${it.version} threshold=${it.blockThreshold}")
                 }
             } catch (t: Throwable) {
                 loadFailed = true

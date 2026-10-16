@@ -20,33 +20,33 @@ class LocalTitleClassifierTest {
     companion object {
         private lateinit var clf: LocalTitleClassifier.Classifier
 
-        // (title, Python reference p_entertainment)
+        // (title, Python reference p_entertainment — v2 bundle)
         private val samples = listOf(
-            "Motion Chapter 1 One Shot | Class 11 Physics" to 0.002212749084,
-            "ye topic samajh nahi aa raha sir physics wala" to 0.089958887574,
-            "गति अध्याय कक्षा 9 एक शॉट" to 0.129402635132,
-            "learn english the fun way | tenses game" to 0.145044187610,
-            "study with me 10 hours live" to 0.179323355658,
-            "physics fails compilation | funny experiments" to 0.924302158552,
-            "exam memes | students relatable" to 0.849016180908,
-            "tum hi ho reprise | official music video" to 0.988314836320,
-            "bgmi live | rank push" to 0.975391793749,
-            "pushpa 2 trailer | official" to 0.990073243060,
-            "day in my life vlog" to 0.961346785916,
-            "funny comedy video 2026" to 0.997820569026,
-            "meme se yaad karo periodic table" to 0.174200941937,
-            "teacher vs students funny video" to 0.980044336741,
-            "ncert solutions class 10 maths chapter 2" to 0.002293815860,
-            "cricket highlights | ind vs pak" to 0.961887178695,
-            "how i scored 99 percent in class 10" to 0.018986516326,
-            "stand up comedy | zakir khan" to 0.968341381335,
-            "doubt: why is current scalar not vector" to 0.356160505256,
-            "doraemon new episode hindi" to 0.955590137110,
-            // Known ambiguous case from the report: the single tricky-set
-            // false-block at T=0.60 ("genuinely ambiguous even for a human").
-            // Lands ENTERTAINMENT; the Guard Hub "youtube-local" entry with
-            // p_ent=0.793 makes it diagnosable on device.
-            "10 hour study challenge | no talking" to 0.792883885098
+            "Motion Chapter 1 One Shot | Class 11 Physics" to 0.001921877455,
+            "ye topic samajh nahi aa raha sir physics wala" to 0.071401813731,
+            "गति अध्याय कक्षा 9 एक शॉट" to 0.093689594270,
+            "learn english the fun way | tenses game" to 0.151370155178,
+            "study with me 10 hours live" to 0.127892906322,
+            "physics fails compilation | funny experiments" to 0.848858639645,
+            "exam memes | students relatable" to 0.752694333382,
+            "tum hi ho reprise | official music video" to 0.991784916179,
+            "bgmi live | rank push" to 0.985973543278,
+            "pushpa 2 trailer | official" to 0.998167216375,
+            "day in my life vlog" to 0.986203415987,
+            "funny comedy video 2026" to 0.999305773761,
+            "meme se yaad karo periodic table" to 0.126073454746,
+            "teacher vs students funny video" to 0.971731556299,
+            "ncert solutions class 10 maths chapter 2" to 0.000748310773,
+            "cricket highlights | ind vs pak" to 0.984977142235,
+            "how i scored 99 percent in class 10" to 0.015143915568,
+            "stand up comedy | zakir khan" to 0.986259213552,
+            "doubt: why is current scalar not vector" to 0.086833189521,
+            "doraemon new episode hindi" to 0.995814617874,
+            // Known ambiguous case: lands ENTERTAINMENT at the v2 threshold
+            // (the retrain trades a few ambiguous study-adjacent titles for
+            // higher entertainment recall). The Guard Hub "youtube-local"
+            // entry with p_ent=0.857 makes it diagnosable on device.
+            "10 hour study challenge | no talking" to 0.856867757249
         )
 
         @BeforeClass
@@ -70,9 +70,18 @@ class LocalTitleClassifierTest {
     }
 
     @Test
+    fun bundleVersionAndThresholdAreV2() {
+        assertEquals(
+            LocalTitleClassifier.EXPECTED_BUNDLE_VERSION,
+            clf.version
+        )
+        assertEquals(0.65, clf.blockThreshold, 1e-12)
+    }
+
+    @Test
     fun blockDecisionsMatchSpecThreshold() {
         for ((title, pEnt) in samples) {
-            val expectedBlock = pEnt >= 0.60
+            val expectedBlock = pEnt >= 0.65
             val actualBlock = clf.decide(clf.pEntertainment(title)) ==
                 LocalTitleClassifier.TitleDecision.ENTERTAINMENT
             assertEquals("block decision mismatch for '$title'", expectedBlock, actualBlock)
@@ -81,10 +90,12 @@ class LocalTitleClassifierTest {
 
     @Test
     fun uncertainMiddleBandTitleFallsThrough() {
-        // 0.20 < 0.356 < 0.60 -> UNCERTAIN: falls through to the existing
+        // 0.20 < 0.471 < 0.65 -> UNCERTAIN: falls through to the existing
         // knowledge -> quick -> Gemini chain (Gemini arbitrates when a key
-        // exists; no key -> existing fail-open rules).
-        val pEnt = clf.pEntertainment("doubt: why is current scalar not vector")
+        // exists; no key -> existing fail-open rules). This is entertainment
+        // the local judge deliberately does NOT block on its own.
+        val pEnt = clf.pEntertainment("the periodic table of memes")
+        assertEquals(0.470656433804, pEnt, 1e-6)
         assertEquals(
             LocalTitleClassifier.TitleDecision.UNCERTAIN,
             clf.decide(pEnt)
@@ -93,9 +104,9 @@ class LocalTitleClassifierTest {
 
     @Test
     fun knownAmbiguousTitleIsDocumented() {
-        // Report's single tricky-set false-block at T=0.60. It lands
-        // ENTERTAINMENT by the spec threshold; the Guard Hub "youtube-local"
-        // entry (p_ent=0.793) makes it diagnosable on device.
+        // Genuinely ambiguous even for a human ("challenge" reads as
+        // entertainment). Lands ENTERTAINMENT at the v2 threshold; the Guard
+        // Hub "youtube-local" entry (p_ent=0.857) makes it diagnosable.
         val pEnt = clf.pEntertainment("10 hour study challenge | no talking")
         assertEquals(
             LocalTitleClassifier.TitleDecision.ENTERTAINMENT,
