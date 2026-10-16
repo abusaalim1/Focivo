@@ -180,7 +180,8 @@ class V123NavPillHotfixTest {
                 }
             }
         }
-        composeTestRule.waitForIdle()
+        // No waitForIdle(): the overlay runs an infinite pulse animation by
+        // design, so idleness never arrives — capture the frame directly.
         // The overlay is a dark full-screen transition with a 300dp ring —
         // it must never paint a giant white capsule or full-height lime bar.
         composeTestRule.onRoot()
