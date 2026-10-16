@@ -88,9 +88,8 @@ class V123RedesignScreenshotsTest {
     )
 
     private fun fakePriorities() = listOf(
-        TaskEntity(title = "Physics: Motion numericals", isCompleted = false),
-        TaskEntity(title = "Maths: Quadratic equations", isCompleted = true),
-        TaskEntity(title = "Revise chemistry notes", isCompleted = false)
+        TaskEntity(id = 1L, title = "Physics: Units & Measurement", category = "Deep Work", priority = 1, isTopPriority = true),
+        TaskEntity(id = 2L, title = "Maths: Quadratic Equations", category = "Deep Work", priority = 1, isTopPriority = true)
     )
 
     private fun fakeSessions() = listOf(
@@ -123,6 +122,12 @@ class V123RedesignScreenshotsTest {
         themed(dark, content)
         composeTestRule.waitForIdle()
         composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v123/$name.png")
+    }
+
+    // ── Smoke test: theme setup ───────────────────────────────────────────
+    @Test
+    fun v123_redesign_smoke() = shot(true, "v123_redesign_smoke") {
+        Box(modifier = Modifier.fillMaxSize())
     }
 
     // ── Home ──────────────────────────────────────────────────────────────
