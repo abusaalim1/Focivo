@@ -1,4 +1,4 @@
-name: TMP Roborazzi Record (delete after verify)
+name: TMP Full Unit Tests (delete after verify)
 
 on:
   push:
@@ -24,8 +24,9 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Run recordRoborazziDebug (exact screenshots-workflow task)
-        run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.v123.*" --rerun-tasks --no-configuration-cache --stacktrace
+      - name: Run FULL unit test suite
+        run: gradle :app:testDebugUnitTest --rerun-tasks --no-configuration-cache --stacktrace
+        continue-on-error: true
 
       - name: Dump test failure stacks
         if: always()
