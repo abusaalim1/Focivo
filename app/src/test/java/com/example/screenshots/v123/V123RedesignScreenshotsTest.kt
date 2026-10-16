@@ -3,6 +3,7 @@ package com.example.screenshots.v123
 import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -10,12 +11,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.LeaderboardUser
 import com.example.data.model.FocusSessionEntity
 import com.example.data.model.TaskEntity
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.AiStudyWarningDialog
+import com.example.ui.components.BuddyMascot
 import com.example.ui.components.CustomizeTimerSheet
 import com.example.ui.components.DeepFocusSettingsSheet
 import com.example.ui.components.SupportLockZenSheet
@@ -426,5 +429,28 @@ class V123RedesignScreenshotsTest {
             onStartNewSession = {},
             onDeleteSession = {}
         )
+    }
+
+    // ── Mascot idle breathing: two phases of the ~3s loop ──────────────────
+    // The loop is transform-only (layout frozen); freezing the test clock at
+    // t=0 and t=1500ms captures the rest and peak frames as proof.
+    @Test
+    fun v123_mascot_breathe_phase_a() {
+        initAll()
+        composeTestRule.mainClock.autoAdvance = false
+        themed(true) { BuddyMascot(modifier = Modifier.width(220.dp)) }
+        composeTestRule.mainClock.advanceTimeBy(0)
+        composeTestRule.waitForIdle()
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v123/v123_mascot_breathe_phase_a.png")
+    }
+
+    @Test
+    fun v123_mascot_breathe_phase_b() {
+        initAll()
+        composeTestRule.mainClock.autoAdvance = false
+        themed(true) { BuddyMascot(modifier = Modifier.width(220.dp)) }
+        composeTestRule.mainClock.advanceTimeBy(1500)
+        composeTestRule.waitForIdle()
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v123/v123_mascot_breathe_phase_b.png")
     }
 }

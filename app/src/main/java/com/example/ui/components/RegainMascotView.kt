@@ -138,7 +138,10 @@ fun RegainMascotView(
         ) {
             com.example.ui.components.BuddyMascot(
                 modifier = Modifier.fillMaxSize(),
-                pose = com.example.util.MascotPose.STUDY
+                pose = com.example.util.MascotPose.STUDY,
+                // The wrapper Box above already runs the breathing loop;
+                // the inner buddy stays static so they don't compound.
+                idleAnimation = false
             )
         }
         return
