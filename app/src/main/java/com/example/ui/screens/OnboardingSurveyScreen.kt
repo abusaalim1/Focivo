@@ -380,13 +380,7 @@ fun OnboardingSurveyScreen(
     val totalSteps = questions.size
 
     val T = focivoTokens()
-    val bgGradient = Brush.verticalGradient(
-        colors = listOf(
-            T.bg,
-            T.bg
-        )
-        )
-    }
+    val bgGradient = Brush.verticalGradient(colors = listOf(T.bg, T.bg))
 
     Surface(
         modifier = Modifier

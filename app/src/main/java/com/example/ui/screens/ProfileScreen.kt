@@ -146,7 +146,7 @@ fun ProfileAvatarImage(
             text = monogram,
             style = MaterialTheme.typography.titleMedium.copy(
                 fontFamily = PoppinsFontFamily,
-                color = T.text,
+                color = focivoTokens().text,
                 fontWeight = FontWeight.Bold,
                 fontSize = textSizeSp.sp
             )
@@ -1580,7 +1580,7 @@ private fun BadgeGridItem(
                                 .offset(x = 4.dp, y = 4.dp)
                                 .size(20.dp)
                                 .clip(CircleShape)
-                                .background(T.surface2)
+                                .background(focivoTokens().surface2)
                                 .border(1.dp, cardBorder, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1598,14 +1598,14 @@ private fun BadgeGridItem(
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(
-                                if (badge.isUnlocked) T.softAccent else T.surface2
+                                if (badge.isUnlocked) focivoTokens().softAccent else focivoTokens().surface2
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = if (badge.isUnlocked) badge.icon else Icons.Default.Lock,
                             contentDescription = badge.title,
-                            tint = if (badge.isUnlocked) T.accentText else textSecondary,
+                            tint = if (badge.isUnlocked) focivoTokens().accentText else textSecondary,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1694,8 +1694,8 @@ private fun AchievementDetailDialog(
                             .fillMaxWidth()
                             .height(8.dp)
                             .clip(RoundedCornerShape(4.dp)),
-                        color = T.accent,
-                        trackColor = T.line
+                        color = focivoTokens().accent,
+                        trackColor = focivoTokens().line
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                 }
@@ -1704,7 +1704,7 @@ private fun AchievementDetailDialog(
                     fontFamily = PoppinsFontFamily,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (badge.isUnlocked) T.accentText else textSecondary
+                    color = if (badge.isUnlocked) focivoTokens().accentText else textSecondary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -1712,12 +1712,12 @@ private fun AchievementDetailDialog(
                     fontFamily = PoppinsFontFamily,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (badge.isUnlocked) T.accentText else textSecondary,
+                    color = if (badge.isUnlocked) focivoTokens().accentText else textSecondary,
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .background(
-                            if (badge.isUnlocked) T.accent.copy(alpha = 0.16f)
-                            else T.surface2
+                            if (badge.isUnlocked) focivoTokens().accent.copy(alpha = 0.16f)
+                            else focivoTokens().surface2
                         )
                         .padding(horizontal = 12.dp, vertical = 5.dp)
                 )

@@ -610,7 +610,7 @@ private fun MetricGlassCard(
                     text = title.uppercase(),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontFamily = AppleLinearFontFamily,
-                        color = T.muted,
+                        color = focivoTokens().muted,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 9.5.sp,
                         letterSpacing = 0.5.sp
@@ -629,7 +629,7 @@ private fun MetricGlassCard(
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontFamily = AppleLinearFontFamily,
                     fontWeight = FontWeight.Bold,
-                    color = T.text,
+                    color = focivoTokens().text,
                     fontSize = 18.sp,
                     letterSpacing = (-0.3).sp
                 )
@@ -638,7 +638,7 @@ private fun MetricGlassCard(
                 text = subValue,
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontFamily = AppleLinearFontFamily,
-                    color = T.muted,
+                    color = focivoTokens().muted,
                     fontSize = 10.5.sp
                 )
             )
@@ -753,7 +753,7 @@ private fun DailyBarMiniVisualizer(
                             .width(16.dp)
                             .fillMaxHeight(0.65f)
                             .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                            .background(T.surface2),
+                            .background(focivoTokens().surface2),
                         contentAlignment = Alignment.BottomCenter
                     ) {
                         Box(
@@ -772,7 +772,7 @@ private fun DailyBarMiniVisualizer(
                         text = stat.dayName.take(3),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontFamily = AppleLinearFontFamily,
-                            color = if (isBest) T.text else textSecondary,
+                            color = if (isBest) focivoTokens().text else textSecondary,
                             fontWeight = if (isBest) FontWeight.Bold else FontWeight.Medium,
                             fontSize = 10.sp
                         )
@@ -866,7 +866,7 @@ private fun SubjectBreakdownSection(
                             .fillMaxWidth()
                             .height(6.dp)
                             .clip(CircleShape)
-                            .background(T.surface2)
+                            .background(focivoTokens().surface2)
                     ) {
                         Box(
                             modifier = Modifier
@@ -897,8 +897,8 @@ private fun SessionItemRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(T.surface2)
-            .border(1.dp, T.line, RoundedCornerShape(12.dp))
+            .background(focivoTokens().surface2)
+            .border(1.dp, focivoTokens().line, RoundedCornerShape(12.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         Row(
@@ -957,7 +957,7 @@ private fun SessionItemRow(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(T.accent.copy(alpha = 0.15f))
+                    .background(focivoTokens().accent.copy(alpha = 0.15f))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(

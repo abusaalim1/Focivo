@@ -1115,11 +1115,11 @@ fun GoogleAccountSelectDialog(
     var inputError by remember { mutableStateOf<String?>(null) }
 
     val isDark = isAppInDarkTheme()
-    val dialogBg = T.surface
-    val dialogFieldBg = T.surface2
-    val dialogTextColor = T.text
-    val dialogSecondaryText = T.muted
-    val dialogBorder = T.accent.copy(alpha = 0.2f)
+    val dialogBg = focivoTokens().surface
+    val dialogFieldBg = focivoTokens().surface2
+    val dialogTextColor = focivoTokens().text
+    val dialogSecondaryText = focivoTokens().muted
+    val dialogBorder = focivoTokens().accent.copy(alpha = 0.2f)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1187,11 +1187,11 @@ fun GoogleAccountSelectDialog(
                         googleName = it
                         inputError = null
                     },
-                    placeholder = { Text("e.g. Tommy Smith", fontFamily = PoppinsFontFamily, fontSize = 13.5.sp, color = T.muted) },
+                    placeholder = { Text("e.g. Tommy Smith", fontFamily = PoppinsFontFamily, fontSize = 13.5.sp, color = focivoTokens().muted) },
                     singleLine = true,
                     shape = CircleShape,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = T.accent,
+                        focusedBorderColor = focivoTokens().accent,
                         unfocusedBorderColor = dialogBorder,
                         focusedContainerColor = dialogFieldBg,
                         unfocusedContainerColor = dialogFieldBg,
@@ -1215,11 +1215,11 @@ fun GoogleAccountSelectDialog(
                         googleEmail = it
                         inputError = null
                     },
-                    placeholder = { Text("tommy@gmail.com", fontFamily = PoppinsFontFamily, fontSize = 13.5.sp, color = T.muted) },
+                    placeholder = { Text("tommy@gmail.com", fontFamily = PoppinsFontFamily, fontSize = 13.5.sp, color = focivoTokens().muted) },
                     singleLine = true,
                     shape = CircleShape,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = T.accent,
+                        focusedBorderColor = focivoTokens().accent,
                         unfocusedBorderColor = dialogBorder,
                         focusedContainerColor = dialogFieldBg,
                         unfocusedContainerColor = dialogFieldBg,
@@ -1233,7 +1233,7 @@ fun GoogleAccountSelectDialog(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = inputError!!,
-                        style = TextStyle(color = T.danger, fontSize = 12.sp, fontFamily = PoppinsFontFamily)
+                        style = TextStyle(color = focivoTokens().danger, fontSize = 12.sp, fontFamily = PoppinsFontFamily)
                     )
                 }
 
@@ -1250,7 +1250,7 @@ fun GoogleAccountSelectDialog(
                         onSelectAccount(name, googleEmail.trim())
                     },
                     shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = T.accent, contentColor = MaterialTheme.colorScheme.onPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = focivoTokens().accent, contentColor = MaterialTheme.colorScheme.onPrimary),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
@@ -1270,7 +1270,7 @@ fun GoogleAccountSelectDialog(
                 ) {
                     Text(
                         text = "Use Android Credential Manager Prompt",
-                        style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 12.5.sp, color = T.accentText, fontWeight = FontWeight.SemiBold)
+                        style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 12.5.sp, color = focivoTokens().accentText, fontWeight = FontWeight.SemiBold)
                     )
                 }
             }
@@ -1291,8 +1291,8 @@ private fun ForgotPasswordDialog(
 ) {
     var email by remember { mutableStateOf(initialEmail) }
     val isDark = isAppInDarkTheme()
-    val textPrimary = T.text
-    val textSecondary = T.muted
+    val textPrimary = focivoTokens().text
+    val textSecondary = focivoTokens().muted
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1321,7 +1321,7 @@ private fun ForgotPasswordDialog(
                             text = resetState.message,
                             fontFamily = PoppinsFontFamily,
                             fontSize = 14.sp,
-                            color = T.danger
+                            color = focivoTokens().danger
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -1343,8 +1343,8 @@ private fun ForgotPasswordDialog(
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = T.accent,
-                            cursorColor = T.accent
+                            focusedBorderColor = focivoTokens().accent,
+                            cursorColor = focivoTokens().accent
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1388,8 +1388,8 @@ private fun SetNewPasswordSheet(
     var confirm by remember { mutableStateOf("") }
     var localError by remember { mutableStateOf<String?>(null) }
     val isDark = isAppInDarkTheme()
-    val textPrimary = T.text
-    val textSecondary = T.muted
+    val textPrimary = focivoTokens().text
+    val textSecondary = focivoTokens().muted
     val updating = resetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Updating
 
     AlertDialog(
@@ -1420,8 +1420,8 @@ private fun SetNewPasswordSheet(
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = T.accent,
-                        cursorColor = T.accent
+                        focusedBorderColor = focivoTokens().accent,
+                        cursorColor = focivoTokens().accent
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1436,8 +1436,8 @@ private fun SetNewPasswordSheet(
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = T.accent,
-                        cursorColor = T.accent
+                        focusedBorderColor = focivoTokens().accent,
+                        cursorColor = focivoTokens().accent
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1451,7 +1451,7 @@ private fun SetNewPasswordSheet(
                         text = showError,
                         fontFamily = PoppinsFontFamily,
                         fontSize = 13.sp,
-                        color = T.danger
+                        color = focivoTokens().danger
                     )
                 }
             }

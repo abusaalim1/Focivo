@@ -76,8 +76,8 @@ import com.example.util.loadPomodoroConfig
  * / "Long Break" mode drives the timer's break presentation (phase pill +
  * ring color shift); the user starts it with the normal Start button.
  */
-// v1.2.3 design-unification — owner clean-redesign accent (#B6F13A).
-private val T.accent = Color(0xFFB6F13A)
+// v1.2.3 design-unification — owner clean-redesign accent (#B6F13A) now comes
+// from focivoTokens(); see the composable body below.
 
 private val CustomizeSounds = listOf("Silent", "Rain", "White noise", "Cafe", "Forest", "Ocean")
 
@@ -590,7 +590,7 @@ private fun CustomizeChip(
             .background(if (selected) selectedBg else cardBg)
             .border(
                 1.dp,
-                if (selected) T.accent else cardBorder,
+                if (selected) focivoTokens().accent else cardBorder,
                 RoundedCornerShape(14.dp)
             )
             .pressFeedback()

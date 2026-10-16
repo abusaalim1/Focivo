@@ -289,7 +289,7 @@ fun SupportLockZenSheet(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) T.softAccent else T.surface2))
+                            .background(if (isSelected) T.softAccent else T.surface2)
                             .border(
                                 1.5.dp,
                                 if (isSelected) RegainLimePrimary else cardBorder,

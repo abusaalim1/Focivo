@@ -104,8 +104,8 @@ fun DeepFocusSettingsSheet(
 
     val isDarkMode = isAppInDarkTheme()
     val isDark = isDarkMode
-    val sheetBackground = T.bg
     val T = focivoTokens()
+    val sheetBackground = T.bg
     val textPrimary = T.text
     val textSecondary = T.muted
     val rowBg = T.surface
@@ -428,8 +428,8 @@ private fun SettingsToggleRow(
             size = 44.dp,
             customContent = iconCustom,
             vectorCircleColor = if (checked) RegainLimePrimary.copy(alpha = 0.18f)
-            else T.surface2,
-            vectorTint = if (checked) T.accentText
+            else focivoTokens().surface2,
+            vectorTint = if (checked) focivoTokens().accentText
             else textSecondary
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -457,7 +457,7 @@ private fun SettingsToggleRow(
             colors = SwitchDefaults.colors(
                 checkedTrackColor = RegainLimePrimary,
                 checkedThumbColor = Color.White,
-                uncheckedTrackColor = T.trackOff
+                uncheckedTrackColor = focivoTokens().trackOff
             )
         )
     }
@@ -503,8 +503,8 @@ private fun SettingsActionRow(
             size = 44.dp,
             customContent = iconCustom,
             vectorCircleColor = if (badgeCount > 0) RegainLimePrimary.copy(alpha = 0.18f)
-            else T.surface2,
-            vectorTint = if (badgeCount > 0) T.accentText else textSecondary
+            else focivoTokens().surface2,
+            vectorTint = if (badgeCount > 0) focivoTokens().accentText else textSecondary
         )
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {

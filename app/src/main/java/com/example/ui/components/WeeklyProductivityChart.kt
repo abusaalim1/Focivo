@@ -408,12 +408,14 @@ fun WeeklyProductivityChart(
                 val goalFraction = (targetDailyGoalHours / chartMaxHours).coerceIn(0f, 1f)
 
                 // Background Reference Grid Lines (0h, mid, max) and Goal Line
+                val chartStrokeColor = focivoTokens().line
+                val chartGoalLineColor = focivoTokens().accent.copy(alpha = 0.4f)
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .drawBehind {
-                            val strokeColor = focivoTokens().line
-                            val goalLineColor = focivoTokens().accent.copy(alpha = 0.4f)
+                            val strokeColor = chartStrokeColor
+                            val goalLineColor = chartGoalLineColor
 
                             // Top boundary line
                             drawLine(

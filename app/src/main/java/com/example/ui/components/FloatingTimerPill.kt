@@ -96,6 +96,7 @@ fun FloatingTimerPill(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Lime play circle (glyph drawn, not emoji)
+        val pillOnAccent = focivoTokens().onAccent
         Box(
             modifier = Modifier
                 .size(46.dp)
@@ -112,7 +113,7 @@ fun FloatingTimerPill(
                     lineTo(w * 0.28f, h * 0.82f)
                     close()
                 }
-                drawPath(path, focivoTokens().onAccent)
+                drawPath(path, pillOnAccent)
             }
         }
 

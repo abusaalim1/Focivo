@@ -145,8 +145,8 @@ fun ScheduleEditSheet(
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val isDark = isAppInDarkTheme()
-    val surfaceDark = T.surface
     val T = focivoTokens()
+    val surfaceDark = T.surface
     val cardBackground = T.surface
     val cardBorderColor = T.accent.copy(alpha = 0.2f)
     val accentViolet = T.accent

@@ -689,7 +689,7 @@ private fun ScheduleCardItem(
                     Icon(
                         imageVector = Icons.Default.Coffee,
                         contentDescription = null,
-                        tint = T.warning, // Warm Amber
+                        tint = focivoTokens().warning, // Warm Amber
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -698,7 +698,7 @@ private fun ScheduleCardItem(
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.SemiBold,
-                            color = T.warning,
+                            color = focivoTokens().warning,
                             fontSize = 13.sp
                         )
                     )
@@ -728,7 +728,7 @@ private fun ScheduleCardItem(
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                if (isSelected) T.softAccent else T.surface2
+                                if (isSelected) focivoTokens().softAccent else focivoTokens().surface2
                             )
                             .padding(vertical = 4.dp),
                         contentAlignment = Alignment.Center
@@ -810,7 +810,7 @@ private fun ScheduleCardItem(
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Delete Schedule",
-                            tint = T.danger,
+                            tint = focivoTokens().danger,
                             modifier = Modifier.size(18.dp)
                         )
                     }

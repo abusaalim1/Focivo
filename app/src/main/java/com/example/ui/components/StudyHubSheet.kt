@@ -97,8 +97,8 @@ fun StudyHubSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val isDark = isAppInDarkTheme()
-    val sheetBackground = T.bg
     val T = focivoTokens()
+    val sheetBackground = T.bg
     val textPrimary = T.text
     val textSecondary = T.muted
     val rowBg = T.surface
@@ -465,7 +465,7 @@ private fun HubToggleRow(
             colors = SwitchDefaults.colors(
                 checkedTrackColor = StudyAccent,
                 checkedThumbColor = Color.White,
-                uncheckedTrackColor = T.trackOff
+                uncheckedTrackColor = focivoTokens().trackOff
             )
         )
     }
@@ -507,7 +507,7 @@ private fun HubActionRow(
             size = 44.dp,
             customContent = iconCustom,
             vectorCircleColor = if (badgeCount > 0) StudyAccent.copy(alpha = 0.18f)
-            else T.surface2,
+            else focivoTokens().surface2,
             vectorTint = if (badgeCount > 0) (if (isDark) StudyAccent else Color(0xFF4A7A00))
             else textSecondary
         )

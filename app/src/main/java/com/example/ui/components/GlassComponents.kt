@@ -131,6 +131,7 @@ fun LinearGlowCard(
 
     val cardBg = focivoTokens().surface
     val cardBorder = focivoTokens().line
+    val glowText = focivoTokens().text
     val topHighlight = if (isDark) Color(0x1AFFFFFF) else Color(0x0DFFFFFF)
 
     val effectiveBorder = border ?: if (accentBorder) {
@@ -320,6 +321,7 @@ fun LiquidGlassCard(
 
     val cardBg = focivoTokens().surface
     val cardBorder = focivoTokens().line
+    val glowText = focivoTokens().text
 
     val effectiveBorder = border ?: if (accentBorder) {
         BorderStroke(1.dp, RegainLimePrimary)
@@ -343,8 +345,8 @@ fun LiquidGlassCard(
                         brush = Brush.linearGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                focivoTokens().text.copy(alpha = 0.05f),
-                                focivoTokens().text.copy(alpha = 0.10f),
+                                glowText.copy(alpha = 0.05f),
+                                glowText.copy(alpha = 0.10f),
                                 Color.Transparent
                             ),
                             start = Offset(shimmerOffset, 0f),
@@ -379,6 +381,7 @@ fun LiquidGlassCard(
  * Apple-style minimal and premium card container modifier with continuous squircle clipping,
  * ultra-refined hairline border, physical specular highlight refraction, and soft ambient shadow.
  */
+@Composable
 fun Modifier.appleCard(
     shape: Shape = RoundedCornerShape(22.dp),
     isDark: Boolean,
@@ -637,7 +640,7 @@ fun GlassButton(
                 elevation = if (isPrimary && enabled) 4.dp else 0.dp,
                 shape = pillShape,
                 ambientColor = Color(0x208CE000),
-                spotColor = T.accent.copy(alpha = 0.16f)
+                spotColor = focivoTokens().accent.copy(alpha = 0.16f)
             )
             .clip(pillShape)
             .then(backgroundModifier)
