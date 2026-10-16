@@ -1161,7 +1161,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
  * RETURNING variant. Only a true first run (no stored session at all)
  * gets NEW_USER. The variant is then never flipped during the launch.
  */
-private fun hasLocalSessionAtLaunch(context: android.content.Context): Boolean = try {
+internal fun hasLocalSessionAtLaunch(context: android.content.Context): Boolean = try {
     AndroidPreferenceSessionManager.getStoredUserId(context) != null ||
         AndroidPreferenceSessionManager.isGuestSession(context)
 } catch (_: Throwable) {

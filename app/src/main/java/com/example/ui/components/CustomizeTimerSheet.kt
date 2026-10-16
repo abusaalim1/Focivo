@@ -724,7 +724,7 @@ private fun CustomizeSectionLabel(text: String, textSecondary: Color) {
  * this row so new users are not overwhelmed. Nothing is removed.
  */
 @Composable
-private fun MoreOptionsExpander(
+internal fun MoreOptionsExpander(
     expanded: Boolean,
     onToggle: () -> Unit,
     textPrimary: Color,
@@ -773,7 +773,7 @@ private fun MoreOptionsExpander(
  * face dialog (same copy rhythm, same premium tone).
  */
 @Composable
-private fun LockedPomodoroDesignDialog(
+internal fun LockedPomodoroDesignDialog(
     style: com.example.ui.timer.PomodoroStyle,
     focusPoints: Int,
     onDismiss: () -> Unit
