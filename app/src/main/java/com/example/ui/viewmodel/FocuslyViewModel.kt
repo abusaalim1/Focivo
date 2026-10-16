@@ -2057,7 +2057,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     fun setAmbientSound(sound: String) {
         _ambientSound.value = sound
         if (_isTimerRunning.value) {
-            audioEngine.play(sound)
+            audioEngine.playSound(getApplication(), sound)
         }
     }
 
@@ -2231,7 +2231,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         if (sessionStartTimeMs == 0L) {
             sessionStartTimeMs = System.currentTimeMillis()
         }
-        audioEngine.play(_ambientSound.value)
+        audioEngine.playSound(getApplication(), _ambientSound.value)
 
         val app = getApplication<Application>()
 

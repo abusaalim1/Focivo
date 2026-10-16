@@ -43,11 +43,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -81,7 +83,7 @@ import com.example.util.loadPomodoroConfig
 // v1.2.3 design-unification — owner clean-redesign accent (#B6F13A) now comes
 // from focivoTokens(); see the composable body below.
 
-private val CustomizeSounds = listOf("Silent", "Rain", "White noise", "Cafe", "Forest", "Ocean")
+// v1.2.3 (Task 12): replaced by BuiltInSounds (procedural + OGG loops) below.
 
 private val PresetSubjects = listOf(
     "Deep Study",
@@ -399,26 +401,15 @@ fun CustomizeTimerSheet(
                         color = textSecondary
                     )
                     Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CustomizeSounds.forEach { sound ->
-                            val isChosen = sound == ambientSound
-                            CustomizeChip(
-                                text = sound,
-                                selected = isChosen,
-                                onClick = { onSelectAmbientSound(sound) },
-                                textPrimary = textPrimary,
-                                cardBg = cardBg,
-                                cardBorder = cardBorder,
-                                selectedBg = selectedBg,
-                                testTag = "customize_sound_${sound.lowercase().replace(" ", "_")}"
-                            )
-                        }
-                    }
+                    SoundscapePicker(
+                        ambientSound = ambientSound,
+                        onSelectAmbientSound = onSelectAmbientSound,
+                        textPrimary = textPrimary,
+                        textSecondary = textSecondary,
+                        cardBg = cardBg,
+                        cardBorder = cardBorder,
+                        selectedBg = selectedBg
+                    )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = "Alarm tone",
@@ -716,6 +707,170 @@ private fun CustomizeChip(
         )
     }
 }
+
+/**
+ * v1.2.3 (Task 12) — Session Soundscape picker: built-in sounds (procedural
+ * + new OGG loops), user-imported audio (SAF, no storage permission), and an
+ * import entry point. Imported entries can be removed; revoked/broken URIs
+ * render as unavailable instead of crashing.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SoundscapePicker(
+    ambientSound: String,
+    onSelectAmbientSound: (String) -> Unit,
+    textPrimary: Color,
+    textSecondary: Color,
+    cardBg: Color,
+    cardBorder: Color,
+    selectedBg: Color
+) {
+    val context = LocalContext.current
+    var importVersion by remember { mutableIntStateOf(0) }
+    val importedTracks = remember(importVersion) {
+        com.example.util.ImportedAudioManager.getTracks(context)
+    }
+
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            if (uri != null) {
+                val name = com.example.util.ImportedAudioManager.queryDisplayName(context, uri)
+                    ?: "Imported audio"
+                if (com.example.util.ImportedAudioManager.addTrack(context, uri, name)) {
+                    importVersion++
+                    onSelectAmbientSound(uri.toString())
+                }
+            }
+        }
+    )
+
+    // Built-in sounds.
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        BuiltInSounds.forEach { sound ->
+            val isChosen = sound == ambientSound
+            CustomizeChip(
+                text = sound,
+                selected = isChosen,
+                onClick = { onSelectAmbientSound(sound) },
+                textPrimary = textPrimary,
+                cardBg = cardBg,
+                cardBorder = cardBorder,
+                selectedBg = selectedBg,
+                testTag = "customize_sound_${sound.lowercase().replace(" ", "_")}"
+            )
+        }
+    }
+
+    // User-imported audio.
+    if (importedTracks.isNotEmpty()) {
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = "Your audio",
+            fontFamily = PoppinsFontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp,
+            color = textSecondary
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            importedTracks.forEach { track ->
+                val available = com.example.util.ImportedAudioManager.isTrackAvailable(context, track.uriString)
+                val isChosen = track.uriString == ambientSound
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (isChosen && available) selectedBg else cardBg)
+                        .border(
+                            1.dp,
+                            if (isChosen && available) focivoTokens().accent else cardBorder,
+                            RoundedCornerShape(14.dp)
+                        )
+                        .alpha(if (available) 1f else 0.45f)
+                        .clickable(enabled = available) { onSelectAmbientSound(track.uriString) }
+                        .padding(start = 12.dp, top = 9.dp, bottom = 9.dp, end = 4.dp)
+                ) {
+                    Text(
+                        text = if (available) track.displayName else "${track.displayName} (Unavailable)",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = if (isChosen) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 12.sp,
+                        color = textPrimary
+                    )
+                    androidx.compose.material3.IconButton(
+                        onClick = {
+                            com.example.util.ImportedAudioManager.removeTrack(context, track.uriString)
+                            if (ambientSound == track.uriString) onSelectAmbientSound("Silent")
+                            importVersion++
+                        },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Close,
+                            contentDescription = "Remove ${track.displayName}",
+                            tint = textSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Import entry point.
+    Spacer(modifier = Modifier.height(8.dp))
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(cardBg)
+            .border(1.dp, cardBorder.copy(alpha = 0.7f), RoundedCornerShape(14.dp))
+            .clickable { importLauncher.launch(arrayOf("audio/*")) }
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = androidx.compose.material.icons.Icons.Default.Add,
+                contentDescription = null,
+                tint = focivoTokens().accent,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = "Import audio from your library",
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.Medium,
+                fontSize = 12.sp,
+                color = textPrimary
+            )
+        }
+    }
+    Spacer(modifier = Modifier.height(2.dp))
+    Text(
+        text = "Your files stay on your device and play under the timer like built-in sounds.",
+        fontFamily = PoppinsFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.sp,
+        color = textSecondary.copy(alpha = 0.75f)
+    )
+}
+
+private val BuiltInSounds = listOf(
+    "Silent", "Rain", "White noise", "Cafe", "Forest", "Ocean",
+    "Night Breeze", "Ambient Pad", "Gentle Stream", "Distant Thunder"
+)
 
 /**
  * v1.2.3 (Task 11) — alarm-tone picker: all tones as chips, tap selects AND
