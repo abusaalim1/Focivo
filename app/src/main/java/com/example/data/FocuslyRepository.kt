@@ -1315,6 +1315,18 @@ class FocuslyRepository(private val context: Context) {
             Log.w(TAG, "Error clearing local cache components: ${e.message}")
         }
 
+        // v1.2.3 (guest-escape fix): also wipe the guest_data directory
+        // (guest_profile.json). The prefs above are cleared by clearCache(), but
+        // WITHOUT this file, restoreAuthSessionStandalone() revives a phantom
+        // guest on the next launch (storedGuestProfile != null -> fabricated
+        // guest user -> RETURNING splash -> straight into the app) and the user
+        // can NEVER reach the Auth / Create Account screen again.
+        try {
+            com.example.data.GuestDataStorageManager.getInstance(context).clearGuestData()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error clearing guest data directory: ${e.message}")
+        }
+
         val defaultLocalPrefs = UserPreferencesEntity(
             id = 1,
             hasCompletedOnboarding = false,
