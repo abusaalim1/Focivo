@@ -101,8 +101,9 @@ fun MascotScreen(
     val cardBorder = if (isDark) Color(0xFF1F1F22) else Color(0xFFE4E9DE)
     val screenBg = if (isDark) Color(0xFF0A0A0B) else Color(0xFFFAFBF7)
     val lime = MascotLime
+    val context = androidx.compose.ui.platform.LocalContext.current
     // v1.2.4: owner admin account unlocks every outfit set — single choke point.
-    val isAdmin = remember { com.example.util.ContentLocks.isAdminUnlocked(androidx.compose.ui.platform.LocalContext.current) }
+    val isAdmin = remember(context) { com.example.util.ContentLocks.isAdminUnlocked(context) }
 
     val savedSetId by MascotWardrobe.equipped.collectAsState()
     // v1.2.1 re-lock: the equipped set can never be a locked one.

@@ -618,6 +618,8 @@ fun TimerThemePicker(
     cardBorder: Color
 ) {
     val context = LocalContext.current
+    // v1.2.4: owner admin account unlocks every theme — single choke point.
+    val isAdmin = remember(context) { com.example.util.ContentLocks.isAdminUnlocked(context) }
     Column(modifier = modifier.fillMaxWidth()) {
         // Round-4: Focus Points header — the real earned balance
         // (1 pt per focused minute) that unlocks themes.
