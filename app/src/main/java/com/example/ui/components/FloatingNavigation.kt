@@ -51,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -172,7 +173,7 @@ fun FloatingNavigation(
         ) {
             // Coordinate space for the liquid pill.
             Box(
-                modifier = Modifier.onGloballyPositioned { navOriginX = it.boundsInRoot().left }
+                modifier = Modifier.onGloballyPositioned { navOriginX = it.localToRoot(Offset.Zero).x }
             ) {
                 // Single liquid pill drawn BEHIND the tabs (first child = back).
                 // It has no click handling, so tabs on top receive all touches.
@@ -218,7 +219,7 @@ fun FloatingNavigation(
                                     scaleY = scale
                                 }
                                 .onGloballyPositioned { coords ->
-                                    val pos = coords.boundsInRoot().left
+                                    val pos = coords.localToRoot(Offset.Zero).x
                                     tabLayout[tab] = pos to coords.size.width.toFloat()
                                 }
                                 .clickable(
