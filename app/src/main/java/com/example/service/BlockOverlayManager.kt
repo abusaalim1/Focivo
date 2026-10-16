@@ -305,6 +305,13 @@ object BlockOverlayManager {
      * incl. freeform/small windows and split-screen) → app-process overlay →
      * legacy fullscreen Activity. The path actually used is logged to the
      * Guard Hub activity feed so it is visible on-device which layer ran.
+     *
+     * Belt + braces (vivo V2403, build-39): in a multi-window context the
+     * accessibility overlay is shown AND the fullscreen BlockedAppActivity is
+     * also launched when the overlay can't be confirmed — freeform contexts
+     * always (the OEM small-window layer question), other modes only if no
+     * draw callback arrives within ~800ms. Single choke point + visibility
+     * dedupe: no loops, no flicker.
      */
     fun intercept(
         context: Context,
@@ -312,26 +319,56 @@ object BlockOverlayManager {
         appName: String,
         durationSec: Int = 0,
         reason: String? = null,
-        isPunishment: Boolean = false
+        isPunishment: Boolean = false,
+        multiWindowMode: String? = null
     ) {
         // v1.2.2 (share screen): record every real intercept so the Session
         // Complete "Shield" card can show the apps blocked during the session.
         SessionBlockRecorder.record(context, blockedPackage, appName)
+        val alreadyShowing = isBlockUiShowing()
         val path = resolveOverlayPath(context)
         val shown = when (path) {
             OverlayPath.A11Y -> showViaA11y(blockedPackage, appName, durationSec, reason, isPunishment)
             OverlayPath.APP -> showIfPermitted(context, blockedPackage, appName, durationSec, reason, isPunishment)
             OverlayPath.ACTIVITY -> false
         }
+        // v1.2.3: braces — a second, guaranteed-top layer for multi-window.
+        var bracesLaunched = false
+        if (shown && !alreadyShowing) {
+            if (multiWindowMode == "floating") {
+                bracesLaunched = launchBracesActivity(
+                    context, blockedPackage, appName, durationSec, reason, isPunishment, "floating"
+                )
+            } else if (path == OverlayPath.A11Y) {
+                // No-draw watchdog: addView succeeding doesn't prove the frame
+                // composited. If nothing drew in 800ms, bring the Activity.
+                mainHandler.postDelayed({
+                    try {
+                        val svc = AiStudyAccessibilityService.connectedInstance
+                        if (isBlockUiShowing() && svc?.isA11yBlockOverlayDrawn() != true) {
+                            launchBracesActivity(
+                                context, blockedPackage, appName, durationSec,
+                                reason, isPunishment, "no-draw-800ms"
+                            )
+                        }
+                    } catch (_: Exception) { }
+                }, 800)
+            }
+        }
         // v1.2.3 diagnostic: honest, on-device evidence of which render layer
-        // actually blocked the app (owner device-test aid).
-        try {
-            com.example.util.AiStudyGuardManager.logGuardActivity(
-                context, appName, "overlay-path",
-                if (shown) "shown" else "fallback",
-                "path=" + path.name.lowercase()
-            )
-        } catch (_: Exception) { }
+        // actually blocked the app (owner device-test aid). Transition-only:
+        // refreshes of an already-visible overlay don't spam the feed.
+        if (!alreadyShowing) {
+            try {
+                com.example.util.AiStudyGuardManager.logGuardActivity(
+                    context, appName, "overlay-path",
+                    if (shown) "shown" else "fallback",
+                    "path=" + path.name.lowercase() +
+                        (if (multiWindowMode != null) " mode=$multiWindowMode" else "") +
+                        if (bracesLaunched) " braces=activity" else ""
+                )
+            } catch (_: Exception) { }
+        }
         if (shown) return
         try {
             val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
@@ -346,6 +383,66 @@ object BlockOverlayManager {
         } catch (e: Exception) {
             Log.e(TAG, "Fallback block Activity failed: ${e.message}")
         }
+    }
+
+    // v1.2.3 — braces Activity bookkeeping.
+    private var lastBracesLaunchMs = 0L
+    private var lastBracesPkg: String? = null
+
+    /**
+     * Launches the fullscreen BlockedAppActivity as the guaranteed top layer
+     * behind/around the overlay. Deduped: never twice for the same package
+     * within 5s, never while it's already showing. Every attempt (and its
+     * failure reason) is logged to the Guard Hub.
+     */
+    private fun launchBracesActivity(
+        context: Context,
+        blockedPackage: String,
+        appName: String,
+        durationSec: Int,
+        reason: String?,
+        isPunishment: Boolean,
+        why: String
+    ): Boolean {
+        val now = System.currentTimeMillis()
+        if (com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing) return true
+        if (now - lastBracesLaunchMs < 5000L && lastBracesPkg == blockedPackage) return false
+        lastBracesLaunchMs = now
+        lastBracesPkg = blockedPackage
+        return try {
+            val intent = com.example.ui.screens.BlockedAppLockActivity.createIntent(
+                context = context,
+                packageName = blockedPackage,
+                appName = appName,
+                durationSec = durationSec,
+                reason = reason,
+                isPunishment = isPunishment
+            )
+            context.startActivity(intent)
+            try {
+                com.example.util.AiStudyGuardManager.logGuardActivity(
+                    context, appName, "overlay-path", "braces",
+                    "activity launched why=$why"
+                )
+            } catch (_: Exception) { }
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Braces block Activity failed: ${e.message}")
+            try {
+                com.example.util.AiStudyGuardManager.logGuardActivity(
+                    context, appName, "overlay-path", "braces-failed",
+                    (e.message ?: "start failed").take(120)
+                )
+            } catch (_: Exception) { }
+            false
+        }
+    }
+
+    /** Finishes the braces Activity if it is up (overlay exit paths call this). */
+    fun dismissBracesActivity() {
+        try {
+            com.example.ui.screens.BlockedAppLockActivity.currentInstance?.finish()
+        } catch (_: Exception) { }
     }
 
     /** True when any block UI (overlay or legacy Activity) is on screen. */

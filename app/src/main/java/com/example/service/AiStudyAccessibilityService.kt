@@ -71,6 +71,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
         private var lastLivenessWriteMs: Long = 0L
         // v1.3.0: multi-window protection scan throttle
         private var lastMultiWindowScanMs: Long = 0L
+        // v1.2.3: periodic sweep throttle (catches idle windows that emit no events)
+        private var lastPeriodicMwScanMs: Long = 0L
         // v1.3.1: deep-focus home-screen block throttle
         private var lastHomeScreenInterceptMs: Long = 0L
         private var lastHomeInterceptedPkg: String? = null
@@ -137,6 +139,22 @@ class AiStudyAccessibilityService : AccessibilityService() {
     private var a11yShortsHost: com.example.ui.overlay.OverlayLifecycleHost? = null
     private var a11yShortsWm: WindowManager? = null
     private val a11yShortsLabel = androidx.compose.runtime.mutableStateOf("Shorts")
+
+    /**
+     * v1.2.3 — draw confirmation for the accessibility block overlay.
+     * addView succeeding does NOT prove the frame ever composited (the vivo
+     * freeform question); a one-shot OnDrawListener flips this on the first
+     * real draw. BlockOverlayManager uses it for the no-draw braces fallback.
+     */
+    @Volatile
+    private var a11yBlockDrawn = false
+
+    /** True once the accessibility block overlay has actually drawn a frame. */
+    fun isA11yBlockOverlayDrawn(): Boolean = a11yBlockDrawn
+
+    // v1.2.3 — throttled "seen but skipped" diagnostics for the Guard Hub
+    // (key = reason; proves the scan ran and says why it skipped).
+    private val lastMwSkipLogMs = mutableMapOf<String, Long>()
 
     /** True when the accessibility-layer block overlay is on screen. */
     fun isA11yBlockOverlayShowing(): Boolean = a11yBlockView != null
@@ -223,6 +241,18 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yBlockView = view
             a11yBlockHost = host
             a11yBlockWm = wm
+            // v1.2.3: one-shot draw confirmation (see isA11yBlockOverlayDrawn).
+            a11yBlockDrawn = false
+            runCatching {
+                view.viewTreeObserver.addOnDrawListener(
+                    object : android.view.ViewTreeObserver.OnDrawListener {
+                        override fun onDraw() {
+                            a11yBlockDrawn = true
+                            runCatching { view.viewTreeObserver.removeOnDrawListener(this) }
+                        }
+                    }
+                )
+            }
             Log.i(TAG, "A11y block overlay shown for $blockedPackage (TYPE_ACCESSIBILITY_OVERLAY)")
             true
         } catch (t: Throwable) {
@@ -244,6 +274,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yBlockView = null
             a11yBlockHost = null
             a11yBlockWm = null
+            a11yBlockDrawn = false
         }
     }
 
@@ -313,6 +344,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
 
     private fun a11yExitToHome() {
         hideA11yBlockOverlay()
+        // v1.2.3: a braces Activity may be up behind the overlay — dismiss it too.
+        runCatching { BlockOverlayManager.dismissBracesActivity() }
         try {
             val homeIntent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_HOME)
@@ -324,6 +357,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
 
     private fun a11yOpenFocivo() {
         hideA11yBlockOverlay()
+        // v1.2.3: a braces Activity may be up behind the overlay — dismiss it too.
+        runCatching { BlockOverlayManager.dismissBracesActivity() }
         try {
             val mainIntent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -360,14 +395,23 @@ class AiStudyAccessibilityService : AccessibilityService() {
      * mini windows may also match the floating heuristic — both are treated
      * as floating (blocking them is the safer behavior for a focus app).
      */
-    private fun enforceMultiWindowProtections(nowTime: Long) {
+    /**
+     * v1.2.3 — multi-window / any-window protection sweep.
+     *
+     * A blocked package appearing in ANY visible application window (any
+     * bounds — fullscreen, split pane, floating/freeform, partial) is an
+     * intercept trigger during a study period, NOT just the active/foreground
+     * window that [onAccessibilityEvent]'s single-package path sees.
+     *
+     * Why this exists (vivo V2403, build-39): the event-package path misses
+     * (a) blocked apps moved into a split pane without a WINDOW_STATE_CHANGED
+     * for their package, (b) freeform windows sitting idle (no content
+     * changes, so no scan trigger), (c) apps already open when the study
+     * period starts. Every skip writes a throttled Guard Hub entry so the
+     * owner's next device test shows exactly which step saw what.
+     */
+    private fun enforceMultiWindowProtections(nowTime: Long, triggerSrc: String) {
         val ctx = applicationContext
-        // v1.1 final: during an active focus period a blocked app must be
-        // intercepted in EVERY window mode — fullscreen, split-screen and
-        // floating/small windows alike. The old StrictMode opt-in toggles
-        // (blockSplit/blockFloat) no longer gate this: if the app is blocked
-        // during focus, it is blocked wherever it appears. The toggles are
-        // retained for standalone-shield use outside focus periods.
         if (nowTime - lastMultiWindowScanMs < 3000L) return
         lastMultiWindowScanMs = nowTime
         try {
@@ -380,43 +424,70 @@ class AiStudyAccessibilityService : AccessibilityService() {
             if (appWins.isEmpty()) return
             val (dispW, dispH) = getDisplaySizePx()
             if (dispW <= 0 || dispH <= 0) return
-            val multiWindowActive = appWins.size >= 2
             val rect = Rect()
             for (w in appWins) {
                 val pkg = try { w.root?.packageName?.toString() } catch (_: Exception) { null }
-                    ?: continue
+                if (pkg == null) {
+                    logMwSkip("root-null")
+                    continue
+                }
                 if (pkg.equals(ctx.packageName, ignoreCase = true)) continue
                 val isBlocked = blockedList.any { b ->
                     pkg.equals(b, ignoreCase = true) || pkg.startsWith(b, ignoreCase = true)
                 }
                 if (!isBlocked) continue
-                try { w.getBoundsInScreen(rect) } catch (_: Exception) { continue }
-                if (rect.width() <= 0 || rect.height() <= 0) continue
+                try { w.getBoundsInScreen(rect) } catch (_: Exception) {
+                    logMwSkip("bounds-fail pkg=$pkg")
+                    continue
+                }
+                if (rect.width() <= 0 || rect.height() <= 0) {
+                    logMwSkip("empty-bounds pkg=$pkg")
+                    continue
+                }
                 val isFloating = rect.width() < dispW * 0.85f && rect.height() < dispH * 0.85f
-                val inSplit = multiWindowActive && !isFloating
-                // v1.1 final: a blocked app is blocked in every window mode
-                // during focus — fullscreen, split-screen, floating.
-                val shouldBlock = isFloating || inSplit
-                if (!shouldBlock) continue
+                val mode = when {
+                    isFloating -> "floating"
+                    appWins.size >= 2 -> "split"
+                    else -> "fullscreen"
+                }
+                // v1.2.3: ANY visible blocked window triggers — the old code
+                // only covered floating/split and relied on the event-package
+                // path for fullscreen, which misses already-open apps.
                 if (nowTime - lastGeneralAppInterceptTimeMs > 2500L || lastGeneralInterceptedPkg != pkg) {
                     lastGeneralAppInterceptTimeMs = nowTime
                     lastGeneralInterceptedPkg = pkg
-                    val mode = if (isFloating) "floating window" else "split-screen"
-                    Log.w(TAG, "[MultiWindow] Blocked app ($pkg) in $mode during focus — intercepting.")
                     val friendlyName = try { FocusShieldService.friendlyAppName(ctx, pkg) } catch (_: Exception) { pkg }
-                    // v1.2.1: overlay-first intercept — the overlay covers
-                    // floating windows too; Activity is the no-overlay fallback.
+                    Log.w(TAG, "[MultiWindow] Blocked app ($pkg) visible in $mode window during focus — intercepting (src=windows-list, trigger=$triggerSrc).")
+                    try {
+                        AiStudyGuardManager.logGuardActivity(
+                            ctx, friendlyName, "multiwindow-detect", "intercept",
+                            "src=windows-list mode=$mode bounds=${rect.width()}x${rect.height()} trigger=$triggerSrc"
+                        )
+                    } catch (_: Exception) { }
                     BlockOverlayManager.intercept(
                         context = ctx,
                         blockedPackage = pkg,
                         appName = friendlyName,
                         durationSec = try { FocusShieldService.getRemainingSeconds(ctx) } catch (_: Exception) { 0 },
-                        reason = "$friendlyName is locked during your active focus session ($mode windows are blocked during focus).",
-                        isPunishment = false
+                        reason = "$friendlyName is locked during your active focus session.",
+                        isPunishment = false,
+                        multiWindowMode = mode
                     )
                 }
                 return
             }
+        } catch (_: Exception) { }
+    }
+
+    /** Throttled Guard Hub "seen but skipped" entries — proves the scan ran. */
+    private fun logMwSkip(reason: String) {
+        val now = System.currentTimeMillis()
+        if (now - (lastMwSkipLogMs[reason] ?: 0L) < 30_000L) return
+        lastMwSkipLogMs[reason] = now
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, "guard", "multiwindow-detect", "skipped", reason
+            )
         } catch (_: Exception) { }
     }
 
@@ -664,11 +735,18 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 }
             }
 
-            // 5b. v1.3.0: multi-window protections — a blocked app opened in
-            // split-screen or a floating window can bypass the fullscreen
-            // intercept above, so scan interactive windows (best-effort).
+            // 5b. v1.2.3: multi-window protections — a blocked app visible in
+            // ANY window (split-screen pane, floating/freeform window, or an
+            // already-open fullscreen window the event-package path missed)
+            // is intercepted via the windows-list scan, not just the
+            // active/foreground window. Event-driven AND periodic: idle
+            // windows emit no events, so a 5s sweep covers them too.
+            if (nowTime - lastPeriodicMwScanMs > 5000L) {
+                lastPeriodicMwScanMs = nowTime
+                enforceMultiWindowProtections(nowTime, "periodic")
+            }
             if (isStudyPeriod && (isWindowStateChanged || eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)) {
-                enforceMultiWindowProtections(nowTime)
+                enforceMultiWindowProtections(nowTime, "event")
             }
 
             // 6. Check per-app daily limit on app open

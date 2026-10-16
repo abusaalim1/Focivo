@@ -35,6 +35,14 @@ class BlockedAppLockActivity : ComponentActivity() {
         @Volatile
         var isCurrentlyShowing: Boolean = false
 
+        /**
+         * v1.2.3 — live instance for the braces dismiss path
+         * ([BlockOverlayManager.dismissBracesActivity]).
+         */
+        @Volatile
+        var currentInstance: BlockedAppLockActivity? = null
+            private set
+
         fun createIntent(
             context: Context,
             packageName: String,
@@ -62,6 +70,7 @@ class BlockedAppLockActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        currentInstance = this
         parseIntentData(intent)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -122,6 +131,7 @@ class BlockedAppLockActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         isCurrentlyShowing = false
+        if (currentInstance === this) currentInstance = null
     }
 
     override fun onNewIntent(intent: Intent) {
