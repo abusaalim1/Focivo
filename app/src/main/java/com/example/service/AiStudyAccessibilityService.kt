@@ -1252,10 +1252,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                         reason = quickScreen.reason
                                     )
                                 } else if (quickScreen.confidence < 0.90f) {
-                                    // v1.2.3 (Task 9): second brain — the on-device
+                                    // v1.2.3 (Task 9, bundle v3): second brain — the on-device
                                     // screen-content classifier judges the extracted
                                     // text BEFORE any network call. Bands per spec:
-                                    //   p_ent >= 0.80 -> non-study candidate ->
+                                    //   study-doubt phrasing -> STUDY -> allow
+                                    //       (doubt gate FIRST — a doubt must never
+                                    //       become a block; regional doubt rows can
+                                    //       score ~0.70-0.75 above the 0.69 line)
+                                    //   p_ent >= 0.69 -> non-study candidate ->
                                     //       same discipline flow as a confident
                                     //       on-device block.
                                     //   p_ent < 0.20  -> study -> allow locally
@@ -1273,8 +1277,25 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                     val contentPEnt = if (contentClf != null && screenText.isNotBlank()) {
                                         contentClf.pEntertainment(screenText)
                                     } else null
-                                    val contentThreshold = contentClf?.blockThreshold ?: 0.80
+                                    val contentThreshold = contentClf?.blockThreshold ?: 0.69
+                                    // v1.2.3 (final assembly): explicit study-doubt
+                                    // gate BEFORE the content block band — a doubt
+                                    // phrasing is STUDY, never a block.
+                                    val isDoubt = screenText.isNotBlank() &&
+                                            OnDeviceStudyClassifier.isStudyDoubt(screenText)
                                     when {
+                                        isDoubt -> {
+                                            val pEntStr = if (contentPEnt != null) {
+                                                "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
+                                            } else "no-score"
+                                            Log.i(TAG, "[Browser AI Guard] Study doubt detected in $browserLabel ($pEntStr) — allowing")
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "STUDY", "study-doubt-allow $pEntStr", urlOrTitle)
+                                            AiStudyGuardManager.onStudyActivityDetected(
+                                                context = applicationContext,
+                                                packageName = pkg,
+                                                messageText = urlOrTitle
+                                            )
+                                        }
                                         contentPEnt != null && contentPEnt >= contentThreshold -> {
                                             val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
                                             val reason = "Non-study screen content detected [local-content $pEntStr]"
@@ -1532,10 +1553,11 @@ class AiStudyAccessibilityService : AccessibilityService() {
         }
 
         // v1.1.8: curated offline knowledge first — instant (<1ms), zero network.
-        // v1.2.3 (Task 6): on-device title classifier is the FIRST title judge,
-        // ahead of the knowledge pack. Fully offline (no key, no network,
-        // <1ms): TF-IDF + logistic regression bundle (assets, v2: 14,744
-        // terms). Held-out 99.71% acc with ZERO false-blocks at p_ent >= 0.65.
+        // v1.2.3 (Task 6, bundle v3): on-device title classifier is the FIRST
+        // title judge, ahead of the knowledge pack. Fully offline (no key,
+        // no network, <1ms): TF-IDF + logistic regression bundle (assets,
+        // v3: 15,109 terms). Held-out 99.73% acc with ZERO false-blocks at
+        // p_ent >= 0.65.
         //   p_ent >= 0.65 -> ENTERTAINMENT -> same discipline flow as a
         //                   high-confidence knowledge NON_STUDY.
         //   p_ent <= 0.20 -> STRONG_STUDY -> allow locally (zero entertainment

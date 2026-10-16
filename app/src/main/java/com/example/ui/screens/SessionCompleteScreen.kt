@@ -20,6 +20,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,8 +45,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import com.example.ui.components.RollingNumber
 import com.example.ui.components.SessionNotificationDigestSheet
+import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.SerifItalicFontFamily
 import com.example.util.SessionNotificationDigestManager
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,11 +87,20 @@ fun SessionCompleteScreen(
     animateEntrance: Boolean = true
 ) {
     val minutesSpent = session.durationSeconds / 60
+    val pointsEarned = session.focusPointsEarned
 
     val suppressedNotifs by SessionNotificationDigestManager.digestList.collectAsState()
     var showDigestSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // v1.2.3 (final assembly) — the owner's Session Complete Flow: staged
+    // celebration (lab celebration NOT used). Stages: CELEBRATE ("Well
+    // done." + points count-up) -> MESSAGE (motivational line) -> FOCUSED
+    // ("Yay! You focused for Xm") -> SHARE (the 4 share cards + sheet).
+    // Screenshot tests pass animateEntrance=false -> straight to SHARE.
+    // (No streak anywhere: the streak feature was removed app-wide.)
+    var flowStage by remember { mutableStateOf(if (animateEntrance) 0 else 3) }
 
     // v1.2.2 — celebration moment: subtle one-shot confetti + completion chime.
     var showConfetti by remember { mutableStateOf(true) }
@@ -98,6 +112,16 @@ fun SessionCompleteScreen(
             animationSpec = tween(durationMillis = 2400, easing = LinearEasing)
         )
         showConfetti = false
+    }
+
+    // Auto-advance the celebration stages; any tap skips ahead.
+    LaunchedEffect(flowStage) {
+        if (!animateEntrance) return@LaunchedEffect
+        when (flowStage) {
+            0 -> { delay(2800); flowStage = 1 }
+            1 -> { delay(2400); flowStage = 2 }
+            2 -> { delay(2400); flowStage = 3 }
+        }
     }
 
     if (showDigestSheet) {
@@ -162,56 +186,229 @@ fun SessionCompleteScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0A0C0B))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                // Tap anywhere to skip ahead through the celebration stages.
+                if (flowStage < 3) flowStage++
+            }
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            if (suppressedNotifs.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .padding(top = 12.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFF1D221C))
-                        .border(1.dp, Color(0x358CE000), RoundedCornerShape(20.dp))
-                        .clickable { showDigestSheet = true }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.NotificationsOff,
-                        contentDescription = null,
-                        // v1.2.3 design-unification: owner clean-redesign lime.
-                        tint = Color(0xFFB6F13A),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "${suppressedNotifs.size} ${if (suppressedNotifs.size == 1) "notification" else "notifications"} held during session (tap to view)",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFB6F13A),
-                            fontSize = 12.sp
+        when (flowStage) {
+            0 -> SessionFlowCelebrateStage(pointsEarned = pointsEarned)
+            1 -> SessionFlowMessageStage(
+                distractionsCount = session.distractionsCount,
+                sessionId = session.id
+            )
+            2 -> SessionFlowFocusedStage(minutesSpent = minutesSpent)
+            else -> SessionFlowShareStage(
+                suppressedNotifs = suppressedNotifs,
+                onOpenDigest = { showDigestSheet = true },
+                shareContent = {
+                    Box(modifier = Modifier.weight(1f)) {
+                        FocivoShareEntry(
+                            data = shareData,
+                            onWhatsApp = { shareCard(it, toWhatsApp = true) },
+                            onMore = { shareCard(it, toWhatsApp = false) },
+                            onDownload = { downloadCard(it) },
+                            onContinue = onDismiss,
+                            animateEntrance = animateEntrance
                         )
-                    )
+                    }
                 }
-            }
-            Box(modifier = Modifier.weight(1f)) {
-                FocivoShareEntry(
-                    data = shareData,
-                    onWhatsApp = { shareCard(it, toWhatsApp = true) },
-                    onMore = { shareCard(it, toWhatsApp = false) },
-                    onDownload = { downloadCard(it) },
-                    onContinue = onDismiss,
-                    animateEntrance = animateEntrance
-                )
-            }
+            )
         }
-
         // v1.2.2 — subtle one-shot confetti over the completed screen.
         // Pointer-transparent: no click handling, so it never blocks input.
         if (showConfetti) {
             CelebrationConfetti(progress = confettiProgress.value)
         }
     }
+}
+
+/**
+ * v1.2.3 (final assembly) — the owner's Session Complete Flow, implemented
+ * as staged celebration composables (the lab celebration is NOT used).
+ * Every number shown is the user's real data.
+ */
+
+/** Stage 0 — "Well done." + real focus points rolling up. */
+@Composable
+private fun SessionFlowCelebrateStage(pointsEarned: Int) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "Well done.",
+                fontFamily = SerifItalicFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 44.sp,
+                color = Color(0xFFF4F4F5)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RollingNumber(
+                    value = pointsEarned,
+                    formatter = { "+$it" },
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFB6F13A),
+                        fontSize = 30.sp
+                    )
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Focus Points",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF76767C),
+                        fontSize = 18.sp
+                    )
+                )
+            }
+        }
+        SessionFlowTapToSkip(modifier = Modifier.align(Alignment.BottomCenter))
+    }
+}
+
+/** Stage 1 — the motivational line + the distraction verdict. */
+@Composable
+private fun SessionFlowMessageStage(distractionsCount: Int, sessionId: Long) {
+    // Owner's own lines, rotated deterministically per session.
+    val lines = listOf(
+        "Small steps still count.",
+        "Your future self says thanks.",
+        "Focus is a muscle. You just trained it."
+    )
+    val line = lines[(sessionId % lines.size).toInt().coerceAtLeast(0)]
+    val verdict = if (distractionsCount == 0) {
+        "Zero distractions. Pure focus."
+    } else {
+        "$distractionsCount ${if (distractionsCount == 1) "distraction" else "distractions"}, still showed up."
+    }
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        ) {
+            Text(
+                text = verdict,
+                fontFamily = SerifItalicFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 32.sp,
+                lineHeight = 38.sp,
+                color = Color(0xFFF4F4F5)
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = line,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF76767C),
+                    fontSize = 16.sp
+                )
+            )
+        }
+        SessionFlowTapToSkip(modifier = Modifier.align(Alignment.BottomCenter))
+    }
+}
+
+/** Stage 2 — "Yay! You focused for Xm". */
+@Composable
+private fun SessionFlowFocusedStage(minutesSpent: Int) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        ) {
+            Text(
+                text = "Yay! You focused for",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF76767C),
+                    fontSize = 18.sp
+                )
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "${minutesSpent}m",
+                fontFamily = SerifItalicFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 72.sp,
+                color = Color(0xFFB6F13A)
+            )
+        }
+        SessionFlowTapToSkip(modifier = Modifier.align(Alignment.BottomCenter))
+    }
+}
+
+/** Stage 3 — the share cards + share sheet (existing plumbing). */
+@Composable
+private fun SessionFlowShareStage(
+    suppressedNotifs: List<*>,
+    onOpenDigest: () -> Unit,
+    shareContent: @Composable () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (suppressedNotifs.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(top = 12.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFF1D221C))
+                    .border(1.dp, Color(0x358CE000), RoundedCornerShape(20.dp))
+                    .clickable { onOpenDigest() }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.NotificationsOff,
+                    contentDescription = null,
+                    tint = Color(0xFFB6F13A),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "${suppressedNotifs.size} ${if (suppressedNotifs.size == 1) "notification" else "notifications"} held during session (tap to view)",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFB6F13A),
+                        fontSize = 12.sp
+                    )
+                )
+            }
+        }
+        shareContent()
+    }
+}
+
+/** "TAP TO SKIP" affordance from the owner's flow. */
+@Composable
+private fun SessionFlowTapToSkip(modifier: Modifier = Modifier) {
+    Text(
+        text = "TAP TO SKIP",
+        style = MaterialTheme.typography.labelSmall.copy(
+            fontFamily = PoppinsFontFamily,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF4A4A4F),
+            fontSize = 11.sp,
+            letterSpacing = 2.sp
+        ),
+        modifier = modifier.padding(bottom = 36.dp)
+    )
 }
 
 

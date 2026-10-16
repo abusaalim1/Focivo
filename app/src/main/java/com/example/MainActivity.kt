@@ -275,6 +275,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val showPreStudyBlockSheet by viewModel.showPreStudyBlockSheet.collectAsState()
     // v1.2.3 (Task 13.2) — pre-session Strict Mode + AI Guard prompt sheet.
     val showStrictGuardPromptSheet by viewModel.showStrictGuardPromptSheet.collectAsState()
+    // v1.2.3 (final assembly) — Motion Lab "Lock-in start" overlay.
+    val showLockInStart by viewModel.showLockInStart.collectAsState()
+    val lockInBlockedPackages by viewModel.lockInBlockedPackages.collectAsState()
     val promptStrictOn by viewModel.promptStrictOn.collectAsState()
     val promptGuardOn by viewModel.promptGuardOn.collectAsState()
     val isSupportLockZenSheetOpen by viewModel.isSupportLockZenSheetOpen.collectAsState()
@@ -838,6 +841,17 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                         alarm = ringingAlarm!!,
                         onDismiss = { viewModel.dismissAlarm() },
                         onSnooze = { viewModel.snoozeAlarm(5) }
+                    )
+                }
+
+                // v1.2.3 (final assembly) — Motion Lab "Lock-in start":
+                // study-start transition showing the user's real blocked
+                // apps locking in; the timer starts when it completes.
+                if (showLockInStart) {
+                    com.example.ui.components.LockInStartOverlay(
+                        blockedPackages = lockInBlockedPackages,
+                        onComplete = { viewModel.proceedAfterLockInAnimation() },
+                        onDismiss = { viewModel.dismissLockInStart() }
                     )
                 }
 

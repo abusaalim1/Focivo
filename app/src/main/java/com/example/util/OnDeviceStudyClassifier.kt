@@ -292,4 +292,53 @@ object OnDeviceStudyClassifier {
             reason = "General learning topic (benefit of doubt)"
         )
     }
+
+    // ------------------------------------------------------------------
+    // v1.2.3 (final assembly): explicit study-doubt detector. Round-4
+    // training flagged short regional doubt phrasings scoring p_ent
+    // ~0.70-0.75 on the screen-content brain — just above the 0.69 block
+    // line. A doubt must NEVER become a block, so the guard pipeline
+    // evaluates this BEFORE the content classifier's block band and
+    // treats a doubt as STUDY (allow). Kept deliberately conservative:
+    // short not-understanding phrasings in regional scripts + explicit
+    // "doubt" markers + academic question stems.
+    // ------------------------------------------------------------------
+    private val DOUBT_REGEXES = listOf(
+        // Explicit doubt markers (English/Hinglish)
+        Regex("""\bdoubt\b""", RegexOption.IGNORE_CASE),
+        // "I don't understand this topic" — Bengali
+        Regex("""বুঝতে\s*পারছি\s*না|বুঝি\s*নাই|বোঝা\s*যাচ্ছে\s*না"""),
+        // "I don't understand this topic" — Assamese
+        Regex("""বুজি\s*পোৱা\s*নাই|বুজা\s*নাই"""),
+        // "I don't understand" — Tamil
+        Regex("""புரியல|புரியவில்லை|விளங்கல"""),
+        // "I don't understand" — Telugu
+        Regex("""అర్థం\s*కాలేదు|అర్థం\s*కాలె"""),
+        // "I don't understand" — Marathi/Hindi (Devanagari)
+        Regex("""समझ\s*नहीं|समजल[ंे]\s*नाही"""),
+        // "I don't understand" — Hinglish (Roman)
+        Regex("""\bsamajh\s*(nahi|nhi|na\s*aa\s*raha|mein\s*nahi)""", RegexOption.IGNORE_CASE),
+        Regex("""\bsamajh\s*(me\s*)?nahi\s*(aa\s*raha|aaya|aata)""", RegexOption.IGNORE_CASE),
+        // English not-understanding + question phrasings
+        Regex("""\b(don'?t|do\s*not|didn'?t|couldn'?t|can'?t)\s+(understand|get\s+it|follow)""", RegexOption.IGNORE_CASE),
+        Regex("""\b(not\s+clear|unclear\s+to\s+me|confused\s+about)""", RegexOption.IGNORE_CASE),
+        // "sir, how is X different from Y" academic doubt stems
+        Regex("""\b(how\s+is\s+.+\s+different\s+from|why\s+is\s+.+\?|what\s+is\s+the\s+difference\s+between)""", RegexOption.IGNORE_CASE),
+        // Doubt-session / doubt-class formats
+        Regex("""\bdoubt[-\s]?(class|session|clearing|solving)""", RegexOption.IGNORE_CASE),
+    )
+
+    /**
+     * True when [text] reads as a study doubt ("I don't understand this
+     * topic", "doubt: ...", academic not-understanding phrasings) rather
+     * than entertainment. The guard pipeline calls this BEFORE the
+     * content-classifier block band: a doubt is STUDY, never a block.
+     */
+    fun isStudyDoubt(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return false
+        // Doubt phrasings are short; long screens are judged by the brain.
+        if (trimmed.length > 400) return false
+        return DOUBT_REGEXES.any { it.containsMatchIn(trimmed) }
+    }
 }

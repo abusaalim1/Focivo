@@ -18,14 +18,16 @@ import kotlinx.serialization.json.jsonPrimitive
  * logistic-regression judges sharing the exact Kotlin inference engine below
  * (same JSON schema, same tokenizer — see inference_spec.md).
  *
- * BRAIN 1 — video titles (Task 6): assets/classifier_bundle.json (v2,
- * 14,744 terms, threshold 0.65). First judge for extracted YouTube titles.
+ * BRAIN 1 — video titles (Task 6): assets/classifier_bundle.json (v3,
+ * 15,109 terms, threshold 0.65). First judge for extracted YouTube titles.
  * BRAIN 2 — screen content (Task 9): assets/classifier_bundle_content.json
- * (v1, 14,933 terms, threshold 0.80). First judge for general screen text
+ * (v3, 14,805 terms, threshold 0.69). First judge for general screen text
  * (the GeminiStudyContentJudge route for non-YouTube screen text).
  *
- * Trained metrics — titles: held-out 99.71% acc, zero false-blocks at 0.65;
- * screen content: held-out 99.89% acc, falseBlock 0.0000 everywhere.
+ * Trained metrics (v3) — titles: held-out 99.73% acc, zero false-blocks at
+ * 0.65; screen content: held-out 99.12% acc at 0.69 (falseBlock 0.0025;
+ * regional doubt phrasings are additionally shielded by the explicit
+ * study-doubt gate in the guard pipeline — see OnDeviceStudyClassifier).
  *
  * Verdict bands (block threshold read from each bundle so retrains never need
  * code changes; the strong-study band was validated per brain):
@@ -67,8 +69,8 @@ object LocalTitleClassifier {
     const val STRONG_STUDY_MAX_P_ENT = 0.20
 
     /** Bundle versions this code was verified against. */
-    const val EXPECTED_TITLE_BUNDLE_VERSION = 2
-    const val EXPECTED_CONTENT_BUNDLE_VERSION = 1
+    const val EXPECTED_TITLE_BUNDLE_VERSION = 3
+    const val EXPECTED_CONTENT_BUNDLE_VERSION = 3
 
     enum class TitleDecision { ENTERTAINMENT, STRONG_STUDY, UNCERTAIN }
 

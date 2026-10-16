@@ -2220,8 +2220,9 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         com.example.util.saveActivePomodoroState(getApplication(), next)
         setMode(next.phaseModeLabel(), next.phaseMinutes())
         Log.i(TAG, "Pomodoro phase -> ${next.phaseModeLabel()} (${next.phaseMinutes()}m)")
-        // Quiet phase start: no "Session started" banner mid-cycle.
-        startTimer(quietPhaseStart = true)
+        // Quiet phase start: no "Session started" banner mid-cycle, and no
+        // lock-in animation (the session is already running).
+        startTimerInternal(quietPhaseStart = true)
     }
 
     fun confirmPreStudyBlock(selectedPackages: Set<String>, saveForFuture: Boolean) {
@@ -2266,7 +2267,58 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * v1.2.3 (final assembly) — Motion Lab "Lock-in start".
+     *
+     * Public session-start entry: plays the lock-in animation (the user's
+     * real blocked apps locking in) and only then starts the timer for
+     * real. Quiet phase starts (pomodoro mid-cycle) skip the animation.
+     * Use [startTimerInternal] for resume-style starts with no animation.
+     */
+    data class LockInStartRequest(
+        val overrideBlockedList: String?,
+        val quietPhaseStart: Boolean
+    )
+
+    private val _showLockInStart = MutableStateFlow(false)
+    val showLockInStart: StateFlow<Boolean> = _showLockInStart.asStateFlow()
+
+    private val _lockInBlockedPackages = MutableStateFlow<List<String>>(emptyList())
+    val lockInBlockedPackages: StateFlow<List<String>> = _lockInBlockedPackages.asStateFlow()
+
+    private var pendingLockInStart: LockInStartRequest? = null
+
     fun startTimer(overrideBlockedList: String? = null, quietPhaseStart: Boolean = false) {
+        if (_isTimerRunning.value) return
+        if (quietPhaseStart) {
+            startTimerInternal(overrideBlockedList, quietPhaseStart)
+            return
+        }
+        // Resolve the blocked packages the overlay will show (real apps).
+        val prefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
+        val raw = overrideBlockedList ?: prefs.blockedAppsList
+        _lockInBlockedPackages.value = raw.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        pendingLockInStart = LockInStartRequest(overrideBlockedList, quietPhaseStart)
+        _showLockInStart.value = true
+        Log.i(TAG, "Lock-in start animation shown")
+    }
+
+    /** Fired by the lock-in overlay when its animation completes. */
+    fun proceedAfterLockInAnimation() {
+        _showLockInStart.value = false
+        val req = pendingLockInStart
+        pendingLockInStart = null
+        startTimerInternal(req?.overrideBlockedList, req?.quietPhaseStart ?: false)
+    }
+
+    /** System back during the lock-in animation: cancel the start entirely. */
+    fun dismissLockInStart() {
+        _showLockInStart.value = false
+        pendingLockInStart = null
+        Log.i(TAG, "Lock-in start dismissed — session not started")
+    }
+
+    fun startTimerInternal(overrideBlockedList: String? = null, quietPhaseStart: Boolean = false) {
         if (_isTimerRunning.value) return
 
         // v1.1: pomodoro — arm the cycle engine. The first Focus phase starts
@@ -2695,7 +2747,8 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun resumeTimer() {
-        startTimer()
+        // Resume never replays the lock-in animation.
+        startTimerInternal()
     }
 
     fun addFiveMinutes() {
