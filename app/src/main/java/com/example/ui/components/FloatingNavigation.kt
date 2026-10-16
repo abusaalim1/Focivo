@@ -53,14 +53,6 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AppleLinearFontFamily
 import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.LocalAppAccent
-import com.example.ui.theme.MutedBorderLight
-import com.example.ui.theme.NearBlack
-import com.example.ui.theme.PureWhite
-import com.example.ui.theme.RegainLimeContainer
-import com.example.ui.theme.RegainLimeDeepText
-import com.example.ui.theme.RegainLimeLight
-import com.example.ui.theme.RegainLimePrimary
-import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
 
 enum class NavTab(

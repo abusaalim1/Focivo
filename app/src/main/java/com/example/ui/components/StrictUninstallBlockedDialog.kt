@@ -37,6 +37,11 @@ import com.example.ui.theme.isAppInDarkTheme
  * mode is active (owner spec). The host Activity shows this when it receives
  * [com.example.util.StrictUninstallGuard.ACTION_STRICT_UNINSTALL_BLOCKED].
  *
+ * SUPERSEDED (v1.2.3, owner 2026-10-16): production now shows
+ * [StrictUninstallBlockedOverlay] instead. This dialog is kept only so the
+ * v122 historical screenshot test still compiles; do not wire it into new
+ * flows.
+ *
  * Wiring (for the host — MainActivity owns its composition):
  * ```
  * var showStrictUninstallBlocked by remember { mutableStateOf(false) }

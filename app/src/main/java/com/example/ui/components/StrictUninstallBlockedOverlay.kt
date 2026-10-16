@@ -16,6 +16,7 @@ import androidx.compose.animation.slideOutVertically
 import com.example.util.MascotPose
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,16 +71,37 @@ import com.example.ui.theme.focivoTokens
 fun StrictUninstallBlockedOverlay(
     remainingSeconds: Int,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Test-only: when non-null, the staged reveal is pinned to this stage and
+    // the LaunchedEffect delays are skipped (Roborazzi cannot wait on them).
+    testStage: Int? = null
 ) {
     val T = focivoTokens()
+    val scope = rememberCoroutineScope()
+    // Shared press source for the CTA: pressFeedback() owns an internal
+    // interaction source that a separate clickable() never feeds, so without
+    // this the CTA press animation is silently dead.
+    val ctaInteraction = remember { MutableInteractionSource() }
 
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
 
+    // Animated dismiss: play the exit transitions first, then notify the
+    // host. Without this the parent removes the whole overlay instantly and
+    // the exit animations below never run.
+    fun animatedDismiss() {
+        if (!entered) return
+        entered = false
+        scope.launch {
+            kotlinx.coroutines.delay(280)
+            onDismiss()
+        }
+    }
+
     // Staged reveal: each line appears after the previous one.
-    var stage by remember { mutableStateOf(0) }
+    var stage by remember { mutableStateOf(testStage ?: 0) }
     LaunchedEffect(entered) {
+        if (testStage != null) return@LaunchedEffect
         if (!entered) return@LaunchedEffect
         kotlinx.coroutines.delay(120)
         stage = 1
@@ -271,10 +294,13 @@ fun StrictUninstallBlockedOverlay(
                             .background(
                                 RegainLimePrimary.copy(alpha = glowAlpha)
                             )
-                            .pressFeedback()
+                            .pressFeedback(interactionSource = ctaInteraction)
                             .clip(RoundedCornerShape(18.dp))
                             .background(RegainLimePrimary)
-                            .clickable(onClick = onDismiss)
+                            .clickable(
+                                interactionSource = ctaInteraction,
+                                onClick = { animatedDismiss() }
+                            )
                             .padding(horizontal = 34.dp, vertical = 15.dp),
                         contentAlignment = Alignment.Center
                     ) {

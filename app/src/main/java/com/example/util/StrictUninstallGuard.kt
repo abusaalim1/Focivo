@@ -30,7 +30,7 @@ import com.example.MainActivity
  *    regular device-admin app.
  *  - [notifyStrictUninstallBlocked]: brings Focivo to the foreground with
  *    [ACTION_STRICT_UNINSTALL_BLOCKED] so the host Activity can show
- *    [com.example.ui.components.StrictUninstallBlockedDialog]. Intended to
+ *    [com.example.ui.components.StrictUninstallBlockedOverlay]. Intended to
  *    be called from the uninstaller-interception path when an uninstall is
  *    attempted while strict mode is active.
  */

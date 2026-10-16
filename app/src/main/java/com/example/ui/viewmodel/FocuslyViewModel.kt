@@ -296,7 +296,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     val showSessionDonationPrompt: StateFlow<Boolean> = _showSessionDonationPrompt.asStateFlow()
 
     // v1.2.2 — strict-mode uninstall attempt popup (triggered by MainActivity's
-    // uninstaller intercept intent; dialog content is StrictUninstallBlockedDialog).
+    // uninstaller intercept intent; overlay content is StrictUninstallBlockedOverlay).
     private val _showStrictUninstallBlocked = MutableStateFlow(false)
     val showStrictUninstallBlocked: StateFlow<Boolean> = _showStrictUninstallBlocked.asStateFlow()
     fun triggerStrictUninstallBlocked() { _showStrictUninstallBlocked.value = true }
