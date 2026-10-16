@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -1081,13 +1082,17 @@ fun TimerFacePicker(
                 tint = Color(0xFFFFD54F),
                 modifier = Modifier.size(18.dp)
             )
-            Text(
-                text = "Your Focus Points: $focusPoints",
+            // Motion Lab #7 — points balance rolls like an odometer.
+            val pointsStyle = TextStyle(
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
                 color = textPrimary
             )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "Your Focus Points: ", style = pointsStyle)
+                RollingNumber(value = focusPoints, style = pointsStyle)
+            }
         }
         Row(
             modifier = Modifier

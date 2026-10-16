@@ -53,7 +53,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.components.BuddyMascot
+import com.example.ui.components.OutfitUnlockPreview
+import com.example.ui.components.PendingUnlock
+import com.example.ui.components.UnlockCelebrationOverlay
+import com.example.ui.components.formatPoints
 import com.example.ui.components.pressFeedback
+import com.example.ui.components.rememberNewlyUnlockedIds
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SecondaryTextLight
@@ -101,6 +106,40 @@ fun MascotScreen(
     // v1.2.1 re-lock: the equipped set can never be a locked one.
     LaunchedEffect(focusPoints) {
         MascotWardrobe.ensureEquippedUnlocked(focusPoints)
+    }
+    // Motion Lab "Theme unlock": celebrate genuinely-new outfit-set threshold
+    // crossings (threshold model — points are never spent). First observation
+    // seeds silently (persisted), so only real crossings celebrate.
+    val outfitUnlocks = rememberNewlyUnlockedIds(
+        allIds = OUTFIT_SETS.map { it.id },
+        isUnlocked = { id -> outfitSetById(id)?.isUnlocked(focusPoints) == true },
+        focusPoints = focusPoints,
+        seenKey = "unlock_seen_outfit_sets"
+    )
+    var outfitUnlockQueue by remember { mutableStateOf(listOf<PendingUnlock>()) }
+    var activeOutfitUnlock by remember { mutableStateOf<PendingUnlock?>(null) }
+
+    LaunchedEffect(outfitUnlocks.newlyUnlocked) {
+        val fresh = outfitUnlocks.newlyUnlocked.mapNotNull { id ->
+            outfitSetById(id)?.let { set ->
+                PendingUnlock(
+                    title = set.name,
+                    subtitle = "${formatPoints(set.unlockPoints)} Focus Points reached",
+                    accent = Color(set.accentColor),
+                    preview = { OutfitUnlockPreview(set) }
+                )
+            }
+        }
+        if (fresh.isNotEmpty()) {
+            outfitUnlockQueue = outfitUnlockQueue + fresh
+            outfitUnlocks.consume()
+        }
+    }
+    LaunchedEffect(outfitUnlockQueue, activeOutfitUnlock) {
+        if (activeOutfitUnlock == null && outfitUnlockQueue.isNotEmpty()) {
+            activeOutfitUnlock = outfitUnlockQueue.first()
+            outfitUnlockQueue = outfitUnlockQueue.drop(1)
+        }
     }
     // Pending set — local to this screen until Save is tapped.
     var pendingSetId by remember(savedSetId) { mutableStateOf(savedSetId) }
@@ -416,5 +455,18 @@ fun MascotScreen(
                 }
             }
         }
+    }
+
+    // Unlock celebration overlay — draws above the screen; the locked-set
+    // info dialog above is unchanged (it explains locked sets, this
+    // celebrates actual unlocks).
+    activeOutfitUnlock?.let { unlock ->
+        UnlockCelebrationOverlay(
+            title = unlock.title,
+            subtitle = unlock.subtitle,
+            accent = unlock.accent,
+            preview = unlock.preview,
+            onDone = { activeOutfitUnlock = null }
+        )
     }
 }

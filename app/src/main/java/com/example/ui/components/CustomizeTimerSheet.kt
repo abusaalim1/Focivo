@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -151,6 +152,71 @@ fun CustomizeTimerSheet(
     val prefsFlow = remember(context) { FocuslyRepository.getInstance(context).userPreferences }
     val prefs by prefsFlow.collectAsState(initial = null)
     val focusPoints = prefs?.focusPoints ?: 0
+
+    // Motion Lab "Theme unlock": celebrate genuinely-new threshold crossings
+    // for timer themes AND timer faces (threshold model — an unlock moment =
+    // lifetime Focus Points newly reaching a tier; points are never spent).
+    // First observation seeds silently (persisted), so only real crossings
+    // celebrate. The first queued item shows; the rest wait their turn.
+    val themeUnlocks = rememberNewlyUnlockedIds(
+        allIds = TimerThemeManager.THEMES.map { it.id },
+        isUnlocked = { id -> TimerThemeManager.getTheme(id).isUnlocked(focusPoints) },
+        focusPoints = focusPoints,
+        seenKey = "unlock_seen_timer_themes"
+    )
+    val faceUnlocks = rememberNewlyUnlockedIds(
+        allIds = TimerFaceManager.FACES.map { it.id },
+        isUnlocked = { id -> TimerFaceManager.getFace(id).isUnlocked(focusPoints) },
+        focusPoints = focusPoints,
+        seenKey = "unlock_seen_timer_faces"
+    )
+    var unlockQueue by remember { mutableStateOf(listOf<PendingUnlock>()) }
+    var activeUnlock by remember { mutableStateOf<PendingUnlock?>(null) }
+
+    LaunchedEffect(themeUnlocks.newlyUnlocked, faceUnlocks.newlyUnlocked) {
+        val fresh = buildList {
+            themeUnlocks.newlyUnlocked.forEach { id ->
+                TimerThemeManager.THEMES.find { it.id == id }?.let { theme ->
+                    add(
+                        PendingUnlock(
+                            title = theme.name,
+                            subtitle = "${formatPoints(theme.unlockPoints)} Focus Points reached",
+                            accent = theme.accent,
+                            preview = { ThemeUnlockPreview(theme) }
+                        )
+                    )
+                }
+            }
+            faceUnlocks.newlyUnlocked.forEach { id ->
+                TimerFaceManager.FACES.find { it.id == id }?.let { face ->
+                    add(
+                        PendingUnlock(
+                            title = face.name,
+                            subtitle = "${formatPoints(face.unlockPoints)} Focus Points reached",
+                            accent = Color(0xFFB6F13A),
+                            preview = {
+                                TimerFaceThumbnail(
+                                    faceId = face.id,
+                                    modifier = Modifier.width(150.dp)
+                                )
+                            }
+                        )
+                    )
+                }
+            }
+        }
+        if (fresh.isNotEmpty()) {
+            unlockQueue = unlockQueue + fresh
+            themeUnlocks.consume()
+            faceUnlocks.consume()
+        }
+    }
+    LaunchedEffect(unlockQueue, activeUnlock) {
+        if (activeUnlock == null && unlockQueue.isNotEmpty()) {
+            activeUnlock = unlockQueue.first()
+            unlockQueue = unlockQueue.drop(1)
+        }
+    }
 
     lockedDialogTheme?.let { lockedTheme ->
         LockedThemeDialog(
@@ -554,6 +620,19 @@ fun CustomizeTimerSheet(
                 item { Spacer(modifier = Modifier.height(28.dp)) }
             }
         }
+    }
+
+    // Unlock celebration overlay — draws above the sheet; LockedThemeDialog /
+    // LockedTimerFaceDialog above are unchanged (they explain locked items,
+    // this celebrates actual unlocks).
+    activeUnlock?.let { unlock ->
+        UnlockCelebrationOverlay(
+            title = unlock.title,
+            subtitle = unlock.subtitle,
+            accent = unlock.accent,
+            preview = unlock.preview,
+            onDone = { activeUnlock = null }
+        )
     }
 }
 
