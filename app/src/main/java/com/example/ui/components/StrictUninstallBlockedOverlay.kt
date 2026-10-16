@@ -118,7 +118,7 @@ fun StrictUninstallBlockedOverlay(
                     animationSpec = tween(380, easing = FastOutSlowInEasing)
                 ),
             exit = fadeOut(animationSpec = tween(200)) +
-                scaleIn(initialScale = 0.96f)
+                scaleOut(targetScale = 0.96f)
         ) {
             Column(
                 modifier = Modifier
