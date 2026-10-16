@@ -268,6 +268,16 @@ class FocusTimerService : Service() {
             getSharedPreferences(PREFS_TIMER_STATE, Context.MODE_PRIVATE).edit()                .putBoolean(KEY_TIMER_RUNNING, false)
                 .apply()
         } catch (_: Exception) {}
+        // v1.2.3 phantom-lock fix (RC2): the deep-focus home-screen block
+        // reads the persisted key_deep_focus_session_active flag, which was
+        // only cleared by the ViewModel's pauseTimer(). If the timer dies
+        // through the service (completion with dead UI, onDestroy, stop
+        // action), the flag stuck true forever -> launcher re-blocked with
+        // no session running. clearTimerPrefs() is the choke point on every
+        // stop/completion path, so clear it here too.
+        try {
+            com.example.util.DeepFocusManager.setDeepFocusSessionActive(this, false)
+        } catch (_: Exception) {}
         // v1.5.0: the pill must disappear the moment the timer stops or completes.
         // clearTimerPrefs() is the choke point on every stop/completion path.
         try {

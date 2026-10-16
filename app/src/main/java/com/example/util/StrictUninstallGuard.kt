@@ -55,13 +55,24 @@ object StrictUninstallGuard {
     }
 
     fun notifyStrictUninstallBlocked(context: Context) {
+        // v1.2.3: FIRST re-assert the launcher entry — a blocked uninstall
+        // attempt is exactly when OEM launchers have been seen dropping our
+        // icon (zombie state: icon gone, package present, services running).
+        reassertLauncherEntryEnabled(context)
         try {
+            // v1.2.3: NO FLAG_ACTIVITY_CLEAR_TOP here — the previous build
+            // yanked MainActivity with CLEAR_TOP while the package installer
+            // was mid-uninstall-flow, aborting the installer task AFTER the
+            // launcher had optimistically dropped the icon (the zombie
+            // trigger). SINGLE_TOP + NEW_TASK only: the window-safe a11y
+            // overlay (BlockOverlayManager.intercept) is the first responder
+            // over the installer; the installer task stays intact so backing
+            // out restores the launcher state instead of aborting it.
             val intent = Intent(context, MainActivity::class.java).apply {
                 action = ACTION_STRICT_UNINSTALL_BLOCKED
                 addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
                 )
             }
             context.startActivity(intent)

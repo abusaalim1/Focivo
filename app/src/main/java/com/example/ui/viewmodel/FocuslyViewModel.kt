@@ -2401,7 +2401,24 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             } else {
                 app.startService(timerIntent)
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+            // v1.2.3 phantom-lock fix (RC3): the manual-timer flags were
+            // pre-written above BEFORE the service started. If the service
+            // never starts (e.g. background-start restriction), those flags
+            // stayed true until end-time -> the guard treated it as an
+            // active study period with nothing actually running. Roll them
+            // back on start failure.
+            try {
+                val prefs = app.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putBoolean("is_manual_timer_running", false)
+                    .putLong("manual_timer_end_time_ms", 0L)
+                    .apply()
+                val tPrefs = app.getSharedPreferences("focusly_timer_state", Context.MODE_PRIVATE)
+                tPrefs.edit().putBoolean("is_timer_running", false).apply()
+                com.example.util.StrictModeManager.setSessionActive(app, false)
+            } catch (_: Exception) {}
+        }
 
         // 2. Evaluate permissions and auto-activate Focus Shield & AI Study Guard
         val hasUsage = com.example.ui.components.FocusShieldPermissions.hasUsageStatsPermission(app)

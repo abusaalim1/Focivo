@@ -872,10 +872,15 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     )
                 }
 
-                // v1.2.2 — strict-mode uninstall attempt popup (owner spec copy).
+                // v1.2.3 — premium animated uninstall-blocked overlay (owner spec):
+                // shows when an uninstall is attempted while Strict Mode
+                // blocks it. Replaces the static dialog.
                 val showStrictUninstallBlocked by viewModel.showStrictUninstallBlocked.collectAsState()
                 if (showStrictUninstallBlocked) {
-                    com.example.ui.components.StrictUninstallBlockedDialog(
+                    val uninstallCtx = androidx.compose.ui.platform.LocalContext.current
+                    val strictRem = com.example.service.FocusShieldService.getRemainingSeconds(uninstallCtx)
+                    com.example.ui.components.StrictUninstallBlockedOverlay(
+                        remainingSeconds = strictRem,
                         onDismiss = { viewModel.dismissStrictUninstallBlocked() }
                     )
                 }

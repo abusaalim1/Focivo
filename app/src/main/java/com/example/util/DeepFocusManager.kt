@@ -30,7 +30,19 @@ object DeepFocusManager {
     fun init(context: Context) {
         val prefs = getPrefs(context)
         val isEnabled = prefs.getBoolean(KEY_DEEP_FOCUS_ENABLED, false)
-        val isActive = prefs.getBoolean(KEY_DEEP_FOCUS_SESSION_ACTIVE, false)
+        var isActive = prefs.getBoolean(KEY_DEEP_FOCUS_SESSION_ACTIVE, false)
+        // v1.2.3 phantom-lock fix (RC2 purge): if a previous install left
+        // the session flag stuck true (service died without the ViewModel's
+        // pauseTimer), drop it here at boot — a deep-focus lock with no
+        // study period is never legitimate.
+        if (isActive) {
+            try {
+                if (!com.example.util.AiStudyGuardManager.isStudyPeriodActive(context)) {
+                    prefs.edit().putBoolean(KEY_DEEP_FOCUS_SESSION_ACTIVE, false).apply()
+                    isActive = false
+                }
+            } catch (_: Exception) { }
+        }
         _isDeepFocusEnabledState.value = isEnabled
         _isDeepFocusActiveState.value = isActive
     }
