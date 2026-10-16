@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -119,6 +120,11 @@ fun CustomizeTimerSheet(
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // v1.2.3 (Task 11): stop any alarm-tone preview when the sheet closes.
+    DisposableEffect(Unit) {
+        onDispose { com.example.util.SoundFx.stopAlarmPreview() }
+    }
 
     val T = focivoTokens()
     val isDark = T.isDark
@@ -415,6 +421,29 @@ fun CustomizeTimerSheet(
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
+                        text = "Alarm tone",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        color = textSecondary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Plays when your timer ends. Tap to preview.",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Normal,
+                        fontSize = 11.sp,
+                        color = textSecondary.copy(alpha = 0.75f)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    AlarmTonePicker(
+                        textPrimary = textPrimary,
+                        cardBg = cardBg,
+                        cardBorder = cardBorder,
+                        selectedBg = selectedBg
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
                         text = "Theme",
                         fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.SemiBold,
@@ -685,6 +714,46 @@ private fun CustomizeChip(
             fontSize = 12.sp,
             color = textPrimary
         )
+    }
+}
+
+/**
+ * v1.2.3 (Task 11) — alarm-tone picker: all tones as chips, tap selects AND
+ * previews the tone. Selection persists via [AlarmToneManager]; the
+ * timer-end alarm plays the selected tone.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AlarmTonePicker(
+    textPrimary: Color,
+    cardBg: Color,
+    cardBorder: Color,
+    selectedBg: Color
+) {
+    val context = LocalContext.current
+    var selectedId by remember { mutableStateOf(com.example.util.AlarmToneManager.getSelectedId(context)) }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        com.example.util.AlarmToneManager.TONES.forEach { tone ->
+            val isChosen = tone.id == selectedId
+            CustomizeChip(
+                text = tone.displayName,
+                selected = isChosen,
+                onClick = {
+                    com.example.util.AlarmToneManager.setSelectedId(context, tone.id)
+                    selectedId = tone.id
+                    com.example.util.SoundFx.playAlarmPreview(context, tone.resId)
+                },
+                textPrimary = textPrimary,
+                cardBg = cardBg,
+                cardBorder = cardBorder,
+                selectedBg = selectedBg,
+                testTag = "customize_alarm_tone_${tone.id}"
+            )
+        }
     }
 }
 
