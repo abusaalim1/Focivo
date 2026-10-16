@@ -365,10 +365,33 @@ class V123RedesignScreenshotsTest {
     }
 
     // ── Past Focus Sessions log (owner report 2026-10-16: was still old design)
+    // NOTE: explicit ids — LazyColumn keys on session.id, and the default
+    // id (System.currentTimeMillis()) collides when built in one batch.
+    private fun fakeLogSessions() = listOf(
+        FocusSessionEntity(
+            id = 101L,
+            taskTitle = "Physics",
+            mode = "Deep Work",
+            durationSeconds = 3600,
+            focusPointsEarned = 60,
+            distractionsCount = 0,
+            completedAt = System.currentTimeMillis()
+        ),
+        FocusSessionEntity(
+            id = 102L,
+            taskTitle = "Maths",
+            mode = "Classic",
+            durationSeconds = 1500,
+            focusPointsEarned = 25,
+            distractionsCount = 2,
+            completedAt = System.currentTimeMillis() - 3_600_000L
+        )
+    )
+
     @Test
     fun v123_redesign_session_log_dark() = shot(true, "v123_redesign_session_log_dark") {
         FocusSessionLogScreen(
-            sessions = fakeSessions(),
+            sessions = fakeLogSessions(),
             onBack = {},
             onStartNewSession = {},
             onDeleteSession = {}
@@ -378,7 +401,7 @@ class V123RedesignScreenshotsTest {
     @Test
     fun v123_redesign_session_log_light() = shot(false, "v123_redesign_session_log_light") {
         FocusSessionLogScreen(
-            sessions = fakeSessions(),
+            sessions = fakeLogSessions(),
             onBack = {},
             onStartNewSession = {},
             onDeleteSession = {}
