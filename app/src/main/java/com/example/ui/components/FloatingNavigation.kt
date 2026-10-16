@@ -21,10 +21,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,18 +46,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AppleLinearFontFamily
@@ -97,7 +95,6 @@ fun FloatingNavigation(
 ) {
     val view = LocalView.current
     val isDark = isAppInDarkTheme()
-    val density = LocalDensity.current
 
     val barBg = focivoTokens().surface.copy(alpha = 0.92f)
     val barBorder = focivoTokens().line
@@ -144,17 +141,13 @@ fun FloatingNavigation(
         animationSpec = tween(150),
         label = "pill_width"
     )
-    val pillWidthDp = with(density) { pillWidthPx.toDp() }
-
-    // Read pillX.value in composition so the stretch recomputes every animation frame.
-    val pillPos = pillX.value
-    val stretch = (abs(pillX.velocity) / 900f).coerceIn(0f, 1f)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .testTag("floating_nav"),
         contentAlignment = Alignment.Center
     ) {
         // Apple-inspired Floating Dock
@@ -172,24 +165,36 @@ fun FloatingNavigation(
                 .padding(horizontal = 7.dp, vertical = 5.dp)
         ) {
             // Coordinate space for the liquid pill.
+            // v1.2.3-hotfix: the pill is painted with drawBehind — NEVER a
+            // layout child. The previous build used a fillMaxHeight() child
+            // Box here; inside this wrap-content parent that resolved to the
+            // Scaffold bottomBar slot's full loose height, blowing the whole
+            // nav bar up into a screen-tall capsule on real devices. A
+            // draw-behind paint cannot participate in measurement, so this
+            // class of bug is impossible by construction.
             Box(
-                modifier = Modifier.onGloballyPositioned { navOriginX = it.localToRoot(Offset.Zero).x }
-            ) {
-                // Single liquid pill drawn BEHIND the tabs (first child = back).
-                // It has no click handling, so tabs on top receive all touches.
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .offset { IntOffset((pillPos - pillWidthPx / 2f).roundToInt(), 0) }
-                        .graphicsLayer {
-                            scaleX = 1f + stretch * 0.4f
-                            transformOrigin = TransformOrigin.Center
+                modifier = Modifier
+                    .onGloballyPositioned { navOriginX = it.localToRoot(Offset.Zero).x }
+                    .drawBehind {
+                        // State reads inside drawBehind invalidate the drawing
+                        // every animation frame without triggering recomposition.
+                        val pos = pillX.value
+                        val wPx = pillWidthPx
+                        if (wPx > 0.5f) {
+                            // Lab stretch: widen mid-travel, keep centered.
+                            val stretchNow = (abs(pillX.velocity) / 900f).coerceIn(0f, 1f)
+                            val w = wPx * (1f + stretchNow * 0.4f)
+                            val x = pos - w / 2f
+                            drawRoundRect(
+                                color = activeBg,
+                                topLeft = Offset(x, 0f),
+                                size = Size(w, size.height),
+                                cornerRadius = CornerRadius(size.height / 2f, size.height / 2f)
+                            )
                         }
-                        .clip(CircleShape)
-                        .background(activeBg)
-                        .width(pillWidthDp)
-                )
-
+                    }
+            ) {
+                // Tabs paint on top of the pill; they keep all touch handling.
                 Row(
                     modifier = Modifier.padding(horizontal = 3.dp),
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
