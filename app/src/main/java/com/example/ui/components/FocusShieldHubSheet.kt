@@ -57,6 +57,9 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -92,6 +95,7 @@ import com.example.R
 import com.example.data.SupabasePunishmentLogDto
 import com.example.data.SupabaseScheduledBlockDto
 import com.example.service.ScheduledBlockScheduler
+import com.example.service.StrictLockInManager
 import com.example.ui.screens.StudyChannelsScreen
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
@@ -450,6 +454,9 @@ fun FocusShieldHubSheet(
     var selectedDurationMinutes by remember { mutableIntStateOf(25) }
     var showPermissionSheet by remember { mutableStateOf(false) }
     var showStudyChannels by remember { mutableStateOf(false) }
+    // v1.2.3 (Task 13.1): strict lock-in — a locked schedule's toggle tap
+    // shows this reason instead of toggling.
+    var lockReasonText by remember { mutableStateOf<String?>(null) }
     var showAiAccessibilityOptInDialog by remember { mutableStateOf(false) }
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var searchQuery by remember { mutableStateOf("") }
@@ -1274,7 +1281,20 @@ fun FocusShieldHubSheet(
                                         }
                                         ShieldToggle(
                                             checked = block.is_enabled,
-                                            onCheckedChange = { onToggleSchedule(block.id, it) }
+                                            onCheckedChange = { checked ->
+                                                // v1.2.3 (Task 13.1): a pre-locked strict schedule
+                                                // cannot be turned off — show the reason.
+                                                if (!checked && StrictLockInManager.isScheduleLocked(context, block.id)) {
+                                                    val mins = StrictLockInManager.minutesLeft(context)
+                                                    lockReasonText = if (mins > 0) {
+                                                        "Locked — your strict study starts in $mins minute${if (mins == 1) "" else "s"} and can no longer be cancelled."
+                                                    } else {
+                                                        "Locked — your strict study is starting and can no longer be cancelled."
+                                                    }
+                                                } else {
+                                                    onToggleSchedule(block.id, checked)
+                                                }
+                                            }
                                         )
                                     }
                                 }
@@ -1698,6 +1718,63 @@ fun FocusShieldHubSheet(
                     showPermissionSheet = false
                     pendingAction?.invoke()
                     pendingAction = null
+                }
+            )
+        }
+
+        // v1.2.3 (Task 13.1): locked-toggle reason — a locked tap does
+        // nothing except show this plain-English reason.
+        lockReasonText?.let { reason ->
+            val T = focivoTokens()
+            AlertDialog(
+                onDismissRequest = { lockReasonText = null },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = T.accentText,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Schedule locked",
+                            style = TextStyle(
+                                fontFamily = PoppinsFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = T.text,
+                                fontSize = 20.sp
+                            )
+                        )
+                    }
+                },
+                text = {
+                    Text(
+                        text = reason,
+                        style = TextStyle(
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.Normal,
+                            color = T.muted,
+                            fontSize = 14.sp
+                        )
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { lockReasonText = null },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = T.accent,
+                            contentColor = T.onAccent
+                        )
+                    ) {
+                        Text(
+                            text = "Got it",
+                            style = TextStyle(
+                                fontFamily = PoppinsFontFamily,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    }
                 }
             )
         }

@@ -149,6 +149,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
     private var a11yShortsWm: WindowManager? = null
     private val a11yShortsLabel = androidx.compose.runtime.mutableStateOf("Shorts")
 
+    // v1.2.3 (Task 13.1) — strict lock-in 10-minute warning overlay
+    // (TYPE_ACCESSIBILITY_OVERLAY layer, fired from the alarm path).
+    private var a11yStrictWarningView: androidx.compose.ui.platform.ComposeView? = null
+    private var a11yStrictWarningHost: com.example.ui.overlay.OverlayLifecycleHost? = null
+    private var a11yStrictWarningWm: WindowManager? = null
+    private val a11yStrictWarningLabel = androidx.compose.runtime.mutableStateOf("")
+    private val a11yStrictWarningStartMs = androidx.compose.runtime.mutableStateOf(0L)
+
     /**
      * v1.2.3 — draw confirmation for the accessibility block overlay.
      * addView succeeding does NOT prove the frame ever composited (the vivo
@@ -170,6 +178,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
 
     /** True when the accessibility-layer Shorts overlay is on screen. */
     fun isA11yShortsOverlayShowing(): Boolean = a11yShortsView != null
+
+    /** True when the accessibility-layer strict warning overlay is on screen. */
+    fun isA11yStrictWarningShowing(): Boolean = a11yStrictWarningView != null
 
     private fun runOnA11yMain(action: () -> Unit) {
         if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) action()
@@ -284,6 +295,70 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yBlockHost = null
             a11yBlockWm = null
             a11yBlockDrawn = false
+        }
+    }
+
+    /**
+     * v1.2.3 (Task 13.1) — shows the strict lock-in 10-minute warning on the
+     * accessibility layer. Must be called on the main thread (StrictLockInManager
+     * routes here via Handler). Returns true when the overlay is (now) showing.
+     */
+    fun showA11yStrictWarningOverlay(subjectLabel: String, startMs: Long): Boolean {
+        if (a11yStrictWarningView != null) {
+            a11yStrictWarningLabel.value = subjectLabel
+            a11yStrictWarningStartMs.value = startMs
+            return true
+        }
+        val host = com.example.ui.overlay.OverlayLifecycleHost()
+        return try {
+            a11yStrictWarningLabel.value = subjectLabel
+            a11yStrictWarningStartMs.value = startMs
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val view = androidx.compose.ui.platform.ComposeView(this).apply {
+                host.installOn(this)
+                setContent {
+                    com.example.ui.theme.FocuslyTheme {
+                        com.example.ui.components.StrictWarningOverlay(
+                            subjectLabel = a11yStrictWarningLabel.value,
+                            startMs = a11yStrictWarningStartMs.value,
+                            onDismiss = { hideA11yStrictWarningOverlay() }
+                        )
+                    }
+                }
+                isFocusableInTouchMode = true
+                setOnKeyListener { _, keyCode, event ->
+                    if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                        hideA11yStrictWarningOverlay()
+                        true
+                    } else false
+                }
+            }
+            host.show()
+            wm.addView(view, a11yOverlayParams())
+            a11yStrictWarningView = view
+            a11yStrictWarningHost = host
+            a11yStrictWarningWm = wm
+            Log.i(TAG, "A11y strict warning overlay shown (TYPE_ACCESSIBILITY_OVERLAY)")
+            true
+        } catch (t: Throwable) {
+            Log.e(TAG, "A11y strict warning overlay failed: ${t.message}")
+            runCatching { host.dismiss() }
+            a11yStrictWarningView = null
+            a11yStrictWarningHost = null
+            a11yStrictWarningWm = null
+            false
+        }
+    }
+
+    /** Hide the accessibility-layer strict warning overlay if visible. Main thread. */
+    fun hideA11yStrictWarningOverlay() {
+        runOnA11yMain {
+            val view = a11yStrictWarningView ?: return@runOnA11yMain
+            try { a11yStrictWarningWm?.removeView(view) } catch (_: Exception) { }
+            runCatching { a11yStrictWarningHost?.dismiss() }
+            a11yStrictWarningView = null
+            a11yStrictWarningHost = null
+            a11yStrictWarningWm = null
         }
     }
 

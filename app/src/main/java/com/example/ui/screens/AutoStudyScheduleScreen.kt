@@ -48,7 +48,9 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,12 +58,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.SupabaseScheduledBlockDto
 import com.example.service.ScheduledBlockScheduler
+import com.example.service.StrictLockInManager
 import com.example.ui.components.GlassCard
 import com.example.ui.components.GlassSwitch
 import com.example.ui.components.MascotPose
@@ -105,6 +109,24 @@ fun AutoStudyScheduleScreen(
     var activeSheetSchedule by remember { mutableStateOf<SupabaseScheduledBlockDto?>(null) }
     var isSheetOpen by remember { mutableStateOf(false) }
     var scheduleToDeleteId by remember { mutableStateOf<String?>(null) }
+
+    // v1.2.3 (Task 13.1): strict lock-in. From the moment the 10-minute
+    // warning fires until the schedule starts, the schedule's toggle is
+    // LOCKED — tapping it shows the plain-English reason instead of
+    // toggling. Re-read every 15s so a warning that fires while the screen
+    // is open takes effect live.
+    val screenContext = LocalContext.current
+    var lockTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(15_000L)
+            lockTick++
+        }
+    }
+    val lockedScheduleId = remember(lockTick, scheduledBlocks) {
+        StrictLockInManager.getLockedScheduleId(screenContext)
+    }
+    var lockReasonText by remember { mutableStateOf<String?>(null) }
 
     fun openNewScheduleSheet() {
         activeSheetSchedule = null
@@ -468,10 +490,23 @@ fun AutoStudyScheduleScreen(
                     }
                 } else {
                     items(scheduledBlocks, key = { it.id }) { schedule ->
+                        val isLocked = lockedScheduleId != null && lockedScheduleId == schedule.id
                         ScheduleCardItem(
                             schedule = schedule,
                             installedApps = installedApps,
-                            onToggle = { isEnabled -> onToggleSchedule(schedule.id, isEnabled) },
+                            isLocked = isLocked,
+                            onToggle = { isEnabled ->
+                                if (isLocked) {
+                                    val mins = StrictLockInManager.minutesLeft(screenContext)
+                                    lockReasonText = if (mins > 0) {
+                                        "Locked — your strict study starts in $mins minute${if (mins == 1) "" else "s"} and can no longer be cancelled."
+                                    } else {
+                                        "Locked — your strict study is starting and can no longer be cancelled."
+                                    }
+                                } else {
+                                    onToggleSchedule(schedule.id, isEnabled)
+                                }
+                            },
                             onEdit = { openEditScheduleSheet(schedule) },
                             onDelete = { scheduleToDeleteId = schedule.id },
                             cardBg = cardBg,
@@ -543,6 +578,57 @@ fun AutoStudyScheduleScreen(
             }
         )
     }
+
+    // v1.2.3 (Task 13.1): locked-toggle reason dialog — a locked tap does
+    // nothing except show this plain-English reason.
+    lockReasonText?.let { reason ->
+        AlertDialog(
+            onDismissRequest = { lockReasonText = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = T.accentText,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Schedule locked",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            color = textPrimary
+                        )
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = reason,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = PoppinsFontFamily,
+                        color = textSecondary
+                    )
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { lockReasonText = null },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RegainLimePrimary,
+                        contentColor = NearBlack
+                    )
+                ) {
+                    Text(
+                        "Got it",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -550,6 +636,7 @@ fun AutoStudyScheduleScreen(
 private fun ScheduleCardItem(
     schedule: SupabaseScheduledBlockDto,
     installedApps: List<DeviceAppInfo>,
+    isLocked: Boolean = false,
     onToggle: (Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -633,6 +720,40 @@ private fun ScheduleCardItem(
                                     maxLines = 1,
                                     softWrap = false
                                 )
+                            }
+                        }
+
+                        // v1.2.3 (Task 13.1): visible lock state while the
+                        // 10-minute warning window is active — the toggle
+                        // does nothing except explain the lock.
+                        if (isLocked) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(focivoTokens().accentText.copy(alpha = 0.16f))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = null,
+                                        tint = focivoTokens().accentText,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "LOCKED",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = PoppinsFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = focivoTokens().accentText,
+                                            fontSize = 9.sp
+                                        ),
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
                             }
                         }
                     }
