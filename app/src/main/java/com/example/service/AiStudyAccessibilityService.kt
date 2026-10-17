@@ -28,6 +28,8 @@ import com.example.util.StudyAllowlistManager
 import com.example.util.StudyGuardKnowledge
 import com.example.util.YouTubeStudyGuardManager
 import com.example.util.YouTubeVideoClassifier
+import com.example.util.brain.BrainBundleLoader
+import com.example.util.brain.FocivoCombinedBrain
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -87,9 +89,12 @@ class AiStudyAccessibilityService : AccessibilityService() {
         // v1.2.3 (Tasks 6 & 9): warm both on-device classifier brains off the
         // main thread so the first title/screen never pays the bundle-parse
         // cost on the accessibility callback thread.
+        // v1.3.0 (Worker E): also warm the ported Focivo repo brain
+        // (model + lexicon + channels).
         serviceScope.launch {
             runCatching { LocalTitleClassifier.get(applicationContext) }
             runCatching { LocalTitleClassifier.getContent(applicationContext) }
+            runCatching { BrainBundleLoader.get(applicationContext) }
         }
         // v1.2.3-hotfix: start the real 5s multi-window sweep loop.
         a11yMainHandler.removeCallbacks(mwSweepRunnable)
@@ -1026,19 +1031,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     playerEvidence = playerEvidence,
                     titleSource = titleSource,
                     title = title.take(60),
+                    fullTitle = title,
                     pEntBand = pEntBand,
                     verdict = verdict,
                     action = action
                 )
             )
         } catch (_: Exception) { }
-    }
-
-    /** p_ent band label for the hub card (title bundle: study <= 0.20, block >= threshold). */
-    private fun pEntBandLabel(pEnt: Double, blockThreshold: Double): String = when {
-        pEnt >= blockThreshold -> ">= %.2f entertainment".format(Locale.ROOT, blockThreshold)
-        pEnt <= LocalTitleClassifier.STRONG_STUDY_MAX_P_ENT -> "<= 0.20 study"
-        else -> "0.20-%.2f uncertain".format(Locale.ROOT, blockThreshold)
     }
 
     @Suppress("DEPRECATION")
@@ -1751,43 +1750,38 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                     //       on-device block.
                                     //   p_ent < 0.20  -> study -> allow locally
                                     //       (no Gemini call needed).
-                                    //   middle        -> Gemini arbiter below
-                                    //       (no key -> existing fail-open).
-                                    // Task-5 hard rules stay supreme: quick-block
-                                    // confidence gating, fail-open, and the
-                                    // discipline semantics are unchanged.
+                                    // v1.3.0 (Worker E): combined brain for screen text —
+                                    // repo brain + v3 content brain. Order inside the
+                                    // judge: corrections -> doubt gate -> combined
+                                    // score -> our bands (p >= 0.80 allow,
+                                    // p <= 0.31 block, middle -> Gemini arbiter
+                                    // below; no key -> existing fail-open).
+                                    // A doubt phrasing can never block once the
+                                    // judge sees it.
                                     val screenText = buildString {
                                         if (!extraction.screenTitle.isNullOrBlank()) append(extraction.screenTitle).append(". ")
                                         extraction.textSnippets.forEach { append(it).append(" ") }
                                     }.trim()
-                                    val contentClf = LocalTitleClassifier.getContent(applicationContext)
-                                    val contentPEnt = if (contentClf != null && screenText.isNotBlank()) {
-                                        contentClf.pEntertainment(screenText)
-                                    } else null
-                                    val contentThreshold = contentClf?.blockThreshold ?: 0.69
-                                    // v1.2.3 (final assembly): explicit study-doubt
-                                    // gate BEFORE the content block band — a doubt
-                                    // phrasing is STUDY, never a block.
-                                    val isDoubt = screenText.isNotBlank() &&
-                                            OnDeviceStudyClassifier.isStudyDoubt(screenText)
+                                    val judgment = runCatching {
+                                        FocivoCombinedBrain.judgeScreen(applicationContext, screenText)
+                                    }.getOrNull()
+                                    val pStr = judgment?.pCombined?.let {
+                                        "p=%.3f".format(Locale.ROOT, it)
+                                    } ?: "no-score"
                                     when {
-                                        isDoubt -> {
-                                            val pEntStr = if (contentPEnt != null) {
-                                                "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
-                                            } else "no-score"
-                                            Log.i(TAG, "[Browser AI Guard] Study doubt detected in $browserLabel ($pEntStr) — allowing")
-                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "STUDY", "study-doubt-allow $pEntStr", urlOrTitle)
+                                        judgment?.tag == "doubt" -> {
+                                            Log.i(TAG, "[Browser AI Guard] Study doubt detected in $browserLabel ($pStr) — allowing")
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "STUDY", "study-doubt-allow $pStr", urlOrTitle)
                                             AiStudyGuardManager.onStudyActivityDetected(
                                                 context = applicationContext,
                                                 packageName = pkg,
                                                 messageText = urlOrTitle
                                             )
                                         }
-                                        contentPEnt != null && contentPEnt >= contentThreshold -> {
-                                            val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
-                                            val reason = "Non-study screen content detected [local-content $pEntStr]"
+                                        judgment?.decision == FocivoCombinedBrain.Decision.BLOCK -> {
+                                            val reason = "Non-study screen content detected [combined-brain $pStr]"
                                             Log.w(TAG, "[Browser AI Guard] $reason in $browserLabel")
-                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "NON_STUDY", "local-content $pEntStr", urlOrTitle)
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "NON_STUDY", "combined-brain $pStr", urlOrTitle)
                                             AiStudyGuardManager.onNonStudyDetected(
                                                 context = applicationContext,
                                                 packageName = pkg,
@@ -1795,9 +1789,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                                 reason = reason
                                             )
                                         }
-                                        contentPEnt != null && contentPEnt < LocalTitleClassifier.STRONG_STUDY_MAX_P_ENT -> {
-                                            val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
-                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "STUDY", "local-content $pEntStr", urlOrTitle)
+                                        judgment?.decision == FocivoCombinedBrain.Decision.ALLOW -> {
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "STUDY", "combined-brain $pStr", urlOrTitle)
                                             AiStudyGuardManager.onStudyActivityDetected(
                                                 context = applicationContext,
                                                 packageName = pkg,
@@ -1805,9 +1798,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                             )
                                         }
                                         else -> {
-                                            if (contentPEnt != null) {
-                                                val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
-                                                AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "UNCERTAIN", "local-content $pEntStr->gemini", urlOrTitle)
+                                            if (judgment?.pCombined != null) {
+                                                AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "UNCERTAIN", "combined-brain $pStr->gemini", urlOrTitle)
                                             }
                                             // Ambient screen check with Gemini
                                             serviceScope.launch {
@@ -2002,21 +1994,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
     }
 
     private fun processYouTubeVideoTitle(title: String, channel: String?, metadata: String?, titleSource: String = ""): Boolean {
-        // v1.2.3 (owner 2026-10-16): study-doubt gate FIRST — mirrors the
-        // browser path. A doubt phrasing ("doubt class", "I don't understand
-        // ...", "how is X different from Y") is STUDY and can never block,
-        // before any classifier or knowledge rule sees the title.
-        if (OnDeviceStudyClassifier.isStudyDoubt(title)) {
-            Log.i(TAG, "[YouTube Guard] Study doubt in title — allowing: '$title'")
-            AiStudyGuardManager.logGuardActivity(
-                applicationContext, "YouTube", "youtube-doubt", "STUDY", "study-doubt-allow", title
-            )
-            recordYouTubeEval(
-                titleSource = titleSource, title = title,
-                pEntBand = "doubt", verdict = "STUDY", action = "allowed"
-            )
-            return false
-        }
+        // v1.3.0 (Worker E): evaluation order is now
+        //   user channel lists -> combined brain -> knowledge -> quick -> Gemini,
+        // where the combined brain itself runs
+        //   repo channels -> corrections -> doubt gate -> combined score -> our bands.
+        // The doubt gate moved INSIDE the combined judge (FocivoCombinedBrain):
+        // the user's own channel lists and their explicit corrections outrank
+        // the heuristic doubt shield; a doubt phrasing still can never block
+        // once the judge sees it.
 
         // v1.2.3 (B): the user's channel BLOCKLIST beats everything — an
         // explicitly blocked channel is blocked outright whenever its video
@@ -2057,48 +2042,59 @@ class AiStudyAccessibilityService : AccessibilityService() {
             return false
         }
 
-        // v1.1.8: curated offline knowledge first — instant (<1ms), zero network.
-        // v1.2.3 (Task 6, bundle v3): on-device title classifier is the FIRST
-        // title judge, ahead of the knowledge pack. Fully offline (no key,
-        // no network, <1ms): TF-IDF + logistic regression bundle (assets,
-        // v3: 15,109 terms). Held-out 99.73% acc with ZERO false-blocks at
-        // p_ent >= 0.65.
-        //   p_ent >= 0.65 -> ENTERTAINMENT -> same discipline flow as a
-        //                   high-confidence knowledge NON_STUDY.
-        //   p_ent <= 0.20 -> STRONG_STUDY -> allow locally (zero entertainment
-        //                   titles at/below 0.20 in the 5233-title corpus).
-        //   middle        -> UNCERTAIN -> fall through to the existing
-        //                   knowledge -> quick -> Gemini chain below (Gemini
-        //                   arbitrates when a key exists; no key -> the
-        //                   existing fail-open rules apply).
+        // v1.3.0 (Worker E): the combined on-device brain is the FIRST title
+        // judge, ahead of the knowledge pack. Fully offline (no key, no
+        // network, <2ms): ported Focivo repo brain (channel lists + 354 cue
+        // rules + 33k ML weights + user corrections) averaged with the v3
+        // TF-IDF brain: p_combined = 0.5*p_repo + 0.5*p_v3 (single-brain
+        // fallback when the other bundle is missing).
+        // Bands (P_study): >= 0.80 -> ALLOW; <= 0.35 -> BLOCK (high
+        // confidence only); middle -> UNCERTAIN -> fall through to the
+        // existing knowledge -> quick -> Gemini chain below (Gemini
+        // arbitrates when a key exists; no key -> the existing fail-open
+        // rules apply).
+        // Inside the judge: repo channels -> corrections -> doubt gate ->
+        // combined score. The user's own channel lists above still win; a
+        // doubt phrasing can never block once the judge sees it.
         // Hard rules stay supreme: this only ever sees actual-playback titles
-        // (callers gate on player evidence), and user channel lists above win.
+        // (callers gate on player evidence).
         if (title.isNotBlank()) {
-            val localClassifier = LocalTitleClassifier.get(applicationContext)
-            if (localClassifier == null) {
+            val judgment = runCatching {
+                FocivoCombinedBrain.judgeTitle(applicationContext, title, channel)
+            }.getOrNull()
+            if (judgment == null) {
                 AiStudyGuardManager.logGuardActivity(
                     applicationContext, "YouTube", "youtube-local", "UNCERTAIN",
-                    "bundle-load-failed->existing-chain", title
+                    "combined-brain-error->existing-chain", title
                 )
             } else {
-                val localPEnt = localClassifier.pEntertainment(title)
-                val pEntStr = "p_ent=%.3f".format(Locale.ROOT, localPEnt)
-                when (localClassifier.decide(localPEnt)) {
-                    LocalTitleClassifier.TitleDecision.ENTERTAINMENT -> {
+                val pStr = judgment.pCombined?.let { "p=%.3f".format(Locale.ROOT, it) } ?: "no-score"
+                val band = when (judgment.tag) {
+                    "doubt" -> "doubt"
+                    "correction" -> "correction"
+                    "repo-channel" -> "repo-channel"
+                    else -> FocivoCombinedBrain.pBandLabel(
+                        judgment.pCombined,
+                        FocivoCombinedBrain.TITLE_BLOCK_P,
+                        FocivoCombinedBrain.TITLE_ALLOW_P
+                    )
+                }
+                when (judgment.decision) {
+                    FocivoCombinedBrain.Decision.BLOCK -> {
                         AiStudyGuardManager.logGuardActivity(
                             applicationContext, "YouTube", "youtube-local", "NON_STUDY",
-                            "local-classifier $pEntStr", title
+                            "combined-brain $pStr [${judgment.tag}]", title
                         )
                         recordYouTubeEval(
                             titleSource = titleSource, title = title,
-                            pEntBand = pEntBandLabel(localPEnt, localClassifier.blockThreshold),
+                            pEntBand = band,
                             verdict = "NON_STUDY", action = "stage-1 warning"
                         )
                         val now = System.currentTimeMillis()
                         if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
                             lastYouTubeAiInterceptTimeMs = now
                             val reason =
-                                "Non-study content detected: \"$title\" [local-classifier $pEntStr]"
+                                "Non-study content detected: \"$title\" [combined-brain $pStr]"
                             Log.w(TAG, "[YouTube Guard] $reason")
                             YouTubeStudyGuardManager.recordBlockedVideo(
                                 context = applicationContext,
@@ -2116,22 +2112,22 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         }
                         return true
                     }
-                    LocalTitleClassifier.TitleDecision.STRONG_STUDY -> {
+                    FocivoCombinedBrain.Decision.ALLOW -> {
                         AiStudyGuardManager.logGuardActivity(
                             applicationContext, "YouTube", "youtube-local", "STUDY",
-                            "local-classifier $pEntStr", title
+                            "combined-brain $pStr [${judgment.tag}]", title
                         )
                         recordYouTubeEval(
                             titleSource = titleSource, title = title,
-                            pEntBand = pEntBandLabel(localPEnt, localClassifier.blockThreshold),
+                            pEntBand = band,
                             verdict = "STUDY", action = "allowed"
                         )
                         return false
                     }
-                    LocalTitleClassifier.TitleDecision.UNCERTAIN -> {
+                    FocivoCombinedBrain.Decision.UNCERTAIN -> {
                         AiStudyGuardManager.logGuardActivity(
                             applicationContext, "YouTube", "youtube-local", "UNCERTAIN",
-                            "local-classifier $pEntStr->existing-chain", title
+                            "combined-brain $pStr->existing-chain", title
                         )
                     }
                 }
