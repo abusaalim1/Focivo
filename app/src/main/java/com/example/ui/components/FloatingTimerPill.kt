@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,55 +21,45 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.service.FloatingPillDocking
 import com.example.ui.theme.focivoTokens
-import kotlinx.coroutines.delay
 import java.util.Locale
 
 /**
- * v1.5.0 — floating countdown pill shown over other apps while a focus
+ * v1.3.1 — floating countdown pill shown over other apps while a focus
  * session runs and the user has left the app.
  *
  * Dark pill: lime play circle, big "MM:SS" + "Time remaining", X button.
  * Tapping the pill returns to the app; the X button only hides the pill
- * (it ends nothing — the session keeps running). Real countdown bound to
- * the running session: starts at [initialRemainingSeconds] and ticks
- * locally, auto-hiding at zero.
+ * (it ends nothing — the session keeps running).
+ *
+ * The countdown is owned by the caller ([remainingSeconds] ticks down in
+ * the overlay host) so docking/expanding never resets it. Horizontal drags
+ * are reported to [dragController]; small movements stay a tap and return
+ * to the app as before. Dragging/docking logic lives in
+ * FloatingTimerPillManager + FloatingPillDocking.
  *
  * Zero unicode emojis — the play glyph is drawn with Canvas.
  */
 @Composable
 fun FloatingTimerPill(
-    initialRemainingSeconds: Int,
+    remainingSeconds: Int,
     onReturnToApp: () -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    dragController: FloatingPillDragController? = null
 ) {
-    var remainingSeconds by remember(initialRemainingSeconds) {
-        mutableIntStateOf(initialRemainingSeconds.coerceAtLeast(0))
-    }
-
-    LaunchedEffect(Unit) {
-        while (remainingSeconds > 0) {
-            delay(1000L)
-            remainingSeconds -= 1
-        }
-        onDismiss()
-    }
-
     val hours = remainingSeconds / 3600
     val minutes = (remainingSeconds % 3600) / 60
     val seconds = remainingSeconds % 60
@@ -80,8 +71,28 @@ fun FloatingTimerPill(
 
     val pillInteraction = remember { MutableInteractionSource() }
 
+    // Drag detection sits OUTSIDE the clickable: once the horizontal-drag
+    // slop is exceeded the drag consumes the gesture and the tap never
+    // fires; small movements stay a tap -> return-to-app.
+    val dragModifier = if (dragController != null) {
+        Modifier.pointerInput(dragController) {
+            detectHorizontalDragGestures(
+                onDragStart = { dragController.onDragStart() },
+                onDragEnd = { dragController.onDragEnd() },
+                onDragCancel = { dragController.onDragEnd() },
+                onHorizontalDrag = { change, dragAmount ->
+                    change.consume()
+                    dragController.onDragDelta(dragAmount)
+                }
+            )
+        }
+    } else {
+        Modifier
+    }
+
     Row(
         modifier = modifier
+            .then(dragModifier)
             .shadow(elevation = 14.dp, shape = RoundedCornerShape(22.dp), spotColor = Color.Black.copy(alpha = 0.6f))
             .clip(RoundedCornerShape(22.dp))
             .background(focivoTokens().surface)
@@ -157,5 +168,54 @@ fun FloatingTimerPill(
                 modifier = Modifier.size(20.dp)
             )
         }
+    }
+}
+
+/**
+ * v1.3.1 — callbacks the floating pill reports horizontal drag gestures
+ * to (implemented by FloatingTimerPillManager). Null in previews/tests.
+ */
+interface FloatingPillDragController {
+    fun onDragStart()
+    fun onDragDelta(deltaPx: Float)
+    fun onDragEnd()
+}
+
+/**
+ * v1.3.1 — docked form of the floating timer pill: a compact circular
+ * mini-pill showing the countdown "MM:SS" with a lime-ring accent, using
+ * the same design tokens as the expanded pill.
+ *
+ * Tapping the mini-pill expands back to the full pill; it never hides or
+ * ends anything.
+ */
+@Composable
+fun FloatingTimerMiniPill(
+    remainingSeconds: Int,
+    onExpand: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val tokens = focivoTokens()
+    Box(
+        modifier = modifier
+            .shadow(elevation = 10.dp, shape = CircleShape, spotColor = Color.Black.copy(alpha = 0.6f))
+            .clip(CircleShape)
+            .background(tokens.surface)
+            .border(2.dp, tokens.accent, CircleShape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onExpand
+            )
+            .size(FloatingPillDocking.DOCKED_SIZE_DP.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = FloatingPillDocking.formatDockedCountdown(remainingSeconds),
+            color = tokens.text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp
+        )
     }
 }
