@@ -140,16 +140,16 @@ private fun Controls(s: PomodoroUiState, c: Color, onToggle: () -> Unit, onSkip:
         val resetSource = remember { MutableInteractionSource() }
         val toggleSource = remember { MutableInteractionSource() }
         val skipSource = remember { MutableInteractionSource() }
-        Box(Modifier.size(54.dp).clip(CircleShape).background(Color.White.copy(.06f)).border(1.dp, Color.White.copy(.1f), CircleShape).pressFeedback(interactionSource = resetSource).clickable(interactionSource = resetSource, onClick = onReset), Alignment.Center) {
+        Box(Modifier.size(54.dp).clip(CircleShape).background(Color.White.copy(.06f)).border(1.dp, Color.White.copy(.1f), CircleShape).pressFeedback(interactionSource = resetSource).clickable(interactionSource = resetSource, indication = null, onClick = onReset), Alignment.Center) {
             Icon(Icons.Filled.Refresh, "Reset", tint = Color.White, modifier = Modifier.size(22.dp))
         }
-        Box(Modifier.size(78.dp).clip(CircleShape).background(c).border(1.dp, Color.White.copy(.35f), CircleShape).pressFeedback(interactionSource = toggleSource).clickable(interactionSource = toggleSource, onClick = onToggle), Alignment.Center) {
+        Box(Modifier.size(78.dp).clip(CircleShape).background(c).border(1.dp, Color.White.copy(.35f), CircleShape).pressFeedback(interactionSource = toggleSource).clickable(interactionSource = toggleSource, indication = null, onClick = onToggle), Alignment.Center) {
             Canvas(Modifier.size(28.dp)) {
                 if (s.running) { drawRoundRect(FtBgDark, Offset(size.width * .14f, 0f), Size(size.width * .24f, size.height), CornerRadius(4.dp.toPx())); drawRoundRect(FtBgDark, Offset(size.width * .62f, 0f), Size(size.width * .24f, size.height), CornerRadius(4.dp.toPx())) }
                 else drawPath(Path().apply { moveTo(size.width * .18f, 0f); lineTo(size.width, size.height / 2); lineTo(size.width * .18f, size.height); close() }, FtBgDark)
             }
         }
-        Box(Modifier.size(54.dp).clip(CircleShape).background(Color.White.copy(.06f)).border(1.dp, Color.White.copy(.1f), CircleShape).pressFeedback(interactionSource = skipSource).clickable(interactionSource = skipSource, onClick = onSkip), Alignment.Center) {
+        Box(Modifier.size(54.dp).clip(CircleShape).background(Color.White.copy(.06f)).border(1.dp, Color.White.copy(.1f), CircleShape).pressFeedback(interactionSource = skipSource).clickable(interactionSource = skipSource, indication = null, onClick = onSkip), Alignment.Center) {
             Canvas(Modifier.size(20.dp)) {
                 drawPath(Path().apply { moveTo(0f, 0f); lineTo(size.width * .75f, size.height / 2); lineTo(0f, size.height); close() }, Color.White)
                 drawRoundRect(Color.White, Offset(size.width * .85f, 0f), Size(size.width * .15f, size.height), CornerRadius(2.dp.toPx()))

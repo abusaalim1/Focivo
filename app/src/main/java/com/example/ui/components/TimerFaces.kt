@@ -408,6 +408,7 @@ fun FacePlayPauseButton(
             .pressFeedback(interactionSource = interactionSource)
             .clickable(
                 interactionSource = interactionSource,
+                indication = null,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
@@ -438,6 +439,7 @@ fun FaceResetButton(
             .pressFeedback(interactionSource = interactionSource)
             .clickable(
                 interactionSource = interactionSource,
+                indication = null,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
@@ -808,7 +810,9 @@ private fun EditorialFace(
     // lime-on-cream) and dark-on-dark (Midnight backdrop in light app mode).
     // Pick the label ink from the backdrop's luminance, mirroring
     // FacePhasePill. The filled play button + progress line keep the accent.
-    val eyebrowColor = if (backdropPrimary(params.theme, isDark).luminance() > 0.5f) {
+    val bg = backdropPrimary(params.theme, isDark)
+    val bgLuminance = 0.2126f * bg.red + 0.7152f * bg.green + 0.0722f * bg.blue
+    val eyebrowColor = if (bgLuminance > 0.5f) {
         if (params.isBreak) FaceMint else FaceLime
     } else {
         if (params.isBreak) Color(0xFF2E7D32) else RegainLimeDeepText

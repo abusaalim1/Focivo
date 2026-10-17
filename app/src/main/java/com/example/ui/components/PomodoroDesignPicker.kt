@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.PoppinsFontFamily
-import kotlin.math.minOf
 import com.example.ui.timer.FocivoPomodoro
 import com.example.ui.timer.PomoPhase
 import com.example.ui.timer.PomodoroStyle
@@ -127,7 +126,7 @@ fun PomodoroDesignPreviewCard(
             val renderW = 360.dp
             val renderH = pomoPreviewRenderHeight(style)
             // Uniform fit scale — the whole render lands inside the card.
-            val fit = minOf(112f / 360f, 140f / renderH.value)
+            val fit = if (112f / 360f < 140f / renderH.value) 112f / 360f else 140f / renderH.value
             Box(
                 modifier = Modifier
                     .size(renderW, renderH)
