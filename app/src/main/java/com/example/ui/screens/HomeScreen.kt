@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +51,7 @@ import com.example.ui.components.FeatureIcon
 import com.example.ui.components.MascotPose
 import com.example.ui.components.PriorityItemRow
 import com.example.ui.components.RegainMascotView
+import com.example.ui.components.RollingText
 import com.example.ui.theme.LocalAppAccent
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SerifItalicFontFamily
@@ -82,6 +84,9 @@ fun HomeScreen(
     onOpenAlarmStudio: () -> Unit = {},
     onOpenShieldHub: () -> Unit = {},
     onOpenAutoSchedule: () -> Unit = {},
+    // v1.3.0: Squads (friends competition) — owner explicit: entered from
+    // HOME, never from Study/settings.
+    onOpenSquads: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val T = focivoTokens()
@@ -246,7 +251,9 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
+                            // Motion Lab #7 — today's focus total rolls like an
+                            // odometer when the minutes change.
+                            RollingText(
                                 text = todayTimeStr,
                                 style = MaterialTheme.typography.displaySmall.copy(
                                     fontFamily = PoppinsFontFamily,
@@ -273,7 +280,8 @@ fun HomeScreen(
                                     .background(T.softAccent)
                                     .padding(horizontal = 12.dp, vertical = 5.dp)
                             ) {
-                                Text(
+                                // Motion Lab #7 — today's session count rolls when it changes.
+                                RollingText(
                                     text = "$todaySessionsCount session${if (todaySessionsCount == 1) "" else "s"} today",
                                     style = MaterialTheme.typography.labelMedium.copy(
                                         fontFamily = PoppinsFontFamily,
@@ -299,15 +307,23 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(text = "Daily goal".uppercase(Locale.getDefault()), style = focivoEyebrow().copy(fontSize = 11.sp))
-                        Text(
-                            text = "$todayMinutes / $dailyGoalMinutes min",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                fontWeight = FontWeight.SemiBold,
-                                color = T.text,
-                                fontSize = 12.sp
-                            )
+                        // Motion Lab #7 — focused minutes roll when the count changes.
+                        val goalCountStyle = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            color = T.text,
+                            fontSize = 12.sp
                         )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RollingText(
+                                text = todayMinutes.toString(),
+                                style = goalCountStyle
+                            )
+                            Text(
+                                text = " / $dailyGoalMinutes min",
+                                style = goalCountStyle
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Box(
@@ -506,7 +522,62 @@ fun HomeScreen(
                 }
             }
 
-            // 4. Today's priorities.
+            // 4. Squads entry (v1.3.0) — owner explicit: squads live on HOME.
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(T.surface)
+                        .border(1.dp, T.line, RoundedCornerShape(24.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onOpenSquads
+                        )
+                        .padding(14.dp)
+                        .testTag("home_squads_entry"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FeatureIcon(
+                        drawableRes = R.drawable.ic3d_people,
+                        contentDescription = "Squads",
+                        size = 38.dp
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Squads",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontFamily = PoppinsFontFamily,
+                                fontWeight = FontWeight.SemiBold,
+                                color = T.text,
+                                fontSize = 13.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Compete with friends",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = PoppinsFontFamily,
+                                color = T.muted,
+                                fontSize = 11.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Open squads",
+                        tint = T.muted,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            // 5. Today's priorities.
             item {
                 Row(
                     modifier = Modifier

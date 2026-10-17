@@ -89,6 +89,26 @@
                     android:scheme="studytracker"
                     android:host="auth-callback" />
             </intent-filter>
+            <!-- v1.3.0: Squads invite App Link — https://focivoapp.vercel.app/join/<code>
+                 opens the app straight into the squad join screen (verified via
+                 /.well-known/assetlinks.json). Custom-scheme fallback below. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="focivoapp.vercel.app"
+                    android:pathPattern="/join/.*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="focivo"
+                    android:host="join" />
+            </intent-filter>
         </activity>
 
         <activity

@@ -303,6 +303,17 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     fun triggerStrictUninstallBlocked() { _showStrictUninstallBlocked.value = true }
     fun dismissStrictUninstallBlocked() { _showStrictUninstallBlocked.value = false }
 
+    // v1.3.0 — Squads deep link: https://focivoapp.vercel.app/join/<code>
+    // (or focivo://join/<code>). MainActivity parses the intent; the UI
+    // consumes the code once by opening the squads join screen.
+    private val _pendingSquadJoinCode = MutableStateFlow<String?>(null)
+    val pendingSquadJoinCode: StateFlow<String?> = _pendingSquadJoinCode.asStateFlow()
+    fun handleSquadJoinLink(code: String) {
+        val clean = code.trim().uppercase()
+        if (clean.isNotBlank()) _pendingSquadJoinCode.value = clean
+    }
+    fun consumeSquadJoinCode() { _pendingSquadJoinCode.value = null }
+
     private val _lastCompletedSessionForPrompt = MutableStateFlow<FocusSessionEntity?>(null)
     val lastCompletedSessionForPrompt: StateFlow<FocusSessionEntity?> = _lastCompletedSessionForPrompt.asStateFlow()
 
