@@ -157,9 +157,6 @@ dependencies {
   implementation(libs.okhttp)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
-  // v1.3.2: on-device NSFW image gate (profile/group pictures).
-  // Plain tensorflow-lite (not task-vision): keeps the release APK under 50 MB.
-  implementation(libs.tflite)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)

@@ -105,7 +105,6 @@ import java.util.Locale
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 // v1.2.3 design-unification — owner's clean-redesign language:
 // Poppins body, Instrument Serif italic for the page headline,
@@ -1445,27 +1444,14 @@ fun ProfileScreen(
             ?.takeIf { com.example.ui.components.isPresetRef(it) }
         var selectedPresetRef by remember { mutableStateOf(currentPresetRef) }
         // v1.3.2 item 8: photo edit flow is a chooser — upload (existing
-        // screened path) or a bundled preset avatar.
+        // path) or a bundled preset avatar.
         var showPhotoChooser by remember { mutableStateOf(false) }
-        // v1.3.2: on-device NSFW screen — explicit pictures are rejected with
-        // a premium sheet before they can be set as the profile picture.
-        var showNsfwRejection by remember { mutableStateOf(false) }
-        val editScope = rememberCoroutineScope()
         val photoPickerLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.PickVisualMedia()
         ) { uri ->
             if (uri != null) {
-                editScope.launch(Dispatchers.IO) {
-                    val verdict = com.example.util.NsfwScreenGate.screenUri(context, uri)
-                    withContext(Dispatchers.Main) {
-                        if (verdict == com.example.util.NsfwScreenGate.Verdict.REJECT) {
-                            showNsfwRejection = true
-                        } else {
-                            selectedPresetRef = null
-                            selectedPhotoUri = uri
-                        }
-                    }
-                }
+                selectedPresetRef = null
+                selectedPhotoUri = uri
             }
         }
 
@@ -1485,18 +1471,6 @@ fun ProfileScreen(
                     selectedPresetRef = ref
                 },
                 onDismiss = { showPhotoChooser = false },
-            )
-        }
-
-        if (showNsfwRejection) {
-            com.example.ui.components.NsfwRejectionSheet(
-                onDismiss = { showNsfwRejection = false },
-                onChooseAnother = {
-                    showNsfwRejection = false
-                    photoPickerLauncher.launch(
-                        androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                }
             )
         }
 

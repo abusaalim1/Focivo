@@ -58,7 +58,7 @@ import com.example.ui.theme.focivoTokens
 /**
  * Focivo 1.3.2, item 8 — premium chooser for profile pictures and group
  * pictures. Two choices at the top: "Upload photo" (calls the caller's
- * existing NSFW-screened upload path, untouched) or "Choose a preset"
+ * existing upload path, untouched) or "Choose a preset"
  * (a 3-column grid of bundled presets with a lime selected ring).
  *
  * Design language: focivoTokens, Poppins body labels, Instrument Serif
@@ -172,7 +172,7 @@ fun PresetChooserContent(
                 )
             },
             title = "Upload photo",
-            subtitle = "From your gallery — screened on-device",
+            subtitle = "From your gallery",
             onClick = onUploadPhoto,
         )
         Spacer(Modifier.height(10.dp))

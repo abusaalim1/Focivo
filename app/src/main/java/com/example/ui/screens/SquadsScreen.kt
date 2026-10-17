@@ -103,7 +103,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.util.Locale
-import com.example.ui.components.NsfwRejectionSheet
 
 /**
  * v1.3.0 — Squads (friends competition). Entered from the HOME screen only
@@ -681,20 +680,12 @@ fun SquadCreateScreen(
     var creating by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    // v1.3.2: on-device NSFW screen — explicit pictures are rejected with
-    // a premium sheet before they can be set as the group picture.
-    var showNsfwRejection by remember { mutableStateOf(false) }
     // v1.3.2 item 8: preset group logos — "Choose image" opens a chooser:
-    // upload (existing screened path) or a bundled preset logo.
+    // upload (plain flow) or a bundled preset logo.
     var showPhotoChooser by remember { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             scope.launch(Dispatchers.IO) {
-                val verdict = com.example.util.NsfwScreenGate.screenUri(context, uri)
-                if (verdict == com.example.util.NsfwScreenGate.Verdict.REJECT) {
-                    withContext(Dispatchers.Main) { showNsfwRejection = true }
-                    return@launch
-                }
                 val encoded = encodePickedSquadPicture(context, uri)
                 withContext(Dispatchers.Main) {
                     if (encoded != null) pictureDataUri = encoded
@@ -702,15 +693,6 @@ fun SquadCreateScreen(
                 }
             }
         }
-    }
-    if (showNsfwRejection) {
-        NsfwRejectionSheet(
-            onDismiss = { showNsfwRejection = false },
-            onChooseAnother = {
-                showNsfwRejection = false
-                picker.launch("image/*")
-            }
-        )
     }
     if (showPhotoChooser) {
         com.example.ui.components.PresetPhotoChooserSheet(
