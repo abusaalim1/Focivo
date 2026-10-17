@@ -371,6 +371,9 @@ class V130FinalScreenshotsTest {
     }
 
     // ── Edit Profile dialog (worker C: name/goal/class/exam/email/switch) ───
+    // NOTE: captured without waitForIdle() — the dialog (activity-result
+    // launcher + AlertDialog window) never settles Robolectric's idling
+    // resource; v123 precedent uses mainClock.advanceTimeBy for such UI.
     @Test
     fun v130final_profile_edit_dark() {
         initAll()
@@ -382,7 +385,7 @@ class V130FinalScreenshotsTest {
             )
         }
         composeTestRule.onNodeWithContentDescription("Edit Profile").performClick()
-        composeTestRule.waitForIdle()
+        composeTestRule.mainClock.advanceTimeBy(2_000)
         composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v130-final/v130final_profile_edit_dark.png")
     }
 
@@ -397,7 +400,7 @@ class V130FinalScreenshotsTest {
             )
         }
         composeTestRule.onNodeWithContentDescription("Edit Profile").performClick()
-        composeTestRule.waitForIdle()
+        composeTestRule.mainClock.advanceTimeBy(2_000)
         composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v130-final/v130final_profile_edit_light.png")
     }
 

@@ -5,12 +5,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 /**
  * v1.5.1 — guards the overlay lifecycle host that replaced the crash where a
  * ComposeView hosted in a TYPE_APPLICATION_OVERLAY window had no
  * ViewTreeLifecycleOwner (IllegalStateException on Android 16).
+ *
+ * v1.3.0 assembly: Robolectric runner — LifecycleRegistry touches
+ * Looper.getMainLooper(), which is not mocked in plain JVM unit tests.
  */
+@RunWith(RobolectricTestRunner::class)
 class OverlayLifecycleHostTest {
 
     @Test
