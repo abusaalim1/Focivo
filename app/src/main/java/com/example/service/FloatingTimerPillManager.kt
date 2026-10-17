@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,12 @@ import com.example.ui.components.FloatingTimerMiniPill
 import com.example.ui.components.FloatingTimerPill
 import com.example.ui.overlay.OverlayLifecycleHost
 import com.example.ui.theme.FocuslyTheme
+import com.example.ui.timer.PomoPhase
+import com.example.ui.timer.PomodoroStyle
+import com.example.util.PomodoroState
+import com.example.util.PomodoroStyleManager
+import com.example.util.loadActivePomodoroState
+import com.example.util.phaseMinutes
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -66,11 +73,6 @@ object FloatingTimerPillManager {
     private const val TAG = "FloatingTimerPill"
     private const val DOCK_ANIM_DURATION_MS = 320L
 
-    // Mirrors FocusTimerService private pref keys (kept local to avoid scope creep).
-    private const val PREFS_LOCAL = "focusly_local_data"
-    private const val KEY_MANUAL_RUNNING = "is_manual_timer_running"
-    private const val KEY_MANUAL_END = "manual_timer_end_time_ms"
-
     private val mainHandler = Handler(Looper.getMainLooper())
     private var pillView: ComposeView? = null
     private var pillHost: OverlayLifecycleHost? = null
@@ -89,16 +91,15 @@ object FloatingTimerPillManager {
 
     /**
      * Remaining seconds of the running session, or 0 when none runs.
-     * Checks the manual focus timer first, then the shield lock.
+     * v1.3.2 (item 11): the manual timer is read from the single persisted
+     * anchor (TimerAnchorStore) — the exact same source the timer
+     * notification uses, so the pill can never drift from it. Shield-only
+     * sessions keep the previous fallback.
      */
     fun getSessionRemainingSeconds(context: Context): Int {
         return try {
-            val prefs = context.getSharedPreferences(PREFS_LOCAL, Context.MODE_PRIVATE)
-            if (prefs.getBoolean(KEY_MANUAL_RUNNING, false)) {
-                val end = prefs.getLong(KEY_MANUAL_END, 0L)
-                val rem = ((end - System.currentTimeMillis()) / 1000L).toInt()
-                if (rem > 0) return rem
-            }
+            val rem = com.example.util.TimerAnchorStore.getRemainingSeconds(context)
+            if (rem > 0) return rem
             FocusShieldService.getRemainingSeconds(context)
         } catch (_: Exception) {
             0
@@ -302,20 +303,47 @@ object FloatingTimerPillManager {
     private fun PillHost(remainingSeconds: Int) {
         FocuslyTheme(darkTheme = true) {
             val isDocked by dockedState
-            // v1.3.1: the countdown lives here so docking/expanding never resets it.
+            // v1.3.2 (item 11): NO independent tick counter. Every tick
+            // re-reads the single persisted anchor (TimerAnchorStore) — the
+            // same source the timer notification uses — so a Doze/screen-lock
+            // stall can never desync the pill from the notification. On wake
+            // the very next tick shows the true remaining time.
+            val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
             var remaining by remember(remainingSeconds) {
                 mutableIntStateOf(remainingSeconds.coerceAtLeast(0))
             }
+            // v1.3.2 (item 14): pomodoro reflection — the live engine state
+            // is re-read beside the clock each tick, and the selected
+            // pomodoro design is collected, so the pill speaks the design's
+            // phase language (phase color, phase + cycle label, cycle
+            // progress) and updates live as phases flip. Null = classic timer.
+            var pomo by remember { mutableStateOf(loadActivePomodoroState(appContext)) }
+            val pomoStyle by PomodoroStyleManager.selectedStyle.collectAsState()
             val dismiss = {
                 pillView?.context?.let { hide(it) }
             }
             LaunchedEffect(Unit) {
-                while (remaining > 0) {
+                // v1.3.2 (item 14): two consecutive zero reads dismiss — a
+                // single zero can be the 1-tick race at a pomodoro phase
+                // boundary (old end passed, new end not yet persisted).
+                var zeroReads = 0
+                while (true) {
                     delay(1000L)
-                    remaining -= 1
+                    val rem = getSessionRemainingSeconds(appContext)
+                    if (rem <= 0) {
+                        zeroReads++
+                        if (zeroReads >= 2) break
+                    } else {
+                        zeroReads = 0
+                        remaining = rem
+                    }
+                    pomo = loadActivePomodoroState(appContext)
                 }
                 dismiss()
             }
+            val pomoPhase = pomo?.let { toUiPomoPhase(it.phase) }
+            val pomoSubtitle = pomo?.let { pomoSubtitle(it) }
+            val pomoCycleProgress = pomo?.let { pomoCycleProgress(it, remaining) }
             Box(
                 modifier = Modifier
                     .wrapContentSize()
@@ -325,7 +353,8 @@ object FloatingTimerPillManager {
                 if (isDocked) {
                     FloatingTimerMiniPill(
                         remainingSeconds = remaining,
-                        onExpand = { expandPill() }
+                        onExpand = { expandPill() },
+                        phaseColor = pomoPhase?.color
                     )
                 } else {
                     FloatingTimerPill(
@@ -348,11 +377,53 @@ object FloatingTimerPillManager {
                             // X hides the pill only — ends nothing.
                             dismiss()
                         },
-                        dragController = dragController
+                        dragController = dragController,
+                        pomoPhase = pomoPhase,
+                        pomoSubtitle = pomoSubtitle,
+                        pomoCycleProgress = pomoCycleProgress,
+                        pomoStyle = pomoStyle
                     )
                 }
             }
         }
+    }
+
+    /** v1.3.2 (item 14): engine phase -> the UI phase carrying the design's color language. */
+    private fun toUiPomoPhase(phase: com.example.util.PomodoroPhase): PomoPhase =
+        when (phase) {
+            com.example.util.PomodoroPhase.FOCUS -> PomoPhase.FOCUS
+            com.example.util.PomodoroPhase.SHORT_BREAK -> PomoPhase.SHORT
+            com.example.util.PomodoroPhase.LONG_BREAK -> PomoPhase.LONG
+        }
+
+    /**
+     * v1.3.2 (item 14): phase-appropriate label language for the overlay —
+     * "FOCUS · SESSION 2 OF 4" / "SHORT BREAK · 1 OF 4 DONE". English only,
+     * mirrors the pomodoro designs' own phase titles.
+     */
+    private fun pomoSubtitle(pomo: PomodoroState): String {
+        val cycles = pomo.config.cycles.coerceAtLeast(1)
+        val phaseTitle = when (pomo.phase) {
+            com.example.util.PomodoroPhase.FOCUS -> "FOCUS"
+            com.example.util.PomodoroPhase.SHORT_BREAK -> "SHORT BREAK"
+            com.example.util.PomodoroPhase.LONG_BREAK -> "LONG BREAK"
+        }
+        val cycleText = if (pomo.phase == com.example.util.PomodoroPhase.FOCUS) {
+            "SESSION ${pomo.focusCompleted + 1} OF $cycles"
+        } else {
+            "${pomo.focusCompleted} OF $cycles DONE"
+        }
+        return "$phaseTitle · $cycleText"
+    }
+
+    /** v1.3.2 (item 14): whole-cycle progress 0..1 (completed sessions + live phase fraction). */
+    private fun pomoCycleProgress(pomo: PomodoroState, remainingSec: Int): Float {
+        val cycles = pomo.config.cycles.coerceAtLeast(1)
+        val totalSec = (pomo.phaseMinutes() * 60).coerceAtLeast(1)
+        val phaseFraction = (1f - remainingSec.toFloat() / totalSec).coerceIn(0f, 1f)
+        val done = pomo.focusCompleted +
+                if (pomo.phase == com.example.util.PomodoroPhase.FOCUS) phaseFraction else 1f
+        return (done / cycles).coerceIn(0f, 1f)
     }
 
     private fun runOnMain(block: () -> Unit) {

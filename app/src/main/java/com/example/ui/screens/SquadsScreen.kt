@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.squads.SQUADS_MAX_MEMBERS
 import com.example.data.squads.Squad
+import com.example.data.squads.SquadMember
 import com.example.data.squads.SquadRepository
 import com.example.data.squads.SquadRepository.SquadsUnavailable
 import com.example.data.squads.SquadStanding
@@ -615,7 +616,10 @@ private fun SquadListRow(squad: Squad, onClick: () -> Unit) {
 @Composable
 private fun SquadPictureThumb(pictureUrl: String?, name: String, size: Dp) {
     val T = focivoTokens()
-    val bitmap = remember(pictureUrl) { decodeDataUriBitmap(pictureUrl) }
+    // v1.3.2 item 8: bundled preset logos render from assets; uploads stay base64.
+    val bitmap = remember(pictureUrl) {
+        if (com.example.ui.components.isPresetRef(pictureUrl)) null else decodeDataUriBitmap(pictureUrl)
+    }
     Box(
         Modifier
             .size(size)
@@ -624,7 +628,14 @@ private fun SquadPictureThumb(pictureUrl: String?, name: String, size: Dp) {
             .border(1.dp, T.line, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        if (bitmap != null) {
+        if (com.example.ui.components.isPresetRef(pictureUrl)) {
+            com.example.ui.components.PresetImage(
+                ref = pictureUrl!!,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else if (bitmap != null) {
             Image(
                 bitmap = bitmap,
                 contentDescription = null,
@@ -673,6 +684,9 @@ fun SquadCreateScreen(
     // v1.3.2: on-device NSFW screen — explicit pictures are rejected with
     // a premium sheet before they can be set as the group picture.
     var showNsfwRejection by remember { mutableStateOf(false) }
+    // v1.3.2 item 8: preset group logos — "Choose image" opens a chooser:
+    // upload (existing screened path) or a bundled preset logo.
+    var showPhotoChooser by remember { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             scope.launch(Dispatchers.IO) {
@@ -696,6 +710,21 @@ fun SquadCreateScreen(
                 showNsfwRejection = false
                 picker.launch("image/*")
             }
+        )
+    }
+    if (showPhotoChooser) {
+        com.example.ui.components.PresetPhotoChooserSheet(
+            mode = com.example.ui.components.PresetChooserMode.GROUP,
+            initialSelection = pictureDataUri?.takeIf { com.example.ui.components.isPresetRef(it) },
+            onUploadPhoto = {
+                showPhotoChooser = false
+                picker.launch("image/*")
+            },
+            onPresetSelected = { ref ->
+                showPhotoChooser = false
+                pictureDataUri = ref
+            },
+            onDismiss = { showPhotoChooser = false },
         )
     }
 
@@ -724,7 +753,7 @@ fun SquadCreateScreen(
                                 .border(1.dp, T.line, CircleShape)
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
-                                    indication = null, onClick = { picker.launch("image/*") }
+                                    indication = null, onClick = { showPhotoChooser = true }
                                 )
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
                         ) {
@@ -1140,6 +1169,8 @@ fun SquadDetailScreen(
     var unavailable by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var leaving by remember { mutableStateOf(false) }
+    // v1.3.2 item 7: tapping a member opens their profile view.
+    var profileMember by remember { mutableStateOf<SquadMember?>(null) }
 
     fun refresh() {
         scope.launch {
@@ -1326,7 +1357,11 @@ fun SquadDetailScreen(
                         }
                     } else {
                         items(st, key = { it.member.id }) { standing ->
-                            SquadMemberRow(standing = standing, maxWeeklySeconds = maxWeekly)
+                            SquadMemberRow(
+                                standing = standing,
+                                maxWeeklySeconds = maxWeekly,
+                                onClick = { profileMember = standing.member },
+                            )
                         }
                     }
                     item {
@@ -1386,5 +1421,15 @@ fun SquadDetailScreen(
                 }
             }
         }
+    }
+
+    // v1.3.2 item 7: member profile view.
+    val pm = profileMember
+    if (pm != null && myUserId != null) {
+        MemberProfileSheet(
+            member = pm,
+            myUserId = myUserId,
+            onDismiss = { profileMember = null },
+        )
     }
 }

@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -179,6 +183,9 @@ fun SquadStandingsCardPng(
     standings: List<SquadStanding>,
     dateLabel: String = remember { squadDateLabel() },
 ) {
+    // v1.3.2: the share card leaves the group — locked (private) members are
+    // excluded entirely, never rendered with a zeroed time.
+    val standings = standings.filterNot { it.isLocked }
     val top = standings.take(3)
     val rest = standings.drop(3)
     // The 450dp card fits 3 rows: ranks 4-6. When the viewer is ranked lower,
@@ -463,13 +470,18 @@ fun SquadMemberRow(
     standing: SquadStanding,
     maxWeeklySeconds: Long,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
 ) {
     val s = standing
     val minutes = (s.weeklySeconds / 60).toInt()
+    // v1.3.2: private members (not self) render LOCKED — name + avatar +
+    // lock, NO study time anywhere on the row.
+    val locked = s.isLocked
     Row(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
             .then(
                 if (s.isMe) Modifier
                     .background(SquadLime.copy(alpha = .1f))
@@ -503,29 +515,46 @@ fun SquadMemberRow(
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
                 )
                 if (s.rank == 1) SquadCrown(Modifier.size(16.dp))
+                if (locked) Icon(
+                    Icons.Default.Lock,
+                    contentDescription = "Private profile",
+                    tint = Color.White.copy(alpha = 0.5f),
+                    modifier = Modifier.size(14.dp),
+                )
             }
             Text(
-                squadRankMessage(s.rank, s.isMe),
+                if (locked) "Private profile" else squadRankMessage(s.rank, s.isMe),
                 style = squadSans(11.5f, FontWeight.Normal, Color.White.copy(alpha = .55f), align = TextAlign.Start),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
-            Box(
-                Modifier.fillMaxWidth().height(5.dp).padding(top = 0.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(Color.White.copy(alpha = .08f))
-            ) {
+            if (!locked) {
                 Box(
-                    Modifier.fillMaxWidth((s.weeklySeconds.toFloat() / maxWeeklySeconds.coerceAtLeast(1L)).coerceIn(0.02f, 1f))
-                        .height(5.dp)
+                    Modifier.fillMaxWidth().height(5.dp).padding(top = 0.dp)
                         .clip(RoundedCornerShape(9.dp))
-                        .background(SquadLime)
-                )
+                        .background(Color.White.copy(alpha = .08f))
+                ) {
+                    Box(
+                        Modifier.fillMaxWidth((s.weeklySeconds.toFloat() / maxWeeklySeconds.coerceAtLeast(1L)).coerceIn(0.02f, 1f))
+                            .height(5.dp)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(SquadLime)
+                    )
+                }
             }
         }
-        Text(
-            squadHm(minutes),
-            style = squadSans(13f, FontWeight.SemiBold, Color.White),
-            textAlign = TextAlign.End,
-        )
+        if (locked) {
+            Icon(
+                Icons.Default.Lock,
+                contentDescription = "Private",
+                tint = Color.White.copy(alpha = 0.45f),
+                modifier = Modifier.size(18.dp),
+            )
+        } else {
+            Text(
+                squadHm(minutes),
+                style = squadSans(13f, FontWeight.SemiBold, Color.White),
+                textAlign = TextAlign.End,
+            )
+        }
     }
 }

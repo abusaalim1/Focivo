@@ -5,8 +5,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -15,6 +17,7 @@ import com.example.MainActivity
 import com.example.R
 import com.example.data.FocuslyRepository
 import com.example.data.model.FocusSessionEntity
+import com.example.util.TimerAnchorStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -69,15 +72,41 @@ class FocusTimerService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var tickerJob: Job? = null
+    // v1.3.2 (item 11): title shown by the unlock-triggered notification refresh.
+    private var lastTaskTitle: String = "Focus Session"
+    // v1.3.2 (item 14 QA): mode shown by the unlock-triggered refresh, so a
+    // pomodoro break keeps its phase label there too.
+    private var lastMode: String = ""
+    // v1.3.2 (item 11): refresh the single timer notification from the
+    // persisted anchor the moment the user unlocks the screen, instead of
+    // waiting for the next ticker wake after a Doze/screen-lock stall.
+    private val unlockReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != Intent.ACTION_USER_PRESENT) return
+            try {
+                val remaining = TimerAnchorStore.getRemainingSeconds(this@FocusTimerService)
+                if (remaining > 0) updateTimerNotification(remaining, lastTaskTitle, lastMode)
+            } catch (_: Exception) { }
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        try {
+            val filter = IntentFilter(Intent.ACTION_USER_PRESENT)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(unlockReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(unlockReceiver, filter)
+            }
+        } catch (_: Exception) { }
     }
 
     override fun onDestroy() {
+        try { unregisterReceiver(unlockReceiver) } catch (_: Exception) { }
         tickerJob?.cancel()
         // v1.4.0-round2: always release the notification blocker when the
         // timer service dies (covers stop, completion, and process kill).
@@ -163,11 +192,13 @@ class FocusTimerService : Service() {
                 "target=${targetSeconds}s title=$taskTitle mode=$mode"
             )
         } catch (_: Exception) { }
-        val remainingSec = ((endTimeMs - now) / 1000L).toInt()
+        val remainingSec = TimerAnchorStore.getRemainingSeconds(this)
+        lastTaskTitle = taskTitle
+        lastMode = mode
         // v1.1.2: if we cannot reach foreground state, stop quietly NOW.
         // Letting the system time-out a startForegroundService() call kills the
         // entire app process (ForegroundServiceDidNotStartInTimeException).
-        val fgOk = safeStartForeground(buildTimerNotificationSafe(remainingSec, taskTitle))
+        val fgOk = safeStartForeground(buildTimerNotificationSafe(remainingSec, taskTitle, mode))
         if (!fgOk) {
             Log.e(TAG, "Could not enter foreground state; stopping service quietly")
             stopSelf()
@@ -191,13 +222,16 @@ class FocusTimerService : Service() {
         tickerJob?.cancel()
         tickerJob = serviceScope.launch {
             while (isActive) {
-                val remainingSec = ((endTimeMs - System.currentTimeMillis()) / 1000L).toInt()
+                // v1.3.2 (item 11): remaining time comes from the single
+                // persisted anchor (elapsedRealtime-based) — the exact same
+                // source the floating pill reads, so the two can never drift.
+                val remainingSec = TimerAnchorStore.getRemainingSeconds(this@FocusTimerService)
                 if (remainingSec <= 0) {
                     // Timer finished while UI is dead: complete the session properly.
                     completeMissedSession(targetSeconds, taskTitle, mode, endTimeMs)
                     break
                 }
-                updateTimerNotification(remainingSec, taskTitle)
+                updateTimerNotification(remainingSec, taskTitle, mode)
                 persistRemaining(remainingSec)
                 delay(1000L)
             }
@@ -268,6 +302,10 @@ class FocusTimerService : Service() {
                 .putString(KEY_TIMER_MODE, mode)
                 .apply()
         } catch (_: Exception) {}
+        // v1.3.2 (item 11): anchor the session end on SystemClock.elapsedRealtime()
+        // at the same choke point — the notification and the floating pill both
+        // read remaining time from this single persisted anchor.
+        try { TimerAnchorStore.arm(this, endTimeMs) } catch (_: Exception) {}
         // v1.3.1: arm the durable strict-session record at the same choke
         // point (carries expiry validation across process death/reboot).
         try { com.example.util.StrictSessionStore.arm(this, endTimeMs) } catch (_: Exception) {}
@@ -290,6 +328,9 @@ class FocusTimerService : Service() {
             getSharedPreferences(PREFS_TIMER_STATE, Context.MODE_PRIVATE).edit()                .putBoolean(KEY_TIMER_RUNNING, false)
                 .apply()
         } catch (_: Exception) {}
+        // v1.3.2 (item 11): clear the elapsed-realtime anchor at the same choke
+        // point — a disarmed anchor can never resurrect remaining time.
+        try { TimerAnchorStore.disarm(this) } catch (_: Exception) {}
         // v1.2.3 phantom-lock fix (RC2): the deep-focus home-screen block
         // reads the persisted key_deep_focus_session_active flag, which was
         // only cleared by the ViewModel's pauseTimer(). If the timer dies
@@ -310,18 +351,27 @@ class FocusTimerService : Service() {
         try { com.example.util.StrictSessionStore.disarm(this) } catch (_: Exception) {}
     }
 
-    private fun buildTimerNotification(remainingSec: Int, taskTitle: String): Notification {
+    private fun buildTimerNotification(remainingSec: Int, taskTitle: String, mode: String): Notification {
         val minutes = remainingSec / 60
         val seconds = remainingSec % 60
         val timeText = String.format("%02d:%02d", minutes, seconds)
+        // v1.3.2 (item 14 QA): the old build always said "Focus Session" —
+        // wrong phase label during pomodoro breaks. The mode already flows
+        // through the service (EXTRA_MODE), so the notification names the
+        // real phase: "Short Break — Physics" / "12:00 remaining — breathe,
+        // stretch." English only, visuals/text only.
+        val isBreak = mode.contains("break", ignoreCase = true)
+        val title = if (isBreak) "$mode — $taskTitle" else "Focus Session — $taskTitle"
+        val text = if (isBreak) "$timeText remaining — breathe, stretch."
+        else "$timeText remaining — stay focused!"
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         val pi = PendingIntent.getActivity(this, NOTIFICATION_ID, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_small)
-            .setContentTitle("Focus Session — $taskTitle")
-            .setContentText("$timeText remaining — stay focused!")
+            .setContentTitle(title)
+            .setContentText(text)
             .setContentIntent(pi)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -331,10 +381,10 @@ class FocusTimerService : Service() {
             .build()
     }
 
-    private fun updateTimerNotification(remainingSec: Int, taskTitle: String) {
+    private fun updateTimerNotification(remainingSec: Int, taskTitle: String, mode: String) {
         try {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            manager?.notify(NOTIFICATION_ID, buildTimerNotification(remainingSec, taskTitle))
+            manager?.notify(NOTIFICATION_ID, buildTimerNotification(remainingSec, taskTitle, mode))
         } catch (_: Exception) {}
     }
 
@@ -393,9 +443,9 @@ class FocusTimerService : Service() {
     }
 
     /** v1.1.2: notification build can never throw — minimal fallback included. */
-    private fun buildTimerNotificationSafe(remainingSec: Int, taskTitle: String): Notification {
+    private fun buildTimerNotificationSafe(remainingSec: Int, taskTitle: String, mode: String): Notification {
         return try {
-            buildTimerNotification(remainingSec, taskTitle)
+            buildTimerNotification(remainingSec, taskTitle, mode)
         } catch (t: Throwable) {
             Log.e(TAG, "buildTimerNotification failed, using fallback: ${t.message}")
             NotificationCompat.Builder(this, CHANNEL_ID)

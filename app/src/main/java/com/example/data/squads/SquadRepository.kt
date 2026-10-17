@@ -229,18 +229,20 @@ object SquadRepository {
                     SupabaseService.getInstance().fetchLeaderboard()
                 }.getOrElse { emptyList() }
                 val byUser = leaderboard.associateBy { it.user_id }
-                val ranked = members.mapNotNull { m ->
+                val ranked = members.map { m ->
                     val row = byUser[m.userId]
-                    // v1.3.2: private profiles (is_public=false) show neither
-                    // stats nor avatar to other users — including fellow group
-                    // members. The member still sees their own entry.
-                    if (m.userId != myUserId && row?.is_public == false) return@mapNotNull null
+                    val public = row?.is_public ?: true // null (legacy) = public
+                    // v1.3.2: private profiles (is_public=false) are NEVER
+                    // excluded — they render as LOCKED rows (name + avatar +
+                    // lock, zero stats) to everyone except themselves. The
+                    // member still sees their own full entry.
                     SquadStanding(
                         member = m,
-                        weeklySeconds = row?.weekly_study_seconds ?: 0L,
-                        allTimeSeconds = row?.study_seconds ?: 0L,
+                        weeklySeconds = if (!public && m.userId != myUserId) 0L else row?.weekly_study_seconds ?: 0L,
+                        allTimeSeconds = if (!public && m.userId != myUserId) 0L else row?.study_seconds ?: 0L,
                         rank = 0,
                         isMe = m.userId == myUserId,
+                        isPublic = public,
                     )
                 }.sortedWith(
                     compareByDescending<SquadStanding> { it.weeklySeconds }

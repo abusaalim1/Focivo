@@ -61,6 +61,8 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SerifItalicFontFamily
 import com.example.ui.theme.focivoEyebrow
 import com.example.ui.theme.focivoTokens
+import com.example.ui.components.PresetImage
+import com.example.ui.components.isPresetRef
 import java.util.Calendar
 import java.util.Locale
 
@@ -118,7 +120,15 @@ fun LeaderboardAvatar(
                 fontSize = textSizeSp.sp
             )
         )
-        if (bitmap != null) {
+        if (isPresetRef(avatarUrl)) {
+            // v1.3.2 item 8: bundled preset picture — render the local asset.
+            PresetImage(
+                ref = avatarUrl!!,
+                contentDescription = displayName,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else if (bitmap != null) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = displayName,

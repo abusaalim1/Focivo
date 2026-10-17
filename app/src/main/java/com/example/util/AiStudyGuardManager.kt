@@ -195,6 +195,16 @@ object AiStudyGuardManager {
      */
     fun updateGuardStatusNotification(context: Context) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        // v1.3.2 (item 10): EXACTLY ONE notification while a focus-timer
+        // session runs — the timer service's foreground notification (id
+        // 7100, shows the true remaining time). Never stack this guard
+        // status notification beside it; the guard keeps protecting silently
+        // and Guard Hub still shows its status. When no timer runs (e.g. a
+        // bare schedule window), this notification behaves exactly as before.
+        if (TimerAnchorStore.isManualTimerRunning(context)) {
+            manager.cancel(NOTIFICATION_ID_GUARD_STATUS)
+            return
+        }
         if (!isAiGuardEnabled(context) || !isStudyPeriodActive(context)) {
             manager.cancel(NOTIFICATION_ID_GUARD_STATUS)
             return

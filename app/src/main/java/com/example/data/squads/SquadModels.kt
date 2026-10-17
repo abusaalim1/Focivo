@@ -40,7 +40,14 @@ data class SquadStanding(
     val allTimeSeconds: Long,
     val rank: Int,
     val isMe: Boolean,
-)
+    // v1.3.2: private members (is_public=false) render as LOCKED rows —
+    // name + avatar + lock, NO study time. Never excluded: the owner wants
+    // them visible-but-locked.
+    val isPublic: Boolean = true,
+) {
+    /** True when this row must hide all stats from the viewer. */
+    val isLocked: Boolean get() = !isPublic && !isMe
+}
 
 const val SQUADS_MAX_MEMBERS = 100 // v1.3.2: owner raised groups to "bohot sare" — cap is 100
 const val SQUADS_JOIN_BASE_URL = "https://focivoapp.vercel.app/join"

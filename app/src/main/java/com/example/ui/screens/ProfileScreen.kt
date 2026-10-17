@@ -1439,6 +1439,14 @@ fun ProfileScreen(
         var editedExam by remember { mutableStateOf(userPreferences?.targetExam.orEmpty()) }
         var editedIsPublic by remember { mutableStateOf(userPreferences?.isProfilePublic ?: true) }
         var selectedPhotoUri by remember { mutableStateOf<android.net.Uri?>(null) }
+        // v1.3.2 item 8: preset avatar reference (e.g. preset:avatar:a03).
+        // Pre-select the current value when it is already a preset ref.
+        val currentPresetRef = userPreferences?.currentUserPhotoUrl
+            ?.takeIf { com.example.ui.components.isPresetRef(it) }
+        var selectedPresetRef by remember { mutableStateOf(currentPresetRef) }
+        // v1.3.2 item 8: photo edit flow is a chooser — upload (existing
+        // screened path) or a bundled preset avatar.
+        var showPhotoChooser by remember { mutableStateOf(false) }
         // v1.3.2: on-device NSFW screen — explicit pictures are rejected with
         // a premium sheet before they can be set as the profile picture.
         var showNsfwRejection by remember { mutableStateOf(false) }
@@ -1453,11 +1461,31 @@ fun ProfileScreen(
                         if (verdict == com.example.util.NsfwScreenGate.Verdict.REJECT) {
                             showNsfwRejection = true
                         } else {
+                            selectedPresetRef = null
                             selectedPhotoUri = uri
                         }
                     }
                 }
             }
+        }
+
+        if (showPhotoChooser) {
+            com.example.ui.components.PresetPhotoChooserSheet(
+                mode = com.example.ui.components.PresetChooserMode.AVATAR,
+                initialSelection = selectedPresetRef,
+                onUploadPhoto = {
+                    showPhotoChooser = false
+                    photoPickerLauncher.launch(
+                        androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                onPresetSelected = { ref ->
+                    showPhotoChooser = false
+                    selectedPhotoUri = null
+                    selectedPresetRef = ref
+                },
+                onDismiss = { showPhotoChooser = false },
+            )
         }
 
         if (showNsfwRejection) {
@@ -1493,14 +1521,17 @@ fun ProfileScreen(
                             .size(80.dp)
                             .clip(CircleShape)
                             .background(T.accent)
-                            .clickable {
-                                photoPickerLauncher.launch(
-                                    androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                )
-                            },
+                            .clickable { showPhotoChooser = true },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (selectedPhotoUri != null) {
+                        if (selectedPresetRef != null) {
+                            com.example.ui.components.PresetImage(
+                                ref = selectedPresetRef!!,
+                                contentDescription = "Selected Avatar",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else if (selectedPhotoUri != null) {
                             AsyncImage(
                                 model = selectedPhotoUri,
                                 contentDescription = "Selected Avatar",
@@ -1689,7 +1720,8 @@ fun ProfileScreen(
                                 studyGoal = editedGoal.trim(),
                                 studyClass = editedClass.trim(),
                                 targetExam = editedExam.trim(),
-                                isPublic = editedIsPublic
+                                isPublic = editedIsPublic,
+                                avatarPresetRef = selectedPresetRef
                             )
                         )
                         showEditProfileDialog = false

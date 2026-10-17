@@ -94,3 +94,12 @@ alter table public.study_leaderboard
 -- legacy row public, matching the app's read-side null-means-public rule.
 alter table public.study_leaderboard
   add column if not exists is_public boolean not null default true;
+
+-- ── (d) Leaderboard weekly_sessions (v1.3.2 member profile) ───────────
+-- Count of the user's completed sessions in the current week, written by the
+-- app's leaderboard sync alongside weekly_study_seconds. Powers the member
+-- profile's "No. of sessions" / "Avg focus per session" tiles. The app
+-- writes this column best-effort (PostgREST 42703 tolerated) and HIDES both
+-- tiles when the value is absent — never invents numbers.
+alter table public.study_leaderboard
+  add column if not exists weekly_sessions integer not null default 0;

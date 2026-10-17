@@ -52,7 +52,7 @@ enum class ClockStyle(val label: String, val desc: String) {
     BARS("Bars", "Quiet equalizer bars fill up")
 }
 
-/** Ek hi entry point. remainingSec/totalSec timer se aate hain, accent = app theme ka rang. */
+/** Single entry point. remainingSec/totalSec come from the timer, accent = the app theme's color. */
 /**
  * v1.3.2: [content] is the backdrop-appropriate ink for time text and labels
  * (the selected timer theme's backdropContent color). Clock designs draw on
@@ -268,7 +268,7 @@ private fun BarsClock(rem: Int, total: Int, acc: Color, content: Color, m: Modif
     }
 }
 
-/* ================= GALLERY (sirf preview/test ke liye - app me zaroori nahi) ================= */
+/* ================= GALLERY (preview/test only — not needed in the app) ================= */
 @Composable
 fun ClockStyleGallery() {
     var style by remember { mutableStateOf(ClockStyle.ORBIT) }

@@ -85,19 +85,33 @@ object FocivoWidgetHelper {
         val isRunning = timerPrefs.getBoolean("is_timer_running", false)
         val remainingSecs = timerPrefs.getInt("remaining_seconds", 25 * 60)
         val currentTask = timerPrefs.getString("current_task_title", "Deep Work Session") ?: "Deep Work Session"
+        // v1.3.2 (item 14 QA): phase-aware labels — the old build always said
+        // "Focus: …" / "Focusing", even during pomodoro breaks (wrong phase
+        // label), and hardcoded "25:00" when idle (stale). The mode is
+        // already persisted in focusly_timer_state by the timer paths.
+        val mode = timerPrefs.getString("timer_mode", "") ?: ""
+        val isBreak = isRunning && mode.contains("break", ignoreCase = true)
 
         val minutes = remainingSecs / 60
         val seconds = remainingSecs % 60
         val timeDisplay = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
 
-        views.setTextViewText(R.id.tv_title, if (isRunning) timeDisplay else "25:00")
+        views.setTextViewText(R.id.tv_title, timeDisplay)
         views.setTextViewText(
             R.id.tv_sub,
-            if (isRunning) "Focus: $currentTask" else "Deep work session"
+            when {
+                !isRunning -> "Deep work session"
+                isBreak -> "$mode: $currentTask"
+                else -> "Focus: $currentTask"
+            }
         )
         views.setTextViewText(
             R.id.tv_badge,
-            if (isRunning) "Focusing" else "Ready"
+            when {
+                !isRunning -> "Ready"
+                isBreak -> "On break"
+                else -> "Focusing"
+            }
         )
         views.setTextViewText(
             R.id.btn_primary,
