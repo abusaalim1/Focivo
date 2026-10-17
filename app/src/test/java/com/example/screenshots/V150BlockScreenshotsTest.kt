@@ -118,7 +118,7 @@ class V150BlockScreenshotsTest {
                     contentAlignment = Alignment.TopCenter
                 ) {
                     FloatingTimerPill(
-                        initialRemainingSeconds = 24 * 60 + 3,
+                        remainingSeconds = 24 * 60 + 3,
                         onReturnToApp = {},
                         onDismiss = {}
                     )

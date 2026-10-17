@@ -666,6 +666,9 @@ object ScheduledBlockScheduler {
                 action = FocusShieldService.ACTION_START_SHIELD
                 putExtra(FocusShieldService.EXTRA_DURATION_SECONDS, remainingSeconds)
                 putExtra(FocusShieldService.EXTRA_IS_PUNISHMENT, false)
+                // v1.3.1: shield starts inside a configured schedule window log
+                // src=SCHEDULE in Guard Hub.
+                putExtra(FocusShieldService.EXTRA_SOURCE, "SCHEDULE")
                 if (activePackages.isNotEmpty()) {
                     putExtra(FocusShieldService.EXTRA_BLOCKED_LIST, activePackages.joinToString(","))
                 }

@@ -47,6 +47,11 @@ class FocusTimerService : Service() {
         const val EXTRA_TARGET_SECONDS = "extra_target_seconds"
         const val EXTRA_TASK_TITLE = "extra_task_title"
         const val EXTRA_MODE = "extra_timer_mode"
+        // v1.3.1 hotfix (owner order 2026-10-17, item B): every session start
+        // carries its source (TAP/WIDGET/RESTORE/SCHEDULE/...) so Guard Hub
+        // shows exactly why a timer is running. Callers set it; default is
+        // SERVICE for unknown/legacy paths.
+        const val EXTRA_SOURCE = "extra_source"
 
         private const val NOTIFICATION_ID = 7100
         private const val CHANNEL_ID = "focus_timer_channel"
@@ -144,6 +149,20 @@ class FocusTimerService : Service() {
         }
 
         persistTimerPrefs(endTimeMs, targetSeconds, taskTitle, mode)
+        // v1.3.1: Guard Hub provenance — EVERY service-level timer start logs
+        // its source (TAP/WIDGET/RESTORE/...). The ViewModel passes its own
+        // source through; legacy/unknown paths log SERVICE.
+        try {
+            // v1.3.1: a null/absent intent means the system restarted the
+            // service after process death — that is a RESTORE, proven by the
+            // expiry check above (endTime > now).
+            val source = if (intent == null || action == null) "RESTORE"
+            else intent.getStringExtra(EXTRA_SOURCE) ?: "SERVICE"
+            com.example.util.AiStudyGuardManager.logSessionStart(
+                this, "Focus Timer", source,
+                "target=${targetSeconds}s title=$taskTitle mode=$mode"
+            )
+        } catch (_: Exception) { }
         val remainingSec = ((endTimeMs - now) / 1000L).toInt()
         // v1.1.2: if we cannot reach foreground state, stop quietly NOW.
         // Letting the system time-out a startForegroundService() call kills the
@@ -249,6 +268,9 @@ class FocusTimerService : Service() {
                 .putString(KEY_TIMER_MODE, mode)
                 .apply()
         } catch (_: Exception) {}
+        // v1.3.1: arm the durable strict-session record at the same choke
+        // point (carries expiry validation across process death/reboot).
+        try { com.example.util.StrictSessionStore.arm(this, endTimeMs) } catch (_: Exception) {}
     }
 
     private fun persistRemaining(remainingSec: Int) {
@@ -283,6 +305,9 @@ class FocusTimerService : Service() {
         try {
             FloatingTimerPillManager.hide(this)
         } catch (_: Exception) { }
+        // v1.3.1: a finished session can never resurrect — disarm the durable
+        // strict-session record at the same choke point.
+        try { com.example.util.StrictSessionStore.disarm(this) } catch (_: Exception) {}
     }
 
     private fun buildTimerNotification(remainingSec: Int, taskTitle: String): Notification {

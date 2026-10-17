@@ -413,12 +413,12 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             setMode(modeName, quickMins)
             _shouldNavigateToStudyTab.value = true
             if (!_isTimerRunning.value) {
-                startTimer()
+                startTimer(source = "WIDGET")
             }
         } else if (startTimer) {
             _shouldNavigateToStudyTab.value = true
             if (!_isTimerRunning.value) {
-                startTimer()
+                startTimer(source = "WIDGET")
             }
         } else if (tab == "FOCUS") {
             _shouldNavigateToStudyTab.value = true
@@ -2263,7 +2263,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         Log.i(TAG, "Pomodoro phase -> ${next.phaseModeLabel()} (${next.phaseMinutes()}m)")
         // Quiet phase start: no "Session started" banner mid-cycle, and no
         // lock-in animation (the session is already running).
-        startTimerInternal(quietPhaseStart = true)
+        startTimerInternal(quietPhaseStart = true, source = "POMODORO")
     }
 
     fun confirmPreStudyBlock(selectedPackages: Set<String>, saveForFuture: Boolean) {
@@ -2318,7 +2318,8 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
      */
     data class LockInStartRequest(
         val overrideBlockedList: String?,
-        val quietPhaseStart: Boolean
+        val quietPhaseStart: Boolean,
+        val source: String = "TAP"
     )
 
     private val _showLockInStart = MutableStateFlow(false)
@@ -2329,17 +2330,20 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
 
     private var pendingLockInStart: LockInStartRequest? = null
 
-    fun startTimer(overrideBlockedList: String? = null, quietPhaseStart: Boolean = false) {
+    // v1.3.1 (owner order 2026-10-17, item B): every session start carries a
+    // source so Guard Hub shows exactly why a timer is running —
+    // TAP/WIDGET/RESUME_TAP/POMODORO/EXTENSION/LOCKIN/RESTORE.
+    fun startTimer(overrideBlockedList: String? = null, quietPhaseStart: Boolean = false, source: String = "TAP") {
         if (_isTimerRunning.value) return
         if (quietPhaseStart) {
-            startTimerInternal(overrideBlockedList, quietPhaseStart)
+            startTimerInternal(overrideBlockedList, quietPhaseStart, source)
             return
         }
         // Resolve the blocked packages the overlay will show (real apps).
         val prefs = userPreferences.value ?: com.example.data.model.UserPreferencesEntity()
         val raw = overrideBlockedList ?: prefs.blockedAppsList
         _lockInBlockedPackages.value = raw.split(",").map { it.trim() }.filter { it.isNotBlank() }
-        pendingLockInStart = LockInStartRequest(overrideBlockedList, quietPhaseStart)
+        pendingLockInStart = LockInStartRequest(overrideBlockedList, quietPhaseStart, source)
         _showLockInStart.value = true
         Log.i(TAG, "Lock-in start animation shown")
     }
@@ -2349,7 +2353,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         _showLockInStart.value = false
         val req = pendingLockInStart
         pendingLockInStart = null
-        startTimerInternal(req?.overrideBlockedList, req?.quietPhaseStart ?: false)
+        startTimerInternal(req?.overrideBlockedList, req?.quietPhaseStart ?: false, req?.source ?: "TAP")
     }
 
     /** System back during the lock-in animation: cancel the start entirely. */
@@ -2359,8 +2363,15 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         Log.i(TAG, "Lock-in start dismissed — session not started")
     }
 
-    fun startTimerInternal(overrideBlockedList: String? = null, quietPhaseStart: Boolean = false) {
+    fun startTimerInternal(overrideBlockedList: String? = null, quietPhaseStart: Boolean = false, source: String = "TAP") {
         if (_isTimerRunning.value) return
+        // v1.3.1: Guard Hub provenance for every ViewModel-level session start.
+        try {
+            com.example.util.AiStudyGuardManager.logSessionStart(
+                getApplication(), "Focus Timer", source,
+                "title=${_currentTaskTitle.value} mode=${_currentMode.value} target=${_targetSeconds.value}s"
+            )
+        } catch (_: Exception) { }
 
         // v1.1: pomodoro — arm the cycle engine. The first Focus phase starts
         // now with the configured duration; phases advance automatically in
@@ -2436,6 +2447,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 putExtra(com.example.service.FocusTimerService.EXTRA_TARGET_SECONDS, _targetSeconds.value)
                 putExtra(com.example.service.FocusTimerService.EXTRA_TASK_TITLE, _currentTaskTitle.value)
                 putExtra(com.example.service.FocusTimerService.EXTRA_MODE, _currentMode.value)
+                putExtra(com.example.service.FocusTimerService.EXTRA_SOURCE, source)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 app.startForegroundService(timerIntent)
@@ -2495,6 +2507,8 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 action = FocusShieldService.ACTION_START_SHIELD
                 putExtra(FocusShieldService.EXTRA_DURATION_SECONDS, _targetSeconds.value)
                 putExtra(FocusShieldService.EXTRA_BLOCKED_LIST, blockedApps.joinToString(","))
+                // v1.3.1: manual-session shields are user taps.
+                putExtra(FocusShieldService.EXTRA_SOURCE, "TAP")
             }
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -2510,6 +2524,8 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 action = FocusShieldService.ACTION_START_SHIELD
                 putExtra(FocusShieldService.EXTRA_DURATION_SECONDS, _targetSeconds.value)
                 putExtra(FocusShieldService.EXTRA_BLOCKED_LIST, blockedApps.joinToString(","))
+                // v1.3.1: manual-session shields are user taps.
+                putExtra(FocusShieldService.EXTRA_SOURCE, "TAP")
             }
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -2685,6 +2701,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                     putExtra(com.example.service.FocusTimerService.EXTRA_TARGET_SECONDS, _targetSeconds.value)
                     putExtra(com.example.service.FocusTimerService.EXTRA_TASK_TITLE, _currentTaskTitle.value)
                     putExtra(com.example.service.FocusTimerService.EXTRA_MODE, _currentMode.value)
+                    putExtra(com.example.service.FocusTimerService.EXTRA_SOURCE, "RESTORE")
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     app.startForegroundService(timerIntent)
@@ -2693,6 +2710,13 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 }
             } catch (_: Throwable) {}
             try { com.example.widget.FocivoWidgetHelper.updateAllWidgets(app) } catch (_: Throwable) {}
+            // v1.3.1: the restore path is an explicit provenance entry.
+            try {
+                com.example.util.AiStudyGuardManager.logSessionStart(
+                    app, "Focus Timer", "RESTORE",
+                    "restored with $remSec s remaining; endTime=$endTime"
+                )
+            } catch (_: Exception) { }
             Log.i(TAG, "[TimerRestore] Restored running timer with $remSec s remaining")
             return true
         }
@@ -2781,10 +2805,18 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         } catch (_: Exception) {}
 
         // Deactivate protections and stop Focus Shield notification service
+        // v1.3.1 hotfix (owner order 2026-10-17, item B): a deliberate stop
+        // must never be silently undone. The marker was previously planted
+        // only for auto-scheduled sessions; now it is planted whenever the
+        // user stops while a schedule window is active — so neither the
+        // schedule engine nor app-resume can resurrect the session/shield
+        // before the window ends.
         val wasAutoScheduled = isAutoScheduledSession
         isAutoScheduledSession = false
 
-        if (wasAutoScheduled) {
+        if (wasAutoScheduled ||
+            com.example.service.ScheduledBlockScheduler.isScheduleCurrentlyActive(app)
+        ) {
             ScheduledBlockScheduler.snoozeOrStopCurrentScheduleBlock(app)
         }
 
@@ -2829,7 +2861,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
 
     fun resumeTimer() {
         // Resume never replays the lock-in animation.
-        startTimerInternal()
+        startTimerInternal(source = "RESUME_TAP")
     }
 
     fun addFiveMinutes() {
@@ -2852,6 +2884,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 putExtra(com.example.service.FocusTimerService.EXTRA_TARGET_SECONDS, _targetSeconds.value)
                 putExtra(com.example.service.FocusTimerService.EXTRA_TASK_TITLE, _currentTaskTitle.value)
                 putExtra(com.example.service.FocusTimerService.EXTRA_MODE, _currentMode.value)
+                putExtra(com.example.service.FocusTimerService.EXTRA_SOURCE, "EXTENSION")
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 app.startForegroundService(timerIntent)
@@ -3266,47 +3299,27 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             val remainingSecs = FocusShieldService.getRemainingSeconds(app)
             val prefs = userPreferences.value ?: repository.userPreferences.firstOrNull() ?: UserPreferencesEntity()
 
-            // Auto-start a study timer session when a schedule with mode="Study" becomes active
-            if (activeStudySchedule != null) {
-                val studyRemaining = ScheduledBlockScheduler.getSecondsRemainingInActiveBlock(app, activeStudySchedule)
-                if (studyRemaining > 10 && (!_isTimerRunning.value || isAutoScheduledSession)) {
-                    if (!isAutoScheduledSession) {
-                        _shouldNavigateToStudyTab.value = true
-                    }
-                    _isTimerRunning.value = true
-                    _remainingSeconds.value = studyRemaining
-                    _targetSeconds.value = studyRemaining
-                    _currentTaskTitle.value = if (!activeStudySchedule.subject.isNullOrBlank()) {
-                        activeStudySchedule.subject!!
-                    } else {
-                        "Scheduled Study: ${activeStudySchedule.label}"
-                    }
-                    isAutoScheduledSession = true
-
-                    try {
-                        val localPrefs = app.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
-                        val endTime = System.currentTimeMillis() + (studyRemaining * 1000L)
-                        localPrefs.edit()
-                            .putBoolean("is_manual_timer_running", true)
-                            .putLong("manual_timer_end_time_ms", endTime)
-                            .apply()
-                    } catch (_: Exception) {}
-
-                    if (timerJob == null || !timerJob!!.isActive) {
-                        timerJob = viewModelScope.launch {
-                            while (isActive && _remainingSeconds.value > 0) {
-                                delay(1000L)
-                                _remainingSeconds.value -= 1
-                            }
-                            if (_remainingSeconds.value <= 0) {
-                                onTimerCompleted()
-                                isAutoScheduledSession = false
-                            }
-                        }
-                    }
-                }
-            } else if (isAutoScheduledSession) {
-                // Scheduled study window finished or break started
+            // v1.3.1 hotfix (owner order 2026-10-17, item B): the old code
+            // here AUTO-STARTED a full study timer on every app resume inside
+            // a schedule window — no tap, no consent. That was the "timer
+            // started by itself" bug. Sessions now start ONLY on explicit
+            // user action (tap/widget) or expiry-validated restore. The
+            // schedule engine still arms the Focus SHIELD (blocker) inside
+            // its window via evaluateAndReschedule — that part is the
+            // schedule feature working as configured.
+            if (activeStudySchedule != null && !_isTimerRunning.value) {
+                try {
+                    com.example.util.AiStudyGuardManager.logGuardSkip(
+                        app,
+                        "Focus Timer",
+                        "session-start",
+                        "schedule-window-no-autostart"
+                    )
+                } catch (_: Exception) { }
+            }
+            if (isAutoScheduledSession) {
+                // Legacy flag from pre-1.3.1 auto-sessions: a finished window
+                // completes any residue; the flag can never be set anymore.
                 onTimerCompleted()
                 isAutoScheduledSession = false
             }
@@ -3497,6 +3510,8 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             action = FocusShieldService.ACTION_START_SHIELD
             putExtra(FocusShieldService.EXTRA_DURATION_SECONDS, seconds)
             putExtra(FocusShieldService.EXTRA_BLOCKED_LIST, userPreferences.value?.blockedAppsList)
+            // v1.3.1: standalone shield starts from an explicit user tap.
+            putExtra(FocusShieldService.EXTRA_SOURCE, "TAP")
         }
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

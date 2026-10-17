@@ -50,6 +50,11 @@ object StrictModeManager {
         // start. No-op when already enabled; restores visibility if anything
         // (e.g. an OEM launcher after a failed uninstall) disabled it.
         StrictUninstallGuard.reassertLauncherEntryEnabled(context)
+        // v1.3.1: validate the durable strict-session record on every app
+        // start — expired records are purged (never resurrect); a live one
+        // keeps the tamper guard armed even if the engine hasn't restarted
+        // the session yet.
+        StrictSessionStore.validateOnBoot(context)
     }
 
     fun isStrictModeEnabled(context: Context): Boolean {
