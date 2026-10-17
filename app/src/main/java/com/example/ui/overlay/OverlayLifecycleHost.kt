@@ -101,6 +101,21 @@ class OverlayLifecycleHost :
     /** Drives the lifecycle to RESUMED. Call BEFORE WindowManager.addView. */
     fun show() {
         savedStateRegistryController.performAttach()
+        // v1.3.0 assembly: SavedStateRegistryController.performRestore(Bundle)
+        // is package-private in savedstate 1.2.1, but performAttach() registers
+        // AndroidX's Recreator observer, which calls consumeRestoredStateForKey()
+        // on ON_CREATE — and that throws IllegalStateException unless
+        // performRestore() ran first (in Activities the framework does this;
+        // this host must do it itself). Reflective call; a null bundle means
+        // "no restored state", which is correct for a fresh overlay.
+        try {
+            val m = savedStateRegistryController.javaClass
+                .getDeclaredMethod("performRestore", android.os.Bundle::class.java)
+            m.isAccessible = true
+            m.invoke(savedStateRegistryController, null)
+        } catch (t: Throwable) {
+            Log.w(TAG, "performRestore reflection failed; Recreator may throw on ON_CREATE", t)
+        }
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
