@@ -170,6 +170,10 @@ fun FocusScreen(
     var showDeepFocusSettings by remember { mutableStateOf(false) }
     var showCustomizeTimer by remember { mutableStateOf(false) }
     var currentTag by remember { mutableStateOf(currentTaskTitle.ifBlank { "Deep Study" }) }
+    // v1.3.0 follow-up (item 2): when strict is enabled from the pre-session
+    // prompt sheet and the device admin isn't active yet, offer the premium
+    // admin explainer right after the prompt closes.
+    var showAdminExplainer by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     LaunchedEffect(Unit) {
@@ -673,14 +677,39 @@ fun FocusScreen(
         }
 
         // v1.2.3 (Task 13.2) — pre-session Strict Mode + AI Guard prompt.
+        // v1.3.0 follow-up (item 2): enabling strict here must also offer the
+        // device-admin uninstall shield — previously this path skipped it,
+        // which is exactly how the owner's device ended up unprotected.
         if (showStrictGuardPromptSheet) {
             StrictGuardPromptSheet(
                 strictOn = promptStrictOn,
                 guardOn = promptGuardOn,
-                onEnableStrict = onEnableStrictFromPrompt,
+                onEnableStrict = {
+                    val wasOff = !promptStrictOn
+                    onEnableStrictFromPrompt()
+                    if (wasOff && !com.example.util.DeviceAdminGuard.isAdminActive(context)) {
+                        showAdminExplainer = true
+                    }
+                },
                 onEnableGuard = onEnableGuardFromPrompt,
                 onStartSession = onStartFromStrictGuardPrompt,
                 onDismiss = onDismissStrictGuardPrompt
+            )
+        }
+
+        // The premium explainer renders only after the prompt sheet is gone.
+        if (showAdminExplainer && !showStrictGuardPromptSheet) {
+            StrictAdminExplainerSheet(
+                onEnable = {
+                    showAdminExplainer = false
+                    com.example.util.StrictModeManager.setUninstallProtectionEnabled(context, true)
+                    com.example.util.DeviceAdminGuard.launchActivation(context)
+                },
+                onOptOut = {
+                    showAdminExplainer = false
+                    com.example.util.StrictModeManager.setUninstallProtectionEnabled(context, false)
+                },
+                onDismiss = { showAdminExplainer = false }
             )
         }
     }

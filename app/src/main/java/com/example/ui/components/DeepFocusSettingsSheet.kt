@@ -42,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -54,9 +55,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import android.content.Context
-import android.content.Intent
 import androidx.compose.material3.MaterialTheme
 import com.example.service.FocivoDeviceAdminReceiver
+import com.example.util.AiStudyGuardManager
+import com.example.util.DeviceAdminGuard
+import com.example.util.UninstallProtectionGate
 import com.example.data.FocuslyRepository
 import com.example.util.TimerTheme
 import com.example.util.TimerThemeManager
@@ -111,7 +114,24 @@ fun DeepFocusSettingsSheet(
     val rowBg = T.surface
     val rowBorder = T.line
 
-    var showDeviceAdminPrompt by remember { mutableStateOf(false) }
+    // v1.3.0 follow-up (item 2): device-admin uninstall protection. The row
+    // reports the HONEST gate state — PROTECTED only when the admin is really
+    // active. Refresh tick re-reads DPM after the user returns from the
+    // system activation screen.
+    var showAdminExplainer by remember { mutableStateOf(false) }
+    var showAdminDisableSheet by remember { mutableStateOf(false) }
+    var adminRefreshTick by remember { mutableIntStateOf(0) }
+    val adminActive = remember(adminRefreshTick) {
+        DeviceAdminGuard.isAdminActive(context)
+    }
+    val protectionState = remember(isStrictModeEnabled, uninstallProtection, adminActive) {
+        UninstallProtectionGate.decide(
+            strictEnabled = isStrictModeEnabled,
+            protectionEnabled = uninstallProtection,
+            sessionActive = AiStudyGuardManager.isStudyPeriodActive(context),
+            adminActive = adminActive
+        )
+    }
     var showThemePicker by remember { mutableStateOf(initialShowThemePicker) }
     val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
     // Round-4: Focus Points balance (real currency, 1 pt per focused minute)
@@ -144,62 +164,33 @@ fun DeepFocusSettingsSheet(
         )
     }
 
-    if (showDeviceAdminPrompt) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showDeviceAdminPrompt = false },
-            title = {
-                Text(
-                    text = "Activate Uninstall Protection?",
-                    fontFamily = PoppinsFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 19.sp,
-                    color = textPrimary
-                )
+    if (showAdminExplainer) {
+        StrictAdminExplainerSheet(
+            onEnable = {
+                showAdminExplainer = false
+                // v1.3.0 follow-up: keep the opt-in preference true and launch
+                // the SYSTEM activation screen; refresh the row when we return.
+                StrictModeManager.setUninstallProtectionEnabled(context, true)
+                DeviceAdminGuard.launchActivation(context)
+                adminRefreshTick += 1
             },
-            text = {
-                Text(
-                    text = "Strict Mode is on! You can optionally activate Device Admin to ensure Focivo cannot be uninstalled or bypassed while a strict study session is running.",
-                    fontFamily = PoppinsFontFamily,
-                    fontSize = 13.sp,
-                    color = textSecondary
-                )
+            onOptOut = {
+                showAdminExplainer = false
+                // Honest OFF: strict keeps working, uninstall stays normal.
+                StrictModeManager.setUninstallProtectionEnabled(context, false)
+                adminRefreshTick += 1
             },
-            confirmButton = {
-                androidx.compose.material3.TextButton(
-                    onClick = {
-                        showDeviceAdminPrompt = false
-                        try {
-                            val intent = Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
-                                putExtra(
-                                    android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN,
-                                    FocivoDeviceAdminReceiver.getComponentName(context)
-                                )
-                                putExtra(
-                                    android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                                    "Prevents accidental uninstallation while a strict focus session is in progress."
-                                )
-                            }
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            android.util.Log.e("DeepFocus", "Could not launch device admin request: ${e.message}")
-                        }
-                    }
-                ) {
-                    Text(
-                        text = "Enable Admin",
-                        fontWeight = FontWeight.Bold,
-                        color = T.accentText
-                    )
-                }
+            onDismiss = { showAdminExplainer = false }
+        )
+    }
+    if (showAdminDisableSheet) {
+        StrictAdminDisableSheet(
+            onOpenSettings = {
+                showAdminDisableSheet = false
+                DeviceAdminGuard.openDeactivateScreen(context)
+                adminRefreshTick += 1
             },
-            dismissButton = {
-                androidx.compose.material3.TextButton(
-                    onClick = { showDeviceAdminPrompt = false }
-                ) {
-                    Text("Skip", color = textSecondary)
-                }
-            },
-            containerColor = rowBg
+            onDismiss = { showAdminDisableSheet = false }
         )
     }
 
@@ -258,7 +249,7 @@ fun DeepFocusSettingsSheet(
                                 val adminComponent = FocivoDeviceAdminReceiver.getComponentName(context)
                                 val isAdminActive = dpm?.isAdminActive(adminComponent) == true
                                 if (!isAdminActive) {
-                                    showDeviceAdminPrompt = true
+                                    showAdminExplainer = true
                                 }
                             }
                         },
@@ -360,18 +351,25 @@ fun DeepFocusSettingsSheet(
                     )
                 }
                 item {
-                    SettingsToggleRow(
-                        icon = Icons.Default.Security,
-                        icon3dRes = com.example.R.drawable.ic3d_shield,
-                        title = "Uninstall protection",
-                        subtitle = "Focivo cannot be uninstalled while a focus session is running.",
-                        checked = uninstallProtection,
-                        onCheckedChange = { StrictModeManager.setUninstallProtectionEnabled(context, it) },
+                    // v1.3.0 follow-up (item 2): honest uninstall-protection
+                    // status. The old toggle claimed "cannot be uninstalled"
+                    // while the device admin was never activated — the owner
+                    // proved uninstall still succeeded. This row reports the
+                    // real gate state; ON is shown ONLY when Android's own
+                    // device-admin layer is active.
+                    UninstallProtectionStatusRow(
+                        state = protectionState,
+                        onClick = {
+                            if (protectionState == UninstallProtectionGate.State.PROTECTED) {
+                                showAdminDisableSheet = true
+                            } else if (isStrictModeEnabled) {
+                                showAdminExplainer = true
+                            }
+                        },
                         textPrimary = textPrimary,
                         textSecondary = textSecondary,
                         rowBg = rowBg,
-                        rowBorder = rowBorder,
-                        testTag = "deep_focus_uninstall_toggle"
+                        rowBorder = rowBorder
                     )
                 }
                 item {
@@ -467,6 +465,95 @@ private fun SettingsToggleRow(
                 uncheckedTrackColor = focivoTokens().trackOff
             )
         )
+    }
+}
+
+/**
+ * v1.3.0 follow-up (item 2) — honest uninstall-protection status row.
+ *
+ * Replaces the old toggle that claimed "cannot be uninstalled" while the
+ * device admin was never activated (the owner proved uninstall still
+ * succeeded). The ON pill appears ONLY for [UninstallProtectionGate.State.PROTECTED].
+ */
+@Composable
+private fun UninstallProtectionStatusRow(
+    state: UninstallProtectionGate.State,
+    onClick: () -> Unit,
+    textPrimary: Color,
+    textSecondary: Color,
+    rowBg: Color,
+    rowBorder: Color
+) {
+    val isOn = state == UninstallProtectionGate.State.PROTECTED
+    val subtitle = when (state) {
+        UninstallProtectionGate.State.PROTECTED ->
+            "On — Android blocks uninstall during strict sessions. Tap to remove."
+        UninstallProtectionGate.State.ADMIN_INACTIVE ->
+            "Off — tap to activate the uninstall shield."
+        UninstallProtectionGate.State.OPTED_OUT ->
+            "Off — you chose to keep uninstall normal. Tap to change."
+        UninstallProtectionGate.State.NO_SESSION ->
+            "Armed — activates automatically when a strict session runs."
+        UninstallProtectionGate.State.STRICT_OFF ->
+            "Turn on Strict Mode to arm protection."
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(rowBg)
+            .border(1.dp, rowBorder, RoundedCornerShape(18.dp))
+            .pressFeedback()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 13.dp)
+            .testTag("deep_focus_uninstall_status_row"),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        FeatureIcon(
+            drawableRes = com.example.R.drawable.ic3d_shield,
+            imageVector = null,
+            contentDescription = null,
+            size = 44.dp,
+            vectorCircleColor = if (isOn) RegainLimePrimary.copy(alpha = 0.18f)
+            else focivoTokens().surface2,
+            vectorTint = if (isOn) focivoTokens().accentText else textSecondary
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Uninstall protection",
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = textPrimary
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                fontFamily = PoppinsFontFamily,
+                fontSize = 11.5.sp,
+                color = textSecondary,
+                lineHeight = 15.sp
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(
+                    if (isOn) RegainLimePrimary
+                    else focivoTokens().surface2
+                )
+                .padding(horizontal = 10.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = if (isOn) "ON" else "OFF",
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                color = if (isOn) Color.Black else textSecondary
+            )
+        }
     }
 }
 
