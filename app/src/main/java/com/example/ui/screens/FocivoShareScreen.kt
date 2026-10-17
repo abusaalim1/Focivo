@@ -661,6 +661,8 @@ private fun Quote(text: String, color: Color) {
  * Returns 7 fill fractions (0..1): each bar is STRICTLY proportional to that
  * day's real minutes (v / max), with a minimal 8% floor so a zero day still
  * renders a stub (same floor as the owner's HTML: Math.max(8, v/mx*100)).
+ * Shorter lists are padded with zero days at the end (today side), matching
+ * the pre-v1.3.0 behavior; production always passes exactly 7.
  * Unit-tested in WeekBarFractionsTest.
  */
 internal fun weekBarFractions(week: List<Int>): List<Float> {

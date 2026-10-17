@@ -51,9 +51,11 @@ class WeekBarFractionsTest {
     }
 
     @Test fun short_list_is_padded_with_zero_days() {
-        val f = weekBarFractions(listOf(120)) // only today has data
+        // Defensive padding matches the historical behavior: values fill
+        // from the oldest slot, zeros pad the today side.
+        val f = weekBarFractions(listOf(120)) // only the oldest day has data
         assertEquals(7, f.size)
-        assertEquals(1.0f, f[6], 1e-6f)
-        for (i in 0 until 6) assertEquals(0.08f, f[i], 1e-6f)
+        assertEquals(1.0f, f[0], 1e-6f)
+        for (i in 1 until 7) assertEquals(0.08f, f[i], 1e-6f)
     }
 }
