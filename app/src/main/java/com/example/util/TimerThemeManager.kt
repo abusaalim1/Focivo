@@ -65,12 +65,28 @@ data class TimerTheme(
      * Dark scenes get light text; the light Aurora canvas keeps dark text.
      * Card-internal text is unaffected (cards are light surfaces).
      */
-    val onBackdropContent: Color = Color(0xFFF7F8F4)
+    val onBackdropContent: Color = Color(0xFFF7F8F4),
+    /**
+     * v1.3.2: override used when the app is in dark mode and this theme's
+     * backdrop is ALSO dark in dark mode (the Aurora canvas: light in light
+     * app mode, dark in dark app mode). Null = backdrop is the same in both
+     * modes, so [onBackdropContent] is used everywhere.
+     */
+    val onBackdropContentDark: Color? = null
 ) {
     // Content lock model (points never spent): ALL_CONTENT_UNLOCKED frees every timer theme.
     // v1.2.4: isAdmin (owner admin account) frees everything — single choke point, no scattered conditionals.
     fun isUnlocked(userPoints: Int, isAdmin: Boolean = false): Boolean =
         isAdmin || ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
+
+    /**
+     * v1.3.2: backdrop-aware content color that is correct in BOTH app modes.
+     * Fixes the Aurora theme rendering dark digits on its dark-mode canvas
+     * (owner screenshot: "25:00" nearly invisible). Every caller drawing text
+     * on a theme backdrop must use this, never [onBackdropContent] directly.
+     */
+    fun backdropContent(isAppDark: Boolean): Color =
+        if (isAppDark) onBackdropContentDark ?: onBackdropContent else onBackdropContent
 }
 
 object TimerThemeManager {
@@ -88,7 +104,10 @@ object TimerThemeManager {
             glowColor = Color.Transparent,
             accent = Color(0xFF8CE000),
             unlockPoints = 0,
-            onBackdropContent = Color(0xFF161A16) // light aurora canvas -> dark text
+            onBackdropContent = Color(0xFF161A16), // light aurora canvas -> dark text
+            // v1.3.2: the aurora canvas is DARK in dark app mode (AuroraBackground
+            // dark gradient) — dark text there rendered "25:00" invisible.
+            onBackdropContentDark = Color(0xFFF7F8F4)
         ),
         TimerTheme(
             id = "forest",

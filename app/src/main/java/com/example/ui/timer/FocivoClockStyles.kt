@@ -53,26 +53,33 @@ enum class ClockStyle(val label: String, val desc: String) {
 }
 
 /** Ek hi entry point. remainingSec/totalSec timer se aate hain, accent = app theme ka rang. */
+/**
+ * v1.3.2: [content] is the backdrop-appropriate ink for time text and labels
+ * (the selected timer theme's backdropContent color). Clock designs draw on
+ * the theme's full-bleed backdrop, so hard-coded white ink went invisible on
+ * light canvases (e.g. Aurora in light app mode).
+ */
 @Composable
 fun FocivoClock(
     style: ClockStyle, remainingSec: Int, totalSec: Int,
-    accent: Color = FtLime, modifier: Modifier = Modifier.size(300.dp)
+    accent: Color = FtLime, content: Color = Color.White,
+    modifier: Modifier = Modifier.size(300.dp)
 ) {
     when (style) {
-        ClockStyle.ORBIT -> OrbitClock(remainingSec, totalSec, accent, modifier)
-        ClockStyle.FLIP -> FlipClock(remainingSec, totalSec, accent, modifier)
-        ClockStyle.LIQUID -> LiquidClock(remainingSec, totalSec, accent, modifier)
-        ClockStyle.EDITORIAL -> EditorialClock(remainingSec, totalSec, accent, modifier)
-        ClockStyle.DIAL -> DialClock(remainingSec, totalSec, accent, modifier)
-        ClockStyle.HORIZON -> HorizonClock(remainingSec, totalSec, accent, modifier)
-        ClockStyle.STACK -> StackClock(remainingSec, totalSec, accent, modifier)
-        ClockStyle.BREATHE -> BreatheClock(remainingSec, totalSec, accent, modifier)
-        ClockStyle.BARS -> BarsClock(remainingSec, totalSec, accent, modifier)
+        ClockStyle.ORBIT -> OrbitClock(remainingSec, totalSec, accent, content, modifier)
+        ClockStyle.FLIP -> FlipClock(remainingSec, totalSec, accent, content, modifier)
+        ClockStyle.LIQUID -> LiquidClock(remainingSec, totalSec, accent, content, modifier)
+        ClockStyle.EDITORIAL -> EditorialClock(remainingSec, totalSec, accent, content, modifier)
+        ClockStyle.DIAL -> DialClock(remainingSec, totalSec, accent, content, modifier)
+        ClockStyle.HORIZON -> HorizonClock(remainingSec, totalSec, accent, content, modifier)
+        ClockStyle.STACK -> StackClock(remainingSec, totalSec, accent, content, modifier)
+        ClockStyle.BREATHE -> BreatheClock(remainingSec, totalSec, accent, content, modifier)
+        ClockStyle.BARS -> BarsClock(remainingSec, totalSec, accent, content, modifier)
     }
 }
 
 @Composable
-private fun OrbitClock(rem: Int, total: Int, acc: Color, m: Modifier) {
+private fun OrbitClock(rem: Int, total: Int, acc: Color, content: Color, m: Modifier) {
     val p = ftProg(rem, total)
     Box(m, Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
@@ -88,14 +95,14 @@ private fun OrbitClock(rem: Int, total: Int, acc: Color, m: Modifier) {
             drawCircle(acc.copy(.25f), 16.dp.toPx(), d); drawCircle(acc, 8.dp.toPx(), d)
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            FtT(ftMmss(rem), 60, weight = FontWeight.Light, spacing = -1f)
-            FtT("MIN REMAINING", 11, Color.White.copy(.5f), spacing = 3f)
+            FtT(ftMmss(rem), 60, content, weight = FontWeight.Light, spacing = -1f)
+            FtT("MIN REMAINING", 11, content.copy(.5f), spacing = 3f)
         }
     }
 }
 
 @Composable
-private fun FlipClock(rem: Int, total: Int, acc: Color, m: Modifier) {
+private fun FlipClock(rem: Int, total: Int, acc: Color, content: Color, m: Modifier) {
     val s = ftMmss(rem); val p = ftProg(rem, total)
     Box(m, Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -126,7 +133,7 @@ private fun FlipDigit(ch: Char) {
 }
 
 @Composable
-private fun LiquidClock(rem: Int, total: Int, acc: Color, m: Modifier) {
+private fun LiquidClock(rem: Int, total: Int, acc: Color, content: Color, m: Modifier) {
     val fill = if (total > 0) (rem.toFloat() / total).coerceIn(0f, 1f) else 0f
     val ph by rememberInfiniteTransition(label = "w").animateFloat(0f, (2 * PI).toFloat(), infiniteRepeatable(tween(4500, easing = LinearEasing)), label = "ph")
     Box(m, Alignment.Center) {
@@ -149,14 +156,14 @@ private fun LiquidClock(rem: Int, total: Int, acc: Color, m: Modifier) {
 }
 
 @Composable
-private fun EditorialClock(rem: Int, total: Int, acc: Color, m: Modifier) {
+private fun EditorialClock(rem: Int, total: Int, acc: Color, content: Color, m: Modifier) {
     val p = ftProg(rem, total); val v = rem.coerceAtLeast(0)
     Box(m, Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(buildAnnotatedString {
                 append("%02d".format(v / 60)); withStyle(SpanStyle(color = acc)) { append(":") }; append("%02d".format(v % 60))
-            }, style = TextStyle(color = Color.White, fontFamily = FtFDisplay, fontStyle = FontStyle.Italic, fontSize = 112.sp, letterSpacing = (-3).sp, fontFeatureSettings = "tnum"))
-            FtT("MINUTES LEFT", 11, Color.White.copy(.5f), spacing = 4f)
+            }, style = TextStyle(color = content, fontFamily = FtFDisplay, fontStyle = FontStyle.Italic, fontSize = 112.sp, letterSpacing = (-3).sp, fontFeatureSettings = "tnum"))
+            FtT("MINUTES LEFT", 11, content.copy(.5f), spacing = 4f)
             Spacer(Modifier.height(22.dp))
             Box(Modifier.width(240.dp).height(7.dp)) {
                 Box(Modifier.align(Alignment.Center).fillMaxWidth().height(1.dp).background(Color.White.copy(.14f)))
@@ -167,7 +174,7 @@ private fun EditorialClock(rem: Int, total: Int, acc: Color, m: Modifier) {
 }
 
 @Composable
-private fun DialClock(rem: Int, total: Int, acc: Color, m: Modifier) {
+private fun DialClock(rem: Int, total: Int, acc: Color, content: Color, m: Modifier) {
     val p = ftProg(rem, total)
     Box(m, Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
@@ -183,12 +190,12 @@ private fun DialClock(rem: Int, total: Int, acc: Color, m: Modifier) {
             drawCircle(acc, 7.dp.toPx(), c)
         }
         Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 54.dp).clip(CircleShape).background(Color.White.copy(.07f))
-            .border(1.dp, Color.White.copy(.1f), CircleShape).padding(horizontal = 18.dp, vertical = 8.dp)) { FtT(ftMmss(rem), 26, weight = FontWeight.SemiBold) }
+            .border(1.dp, Color.White.copy(.1f), CircleShape).padding(horizontal = 18.dp, vertical = 8.dp)) { FtT(ftMmss(rem), 26, content, weight = FontWeight.SemiBold) }
     }
 }
 
 @Composable
-private fun HorizonClock(rem: Int, total: Int, acc: Color, m: Modifier) {
+private fun HorizonClock(rem: Int, total: Int, acc: Color, content: Color, m: Modifier) {
     val p = ftProg(rem, total)
     Box(m, Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
@@ -201,14 +208,14 @@ private fun HorizonClock(rem: Int, total: Int, acc: Color, m: Modifier) {
             drawCircle(acc, 10.dp.toPx(), sun)
         }
         Column(Modifier.align(Alignment.Center).offset(y = 44.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            FtT(ftMmss(rem), 64, weight = FontWeight.Light, family = FtFDisplay, italic = true, spacing = -1f)
-            FtT("UNTIL SUNSET", 11, Color.White.copy(.5f), spacing = 4f)
+            FtT(ftMmss(rem), 64, content, weight = FontWeight.Light, family = FtFDisplay, italic = true, spacing = -1f)
+            FtT("UNTIL SUNSET", 11, content.copy(.5f), spacing = 4f)
         }
     }
 }
 
 @Composable
-private fun StackClock(rem: Int, total: Int, acc: Color, m: Modifier) {
+private fun StackClock(rem: Int, total: Int, acc: Color, content: Color, m: Modifier) {
     val p = ftProg(rem, total); val v = rem.coerceAtLeast(0)
     Box(m, Alignment.Center) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(26.dp)) {
@@ -216,7 +223,7 @@ private fun StackClock(rem: Int, total: Int, acc: Color, m: Modifier) {
                 Box(Modifier.fillMaxWidth().fillMaxHeight(1f - p).background(acc))
             }
             Column {
-                FtT("%02d".format(v / 60), 104, weight = FontWeight.Thin, spacing = -4f, lh = 100f)
+                FtT("%02d".format(v / 60), 104, content, weight = FontWeight.Thin, spacing = -4f, lh = 100f)
                 FtT("%02d".format(v % 60), 104, acc, FontWeight.Thin, spacing = -4f, lh = 100f)
             }
         }
@@ -224,7 +231,7 @@ private fun StackClock(rem: Int, total: Int, acc: Color, m: Modifier) {
 }
 
 @Composable
-private fun BreatheClock(rem: Int, total: Int, acc: Color, m: Modifier) {
+private fun BreatheClock(rem: Int, total: Int, acc: Color, content: Color, m: Modifier) {
     val p = ftProg(rem, total)
     val b by rememberInfiniteTransition(label = "b").animateFloat(.82f, 1f, infiniteRepeatable(tween(4000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "b")
     Box(m, Alignment.Center) {
@@ -237,18 +244,18 @@ private fun BreatheClock(rem: Int, total: Int, acc: Color, m: Modifier) {
             drawArc(Color.White.copy(.8f), -90f, 360f * p, false, Offset(c.x - r, c.y - r), Size(2 * r, 2 * r), style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            FtT(ftMmss(rem), 54, weight = FontWeight.Light, spacing = -1f)
-            FtT("BREATHE", 11, Color.White.copy(.55f), spacing = 4f)
+            FtT(ftMmss(rem), 54, content, weight = FontWeight.Light, spacing = -1f)
+            FtT("BREATHE", 11, content.copy(.55f), spacing = 4f)
         }
     }
 }
 
 @Composable
-private fun BarsClock(rem: Int, total: Int, acc: Color, m: Modifier) {
+private fun BarsClock(rem: Int, total: Int, acc: Color, content: Color, m: Modifier) {
     val p = ftProg(rem, total)
     Box(m, Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            FtT(ftMmss(rem), 64, weight = FontWeight.Light, spacing = -1f)
+            FtT(ftMmss(rem), 64, content, weight = FontWeight.Light, spacing = -1f)
             Spacer(Modifier.height(36.dp))
             Canvas(Modifier.width(264.dp).height(96.dp)) {
                 val n = 32; val gap = 4.dp.toPx(); val bw = (size.width - gap * (n - 1)) / n; val done = (p * n).toInt()
