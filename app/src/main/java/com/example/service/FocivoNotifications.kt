@@ -266,15 +266,20 @@ object FocivoNotifications {
         } catch (_: Exception) { }
     }
 
-    /** 7. Update available — once per version code (plus respects overlay dismissal). */
+    /**
+     * 7. Update available — AT MOST ONE notification per version, ever.
+     * v1.3.2: the gate lives in AppUpdateManager as a persisted
+     * last-notified versionCode, shared by every check path (app-open check +
+     * scheduled daily check). Respects the in-app overlay dismissal.
+     * Stable notification id [ID_UPDATE_AVAILABLE] keeps the shade clean.
+     */
     fun postUpdateAvailable(context: Context, versionName: String, versionCode: Int) {
-        val key = "update_$versionCode"
-        if (isDeduped(context, key)) return
         // Dedupe with the stored overlay dismissal for the same version.
         try {
             if (com.example.util.AppUpdateManager.isUpdateOverlayDismissed(context, versionCode)) return
         } catch (_: Exception) { }
-        markDeduped(context, key)
+        // Central gate: one notification per versionCode, across all paths.
+        if (!com.example.util.AppUpdateManager.claimNotifyForVersion(context, versionCode)) return
         post(
             context,
             CHANNEL_UPDATES, "App Updates", "New version alerts",

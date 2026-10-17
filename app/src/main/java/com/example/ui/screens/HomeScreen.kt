@@ -541,13 +541,13 @@ fun HomeScreen(
                 ) {
                     FeatureIcon(
                         drawableRes = R.drawable.ic3d_people,
-                        contentDescription = "Squads",
+                        contentDescription = "Groups",
                         size = 38.dp
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Squads",
+                            text = "Groups",
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontFamily = PoppinsFontFamily,
                                 fontWeight = FontWeight.SemiBold,
@@ -570,7 +570,7 @@ fun HomeScreen(
                     }
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "Open squads",
+                        contentDescription = "Open groups",
                         tint = T.muted,
                         modifier = Modifier.size(20.dp)
                     )

@@ -8,7 +8,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import com.example.ui.components.pressFeedback
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
 
-/* ================= DATA (UI sirf ye state leta hai - tumhara timer logic yahan nahi badalta) ================= */
+/* ================= DATA (the UI only consumes this state — the timer logic itself is untouched here) ================= */
 enum class PomoPhase(val title: String, val sub: String, val color: Color) {
     FOCUS("Focus", "Stay with it.", FtLime),
     SHORT("Short break", "Breathe. Stretch.", FtMint),
@@ -52,9 +54,9 @@ data class PomodoroUiState(
 
 enum class PomodoroStyle(val label: String, val unlockPoints: Int = 0) {
     TICK_RING("Tick Ring", 0),
-    ACTIVITY_RINGS("Activity Rings", 1000),
-    SESSION_STACK("Session Stack", 2500),
-    TYPOGRAPHIC("Typographic", 5000);
+    ACTIVITY_RINGS("Activity Rings", 750),
+    SESSION_STACK("Session Stack", 1800),
+    TYPOGRAPHIC("Typographic", 3500);
 
     /**
      * v1.2.4 — lock model matches the timer faces exactly (threshold-based,
@@ -71,7 +73,7 @@ fun FocivoPomodoro(
     state: PomodoroUiState, style: PomodoroStyle,
     onToggle: () -> Unit, onSkip: () -> Unit, onReset: () -> Unit, modifier: Modifier = Modifier
 ) {
-    val c by animateColorAsState(state.phase.color, tween(900), label = "phaseColor")   // phase badalte hi rang smoothly badalta hai
+    val c by animateColorAsState(state.phase.color, tween(900), label = "phaseColor")   // the color shifts smoothly as soon as the phase changes
     Box(modifier.fillMaxSize().background(FtBgDark)) {
         Canvas(Modifier.fillMaxSize()) {
             drawCircle(Brush.radialGradient(listOf(c.copy(.2f), Color.Transparent), Offset(size.width / 2, size.height * .36f), size.width * .9f))
@@ -132,16 +134,22 @@ private fun NextUp(s: PomodoroUiState) = Box(
 @Composable
 private fun Controls(s: PomodoroUiState, c: Color, onToggle: () -> Unit, onSkip: () -> Unit, onReset: () -> Unit) =
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(26.dp)) {
-        Box(Modifier.size(54.dp).clip(CircleShape).background(Color.White.copy(.06f)).border(1.dp, Color.White.copy(.1f), CircleShape).clickable(onClick = onReset), Alignment.Center) {
+        // v1.3.2 (item 12): real press states — each button shares one
+        // interaction source between pressFeedback and clickable (separate
+        // sources meant the press animation never fired). Visuals only.
+        val resetSource = remember { MutableInteractionSource() }
+        val toggleSource = remember { MutableInteractionSource() }
+        val skipSource = remember { MutableInteractionSource() }
+        Box(Modifier.size(54.dp).clip(CircleShape).background(Color.White.copy(.06f)).border(1.dp, Color.White.copy(.1f), CircleShape).pressFeedback(interactionSource = resetSource).clickable(interactionSource = resetSource, indication = null, onClick = onReset), Alignment.Center) {
             Icon(Icons.Filled.Refresh, "Reset", tint = Color.White, modifier = Modifier.size(22.dp))
         }
-        Box(Modifier.size(78.dp).clip(CircleShape).background(c).clickable(onClick = onToggle), Alignment.Center) {
+        Box(Modifier.size(78.dp).clip(CircleShape).background(c).border(1.dp, Color.White.copy(.35f), CircleShape).pressFeedback(interactionSource = toggleSource).clickable(interactionSource = toggleSource, indication = null, onClick = onToggle), Alignment.Center) {
             Canvas(Modifier.size(28.dp)) {
                 if (s.running) { drawRoundRect(FtBgDark, Offset(size.width * .14f, 0f), Size(size.width * .24f, size.height), CornerRadius(4.dp.toPx())); drawRoundRect(FtBgDark, Offset(size.width * .62f, 0f), Size(size.width * .24f, size.height), CornerRadius(4.dp.toPx())) }
                 else drawPath(Path().apply { moveTo(size.width * .18f, 0f); lineTo(size.width, size.height / 2); lineTo(size.width * .18f, size.height); close() }, FtBgDark)
             }
         }
-        Box(Modifier.size(54.dp).clip(CircleShape).background(Color.White.copy(.06f)).border(1.dp, Color.White.copy(.1f), CircleShape).clickable(onClick = onSkip), Alignment.Center) {
+        Box(Modifier.size(54.dp).clip(CircleShape).background(Color.White.copy(.06f)).border(1.dp, Color.White.copy(.1f), CircleShape).pressFeedback(interactionSource = skipSource).clickable(interactionSource = skipSource, indication = null, onClick = onSkip), Alignment.Center) {
             Canvas(Modifier.size(20.dp)) {
                 drawPath(Path().apply { moveTo(0f, 0f); lineTo(size.width * .75f, size.height / 2); lineTo(0f, size.height); close() }, Color.White)
                 drawRoundRect(Color.White, Offset(size.width * .85f, 0f), Size(size.width * .15f, size.height), CornerRadius(2.dp.toPx()))
@@ -183,8 +191,8 @@ private fun ActivityRingsStyle(s: PomodoroUiState, c: Color) = Column(horizontal
                 drawArc(col, -90f, 360f * p.coerceIn(0f, 1f), false, Offset(cc.x - r, cc.y - r), Size(2 * r, 2 * r), style = Stroke(sw, cap = StrokeCap.Round))
             }
             val done = s.sessionIndex + (if (s.phase == PomoPhase.FOCUS) s.progress else 1f)
-            ring(.5f, s.progress, c)                                    // outer: is phase ka progress
-            ring(.395f, done / s.sessions, Color.White)                 // middle: poore cycle ka progress
+            ring(.5f, s.progress, c)                                    // outer: this phase's progress
+            ring(.395f, done / s.sessions, Color.White)                 // middle: whole-cycle progress
             ring(.29f, 1f - (s.remainingSec % 60) / 60f, c.copy(.65f))  // inner: live seconds
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -203,7 +211,7 @@ private fun ActivityRingsStyle(s: PomodoroUiState, c: Color) = Column(horizontal
     Spacer(Modifier.height(16.dp)); NextUp(s)
 }
 
-/* ================= 3) SESSION STACK (cards list, current wala expand) ================= */
+/* ================= 3) SESSION STACK (cards list, the current one expands) ================= */
 @Composable
 private fun SessionStackStyle(s: PomodoroUiState, c: Color) = Column(Modifier.padding(horizontal = 24.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
     repeat(s.sessions) { i ->

@@ -847,6 +847,9 @@ class FocuslyRepository(private val context: Context) {
                     val weeklyStudySeconds = _allSessions.value
                         .filter { it.completedAt >= weekStartMs }
                         .sumOf { it.durationSeconds }.toLong()
+                    // v1.3.2: this week's completed-session count for the member profile.
+                    val weeklySessionCount = _allSessions.value
+                        .count { it.completedAt >= weekStartMs }
 
                     SupabaseService.getInstance().upsertLeaderboard(
                         SupabaseStudyLeaderboardDto(
@@ -854,6 +857,7 @@ class FocuslyRepository(private val context: Context) {
                             display_name = displayName,
                             study_seconds = effectiveStudySeconds,
                             weekly_study_seconds = weeklyStudySeconds,
+                            weekly_sessions = weeklySessionCount,
                             current_week_start = LeaderboardDateUtils.getCurrentWeekMonday(),
                             streak = preferences.currentStreak.coerceAtLeast(1),
                             subject_tag = preferences.primaryStudyGoal.ifBlank { "Study" },
@@ -1678,12 +1682,16 @@ class FocuslyRepository(private val context: Context) {
             val weeklyStudySecondsSync = _allSessions.value
                 .filter { it.completedAt >= weekStartMsSync }
                 .sumOf { it.durationSeconds }.toLong()
+            // v1.3.2: this week's completed-session count for the member profile.
+            val weeklySessionCountSync = _allSessions.value
+                .count { it.completedAt >= weekStartMsSync }
             val lbRes = SupabaseService.getInstance().upsertLeaderboard(
                 SupabaseStudyLeaderboardDto(
                     user_id = resolvedUid,
                     display_name = displayName,
                     study_seconds = ((_allSessions.value.sumOf { it.durationSeconds })).toLong().coerceAtLeast(1L),
                     weekly_study_seconds = weeklyStudySecondsSync,
+                    weekly_sessions = weeklySessionCountSync,
                     current_week_start = LeaderboardDateUtils.getCurrentWeekMonday(),
                     streak = prefs.currentStreak.coerceAtLeast(1),
                     subject_tag = prefs.primaryStudyGoal.ifBlank { "Study" },

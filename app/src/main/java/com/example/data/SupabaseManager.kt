@@ -160,6 +160,11 @@ data class SupabaseStudyLeaderboardDto(
     // means a null is never encoded, so the SDK upsert can never fail on a
     // missing column. Written only via the dedicated best-effort update.
     val is_public: Boolean? = null,
+    // v1.3.2: this week's completed-session count for the member profile.
+    // Nullable so explicitNulls=false strips it from the main upsert — it is
+    // written only via the dedicated best-effort update (column may not exist
+    // yet). Null on read = column absent = hide the sessions tiles.
+    val weekly_sessions: Int? = null,
     val last_updated: String? = null
 )
 

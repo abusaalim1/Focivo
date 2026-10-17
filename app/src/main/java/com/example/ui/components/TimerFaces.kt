@@ -9,7 +9,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -189,6 +188,9 @@ private fun ClockStyleFace(
                 remainingSec = params.remainingSeconds,
                 totalSec = params.totalSeconds,
                 accent = accent,
+                // v1.3.2: backdrop-appropriate ink (Aurora light canvas gets dark
+                // digits; dark backdrops keep white). Fixes invisible digits.
+                content = backdropPrimary(params.theme, isDark),
                 modifier = Modifier.size(300.dp)
             )
         }
@@ -200,7 +202,7 @@ private fun ClockStyleFace(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 9.sp,
                 letterSpacing = 2.sp,
-                color = faceTextSecondary(isDark).copy(alpha = 0.75f)
+                color = backdropSecondary(params.theme, isDark)
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
@@ -330,10 +332,17 @@ private fun FaceTappableTime(
     letterSpacing: TextUnit = (-1).sp,
     textAlign: TextAlign = TextAlign.Center,
     horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // v1.3.2: explicit ink override for faces that draw the digits on a CARD
+    // surface (GlassCard) rather than the backdrop. Null = backdrop ink.
+    color: Color? = null
 ) {
     val isDark = isAppInDarkTheme()
     val tappable = params.onTimeClick != null && !params.isRunning
+    // v1.3.2 (QA): hour-long sessions format as "H:MM:SS" (7 chars) and
+    // overflowed at the big sizes — digits clipped at the face bounds.
+    // Scale down whenever hours are present.
+    val resolvedSize = if (params.remainingSeconds >= 3600) fontSize * 0.72f else fontSize
     Column(
         horizontalAlignment = horizontalAlignment,
         modifier = modifier
@@ -342,9 +351,9 @@ private fun FaceTappableTime(
             text = formatFaceTime(params.remainingSeconds),
             fontFamily = PoppinsFontFamily,
             fontWeight = FontWeight.Bold,
-            fontSize = fontSize,
+            fontSize = resolvedSize,
             letterSpacing = letterSpacing,
-            color = backdropPrimary(params.theme, isDark),
+            color = color ?: backdropPrimary(params.theme, isDark),
             textAlign = textAlign,
             modifier = Modifier.then(
                 if (tappable) Modifier.clickable(
@@ -361,9 +370,86 @@ private fun FaceTappableTime(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 9.sp,
                 letterSpacing = 2.sp,
-                color = faceTextSecondary(isDark).copy(alpha = 0.75f)
+                color = backdropSecondary(params.theme, isDark)
             )
         }
+    }
+}
+
+/**
+ * v1.3.2 (item 12) — the RUNNING timer's pause and restart buttons, one
+ * shared implementation for every face: lime (focus) / mint (break) filled
+ * play-pause with a glass rim-light + soft accent shadow, and a frosted
+ * glass reset circle. The press state is a real spring scale-down: the
+ * interaction source is SHARED between pressFeedback and clickable (the old
+ * per-face copies each created their own source, so the press animation
+ * never fired). Sizes stay exactly as each face had them; visuals only,
+ * no behaviour change. Public so screenshot tests can capture them.
+ */
+@Composable
+fun FacePlayPauseButton(
+    isRunning: Boolean,
+    isBreak: Boolean,
+    onClick: () -> Unit,
+    buttonSize: Dp = 72.dp,
+    modifier: Modifier = Modifier
+) {
+    val accent = if (isBreak) FaceMint else FaceLime
+    val interactionSource = remember { MutableInteractionSource() }
+    Box(
+        modifier = modifier
+            .size(buttonSize)
+            .shadow(8.dp, CircleShape, ambientColor = accent.copy(alpha = 0.35f))
+            .clip(CircleShape)
+            .background(accent)
+            // Glass rim-light: a thin white edge catches the light, matching
+            // the rest of the design system's glass treatment.
+            .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
+            .pressFeedback(interactionSource = interactionSource)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+            contentDescription = if (isRunning) "Pause" else "Start",
+            tint = NearBlack,
+            modifier = Modifier.size(buttonSize * 0.42f)
+        )
+    }
+}
+
+@Composable
+fun FaceResetButton(
+    onClick: () -> Unit,
+    buttonSize: Dp = 48.dp,
+    modifier: Modifier = Modifier
+) {
+    val isDark = isAppInDarkTheme()
+    val interactionSource = remember { MutableInteractionSource() }
+    Box(
+        modifier = modifier
+            .size(buttonSize)
+            .clip(CircleShape)
+            .background(if (isDark) Color(0x22FFFFFF) else Color(0x14000000))
+            .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x22000000), CircleShape)
+            .pressFeedback(interactionSource = interactionSource)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Refresh,
+            contentDescription = "Reset timer",
+            tint = if (isDark) Color(0xFFDDE3DA) else Color(0xFF3A4038),
+            modifier = Modifier.size(buttonSize * 0.42f)
+        )
     }
 }
 
@@ -378,46 +464,22 @@ private fun FaceControlRow(
     onTogglePlay: () -> Unit,
     onReset: () -> Unit
 ) {
-    val isDark = isAppInDarkTheme()
-    val accent = if (isBreak) FaceMint else FaceLime
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .shadow(8.dp, CircleShape, ambientColor = accent.copy(alpha = 0.35f))
-                .clip(CircleShape)
-                .background(accent)
-                .clickable(onClick = onTogglePlay),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (isRunning) "Pause" else "Start",
-                tint = NearBlack,
-                modifier = Modifier.size(30.dp)
-            )
-        }
+        FacePlayPauseButton(
+            isRunning = isRunning,
+            isBreak = isBreak,
+            onClick = onTogglePlay,
+            buttonSize = 72.dp
+        )
         Spacer(modifier = Modifier.width(14.dp))
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(if (isDark) Color(0x22FFFFFF) else Color(0x14000000))
-                .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x22000000), CircleShape)
-                .clickable(onClick = onReset),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "Reset timer",
-                tint = if (isDark) Color(0xFFDDE3DA) else Color(0xFF3A4038),
-                modifier = Modifier.size(20.dp)
-            )
-        }
+        FaceResetButton(
+            onClick = onReset,
+            buttonSize = 48.dp
+        )
     }
 }
 
@@ -436,10 +498,10 @@ private fun faceTextSecondary(isDark: Boolean): Color =
  * heuristic only when no theme is attached.
  */
 private fun backdropPrimary(theme: TimerTheme?, isDark: Boolean): Color =
-    theme?.onBackdropContent ?: faceTextPrimary(isDark)
+    theme?.backdropContent(isDark) ?: faceTextPrimary(isDark)
 
 private fun backdropSecondary(theme: TimerTheme?, isDark: Boolean): Color =
-    theme?.onBackdropContent?.copy(alpha = 0.72f) ?: faceTextSecondary(isDark)
+    theme?.backdropContent(isDark)?.copy(alpha = 0.72f) ?: faceTextSecondary(isDark)
 
 // ---------------------------------------------------------------------------
 // Face 2 — Minimal Digits: huge type, no ring, hairline progress.
@@ -480,7 +542,7 @@ private fun MinimalDigitsFace(
         )
         Spacer(modifier = Modifier.height(20.dp))
         // Hairline progress — track tint follows the backdrop, not the app theme.
-        val onBackdrop = params.theme?.onBackdropContent
+        val onBackdrop = params.theme?.backdropContent(isDark)
         val trackColor = when {
             onBackdrop != null -> onBackdrop.copy(alpha = 0.18f)
             isDark -> Color(0x33FFFFFF)
@@ -557,15 +619,25 @@ private fun GlassCardFace(
                     onTagClick = params.onTagClick
                 )
                 Spacer(modifier = Modifier.height(14.dp))
-                FaceTappableTime(params = params, fontSize = 64.sp, letterSpacing = (-0.5).sp)
+                // v1.3.2: the glass card is a LIGHT surface in light app mode —
+                // backdrop ink (light) rendered the digits invisible on it.
+                FaceTappableTime(
+                    params = params,
+                    fontSize = 64.sp,
+                    letterSpacing = (-0.5).sp,
+                    color = faceTextPrimary(isDark)
+                )
                 Spacer(modifier = Modifier.height(12.dp))
-                // Rounded progress bar
+                // Rounded progress bar — v1.3.2 (QA): the old track used the
+                // BACKDROP ink, which went invisible on the light card when a
+                // dark backdrop theme (e.g. Midnight) was selected in light
+                // app mode. Card-surface ink (same as the % labels below).
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(10.dp)
                         .clip(CircleShape)
-                        .background(if (isDark) Color(0x2AFFFFFF) else Color(0x14000000))
+                        .background(faceTextSecondary(isDark).copy(alpha = 0.35f))
                 ) {
                     Box(
                         modifier = Modifier
@@ -607,38 +679,20 @@ private fun GlassCardFace(
                         animate = params.isRunning
                     )
                     Spacer(modifier = Modifier.width(18.dp))
-                    // Compact controls inside the card
-                    Box(
-                        modifier = Modifier
-                            .size(60.dp)
-                            .clip(CircleShape)
-                            .background(accent)
-                            .clickable(onClick = params.onTogglePlay),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (params.isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (params.isRunning) "Pause" else "Start",
-                            tint = NearBlack,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
+                    // Compact controls inside the card — v1.3.2 (item 12):
+                    // the shared buttons (same glass/lime styling + press
+                    // states as every other face; sizes unchanged).
+                    FacePlayPauseButton(
+                        isRunning = params.isRunning,
+                        isBreak = params.isBreak,
+                        onClick = params.onTogglePlay,
+                        buttonSize = 60.dp
+                    )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x22000000), CircleShape)
-                            .clickable(onClick = params.onReset),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Reset timer",
-                            tint = faceTextSecondary(isDark),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                    FaceResetButton(
+                        onClick = params.onReset,
+                        buttonSize = 44.dp
+                    )
                 }
             }
         }
@@ -658,7 +712,7 @@ private fun HalfArcFace(
         ((params.totalSeconds - params.remainingSeconds).toFloat() / params.totalSeconds).coerceIn(0f, 1f)
     } else 0f
     val accent = if (params.isBreak) FaceMint else FaceLime
-    val trackColor = if (isDark) Color(0x2EFFFFFF) else Color(0x16000000)
+    val trackColor = backdropSecondary(params.theme, isDark).copy(alpha = 0.4f)
 
     Column(
         modifier = modifier
@@ -682,8 +736,12 @@ private fun HalfArcFace(
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val stroke = 26.dp.toPx()
-                val arcSize = Size(size.width - stroke, (size.height - stroke / 2) * 2)
-                val topLeft = Offset(stroke / 2, stroke / 2)
+                // v1.3.2 (QA): a TRUE semicircle on every screen width — the
+                // radius comes from the measured width. The old box-proportioned
+                // ellipse stretched tall on narrow phones.
+                val r = (size.width - stroke) / 2f
+                val topLeft = Offset(size.width / 2f - r, stroke / 2f)
+                val arcSize = Size(r * 2f, r * 2f)
                 drawArc(
                     color = trackColor,
                     startAngle = 180f,
@@ -714,7 +772,7 @@ private fun HalfArcFace(
                     fontSize = 11.sp,
                     letterSpacing = 1.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = faceTextSecondary(isDark)
+                    color = backdropSecondary(params.theme, isDark)
                 )
             }
         }
@@ -747,6 +805,18 @@ private fun EditorialFace(
         ((params.totalSeconds - params.remainingSeconds).toFloat() / params.totalSeconds).coerceIn(0f, 1f)
     } else 0f
     val accent = if (params.isBreak) FaceMint else FaceLime
+    // v1.3.2 (QA): the lime/mint eyebrow + "Edit" ink followed the APP theme,
+    // so they went low-contrast on light backdrops (Aurora in light mode:
+    // lime-on-cream) and dark-on-dark (Midnight backdrop in light app mode).
+    // Pick the label ink from the backdrop's luminance, mirroring
+    // FacePhasePill. The filled play button + progress line keep the accent.
+    val bg = backdropPrimary(params.theme, isDark)
+    val bgLuminance = 0.2126f * bg.red + 0.7152f * bg.green + 0.0722f * bg.blue
+    val eyebrowColor = if (bgLuminance > 0.5f) {
+        if (params.isBreak) FaceMint else FaceLime
+    } else {
+        if (params.isBreak) Color(0xFF2E7D32) else RegainLimeDeepText
+    }
 
     Column(
         modifier = modifier
@@ -759,7 +829,7 @@ private fun EditorialFace(
             fontWeight = FontWeight.Bold,
             fontSize = 12.sp,
             letterSpacing = 4.sp,
-            color = accent
+            color = eyebrowColor
         )
         Spacer(modifier = Modifier.height(8.dp))
         FaceTappableTime(
@@ -776,7 +846,7 @@ private fun EditorialFace(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(3.dp)
-                .background(if (isDark) Color(0x2AFFFFFF) else Color(0x14000000))
+                .background(backdropSecondary(params.theme, isDark).copy(alpha = 0.35f))
         ) {
             Box(
                 modifier = Modifier
@@ -796,7 +866,7 @@ private fun EditorialFace(
                 fontFamily = PoppinsFontFamily,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
-                color = faceTextSecondary(isDark),
+                color = backdropSecondary(params.theme, isDark),
                 modifier = Modifier.weight(1f)
             )
             if (params.onTagClick != null && !params.isRunning && !params.isBreak) {
@@ -805,7 +875,7 @@ private fun EditorialFace(
                     fontFamily = PoppinsFontFamily,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isDark) FaceLime else RegainLimeDeepText,
+                    color = eyebrowColor,
                     modifier = Modifier
                         .clickable(onClick = params.onTagClick)
                         .padding(6.dp)
@@ -823,39 +893,19 @@ private fun EditorialFace(
                 animate = params.isRunning
             )
             Spacer(modifier = Modifier.weight(1f))
-            // Left-aligned controls: play pill + reset
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .shadow(8.dp, CircleShape, ambientColor = accent.copy(alpha = 0.35f))
-                    .clip(CircleShape)
-                    .background(accent)
-                    .clickable(onClick = params.onTogglePlay),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (params.isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (params.isRunning) "Pause" else "Start",
-                    tint = NearBlack,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
+            // Left-aligned controls — v1.3.2 (item 12): the shared buttons
+            // (same glass/lime styling + press states; sizes unchanged).
+            FacePlayPauseButton(
+                isRunning = params.isRunning,
+                isBreak = params.isBreak,
+                onClick = params.onTogglePlay,
+                buttonSize = 64.dp
+            )
             Spacer(modifier = Modifier.width(10.dp))
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .border(1.dp, if (isDark) Color(0x33FFFFFF) else Color(0x22000000), CircleShape)
-                    .clickable(onClick = params.onReset),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Reset timer",
-                    tint = faceTextSecondary(isDark),
-                    modifier = Modifier.size(19.dp)
-                )
-            }
+            FaceResetButton(
+                onClick = params.onReset,
+                buttonSize = 46.dp
+            )
         }
     }
 }
@@ -1034,13 +1084,17 @@ fun TimerFaceThumbnail(
 /**
  * v1.2.3 — mini render of one new clock style for the picker. The clock is
  * drawn at its natural 300dp size and scaled down to fit the card.
+ *
+ * v1.3.2 (item 13) — EXACT fit: the 300dp clock center-scales to exactly
+ * 96dp and the tile is exactly 96dp, so no face clips at the card bounds.
+ * The old 88dp tile cropped ~4dp per side (FLIP's wide digits far more).
  */
 @Composable
 private fun ClockStyleThumbnail(style: ClockStyle) {
+    val tile = 96.dp
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
+            .size(tile)
             .clip(RoundedCornerShape(10.dp))
             .background(Color(0xFF0D110E)),
         contentAlignment = Alignment.Center

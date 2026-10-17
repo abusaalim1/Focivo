@@ -1160,13 +1160,10 @@ class SupabaseService {
      * v1.2: targeted avatar write for public.study_leaderboard — ONLY the
      * avatar_url column, and ONLY when non-blank. Never null-wipes.
      *
-     * Proven live 2026-10-15: the avatar_url column does NOT exist on the
-     * study_leaderboard table (PostgREST 42703) and the 'avatars' storage
-     * bucket is missing, so remote leaderboard avatars currently cannot
-     * persist. This write is therefore best-effort: a missing column is
-     * caught and logged, never propagated as a failure. Once the column is
-     * added server-side (ALTER TABLE study_leaderboard ADD COLUMN avatar_url
-     * text), avatars start syncing with no app update needed.
+     * v1.3.2: the avatar_url column now EXISTS on study_leaderboard (owner ran
+     * the schema SQL 2026-10-17; verified live via REST round-trip — an anon
+     * read-back returns the written avatar_url). Avatars therefore sync to
+     * other users. The write stays best-effort (caught, never propagated).
      */
     suspend fun updateLeaderboardAvatarUrl(userId: String, avatarUrl: String): Result<Boolean> =
         withContext(Dispatchers.IO) {
@@ -1408,7 +1405,7 @@ class SupabaseService {
         // 2026-10-17, but an explicit null would wipe a previously stored
         // avatar — so nulls are stripped and the avatar is synced
         // separately, only when non-blank (best-effort).
-        val statsOnly = leaderboardDto.copy(avatar_url = null)
+        val statsOnly = leaderboardDto.copy(avatar_url = null, weekly_sessions = null)
         val statsResult: Result<Boolean> = try {
             client.from("study_leaderboard").upsert(statsOnly)
             Log.i(TAG, "[LeaderboardSync] SDK upsert succeeded for user_id=$userId")
@@ -1423,8 +1420,40 @@ class SupabaseService {
         if (!avatarToSync.isNullOrBlank()) {
             updateLeaderboardAvatarUrl(userId, avatarToSync)
         }
+        // v1.3.2: best-effort weekly session count for the member profile.
+        // Written ONLY via the dedicated update — the column may not exist
+        // yet (owner dashboard step pending); a missing column is caught and
+        // logged, never fails the sync.
+        leaderboardDto.weekly_sessions?.let { count ->
+            updateLeaderboardWeeklySessions(userId, count)
+        }
         return@withContext statsResult
     }
+
+    /**
+     * v1.3.2: best-effort weekly-session-count write for
+     * public.study_leaderboard — ONLY the weekly_sessions column. Mirrors the
+     * avatar_url / is_public pattern: the column very likely does NOT exist
+     * yet, so a missing column is caught and logged, never propagated.
+     */
+    suspend fun updateLeaderboardWeeklySessions(userId: String, count: Int): Result<Boolean> =
+        withContext(Dispatchers.IO) {
+            if (userId.isBlank() || count < 0) return@withContext Result.success(false)
+            return@withContext try {
+                client.from("study_leaderboard").update(mapOf("weekly_sessions" to count)) {
+                    filter { eq("user_id", userId) }
+                }
+                Log.i(TAG, "[LeaderboardSessions] study_leaderboard weekly_sessions=$count for user_id=$userId")
+                Result.success(true)
+            } catch (e: Exception) {
+                Log.w(
+                    TAG,
+                    "[LeaderboardSessions] weekly_sessions write failed " +
+                        "(column may not exist yet): ${e.message}"
+                )
+                Result.success(false)
+            }
+        }
 
     /**
      * v1.2: REST fallback for the stats-only leaderboard write. The payload

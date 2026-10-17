@@ -1651,7 +1651,15 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
 
             Log.i("FocuslyViewModel", "[ProfileUpdate] Updating name='$name', goal='${result.studyGoal}', class='${result.studyClass}', exam='${result.targetExam}', public=${result.isPublic}, avatar bytes (${avatarBytes?.size ?: 0} bytes) for user_id='$userIdStr'")
 
-            if (avatarBytes != null && userIdStr.isNotBlank()) {
+            // v1.3.2 item 8: a bundled preset avatar reference is stored as the
+            // avatar value directly — no upload, no NSFW screen needed. It
+            // flows through the exact same avatar_url sync path below.
+            val presetRef = result.avatarPresetRef
+                ?.takeIf { com.example.ui.components.isPresetRef(it) }
+            if (presetRef != null) {
+                photoUrl = presetRef
+                Log.i("FocuslyViewModel", "[ProfileUpdate] Using preset avatar ref: $presetRef")
+            } else if (avatarBytes != null && userIdStr.isNotBlank()) {
                 val uploadedUrl = com.example.data.SupabaseService.getInstance().uploadAvatarImage(userIdStr, avatarBytes)
                 if (!uploadedUrl.isNullOrBlank()) {
                     photoUrl = uploadedUrl

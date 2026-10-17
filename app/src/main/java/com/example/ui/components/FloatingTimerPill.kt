@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,11 +32,16 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.service.FloatingPillDocking
+import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.focivoTokens
+import com.example.ui.timer.FtFDisplay
+import com.example.ui.timer.PomoPhase
+import com.example.ui.timer.PomodoroStyle
 import java.util.Locale
 
 /**
@@ -50,6 +58,15 @@ import java.util.Locale
  * to the app as before. Dragging/docking logic lives in
  * FloatingTimerPillManager + FloatingPillDocking.
  *
+ * v1.3.2 (item 14) — pomodoro reflection: while a pomodoro run is active the
+ * pill speaks the selected design's phase language — the accent circle, the
+ * subtitle and the mini-pill ring take the CURRENT phase's color
+ * (Focus = lime, Short break = mint, Long break = sand), the subtitle names
+ * the phase + cycle position ("FOCUS · SESSION 2 OF 4"), and a slim bar shows
+ * whole-cycle progress. The manager re-reads the live engine state every
+ * second, so phase flips reflect in real time. Typographic renders its phase
+ * label in Instrument Serif italic, like the design itself.
+ *
  * Zero unicode emojis — the play glyph is drawn with Canvas.
  */
 @Composable
@@ -58,7 +75,12 @@ fun FloatingTimerPill(
     onReturnToApp: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    dragController: FloatingPillDragController? = null
+    dragController: FloatingPillDragController? = null,
+    // v1.3.2 (item 14): pomodoro phase reflection — null = classic timer.
+    pomoPhase: PomoPhase? = null,
+    pomoSubtitle: String? = null,
+    pomoCycleProgress: Float? = null,
+    pomoStyle: PomodoroStyle = PomodoroStyle.TICK_RING
 ) {
     val hours = remainingSeconds / 3600
     val minutes = (remainingSeconds % 3600) / 60
@@ -106,13 +128,16 @@ fun FloatingTimerPill(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Lime play circle (glyph drawn, not emoji)
+        // v1.3.2 (item 14): accent circle follows the pomodoro phase color
+        // (lime Focus / mint Short break / sand Long break); classic timers
+        // keep the lime accent. Glyph drawn, not emoji.
+        val phaseColor = pomoPhase?.color ?: focivoTokens().accent
         val pillOnAccent = focivoTokens().onAccent
         Box(
             modifier = Modifier
                 .size(46.dp)
                 .clip(CircleShape)
-                .background(focivoTokens().accent),
+                .background(phaseColor),
             contentAlignment = Alignment.Center
         ) {
             Canvas(modifier = Modifier.size(20.dp)) {
@@ -134,16 +159,50 @@ fun FloatingTimerPill(
             Text(
                 text = timeText,
                 color = Color.White,
+                fontFamily = PoppinsFontFamily,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.5.sp
             )
-            Text(
-                text = "Time remaining",
-                color = focivoTokens().muted,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
+            if (pomoPhase != null && pomoSubtitle != null) {
+                // Phase-appropriate label language, live from the engine.
+                val isTypographic = pomoStyle == PomodoroStyle.TYPOGRAPHIC
+                Text(
+                    text = pomoSubtitle,
+                    color = phaseColor,
+                    fontFamily = if (isTypographic) FtFDisplay else PoppinsFontFamily,
+                    fontStyle = if (isTypographic) FontStyle.Italic else FontStyle.Normal,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                if (pomoCycleProgress != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(120.dp)
+                            .height(3.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.14f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(pomoCycleProgress.coerceIn(0f, 1f))
+                                .clip(CircleShape)
+                                .background(phaseColor)
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = "Time remaining",
+                    color = focivoTokens().muted,
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(2.dp))
@@ -186,6 +245,9 @@ interface FloatingPillDragController {
  * mini-pill showing the countdown "MM:SS" with a lime-ring accent, using
  * the same design tokens as the expanded pill.
  *
+ * v1.3.2 (item 14): the ring takes the pomodoro phase color while a
+ * pomodoro run is active (lime Focus / mint Short break / sand Long break).
+ *
  * Tapping the mini-pill expands back to the full pill; it never hides or
  * ends anything.
  */
@@ -193,7 +255,8 @@ interface FloatingPillDragController {
 fun FloatingTimerMiniPill(
     remainingSeconds: Int,
     onExpand: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    phaseColor: Color? = null
 ) {
     val tokens = focivoTokens()
     Box(
@@ -201,7 +264,7 @@ fun FloatingTimerMiniPill(
             .shadow(elevation = 10.dp, shape = CircleShape, spotColor = Color.Black.copy(alpha = 0.6f))
             .clip(CircleShape)
             .background(tokens.surface)
-            .border(2.dp, tokens.accent, CircleShape)
+            .border(2.dp, phaseColor ?: tokens.accent, CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -213,6 +276,7 @@ fun FloatingTimerMiniPill(
         Text(
             text = FloatingPillDocking.formatDockedCountdown(remainingSeconds),
             color = tokens.text,
+            fontFamily = PoppinsFontFamily,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.5.sp

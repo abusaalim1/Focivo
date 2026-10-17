@@ -11,8 +11,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.example.ui.theme.RegainBackgroundBrush
 
-import androidx.compose.material3.MaterialTheme
-import com.example.ui.theme.RegainBgTop
+import com.example.ui.theme.isAppInDarkTheme
 
 /**
  * Global background wrapper providing the signature Regain soft white-to-pale-lime gradient background
@@ -23,8 +22,11 @@ fun AuroraBackground(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit = {}
 ) {
-    val bg = MaterialTheme.colorScheme.background
-    val isDark = bg != RegainBgTop
+    // v1.3.2: never infer the mode from a color equality — the light tokens'
+    // background (0xFFF7F7F5) is not pure white, so `bg != RegainBgTop` was
+    // true in BOTH modes and the canvas drew dark even in light mode (dark
+    // digits then rendered invisible on it). Use the theme's dark flag.
+    val isDark = isAppInDarkTheme()
 
     val backgroundBrush = if (isDark) {
         Brush.verticalGradient(

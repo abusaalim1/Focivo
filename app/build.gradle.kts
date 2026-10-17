@@ -18,10 +18,16 @@ android {
     applicationId = "com.aistudio.focusly.kqpzxr"
     minSdk = 24
     targetSdk = 36
-    versionCode = 28
-    versionName = "1.3.1"
+    versionCode = 29
+    versionName = "1.3.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    // v1.3.2: ship ARM ABIs only (x86/x86_64 are emulator-only and the TFLite
+    // native lib nearly doubled the APK). Keeps the release APK under 50 MB.
+    ndk {
+      abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+    }
   }
 
   signingConfigs {

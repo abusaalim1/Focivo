@@ -14,5 +14,11 @@ data class ProfileEditResult(
     val studyGoal: String = "",
     val studyClass: String = "",
     val targetExam: String = "",
-    val isPublic: Boolean = true
+    val isPublic: Boolean = true,
+    /**
+     * v1.3.2 item 8 — bundled preset avatar reference, e.g. `preset:avatar:a03`.
+     * When set, it is stored as the avatar value directly (through the
+     * existing avatar_url sync path) instead of uploading [avatarBytes].
+     */
+    val avatarPresetRef: String? = null
 )
