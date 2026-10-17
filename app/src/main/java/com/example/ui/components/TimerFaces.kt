@@ -344,7 +344,7 @@ private fun FaceTappableTime(
             fontWeight = FontWeight.Bold,
             fontSize = fontSize,
             letterSpacing = letterSpacing,
-            color = faceTextPrimary(isDark),
+            color = backdropPrimary(params.theme, isDark),
             textAlign = textAlign,
             modifier = Modifier.then(
                 if (tappable) Modifier.clickable(
@@ -427,6 +427,20 @@ private fun faceTextPrimary(isDark: Boolean): Color =
 private fun faceTextSecondary(isDark: Boolean): Color =
     if (isDark) Color(0xFFA2AAA0) else Color(0xFF5A6258)
 
+/**
+ * v1.3.0 assembly: backdrop-aware text colors. Timer faces are drawn on the
+ * SELECTED TIMER THEME's full-bleed backdrop, not on the app surface — so in
+ * light app mode with a dark theme (e.g. Midnight), isAppInDarkTheme() picks
+ * dark digits that vanish on the dark backdrop. The theme's onBackdropContent
+ * is the designed content color for its backdrop; fall back to the app-theme
+ * heuristic only when no theme is attached.
+ */
+private fun backdropPrimary(theme: TimerTheme?, isDark: Boolean): Color =
+    theme?.onBackdropContent ?: faceTextPrimary(isDark)
+
+private fun backdropSecondary(theme: TimerTheme?, isDark: Boolean): Color =
+    theme?.onBackdropContent?.copy(alpha = 0.72f) ?: faceTextSecondary(isDark)
+
 // ---------------------------------------------------------------------------
 // Face 2 — Minimal Digits: huge type, no ring, hairline progress.
 // ---------------------------------------------------------------------------
@@ -462,16 +476,22 @@ private fun MinimalDigitsFace(
             fontWeight = FontWeight.SemiBold,
             fontSize = 11.sp,
             letterSpacing = 2.5.sp,
-            color = faceTextSecondary(isDark)
+            color = backdropSecondary(params.theme, isDark)
         )
         Spacer(modifier = Modifier.height(20.dp))
-        // Hairline progress
+        // Hairline progress — track tint follows the backdrop, not the app theme.
+        val onBackdrop = params.theme?.onBackdropContent
+        val trackColor = when {
+            onBackdrop != null -> onBackdrop.copy(alpha = 0.18f)
+            isDark -> Color(0x33FFFFFF)
+            else -> Color(0x1A000000)
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.72f)
                 .height(4.dp)
                 .clip(CircleShape)
-                .background(if (isDark) Color(0x33FFFFFF) else Color(0x1A000000))
+                .background(trackColor)
         ) {
             Box(
                 modifier = Modifier
