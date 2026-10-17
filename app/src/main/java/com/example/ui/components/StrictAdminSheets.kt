@@ -119,6 +119,7 @@ fun StrictAdminExplainerSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = T.surface,
+        dragHandle = null,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         modifier = modifier.testTag("strict_admin_explainer_sheet")
     ) {
@@ -223,6 +224,7 @@ fun StrictAdminDisableSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = T.surface,
+        dragHandle = null,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         modifier = modifier.testTag("strict_admin_disable_sheet")
     ) {
