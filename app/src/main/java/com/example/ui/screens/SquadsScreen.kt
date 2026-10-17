@@ -395,7 +395,8 @@ private fun SquadSvg24(dp: Dp, draw: androidx.compose.ui.graphics.drawscope.Draw
 /* ═══════════════════════════ Hub ═══════════════════════════ */
 
 @Composable
-private fun SquadHubScreen(
+/** Public for v1.3.0 screenshot tests (route shells render these directly). */
+fun SquadHubScreen(
     myUserId: String?,
     onBack: () -> Unit,
     onCreate: () -> Unit,
@@ -648,7 +649,8 @@ private fun decodeDataUriBitmap(dataUri: String?): androidx.compose.ui.graphics.
 /* ═══════════════════════════ Create ═══════════════════════════ */
 
 @Composable
-private fun SquadCreateScreen(
+/** Public for v1.3.0 screenshot tests (route shells render these directly). */
+fun SquadCreateScreen(
     myUserId: String?,
     myDisplayName: String,
     myAvatarUrl: String?,
@@ -787,7 +789,8 @@ private fun encodePickedSquadPicture(context: Context, uri: Uri): String? {
 /* ═══════════════════════════ Invite (referral card) ═══════════════════════════ */
 
 @Composable
-private fun SquadInviteScreen(
+/** Public for v1.3.0 screenshot tests (route shells render these directly). */
+fun SquadInviteScreen(
     squad: Squad,
     inviterName: String,
     inviterWeeklyMin: Int,
@@ -997,7 +1000,8 @@ private fun SquadInviteScreen(
 /* ═══════════════════════════ Join ═══════════════════════════ */
 
 @Composable
-private fun SquadJoinScreen(
+/** Public for v1.3.0 screenshot tests (route shells render these directly). */
+fun SquadJoinScreen(
     prefillCode: String,
     myUserId: String?,
     myDisplayName: String,
@@ -1100,7 +1104,8 @@ private fun SquadJoinScreen(
 /* ═══════════════════════════ Detail ═══════════════════════════ */
 
 @Composable
-private fun SquadDetailScreen(
+/** Public for v1.3.0 screenshot tests (route shells render these directly). */
+fun SquadDetailScreen(
     squadId: String,
     myUserId: String?,
     myDisplayName: String,

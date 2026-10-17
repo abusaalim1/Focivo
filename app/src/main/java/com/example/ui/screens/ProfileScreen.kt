@@ -86,6 +86,7 @@ import com.example.data.model.FocusSessionEntity
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.GlassCard
 import com.example.ui.components.LiquidGlassCard
+import com.example.ui.components.RollingText
 import com.example.ui.components.pressFeedback
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SerifItalicFontFamily
@@ -644,7 +645,8 @@ fun ProfileScreen(
                                             )
                                         }
                                         Spacer(modifier = Modifier.height(3.dp))
-                                        Text(
+                                        // Motion Lab #7 — profile stat numbers roll like an odometer.
+                                        RollingText(
                                             text = "$sessionCount Completed Sessions · $hoursFocused Logged",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = PoppinsFontFamily,
@@ -704,7 +706,8 @@ fun ProfileScreen(
                                 )
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
+                                // Motion Lab #7 — stat values roll like an odometer when they change.
+                                RollingText(
                                     text = value,
                                     style = MaterialTheme.typography.titleLarge.copy(
                                         fontFamily = PoppinsFontFamily,

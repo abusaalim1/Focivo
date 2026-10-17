@@ -26,7 +26,7 @@ data class UserAccountEntity(
     val primaryStudyGoal: String = "Build daily habit",
     val biggestDistractionApp: String = "Instagram Reels",
     val preferredStudyTimeWindow: String = "Evening",
-    val motivationStyle: String = "Streaks",
+    val motivationStyle: String = "Consistency",
     val hasCompletedIntakeSurvey: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
 )
