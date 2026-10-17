@@ -417,7 +417,10 @@ fun SquadHubScreen(
             res.onSuccess { squads = it }
                 .onFailure {
                     if (it is SquadsUnavailable) unavailable = true
-                    else error = it.message ?: "Could not load squads."
+                    else {
+                        android.util.Log.w("Squads", "fetchMySquads failed: ${it.message}")
+                        error = "Could not load squads. Check your connection and try again."
+                    }
                 }
         }
     }
@@ -1142,7 +1145,10 @@ fun SquadDetailScreen(
                 .onSuccess { standings = it }
                 .onFailure {
                     if (it is SquadsUnavailable) unavailable = true
-                    else error = it.message ?: "Could not load standings."
+                    else {
+                        android.util.Log.w("Squads", "fetchStandings failed: ${it.message}")
+                        error = "Could not load standings. Check your connection and try again."
+                    }
                 }
         }
     }

@@ -67,6 +67,10 @@ class V130FinalScreenshotsTest {
         TimerThemeManager.init(context)
         TimerThemeManager.selectTheme(context, "midnight")
         MascotWardrobe.init(context)
+        // Squads screens hit SquadRepository -> SupabaseManager.client (lazy).
+        // Initialize so the client builds properly in tests; the absent
+        // tables then resolve to the graceful SquadsUnavailable state.
+        com.example.data.SupabaseManager.initialize(context)
     }
 
     /** Same stack as MainActivity: theme backdrop behind everything. */
@@ -88,6 +92,19 @@ class V130FinalScreenshotsTest {
         initAll()
         themed(dark, content)
         composeTestRule.waitForIdle()
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v130-final/$name.png")
+    }
+
+    /**
+     * Squad flow screens fetch from SquadRepository on Dispatchers.IO, which
+     * waitForIdle() does not track. Give the call time to resolve to the
+     * graceful unavailable/error state before capturing.
+     */
+    private fun shotSquads(dark: Boolean, name: String, content: @Composable () -> Unit) {
+        initAll()
+        themed(dark, content)
+        composeTestRule.waitForIdle()
+        composeTestRule.mainClock.advanceTimeBy(5_000)
         composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v130-final/$name.png")
     }
 
@@ -173,7 +190,7 @@ class V130FinalScreenshotsTest {
 
     // ── Squads hub ──────────────────────────────────────────────────────
     @Test
-    fun v130final_squads_hub_dark() = shot(true, "v130final_squads_hub_dark") {
+    fun v130final_squads_hub_dark() = shotSquads(true, "v130final_squads_hub_dark") {
         SquadsFlowScreen(
             onBack = {},
             myUserId = "user-1",
@@ -184,7 +201,7 @@ class V130FinalScreenshotsTest {
     }
 
     @Test
-    fun v130final_squads_hub_light() = shot(false, "v130final_squads_hub_light") {
+    fun v130final_squads_hub_light() = shotSquads(false, "v130final_squads_hub_light") {
         SquadsFlowScreen(
             onBack = {},
             myUserId = "user-1",
@@ -244,7 +261,7 @@ class V130FinalScreenshotsTest {
 
     // ── Squads join ─────────────────────────────────────────────────────
     @Test
-    fun v130final_squads_join_dark() = shot(true, "v130final_squads_join_dark") {
+    fun v130final_squads_join_dark() = shotSquads(true, "v130final_squads_join_dark") {
         SquadJoinScreen(
             prefillCode = "ABU7K2",
             myUserId = "user-1",
@@ -256,7 +273,7 @@ class V130FinalScreenshotsTest {
     }
 
     @Test
-    fun v130final_squads_join_light() = shot(false, "v130final_squads_join_light") {
+    fun v130final_squads_join_light() = shotSquads(false, "v130final_squads_join_light") {
         SquadJoinScreen(
             prefillCode = "ABU7K2",
             myUserId = "user-1",
@@ -269,7 +286,7 @@ class V130FinalScreenshotsTest {
 
     // ── Squads detail ───────────────────────────────────────────────────
     @Test
-    fun v130final_squads_detail_dark() = shot(true, "v130final_squads_detail_dark") {
+    fun v130final_squads_detail_dark() = shotSquads(true, "v130final_squads_detail_dark") {
         SquadDetailScreen(
             squadId = "squad-1",
             myUserId = "user-1",
@@ -279,7 +296,7 @@ class V130FinalScreenshotsTest {
     }
 
     @Test
-    fun v130final_squads_detail_light() = shot(false, "v130final_squads_detail_light") {
+    fun v130final_squads_detail_light() = shotSquads(false, "v130final_squads_detail_light") {
         SquadDetailScreen(
             squadId = "squad-1",
             myUserId = "user-1",
