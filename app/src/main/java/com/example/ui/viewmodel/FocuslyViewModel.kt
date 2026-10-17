@@ -23,6 +23,7 @@ import com.example.data.model.ReflectionEntity
 import com.example.data.model.TaskEntity
 import com.example.data.model.UserAccountEntity
 import com.example.data.model.UserPreferencesEntity
+import com.example.ui.screens.ProfileEditResult
 import com.example.data.model.WeeklyRecapSummary
 import com.example.data.model.WeeklySubjectStat
 import com.example.data.model.WeeklyDailyStat
@@ -1617,24 +1618,37 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun updateProfileNameAndAvatar(name: String, avatarBytes: ByteArray?) {
+    /**
+     * v1.3.0 — full profile customization save: display name, avatar,
+     * study goal, class, target exam, and the public/private visibility flag.
+     *
+     * Backend sync (graceful degradation):
+     * - display name -> public.study_leaderboard.display_name (existing column).
+     * - study goal -> public.study_leaderboard.subject_tag (existing column).
+     * - avatar_url -> best-effort write (column may not exist yet, PostgREST 42703).
+     * - is_public -> best-effort write (column may not exist yet — owner
+     *   dashboard step pending). Never fails the save.
+     */
+    fun updateUserProfile(result: ProfileEditResult) {
+        val name = result.displayName
+        val avatarBytes = result.avatarBytes
         viewModelScope.launch {
             val user = _currentUser.value ?: return@launch
             val supabaseUid = SupabaseService.getInstance().getCurrentUserId()
             val userIdStr = if (!supabaseUid.isNullOrBlank()) supabaseUid else if (!user.firebaseUid.isNullOrBlank()) user.firebaseUid else ""
             var photoUrl = user.photoUrl
 
-            Log.i("FocuslyViewModel", "[AvatarUpdate] BEFORE UPDATE: Updating profile name='$name' and avatar bytes (${avatarBytes?.size ?: 0} bytes) for user_id='$userIdStr'")
+            Log.i("FocuslyViewModel", "[ProfileUpdate] Updating name='$name', goal='${result.studyGoal}', class='${result.studyClass}', exam='${result.targetExam}', public=${result.isPublic}, avatar bytes (${avatarBytes?.size ?: 0} bytes) for user_id='$userIdStr'")
 
             if (avatarBytes != null && userIdStr.isNotBlank()) {
                 val uploadedUrl = com.example.data.SupabaseService.getInstance().uploadAvatarImage(userIdStr, avatarBytes)
                 if (!uploadedUrl.isNullOrBlank()) {
                     photoUrl = uploadedUrl
-                    Log.i("FocuslyViewModel", "[AvatarUpdate] Uploaded avatar successfully: ${photoUrl.take(60)}...")
+                    Log.i("FocuslyViewModel", "[ProfileUpdate] Uploaded avatar successfully: ${photoUrl.take(60)}...")
                 } else {
                     val base64 = android.util.Base64.encodeToString(avatarBytes, android.util.Base64.NO_WRAP)
                     photoUrl = "data:image/jpeg;base64,$base64"
-                    Log.w("FocuslyViewModel", "[AvatarUpdate] Storage upload returned fallback data URL")
+                    Log.w("FocuslyViewModel", "[ProfileUpdate] Storage upload returned fallback data URL")
                 }
             }
 
@@ -1645,8 +1659,14 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             val prefs = userPreferences.value ?: UserPreferencesEntity()
             val updatedPrefs = prefs.copy(
                 currentUserName = name,
-                currentUserPhotoUrl = photoUrl
+                currentUserPhotoUrl = photoUrl,
+                primaryStudyGoal = result.studyGoal,
+                studentClassLevel = result.studyClass,
+                targetExam = result.targetExam,
+                isProfilePublic = result.isPublic
             )
+            // repository.savePreferences also upserts the leaderboard row with
+            // display_name + subject_tag(study goal) via the existing columns.
             repository.savePreferences(updatedPrefs)
 
             if (userIdStr.isNotBlank()) {
@@ -1656,14 +1676,24 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
 
                 if (!photoUrl.isNullOrBlank()) {
                     val avatarResult = com.example.data.SupabaseService.getInstance().updateUserAvatarUrl(userIdStr, photoUrl)
-                    Log.i("FocuslyViewModel", "[AvatarUpdate] AFTER UPDATE: Supabase avatar_url update success=${avatarResult.isSuccess}")
+                    Log.i("FocuslyViewModel", "[ProfileUpdate] Supabase avatar_url update success=${avatarResult.isSuccess}")
                 }
                 val nameResult = com.example.data.SupabaseService.getInstance().updateUserSurveyCompleted(
                     userId = userIdStr,
                     isCompleted = user.hasCompletedIntakeSurvey,
                     name = name
                 )
-                Log.i("FocuslyViewModel", "[AvatarUpdate] AFTER UPDATE: Supabase name update success=${nameResult.isSuccess}")
+                Log.i("FocuslyViewModel", "[ProfileUpdate] Supabase name update success=${nameResult.isSuccess}")
+
+                // Study goal -> leaderboard subject_tag (existing column, synced).
+                val goalResult = com.example.data.SupabaseService.getInstance()
+                    .updateLeaderboardSubjectTag(userIdStr, result.studyGoal.ifBlank { "Study" })
+                Log.i("FocuslyViewModel", "[ProfileUpdate] Supabase subject_tag update success=${goalResult.isSuccess}")
+
+                // Public/private flag -> best-effort (column may not exist yet).
+                val privacyResult = com.example.data.SupabaseService.getInstance()
+                    .updateLeaderboardProfilePublic(userIdStr, result.isPublic)
+                Log.i("FocuslyViewModel", "[ProfileUpdate] Supabase is_public update success=${privacyResult.isSuccess}")
 
                 // Also update leaderboard row with new display name and avatar
                 val lbDto = com.example.data.SupabaseStudyLeaderboardDto(
@@ -1675,7 +1705,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 )
                 com.example.data.SupabaseService.getInstance().upsertLeaderboard(lbDto)
             } else {
-                Log.e("FocuslyViewModel", "[AvatarUpdate] ERROR: Could not resolve valid user UUID for Supabase profile update!")
+                Log.e("FocuslyViewModel", "[ProfileUpdate] ERROR: Could not resolve valid user UUID for Supabase profile update!")
             }
         }
     }
@@ -2685,6 +2715,29 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             tPrefs.edit().putBoolean("is_timer_running", false).apply()
         }
         return false
+    }
+
+    /**
+     * v1.3.0 — UI-facing Pause tap (owner order 2026-10-17): Strict Mode
+     * forbids pausing, exactly like it forbids Stop and Restart. Returns
+     * BLOCKED_STRICT as a pure no-op when strict is on and the timer is
+     * running (the caller shows the strict explanation dialog); otherwise
+     * performs the normal pause and returns PAUSED. Internal callers
+     * (discard, skip, completion) keep using pauseTimer() directly — only
+     * Pause TAPS are gated.
+     */
+    fun attemptPauseTimer(): com.example.util.StrictPauseGate.Result {
+        val app = getApplication<Application>()
+        val decision = com.example.util.StrictPauseGate.decide(
+            strictEnabled = com.example.util.StrictModeManager.isStrictModeEnabled(app),
+            timerRunning = _isTimerRunning.value
+        )
+        if (decision == com.example.util.StrictPauseGate.Result.PAUSED) {
+            pauseTimer()
+        } else {
+            Log.i(TAG, "[StrictPause] Pause tap blocked under Strict Mode — no-op, timer keeps running")
+        }
+        return decision
     }
 
     fun pauseTimer() {

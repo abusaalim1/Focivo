@@ -57,11 +57,18 @@ import kotlinx.coroutines.delay
  *
  * Replaces StrictEndSessionDialog (deleted): strict lock-in has no
  * early-exit path by design.
+ *
+ * v1.3.0 (owner order 2026-10-17): [mode] adds the PAUSE variant — Pause
+ * joins Stop and Restart as forbidden under strict. Same premium animated
+ * explanation (small mascot + animated words), pause-specific copy.
  */
+enum class StrictLockMode { STOP, PAUSE }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StrictLockDialog(
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    mode: StrictLockMode = StrictLockMode.STOP
 ) {
     val isDark = isAppInDarkTheme()
     val T = focivoTokens()
@@ -70,7 +77,9 @@ fun StrictLockDialog(
 
     BasicAlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.testTag("strict_lock_dialog")
+        modifier = Modifier.testTag(
+            if (mode == StrictLockMode.PAUSE) "strict_pause_dialog" else "strict_lock_dialog"
+        )
     ) {
         Surface(
             shape = RoundedCornerShape(24.dp),
@@ -105,10 +114,18 @@ fun StrictLockDialog(
                 }
                 Spacer(modifier = Modifier.height(14.dp))
                 AnimatedWordsText(
-                    text = "You asked me to be strict with you, so I am being strict. " +
-                        "This session cannot be stopped or restarted until the timer finishes, " +
-                        "and your blocked apps stay locked the whole way. " +
-                        "Take a breath. Keep going.",
+                    text = if (mode == StrictLockMode.PAUSE) {
+                        // v1.3.0: Pause is forbidden under strict — same
+                        // first-person, warm-but-firm voice as the Stop copy.
+                        "Strict Mode is on, so pausing is off too — just like Stop and Restart. " +
+                            "The timer keeps running while you're away, and your locked apps stay locked. " +
+                            "Take a breath and finish strong."
+                    } else {
+                        "You asked me to be strict with you, so I am being strict. " +
+                            "This session cannot be stopped or restarted until the timer finishes, " +
+                            "and your blocked apps stay locked the whole way. " +
+                            "Take a breath. Keep going."
+                    },
                     textColor = textSecondary
                 )
                 Spacer(modifier = Modifier.height(22.dp))

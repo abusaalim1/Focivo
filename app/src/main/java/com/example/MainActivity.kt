@@ -333,6 +333,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     var showSignOutConfirmationDialog by rememberSaveable { mutableStateOf(false) }
     // v1.3.1: strict-mode end-early confirmation (Regain parity — "you cannot end your session early").
     var showStrictEndConfirmDialog by remember { mutableStateOf(false) }
+    // v1.3.0 (owner order 2026-10-17): strict-mode Pause is forbidden — the
+    // tap shows the same premium animated explanation as Stop.
+    var showStrictPauseDialog by remember { mutableStateOf(false) }
 
     // Real-time network connectivity observation
     LaunchedEffect(Unit) {
@@ -723,7 +726,17 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onStartFromStrictGuardPrompt = { viewModel.continueSessionStartAfterPrompt() },
                                         onDismissStrictGuardPrompt = { viewModel.dismissStrictGuardPrompt() },
                                         onStartTimer = { viewModel.requestStudySessionStart() },
-                                        onPauseTimer = { viewModel.pauseTimer() },
+                                        onPauseTimer = {
+                                            // v1.3.0 (owner order 2026-10-17): strict-mode
+                                            // Pause is forbidden — the tap is a no-op and
+                                            // shows the strict explanation dialog, the
+                                            // same premium treatment as Stop.
+                                            if (viewModel.attemptPauseTimer() ==
+                                                com.example.util.StrictPauseGate.Result.BLOCKED_STRICT
+                                            ) {
+                                                showStrictPauseDialog = true
+                                            }
+                                        },
                                         onResumeTimer = { viewModel.resumeTimer() },
                                         onFinishEarly = {
                                             // v1.2.3 (Task 10): strict mode FULL lock-in —
@@ -792,8 +805,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onOpenMascot = { isMascotOpen = true },
                                         onCheckForUpdates = { viewModel.checkForAppUpdates(context, isManual = true) },
                                         onLogout = { showSignOutConfirmationDialog = true },
-                                        onUpdateProfile = { name, avatarBytes ->
-                                            viewModel.updateProfileNameAndAvatar(name, avatarBytes)
+                                        onUpdateProfile = { result ->
+                                            viewModel.updateUserProfile(result)
                                         }
                                     )
                                 }
@@ -1088,6 +1101,16 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 if (showStrictEndConfirmDialog) {
                     com.example.ui.components.StrictLockDialog(
                         onDismiss = { showStrictEndConfirmDialog = false }
+                    )
+                }
+
+                // v1.3.0 (owner order 2026-10-17): strict-mode Pause is
+                // forbidden — the tap shows the same premium animated
+                // explanation (small mascot + animated text) as Stop.
+                if (showStrictPauseDialog) {
+                    com.example.ui.components.StrictLockDialog(
+                        mode = com.example.ui.components.StrictLockMode.PAUSE,
+                        onDismiss = { showStrictPauseDialog = false }
                     )
                 }
 

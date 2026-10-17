@@ -121,19 +121,22 @@ object BlockOverlayManager {
         warningVariant: Boolean = false,
         // v1.2.4: offending window bounds (screen coords) — clips the
         // overlay to exactly that window. Null = fullscreen path.
-        windowBounds: android.graphics.Rect? = null
+        windowBounds: android.graphics.Rect? = null,
+        // v1.3.0: "floating" | "split" — the compact small-window message
+        // for split-pane / freeform interceptions. Null = fullscreen copy.
+        windowedMode: String? = null
     ): Boolean {
         val svc = AiStudyAccessibilityService.connectedInstance ?: return false
         if (svc.isA11yBlockOverlayShowing()) return true
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            return svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant, windowBounds)
+            return svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant, windowBounds, windowedMode)
         }
         val result = java.util.concurrent.atomic.AtomicBoolean(false)
         val latch = java.util.concurrent.CountDownLatch(1)
         mainHandler.post {
             try {
                 result.set(
-                    svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant, windowBounds)
+                    svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant, windowBounds, windowedMode)
                 )
             } finally {
                 latch.countDown()
@@ -343,8 +346,14 @@ object BlockOverlayManager {
         SessionBlockRecorder.record(context, blockedPackage, appName)
         val alreadyShowing = isBlockUiShowing()
         val path = resolveOverlayPath(context)
+        // v1.3.0: the windowed variant only applies when the a11y overlay is
+        // clipped to the offending window (split/freeform). Fullscreen keeps
+        // the existing fullscreen copy and path.
+        val windowedMode = if (windowBounds != null &&
+            (multiWindowMode == "floating" || multiWindowMode == "split")
+        ) multiWindowMode else null
         val shown = when (path) {
-            OverlayPath.A11Y -> showViaA11y(blockedPackage, appName, durationSec, reason, isPunishment, windowBounds = windowBounds)
+            OverlayPath.A11Y -> showViaA11y(blockedPackage, appName, durationSec, reason, isPunishment, windowBounds = windowBounds, windowedMode = windowedMode)
             OverlayPath.APP -> showIfPermitted(context, blockedPackage, appName, durationSec, reason, isPunishment)
             OverlayPath.ACTIVITY -> false
         }
@@ -380,6 +389,8 @@ object BlockOverlayManager {
         // v1.2.3 diagnostic: honest, on-device evidence of which render layer
         // actually blocked the app (owner device-test aid). Transition-only:
         // refreshes of an already-visible overlay don't spam the feed.
+        // v1.3.0: the entry now always names window mode, bounds AND the
+        // action taken (windowed-block vs fullscreen-block, braces, ...).
         if (!alreadyShowing) {
             try {
                 com.example.util.AiStudyGuardManager.logGuardActivity(
@@ -388,8 +399,9 @@ object BlockOverlayManager {
                     "path=" + path.name.lowercase() +
                         (if (multiWindowMode != null) " mode=$multiWindowMode" else "") +
                         (if (windowBounds != null)
-                            " overlay=bounds ${windowBounds.width()}x${windowBounds.height()}@${windowBounds.left},${windowBounds.top}"
-                        else "") +
+                            " bounds=${windowBounds.width()}x${windowBounds.height()}@${windowBounds.left},${windowBounds.top}"
+                        else " bounds=fullscreen") +
+                        " action=" + if (windowedMode != null) "windowed-block" else "fullscreen-block" +
                         if (bracesLaunched) " braces=activity" else ""
                 )
             } catch (_: Exception) { }

@@ -157,6 +157,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     enforceMultiWindowProtections(
                         System.currentTimeMillis(), "timer-sweep"
                     )
+                    // v1.3.0: also re-glue here — covers window moves the OS
+                    // didn't report as TYPE_WINDOWS_CHANGED.
+                    glueWindowedOverlayToWindow()
                 }
             } catch (_: Exception) { }
             a11yMainHandler.postDelayed(this, 5000L)
@@ -169,9 +172,27 @@ class AiStudyAccessibilityService : AccessibilityService() {
     // fullscreen). Split-pane / freeform interceptions cover ONLY the
     // offending window so the rest of the screen stays usable.
     private var a11yBlockBounds: android.graphics.Rect? = null
-    // v1.2.4: bounds the current block overlay is clipped to (null =
-    // fullscreen). Split-pane / freeform interceptions cover ONLY the
-    // offending window so the rest of the screen stays usable.
+    // v1.3.0: windowed block variant ("floating" | "split" | null) — the
+    // compact small-window message for split-pane / freeform intercepts.
+    // Null = the existing fullscreen copy.
+    private val a11yWindowedMode = androidx.compose.runtime.mutableStateOf<String?>(null)
+    // v1.3.0: the blocked package whose small window is currently tracked
+    // (glue loop + z-order watchdog). ONLY ever a blocked package — never
+    // another app's window.
+    private var mwTrackedPkg: String? = null
+    // v1.3.0: glue loop throttle (re-measures the tracked window on every
+    // window-set change + the 5s sweep).
+    private var lastGlueMs = 0L
+    private var lastGlueLogMs = 0L
+    // v1.3.0: z-order watchdog state. Armed when a window-bounded overlay is
+    // placed; evaluated once after 4s. A touch-consuming overlay means any
+    // tap/scroll/navigation inside the blocked app's window proves the OEM
+    // composited the app ABOVE our overlay (vivo freeform layers do this).
+    private var zWatchPkg: String? = null
+    private var zWatchStrongHits = 0
+    private var zWatchScrollHits = 0
+    private var zWatchStartMs = 0L
+    private val zWatchRunnable = Runnable { evaluateZOrderWatchdog() }
     private val a11yBlockedPackage = androidx.compose.runtime.mutableStateOf("")
     private val a11yAppName = androidx.compose.runtime.mutableStateOf("")
     private val a11yDurationSec = androidx.compose.runtime.mutableStateOf(0)
@@ -282,7 +303,10 @@ class AiStudyAccessibilityService : AccessibilityService() {
         warningVariant: Boolean = false,
         // v1.2.4: offending window bounds (screen coords) — clips the
         // overlay to exactly that window. Null = fullscreen path.
-        windowBounds: android.graphics.Rect? = null
+        windowBounds: android.graphics.Rect? = null,
+        // v1.3.0: "floating" | "split" — the compact small-window message
+        // for split-pane / freeform interceptions. Null = fullscreen copy.
+        windowedMode: String? = null
     ): Boolean {
         if (a11yBlockView != null) {
             a11yBlockedPackage.value = blockedPackage
@@ -290,6 +314,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yDurationSec.value = durationSec
             a11yReason.value = reason
             a11yPunishment.value = isPunishment
+            a11yWindowedMode.value = windowedMode
             // Reposition to the offending window when a (different) bound
             // is supplied — e.g. fullscreen overlay followed by a
             // small-window intercept of the same package.
@@ -308,6 +333,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yDurationSec.value = durationSec
             a11yReason.value = reason
             a11yPunishment.value = isPunishment
+            a11yWindowedMode.value = windowedMode
             val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
             val view = androidx.compose.ui.platform.ComposeView(this).apply {
                 host.installOn(this)
@@ -321,6 +347,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                             isPunishment = a11yPunishment.value,
                             mascotRes = if (warningVariant) com.example.R.drawable.mascot_warning_transparent
                             else com.example.R.drawable.mascot_blocked,
+                            windowedMode = a11yWindowedMode.value,
                             onExitApp = { a11yExitToHome() },
                             onOpenFocusly = { a11yOpenFocivo() }
                         )
@@ -367,6 +394,10 @@ class AiStudyAccessibilityService : AccessibilityService() {
 
     /** Hide the accessibility-layer block overlay if visible. Main thread. */
     fun hideA11yBlockOverlay() {
+        // v1.3.0: a hidden overlay owns no window — drop the glue tracking
+        // and the z-order watchdog with it.
+        disarmZOrderWatchdog()
+        mwTrackedPkg = null
         runOnA11yMain {
             val view = a11yBlockView ?: return@runOnA11yMain
             try { a11yBlockWm?.removeView(view) } catch (_: Exception) { }
@@ -375,7 +406,231 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yBlockHost = null
             a11yBlockWm = null
             a11yBlockBounds = null
+            a11yWindowedMode.value = null
             a11yBlockDrawn = false
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // v1.3.0 — window-bounded block: glue + z-order watchdog (owner order
+    // 2026-10-17).
+    //
+    // ROOT CAUSE (owner's vivo V2403, rounds 1-3): the full-screen block
+    // fires, the draw listener fires, but the freeform window floats
+    // UNBLOCKED on top / the split pane still shows the locked app. The
+    // overlay drew — it just lost the z-order fight to the OEM's small-window
+    // container. Two mechanisms close the gap:
+    //
+    // (a) GLUE: the bounds-matched overlay is re-measured against the live
+    //     window list on every TYPE_WINDOWS_CHANGED (and the 5s sweep) and
+    //     repositioned with updateViewLayout when the window moves/resizes.
+    // (b) Z-ORDER WATCHDOG: the bounds overlay is deliberately
+    //     touch-consuming, so any tap/scroll/navigation inside the blocked
+    //     app's window while it is up proves the overlay lost z-order. On
+    //     proof, GLOBAL_ACTION_HOME collapses the small window and the
+    //     existing overlay expands into the fullscreen block notice.
+    //
+    // Both mechanisms act ONLY on the tracked blocked package — never on
+    // another app's window. On stock Android (overlay wins z-order) the
+    // watchdog simply records "clean" and disarms.
+    // ------------------------------------------------------------------
+
+    /**
+     * Starts tracking a freshly placed window-bounded block: the glue loop
+     * repositions the overlay as the window moves, and the z-order watchdog
+     * verifies the overlay actually won the layer fight. Call only with the
+     * blocked package — never another app's window.
+     */
+    private fun trackWindowedBlock(pkg: String, mode: String, bounds: android.graphics.Rect) {
+        mwTrackedPkg = pkg
+        armZOrderWatchdog(pkg)
+        Log.i(TAG, "[MultiWindow] tracking $mode window for $pkg " +
+            "(${bounds.width()}x${bounds.height()}@${bounds.left},${bounds.top}) — glue + z-order watch armed")
+    }
+
+    /**
+     * Keeps the window-bounded block overlay GLUED to the offending window:
+     * re-measures the tracked blocked window and repositions the overlay
+     * with updateViewLayout when it moved/resized. A window that grew to
+     * cover the display becomes the fullscreen block. A window that is gone
+     * is left alone — the existing hide / re-intercept paths own that.
+     */
+    private fun glueWindowedOverlayToWindow() {
+        val now = System.currentTimeMillis()
+        if (now - lastGlueMs < 700L) return
+        lastGlueMs = now
+        val trackedPkg = mwTrackedPkg ?: return
+        if (a11yBlockView == null || a11yBlockBounds == null) return
+        if (!trackedPkg.equals(a11yBlockedPackage.value, ignoreCase = true)) return
+        runOnA11yMain {
+            try {
+                val wins = try { windows } catch (_: Exception) { null } ?: return@runOnA11yMain
+                val target = wins.firstOrNull {
+                    try {
+                        it.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
+                            it.root?.packageName?.toString().equals(trackedPkg, ignoreCase = true)
+                    } catch (_: Exception) { false }
+                } ?: return@runOnA11yMain // Window gone — hide/re-intercept paths own this.
+                val r = Rect()
+                try { target.getBoundsInScreen(r) } catch (_: Exception) { return@runOnA11yMain }
+                if (r.width() <= 0 || r.height() <= 0) return@runOnA11yMain
+                val view = a11yBlockView ?: return@runOnA11yMain
+                val (dispW, dispH) = getDisplaySizePx()
+                if (dispW > 0 && dispH > 0 &&
+                    r.width() >= dispW * 0.95f && r.height() >= dispH * 0.95f
+                ) {
+                    // The window grew to cover the display — expand the
+                    // overlay into the fullscreen block (message stays).
+                    a11yBlockBounds = null
+                    a11yBlockWm?.updateViewLayout(view, a11yOverlayParams(null))
+                    logGlue("fullscreen-expand", "${r.width()}x${r.height()}")
+                    return@runOnA11yMain
+                }
+                val old = a11yBlockBounds ?: return@runOnA11yMain
+                val moved = kotlin.math.abs(r.left - old.left) + kotlin.math.abs(r.top - old.top) +
+                    kotlin.math.abs(r.width() - old.width()) + kotlin.math.abs(r.height() - old.height())
+                if (moved > 6) {
+                    val nb = android.graphics.Rect(r)
+                    a11yBlockBounds = nb
+                    a11yBlockWm?.updateViewLayout(view, a11yOverlayParams(nb))
+                    logGlue(
+                        "repositioned",
+                        "${old.width()}x${old.height()}@${old.left},${old.top} -> " +
+                            "${nb.width()}x${nb.height()}@${nb.left},${nb.top}"
+                    )
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    /** Throttled Guard Hub evidence for glue actions. */
+    private fun logGlue(action: String, detail: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastGlueLogMs < 30_000L) return
+        lastGlueLogMs = now
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, a11yAppName.value.ifBlank { "guard" },
+                "window-glue", action, detail
+            )
+        } catch (_: Exception) { }
+    }
+
+    /**
+     * Arms the z-order watchdog for a freshly placed window-bounded overlay.
+     * Evaluated once after 4s; disarmed on hide. Watches ONLY the blocked
+     * package — never another app's window.
+     */
+    private fun armZOrderWatchdog(pkg: String) {
+        disarmZOrderWatchdog()
+        zWatchPkg = pkg
+        zWatchStrongHits = 0
+        zWatchScrollHits = 0
+        zWatchStartMs = System.currentTimeMillis()
+        a11yMainHandler.postDelayed(zWatchRunnable, 4000L)
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, a11yAppName.value.ifBlank { pkg },
+                "zorder-watch", "armed",
+                "pkg=$pkg oem=${Build.MANUFACTURER} window=4s"
+            )
+        } catch (_: Exception) { }
+    }
+
+    private fun disarmZOrderWatchdog() {
+        zWatchPkg = null
+        zWatchStrongHits = 0
+        zWatchScrollHits = 0
+        zWatchStartMs = 0L
+        a11yMainHandler.removeCallbacks(zWatchRunnable)
+    }
+
+    /**
+     * Z-order watchdog event counting. The window-bounded overlay consumes
+     * every touch (no NOT_TOUCHABLE flag), so interactive events from the
+     * blocked package while it is up prove the OEM composited the app window
+     * ABOVE our overlay. Scrolls alone are weak evidence (autoplay feeds
+     * scroll themselves): one strong hit (tap / long-press / in-app
+     * navigation) — or three scrolls — arms the escalation.
+     */
+    private fun countZOrderWatchEvent(pkg: String, eventType: Int) {
+        val watchPkg = zWatchPkg ?: return
+        if (!pkg.equals(watchPkg, ignoreCase = true)) return
+        if (a11yBlockView == null || a11yBlockBounds == null || !a11yBlockDrawn) return
+        when (eventType) {
+            AccessibilityEvent.TYPE_VIEW_CLICKED,
+            AccessibilityEvent.TYPE_VIEW_LONG_CLICKED,
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                zWatchStrongHits++
+                Log.w(TAG, "[ZOrderWatch] strong hit #$zWatchStrongHits for $pkg " +
+                    "(${AccessibilityEvent.eventTypeToString(eventType)}) — overlay may have lost z-order")
+            }
+            AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
+                zWatchScrollHits++
+            }
+        }
+    }
+
+    /** One-shot 4s evaluation of the z-order watchdog. */
+    private fun evaluateZOrderWatchdog() {
+        val pkg = zWatchPkg
+        if (pkg == null || a11yBlockView == null || a11yBlockBounds == null) {
+            disarmZOrderWatchdog()
+            return
+        }
+        if (!a11yBlockDrawn) {
+            // Never composited — the no-draw braces watchdog in
+            // BlockOverlayManager owns this case, not the z-order path.
+            disarmZOrderWatchdog()
+            return
+        }
+        val lost = zWatchStrongHits >= 1 || zWatchScrollHits >= 3
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, a11yAppName.value.ifBlank { pkg },
+                "zorder-watch", if (lost) "lost" else "clean",
+                "strong=$zWatchStrongHits scroll=$zWatchScrollHits oem=${Build.MANUFACTURER}"
+            )
+        } catch (_: Exception) { }
+        if (lost) escalateZOrderLoss(pkg) else disarmZOrderWatchdog()
+    }
+
+    /**
+     * Z-order escalation: the OEM won the layer fight, so collapse the small
+     * window with GLOBAL_ACTION_HOME and expand the existing overlay into
+     * the fullscreen block notice (the small-window message stays — it is
+     * still why the app was blocked). Only the blocked app's window is ever
+     * targeted; HOME is a system action, never a touch on another app's
+     * window.
+     */
+    private fun escalateZOrderLoss(pkg: String) {
+        disarmZOrderWatchdog()
+        // The tracked window is being collapsed — forget it.
+        mwTrackedPkg = null
+        Log.w(TAG, "[ZOrderWatch] escalating: GLOBAL_ACTION_HOME for $pkg " +
+            "(overlay lost z-order on ${Build.MANUFACTURER})")
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, a11yAppName.value.ifBlank { pkg },
+                "zorder-escalation", "home",
+                "action=GLOBAL_ACTION_HOME (collapse small window); block notice -> fullscreen"
+            )
+        } catch (_: Exception) { }
+        try {
+            performGlobalAction(GLOBAL_ACTION_HOME)
+        } catch (t: Throwable) {
+            Log.e(TAG, "[ZOrderWatch] GLOBAL_ACTION_HOME failed: ${t.message}")
+        }
+        // Show the block notice: expand the already-placed overlay to the
+        // fullscreen block layout.
+        runOnA11yMain {
+            val view = a11yBlockView ?: return@runOnA11yMain
+            a11yBlockBounds = null
+            try {
+                a11yBlockWm?.updateViewLayout(view, a11yOverlayParams(null))
+            } catch (t: Throwable) {
+                Log.e(TAG, "[ZOrderWatch] fullscreen expand failed: ${t.message}")
+            }
         }
     }
 
@@ -675,6 +930,16 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         multiWindowMode = mode,
                         windowBounds = overlayBounds
                     )
+                    // v1.3.0: when the intercept placed a window-bounded
+                    // overlay, track that window — the glue loop repositions
+                    // the overlay as the window moves, and the z-order
+                    // watchdog verifies the overlay won the layer fight.
+                    // Fullscreen keeps the existing fullscreen path.
+                    if (overlayBounds != null && mode != "fullscreen" &&
+                        isA11yBlockOverlayShowing()
+                    ) {
+                        trackWindowedBlock(pkg, mode, android.graphics.Rect(rect))
+                    }
                 }
                 logMwSummary(
                     "trigger=$triggerSrc windows=${appWins.size} " +
@@ -892,10 +1157,19 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     enforceMultiWindowProtections(
                         System.currentTimeMillis(), "windows-changed"
                     )
+                    // v1.3.0: keep the window-bounded block overlay glued to
+                    // the offending window as it moves/resizes.
+                    glueWindowedOverlayToWindow()
                 }
             }
 
             val pkg = event.packageName?.toString() ?: return
+
+            // v1.3.0 — z-order watchdog counting: the window-bounded overlay
+            // consumes every touch, so interactive events from the tracked
+            // blocked package while it is up prove the OEM composited the
+            // app window ABOVE our overlay.
+            countZOrderWatchEvent(pkg, eventType)
 
             // 1. Never block self (Focivo)
             if (pkg.equals(applicationContext.packageName, ignoreCase = true)) {
