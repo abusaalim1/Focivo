@@ -11,8 +11,12 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * Lock model mirrors the theme unlocks exactly: threshold-based PERMANENT
  * unlock with Focus Points, NO spending, same [UserPreferencesEntity.focusPoints]
- * source of truth. Ring + Minimal Digits are free; the rest sit on the
+ * source of truth. Minimal Digits is free; the rest sit on the
  * theme price ladder.
+ *
+ * v1.3.0 — the "Aurora Ring" face was REMOVED by owner order (2026-10-17).
+ * "digits" is the default/fallback face. Persisted "ring" selections
+ * resolve to "digits" via [getFace].
  */
 data class TimerFace(
     val id: String,
@@ -33,12 +37,6 @@ object TimerFaceManager {
     private const val KEY_SELECTED_FACE = "selected_face_id"
 
     val FACES = listOf(
-        TimerFace(
-            id = "ring",
-            name = "Aurora Ring",
-            tagline = "The classic glowing ring",
-            unlockPoints = 0
-        ),
         TimerFace(
             id = "digits",
             name = "Minimal Digits",
@@ -127,7 +125,7 @@ object TimerFaceManager {
 
     fun init(context: Context) {
         val id = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_SELECTED_FACE, "ring")
+            .getString(KEY_SELECTED_FACE, "digits")
         _selectedFace.value = getFace(id)
     }
 
@@ -158,11 +156,11 @@ object TimerFaceManager {
 
     /**
      * Automatic fallback: if the persisted face is somehow locked
-     * (rules changed), fall back to the free Aurora Ring.
+     * (rules changed), fall back to the free Minimal Digits.
      */
     fun validateSelection(context: Context, userPoints: Int, isAdmin: Boolean = ContentLocks.isAdminUnlocked(context)) {
         if (!_selectedFace.value.isUnlocked(userPoints, isAdmin)) {
-            selectFace(context, "ring")
+            selectFace(context, "digits")
         }
     }
 }

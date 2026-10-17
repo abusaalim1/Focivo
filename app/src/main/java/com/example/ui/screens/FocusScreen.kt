@@ -324,8 +324,9 @@ fun FocusScreen(
                     }
                 }
 
-                // 1. Timer presentation — Aurora is the single flagship timer
-                // (the old Aurora/Classic toggle was a scattered control).
+                // 1. Timer presentation — the selected face renders here.
+                // v1.3.0: the Aurora Ring face was removed by owner order;
+                // Minimal Digits is the default face.
                 // v1.1: TimerFaceHost renders the selected timer face; the
                 // dressed buddy (Mascot system) shows on the default theme,
                 // themed mascots keep their pose on other themes.

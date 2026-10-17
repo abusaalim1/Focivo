@@ -73,8 +73,18 @@ class ContentLockTest {
     }
 
     @Test fun free_faces_unlocked_at_zero() {
-        assertTrue(face("ring").isUnlocked(0))
+        // v1.3.0 — Aurora Ring removed; Minimal Digits is the free default.
         assertTrue(face("digits").isUnlocked(0))
+    }
+
+    @Test fun aurora_ring_face_removed_v130() {
+        // Owner order 2026-10-17: the Aurora Ring face is gone completely.
+        assertTrue(TimerFaceManager.FACES.none { it.id == "ring" })
+        assertTrue(TimerFaceManager.FACES.none { it.name.contains("Aurora") })
+        // Legacy persisted "ring" ids resolve to the new default face.
+        assertEquals("digits", TimerFaceManager.getFace("ring").id)
+        assertEquals("digits", TimerFaceManager.getFace(null).id)
+        assertEquals("digits", TimerFaceManager.FACES.first().id)
     }
 
     @Test fun face_ladder_thresholds() {

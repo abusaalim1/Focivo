@@ -15,8 +15,10 @@ import android.view.View
 import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import com.example.ui.components.RollingNumber
+import com.example.ui.components.RollingText
 import com.example.ui.components.SessionNotificationDigestSheet
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SerifItalicFontFamily
@@ -54,15 +57,26 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import com.example.R
 import com.example.data.model.FocusSessionEntity
 import com.example.ui.theme.RegainLimeLight
 import com.example.ui.theme.RegainLimePrimary
@@ -195,7 +209,11 @@ fun SessionCompleteScreen(
             }
     ) {
         when (flowStage) {
-            0 -> SessionFlowCelebrateStage(pointsEarned = pointsEarned)
+            0 -> SessionFlowCelebrateStage(
+                pointsEarned = pointsEarned,
+                minutesSpent = minutesSpent,
+                distractionsCount = session.distractionsCount
+            )
             1 -> SessionFlowMessageStage(
                 distractionsCount = session.distractionsCount,
                 sessionId = session.id
@@ -230,23 +248,119 @@ fun SessionCompleteScreen(
  * Every number shown is the user's real data.
  */
 
-/** Stage 0 — "Well done." + real focus points rolling up. */
+/**
+ * Stage 0 — the owner's done screen, beat for beat: lime ring sweeps to
+ * full, the cheer mascot pops in inside the ring, "Well done.", "+N Focus
+ * Points" counting up, "Ym · N distractions", TAP TO SKIP.
+ *
+ * v1.3.0 mascot decision: the HTML spec already embeds its own cheer mascot
+ * (the white clay graduate, arms up) — the app packages that same art as
+ * [R.drawable.mascot_celebration], so it renders here. The separate
+ * black-background cheer_4 PNG is deliberately NOT used: per the task it
+ * would be a second mascot on top of the spec's own.
+ *
+ * (No streak anywhere: the streak feature was removed app-wide.)
+ */
 @Composable
-private fun SessionFlowCelebrateStage(pointsEarned: Int) {
+private fun SessionFlowCelebrateStage(
+    pointsEarned: Int,
+    minutesSpent: Int,
+    distractionsCount: Int
+) {
+    val ringColor = Color(0xFF8CE000) // the HTML's --lime
+    // Ring sweep 0 -> full over 0.9s, like the HTML's stroke-dasharray anim.
+    val ringProgress = remember { Animatable(0f) }
+    // Mascot pop-in: the HTML shows it at t=0.45s, scale 0.5 -> 1.
+    val mascotScale = remember { Animatable(0.5f) }
+    val mascotAlpha = remember { Animatable(0f) }
+    // Staggered text fade-ins (HTML: dh@0.9s, dpts@1.1s, dmm@1.4s).
+    val titleAlpha = remember { Animatable(0f) }
+    val pointsAlpha = remember { Animatable(0f) }
+    val dmmAlpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        launch { ringProgress.animateTo(1f, tween(900, easing = LinearEasing)) }
+        launch {
+            delay(450)
+            launch { mascotAlpha.animateTo(1f, tween(200)) }
+            mascotScale.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 220f))
+        }
+        launch { delay(900); titleAlpha.animateTo(1f, tween(400)) }
+        launch { delay(1100); pointsAlpha.animateTo(1f, tween(300)) }
+        launch { delay(1400); dmmAlpha.animateTo(1f, tween(400)) }
+    }
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // Ring + mascot (230dp, like the HTML's #dst).
+            Box(
+                modifier = Modifier
+                    .size(230.dp)
+                    .drawBehind {
+                        // Radial lime glow behind the ring.
+                        drawRect(
+                            Brush.radialGradient(
+                                0f to ringColor.copy(alpha = 0.20f),
+                                0.7f to ringColor.copy(alpha = 0.04f),
+                                1f to Color.Transparent,
+                                center = Offset(size.width / 2f, size.height * 0.38f),
+                                radius = size.width / 2f
+                            )
+                        )
+                    }
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val stroke = 7.dp.toPx()
+                    val r = size.minDimension / 2f - stroke
+                    val c = center
+                    drawCircle(
+                        color = ringColor.copy(alpha = 0.14f),
+                        radius = r,
+                        center = c,
+                        style = Stroke(stroke)
+                    )
+                    drawArc(
+                        color = ringColor,
+                        startAngle = -90f,
+                        sweepAngle = 360f * ringProgress.value,
+                        useCenter = false,
+                        topLeft = Offset(c.x - r, c.y - r),
+                        size = Size(r * 2f, r * 2f),
+                        style = Stroke(stroke, cap = StrokeCap.Round)
+                    )
+                }
+                Image(
+                    painter = painterResource(R.drawable.mascot_celebration),
+                    contentDescription = "Celebrating mascot",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 20.dp)
+                        .height(170.dp)
+                        .graphicsLayer {
+                            scaleX = mascotScale.value
+                            scaleY = mascotScale.value
+                            alpha = mascotAlpha.value
+                            transformOrigin = TransformOrigin(0.5f, 1f)
+                        }
+                )
+            }
+            Spacer(modifier = Modifier.height(30.dp))
             Text(
                 text = "Well done.",
                 fontFamily = SerifItalicFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 44.sp,
-                color = Color(0xFFF4F4F5)
+                color = Color(0xFFF4F4F5),
+                modifier = Modifier.graphicsLayer { alpha = titleAlpha.value }
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.graphicsLayer { alpha = pointsAlpha.value }
+            ) {
                 RollingNumber(
                     value = pointsEarned,
                     formatter = { "+$it" },
@@ -268,6 +382,20 @@ private fun SessionFlowCelebrateStage(pointsEarned: Int) {
                     )
                 )
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "${hm(minutesSpent)} · " + if (distractionsCount > 0) {
+                    "$distractionsCount ${if (distractionsCount == 1) "distraction" else "distractions"}"
+                } else {
+                    "zero distractions"
+                },
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = PoppinsFontFamily,
+                    color = Color(0xFFF4F4F5).copy(alpha = 0.55f),
+                    fontSize = 13.sp
+                ),
+                modifier = Modifier.graphicsLayer { alpha = dmmAlpha.value }
+            )
         }
         SessionFlowTapToSkip(modifier = Modifier.align(Alignment.BottomCenter))
     }
@@ -340,12 +468,15 @@ private fun SessionFlowFocusedStage(minutesSpent: Int) {
                 )
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
+            // Motion Lab #7 — focused minutes roll like an odometer.
+            RollingText(
                 text = "${minutesSpent}m",
-                fontFamily = SerifItalicFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 72.sp,
-                color = Color(0xFFB6F13A)
+                style = TextStyle(
+                    fontFamily = SerifItalicFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 72.sp,
+                    color = Color(0xFFB6F13A)
+                )
             )
         }
         SessionFlowTapToSkip(modifier = Modifier.align(Alignment.BottomCenter))

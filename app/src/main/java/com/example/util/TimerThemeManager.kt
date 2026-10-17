@@ -84,7 +84,7 @@ object TimerThemeManager {
             name = "Aurora",
             backdropRes = null, // code-drawn aurora canvas (unchanged from v1.3.1)
             mascotPose = MascotPose.STUDY_HAPPY, // round-3: happy default study face
-            arcColors = emptyList(), // unused — AuroraTimer uses its built-in palette
+            arcColors = emptyList(), // unused — the aurora canvas is code-drawn
             glowColor = Color.Transparent,
             accent = Color(0xFF8CE000),
             unlockPoints = 0,

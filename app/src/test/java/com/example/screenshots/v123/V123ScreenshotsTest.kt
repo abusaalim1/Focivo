@@ -257,7 +257,7 @@ class V123ScreenshotsTest {
         initManagers()
         PomodoroStyleManager.selectStyle(context, PomodoroStyle.TICK_RING)
         focusScreen(
-            faceId = "ring",
+            faceId = "digits",
             pomoState = PomodoroState(
                 config = PomodoroConfig(25, 5, 15, 4, null),
                 phase = PomodoroPhase.FOCUS,
@@ -276,7 +276,7 @@ class V123ScreenshotsTest {
         initManagers()
         PomodoroStyleManager.selectStyle(context, PomodoroStyle.ACTIVITY_RINGS)
         focusScreen(
-            faceId = "ring",
+            faceId = "digits",
             pomoState = PomodoroState(
                 config = PomodoroConfig(25, 5, 15, 4, null),
                 phase = PomodoroPhase.SHORT_BREAK,

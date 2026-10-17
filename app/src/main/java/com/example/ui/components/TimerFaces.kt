@@ -70,12 +70,17 @@ import com.example.util.TimerTheme
 /**
  * v1.1 — switchable timer face templates (Apple/Notion minimal aesthetic).
  *
- * Template 1 "Aurora Ring" is the existing [AuroraTimer] flagship. The four
- * new faces are GENUINELY DIFFERENT layouts, not recolors:
+ * v1.3.0 — the "Aurora Ring" face was REMOVED by owner order (2026-10-17):
+ * its registry entry, [TimerFaceHost]/[TimerFaceThumbnail] branches and
+ * AuroraTimer.kt are gone. "Minimal Digits" is now the default face and
+ * the safe fallback for unknown/legacy ids.
+ *
+ * The faces are GENUINELY DIFFERENT layouts, not recolors:
  * - Minimal Digits: huge type, no ring, hairline progress
  * - Glass Card: frosted centered card holding everything
  * - Half Arc: half-donut progress arc with digits beneath
  * - Editorial: oversized left-aligned numerals + thin progress line
+ * - nine v1.2.3 FocivoClock styles (Orbit … Bars)
  *
  * Every face keeps: the themed backdrop (drawn by the caller behind),
  * themed mascot ([MascotPose]), the session/subject chip, readable contrast
@@ -116,8 +121,7 @@ fun formatFaceTime(remainingSeconds: Int): String {
 fun TimerFaceHost(
     params: TimerFaceParams,
     faceId: String,
-    modifier: Modifier = Modifier,
-    dialSize: Dp = 352.dp
+    modifier: Modifier = Modifier
 ) {
     when (faceId) {
         "digits" -> MinimalDigitsFace(params, modifier)
@@ -135,23 +139,9 @@ fun TimerFaceHost(
         "clock_stack" -> ClockStyleFace(params, ClockStyle.STACK, modifier)
         "clock_breathe" -> ClockStyleFace(params, ClockStyle.BREATHE, modifier)
         "clock_bars" -> ClockStyleFace(params, ClockStyle.BARS, modifier)
-        else -> AuroraTimer(
-            totalSeconds = params.totalSeconds,
-            remainingSeconds = params.remainingSeconds,
-            isRunning = params.isRunning,
-            isBreak = params.isBreak,
-            subjectTitle = params.subjectTitle,
-            modifier = modifier,
-            dialSize = dialSize,
-            mascotPose = params.mascotPose,
-            theme = params.theme,
-            onTogglePlay = params.onTogglePlay,
-            onReset = params.onReset,
-            onTagClick = params.onTagClick,
-            onTimeClick = params.onTimeClick,
-            mascotContent = params.mascotContent,
-            onMascotClick = params.onMascotClick
-        )
+        // v1.3.0 — Aurora Ring removed; unknown/legacy ids (e.g. a persisted
+        // "ring") fall back to the free default face, Minimal Digits.
+        else -> MinimalDigitsFace(params, modifier)
     }
 }
 
@@ -378,9 +368,8 @@ private fun FaceTappableTime(
 }
 
 /**
- * Shared control row for the four new faces — consistent placement:
+ * Shared control row for the non-clock faces — consistent placement:
  * primary play/pause pill + quiet reset circle, centered below the visual.
- * (Aurora Ring keeps its own in-dial controls as the flagship template.)
  */
 @Composable
 private fun FaceControlRow(
@@ -992,28 +981,29 @@ fun TimerFaceThumbnail(
             "clock_stack" -> ClockStyleThumbnail(ClockStyle.STACK)
             "clock_breathe" -> ClockStyleThumbnail(ClockStyle.BREATHE)
             "clock_bars" -> ClockStyleThumbnail(ClockStyle.BARS)
-            else -> {
-                // Ring thumbnail: simple glowing ring with digits
-                Box(contentAlignment = Alignment.Center) {
-                    Canvas(modifier = Modifier.size(84.dp)) {
-                        val stroke = 9.dp.toPx()
-                        drawArc(
-                            color = if (isDark) Color(0x2EFFFFFF) else Color(0x16000000),
-                            startAngle = 0f, sweepAngle = 360f, useCenter = false,
-                            style = Stroke(width = stroke, cap = StrokeCap.Round)
-                        )
-                        drawArc(
-                            color = FaceLime,
-                            startAngle = -90f, sweepAngle = 360f * sampleProgress, useCenter = false,
-                            style = Stroke(width = stroke, cap = StrokeCap.Round)
-                        )
-                    }
-                    Text(
-                        "25:00",
-                        fontFamily = PoppinsFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = faceTextPrimary(isDark)
+            // v1.3.0 — Aurora Ring removed; the fallback thumbnail is the
+            // Minimal Digits mini render (also used for legacy "ring").
+            else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "25:00",
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 26.sp,
+                    color = faceTextPrimary(isDark)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(3.dp)
+                        .clip(CircleShape)
+                        .background(if (isDark) Color(0x33FFFFFF) else Color(0x1A000000))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(sampleProgress)
+                            .height(3.dp)
+                            .background(FaceLime)
                     )
                 }
             }
