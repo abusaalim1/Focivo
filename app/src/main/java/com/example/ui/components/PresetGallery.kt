@@ -93,10 +93,10 @@ data class AvatarPreset(
 }
 
 /**
- * Structured avatar gallery. Id ranges (owner spec 2026-10-17, rev 20:20 —
- * HUMANS ONLY; animal/character avatars removed):
- * - Boys FREE: a41–a50 | Boys LOCKED: a51–a55 (500 pts), a56–a60 (1000 pts)
- * - Girls FREE: a11–a15, a26–a30 | Girls LOCKED: a31–a35 (500 pts), a36–a40 (1000 pts)
+ * Structured avatar gallery. Id ranges (owner spec 2026-10-17, rev 20:21 —
+ * HUMANS ONLY; each section 10 FREE + 15 LOCKED = 25):
+ * - Boys FREE: a41–a50 | Boys LOCKED: a51–a60, a66–a70 (8 at 500 pts, 7 at 1000 pts)
+ * - Girls FREE: a11–a15, a26–a30 | Girls LOCKED: a31–a40, a61–a65 (8 at 500 pts, 7 at 1000 pts)
  * Missing asset files are omitted (no crash, no placeholder art).
  */
 fun avatarPresets(context: android.content.Context): List<AvatarPreset> {
@@ -111,15 +111,17 @@ fun avatarPresets(context: android.content.Context): List<AvatarPreset> {
         (from..to).map { prefix + it.toString().padStart(2, '0') }
 
     val defs = mutableListOf<AvatarPreset>()
-    // Boys (humans only)
+    // Boys (humans only): 10 free + 15 locked (8 at 500 pts, 7 at 1000 pts)
     idRange("a", 41, 50).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, 0) }
-    idRange("a", 51, 55).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, AVATAR_UNLOCK_TIER_1) }
-    idRange("a", 56, 60).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, AVATAR_UNLOCK_TIER_2) }
-    // Girls
+    idRange("a", 51, 58).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, AVATAR_UNLOCK_TIER_1) }
+    idRange("a", 59, 60).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, AVATAR_UNLOCK_TIER_2) }
+    idRange("a", 66, 70).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, AVATAR_UNLOCK_TIER_2) }
+    // Girls: 10 free + 15 locked (8 at 500 pts, 7 at 1000 pts)
     idRange("a", 11, 15).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, 0) }
     idRange("a", 26, 30).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, 0) }
-    idRange("a", 31, 35).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, AVATAR_UNLOCK_TIER_1) }
-    idRange("a", 36, 40).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, AVATAR_UNLOCK_TIER_2) }
+    idRange("a", 31, 38).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, AVATAR_UNLOCK_TIER_1) }
+    idRange("a", 39, 40).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, AVATAR_UNLOCK_TIER_2) }
+    idRange("a", 61, 65).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, AVATAR_UNLOCK_TIER_2) }
     return defs.filter { it.id in available }
 }
 
