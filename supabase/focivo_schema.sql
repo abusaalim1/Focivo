@@ -86,3 +86,11 @@ create policy "squad_members_delete" on public.squad_members
 -- adding it makes leaderboard + squad avatars persist for real.
 alter table public.study_leaderboard
   add column if not exists avatar_url text;
+
+-- ── (c) Leaderboard is_public (v1.3.0 profile privacy) ───────────────
+-- The app writes this column best-effort (PostgREST 42703 tolerated) and
+-- enforces privacy locally until it exists: private users are hidden from
+-- other users' leaderboard surfaces on-device. DEFAULT true keeps every
+-- legacy row public, matching the app's read-side null-means-public rule.
+alter table public.study_leaderboard
+  add column if not exists is_public boolean not null default true;
