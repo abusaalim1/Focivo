@@ -161,4 +161,38 @@ class V130SquadsScreenshotsTest {
         }
         capture("squad_member_rows")
     }
+
+    @Test
+    fun squad_standings_card_full() {
+        // 8 members (the cap): proves the card fits with zero clipping —
+        // rows show ranks 4-6, with the viewer swapped into the last row.
+        val names = listOf("Riya", "Abu Saalim", "Imran", "Sana", "Dev", "Noor", "Arif", "Zara")
+        val weeklyMin = listOf(410, 320, 210, 95, 40, 30, 22, 10)
+        val standings = names.mapIndexed { i, n ->
+            SquadStanding(
+                member = SquadMember(
+                    id = "m-$i", squadId = "squad-1", userId = "user-$i",
+                    displayName = n, avatarUrl = null,
+                ),
+                weeklySeconds = weeklyMin[i] * 60L,
+                allTimeSeconds = weeklyMin[i] * 300L,
+                rank = i + 1,
+                isMe = n == "Zara",
+            )
+        }
+        val squad = fakeSquad().copy(memberCount = 8)
+        themed {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF0A0C0B))
+                    .padding(24.dp)
+            ) {
+                Box(Modifier.size(360.dp, 450.dp)) {
+                    SquadStandingsCardPng(squad = squad, standings = standings)
+                }
+            }
+        }
+        capture("squad_standings_card_full")
+    }
 }

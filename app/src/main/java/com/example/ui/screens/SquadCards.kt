@@ -104,7 +104,7 @@ private fun SquadCardFrame(
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(26.dp),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             content = content,
         )
@@ -181,6 +181,13 @@ fun SquadStandingsCardPng(
 ) {
     val top = standings.take(3)
     val rest = standings.drop(3)
+    // The 450dp card fits 3 rows: ranks 4-6. When the viewer is ranked lower,
+    // swap the last row for their own so the shared card still shows them.
+    val shownRows = when {
+        rest.size <= 3 -> rest
+        rest.any { it.isMe } -> rest.take(2) + rest.first { it.isMe }
+        else -> rest.take(3)
+    }
     val maxMin = (standings.maxOfOrNull { it.weeklySeconds } ?: 1L).coerceAtLeast(1L)
     val me = standings.firstOrNull { it.isMe }
     val leader = standings.firstOrNull()
@@ -199,13 +206,13 @@ fun SquadStandingsCardPng(
         }
     ) {
         SquadTopBar("${squad.name} · This week", SquadLime, Color.White)
-        Text("Standings", style = squadSerif(28f, Color.White), modifier = Modifier.padding(top = 6.dp))
+        Text("Standings", style = squadSerif(26f, Color.White), modifier = Modifier.padding(top = 4.dp))
 
         // Podium (2nd, 1st, 3rd) — .pod
         if (top.isNotEmpty()) {
             val order = listOfNotNull(top.getOrNull(1), top.getOrNull(0), top.getOrNull(2))
             Row(
-                Modifier.padding(top = 18.dp).fillMaxWidth(),
+                Modifier.padding(top = 10.dp).fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.Bottom,
             ) {
@@ -216,12 +223,12 @@ fun SquadStandingsCardPng(
                         modifier = Modifier.width(98.dp),
                     ) {
                         Box(
-                            modifier = Modifier.padding(top = if (isFirst) 14.dp else 0.dp),
+                            modifier = Modifier.padding(top = if (isFirst) 12.dp else 0.dp),
                             contentAlignment = Alignment.TopCenter,
                         ) {
                             Box(
                                 Modifier
-                                    .size(if (isFirst) 52.dp else 42.dp)
+                                    .size(if (isFirst) 46.dp else 38.dp)
                                     .then(
                                         if (s.isMe) Modifier.border(3.dp, SquadLime, CircleShape)
                                         else Modifier
@@ -255,12 +262,12 @@ fun SquadStandingsCardPng(
                         Text(
                             squadHm((s.weeklySeconds / 60).toInt()),
                             style = squadSans(12f, FontWeight.Normal, Color.White.copy(alpha = .65f)),
-                            modifier = Modifier.padding(bottom = 6.dp),
+                            modifier = Modifier.padding(bottom = 4.dp),
                         )
                         Box(
                             Modifier
                                 .fillMaxWidth()
-                                .height(when (s.rank) { 1 -> 78.dp; 2 -> 58.dp; else -> 44.dp })
+                                .height(when (s.rank) { 1 -> 60.dp; 2 -> 46.dp; else -> 34.dp })
                                 .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
                                 .background(
                                     Brush.verticalGradient(
@@ -272,8 +279,8 @@ fun SquadStandingsCardPng(
                         ) {
                             Text(
                                 "${s.rank}",
-                                style = squadSerif(26f, Color.White),
-                                modifier = Modifier.padding(top = 8.dp),
+                                style = squadSerif(24f, Color.White),
+                                modifier = Modifier.padding(top = 6.dp),
                             )
                         }
                     }
@@ -287,10 +294,10 @@ fun SquadStandingsCardPng(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp),
+                    .padding(top = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                rest.forEach { s ->
+                shownRows.forEach { s ->
                     val min = (s.weeklySeconds / 60).toInt()
                     Row(
                         Modifier
@@ -302,7 +309,7 @@ fun SquadStandingsCardPng(
                                     .border(1.dp, SquadLime.copy(alpha = .4f), RoundedCornerShape(14.dp))
                                 else Modifier
                             )
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                            .padding(horizontal = 10.dp, vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -354,13 +361,13 @@ fun SquadStandingsCardPng(
         }
         Text(
             quote,
-            style = squadSerif(17f, Color.White.copy(alpha = .92f), 1.25f),
-            modifier = Modifier.widthIn(max = 290.dp).padding(top = 8.dp),
+            style = squadSerif(16f, Color.White.copy(alpha = .92f), 1.25f),
+            modifier = Modifier.widthIn(max = 290.dp).padding(top = 6.dp),
         )
         Text(
             dateLabel,
             style = squadSans(11f, FontWeight.Medium, Color.White.copy(alpha = .4f), .5f),
-            modifier = Modifier.padding(top = 6.dp),
+            modifier = Modifier.padding(top = 4.dp),
         )
     }
 }
