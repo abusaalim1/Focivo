@@ -60,11 +60,11 @@ import kotlin.math.sin
 
 /* ═══════════════════════════ Tokens (owner's Group Cards design) ═══════════════════════════ */
 
-private val SquadLime = Color(0xFF8CE000)
-private val SquadInk = Color(0xFF0D110E)
+internal val SquadLime = Color(0xFF8CE000)
+internal val SquadInk = Color(0xFF0D110E)
 private val SquadCream = Color(0xFFF3F1E8)
-private val SquadRowLine = Color(0xFF27381F)
-private val CrownGold = Color(0xFFFFD66B)
+internal val SquadRowLine = Color(0xFF27381F)
+internal val CrownGold = Color(0xFFFFD66B)
 
 private fun squadHm(minutes: Int): String =
     if (minutes < 60) "${minutes}m"
@@ -147,20 +147,20 @@ private fun SquadTopBar(label: String, brand: Color, textColor: Color) {
     }
 }
 
-private fun squadSerif(size: Float, color: Color, lh: Float = 1.05f) = TextStyle(
+internal fun squadSerif(size: Float, color: Color, lh: Float = 1.05f) = TextStyle(
     fontFamily = SerifItalicFontFamily, fontStyle = FontStyle.Italic,
     fontWeight = FontWeight.Normal, fontSize = size.sp, lineHeight = (size * lh).sp,
     color = color, textAlign = TextAlign.Center,
 )
 
-private fun squadSans(size: Float, weight: FontWeight, color: Color, ls: Float = 0f, lh: Float = 1f, align: TextAlign = TextAlign.Center) = TextStyle(
+internal fun squadSans(size: Float, weight: FontWeight, color: Color, ls: Float = 0f, lh: Float = 1f, align: TextAlign = TextAlign.Center) = TextStyle(
     fontFamily = PoppinsFontFamily, fontWeight = weight, fontSize = size.sp,
     letterSpacing = ls.sp, lineHeight = (size * lh).sp, color = color, textAlign = align,
 )
 
-/** Vector crown (gold) — the HTML's crown path, drawn; never an emoji. */
+/** Vector crown (gold) — the HTML's crown path, drawn; never an emoji. Internal: reused by the detail-screen podium. */
 @Composable
-private fun SquadCrown(modifier: Modifier = Modifier) {
+internal fun SquadCrown(modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val path = PathParser().parsePathString("M3 18l-1-11 5 4 5-8 5 8 5-4-1 11z").toPath()
         withTransform(

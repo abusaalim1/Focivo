@@ -29,10 +29,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -42,6 +44,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -59,6 +62,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -1262,145 +1266,36 @@ fun SquadDetailScreen(
             }
             else -> {
                 val s = squad!!
-                val st = standings
-                val maxWeekly = (st?.maxOfOrNull { it.weeklySeconds } ?: 1L).coerceAtLeast(1L)
-                LazyColumn(
-                    Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 40.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    item {
-                        SquadTopAppBar(s.name, onBack)
-                    }
-                    item {
-                        // Header: picture, name, bio, code chip.
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            SquadPictureThumb(pictureUrl = s.pictureUrl, name = s.name, size = 64.dp)
-                            Spacer(Modifier.width(14.dp))
-                            Column(Modifier.weight(1f)) {
-                                if (!s.bio.isNullOrBlank()) {
-                                    Text(
-                                        s.bio,
-                                        style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 13.sp, color = T.muted),
-                                        maxLines = 2, overflow = TextOverflow.Ellipsis,
-                                    )
+                SquadDetailContent(
+                    squad = s,
+                    standings = standings,
+                    myUserId = myUserId,
+                    onBack = onBack,
+                    onMemberClick = { profileMember = it },
+                    onRefresh = ::refresh,
+                    onShareWhatsApp = { shareStandings(toWhatsApp = true) },
+                    onShareMore = { shareStandings(toWhatsApp = false) },
+                    onDownloadCard = ::downloadStandings,
+                    onLeaveOrDelete = {
+                        if (leaving) return@SquadDetailContent
+                        leaving = true
+                        scope.launch {
+                            val isOwner = myUserId != null && myUserId == s.ownerUserId
+                            val res = if (isOwner) SquadRepository.deleteSquad(s.id)
+                            else SquadRepository.leaveSquad(s.id, myUserId.orEmpty())
+                            leaving = false
+                            res.onSuccess { onBack() }
+                                .onFailure {
+                                    Toast.makeText(
+                                        context,
+                                        it.message ?: "Could not leave the group.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
-                                Spacer(Modifier.height(6.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        Modifier
-                                            .clip(CircleShape)
-                                            .background(T.surface)
-                                            .border(1.dp, T.line, CircleShape)
-                                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                                    ) {
-                                        Text(
-                                            "CODE ${s.inviteCode}",
-                                            style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp, color = T.accentText),
-                                        )
-                                    }
-                                    Text(
-                                        "${s.memberCount}/$SQUADS_MAX_MEMBERS",
-                                        style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 12.sp, color = T.muted),
-                                    )
-                                }
-                            }
                         }
-                    }
-                    item {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("STANDINGS · THIS WEEK", style = focivoEyebrow())
-                            IconButton(onClick = ::refresh, modifier = Modifier.size(36.dp)) {
-                                Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = T.muted, modifier = Modifier.size(18.dp))
-                            }
-                        }
-                    }
-                    if (st == null) {
-                        item {
-                            Box(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(120.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                CircularProgressIndicator(color = T.accent, modifier = Modifier.size(28.dp))
-                            }
-                        }
-                    } else if (st.isEmpty()) {
-                        item {
-                            Text(
-                                "No members yet — share the invite code.",
-                                style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 13.sp, color = T.muted),
-                            )
-                        }
-                    } else {
-                        items(st, key = { it.member.id }) { standing ->
-                            SquadMemberRow(
-                                standing = standing,
-                                maxWeeklySeconds = maxWeekly,
-                                onClick = { profileMember = standing.member },
-                            )
-                        }
-                    }
-                    item {
-                        Spacer(Modifier.height(6.dp))
-                        Text("SHARE STANDINGS", style = focivoEyebrow())
-                        Spacer(Modifier.height(12.dp))
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .background(Color(0xFF0A0C0B))
-                                .padding(vertical = 8.dp),
-                        ) {
-                            SquadShareActions(
-                                onWhatsApp = { shareStandings(toWhatsApp = true) },
-                                onMore = { shareStandings(toWhatsApp = false) },
-                                onDownload = ::downloadStandings,
-                            )
-                        }
-                    }
-                    item {
-                        Spacer(Modifier.height(4.dp))
-                        val isOwner = myUserId != null && myUserId == s.ownerUserId
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = {
-                                        if (leaving) return@clickable
-                                        leaving = true
-                                        scope.launch {
-                                            val res = if (isOwner) SquadRepository.deleteSquad(s.id)
-                                            else SquadRepository.leaveSquad(s.id, myUserId.orEmpty())
-                                            leaving = false
-                                            res.onSuccess { onBack() }
-                                                .onFailure {
-                                                    Toast.makeText(
-                                                        context,
-                                                        it.message ?: "Could not leave the group.",
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
-                                                }
-                                        }
-                                    }
-                                )
-                                .padding(vertical = 12.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                if (leaving) "Working..." else if (isOwner) "Delete group" else "Leave group",
-                                style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Color(0xFFE5484D)),
-                            )
-                        }
-                    }
-                }
+                    },
+                    leaving = leaving,
+                )
             }
         }
     }
@@ -1412,6 +1307,446 @@ fun SquadDetailScreen(
             member = pm,
             myUserId = myUserId,
             onDismiss = { profileMember = null },
+        )
+    }
+}
+
+/* ═══════════════════════════ Detail content (v1.3.2 item 15) ═══════════════════════════ */
+
+/** "12h 30m" formatter for the detail screen's stat band and podium. */
+private fun squadDetailHm(totalSeconds: Long): String {
+    val minutes = (totalSeconds / 60).toInt()
+    return if (minutes < 60) "${minutes}m"
+    else "${minutes / 60}h ${(minutes % 60).toString().padStart(2, '0')}m"
+}
+
+/** Copies the invite link — same clipboard logic as the invite screen. */
+private fun copySquadInviteLink(context: Context, link: String) {
+    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    cm.setPrimaryClip(ClipData.newPlainText("Group invite", link))
+}
+
+/**
+ * v1.3.2 item 15 — enriched group detail. Pure content (no data loading),
+ * so screenshot tests can render it directly with fake standings.
+ * Premium dark-card aesthetic, English only, zero emojis.
+ */
+@Composable
+fun SquadDetailContent(
+    squad: Squad,
+    standings: List<SquadStanding>?,
+    myUserId: String?,
+    onBack: () -> Unit,
+    onMemberClick: (SquadMember) -> Unit = {},
+    onRefresh: () -> Unit = {},
+    onShareWhatsApp: () -> Unit = {},
+    onShareMore: () -> Unit = {},
+    onDownloadCard: () -> Unit = {},
+    onLeaveOrDelete: () -> Unit = {},
+    leaving: Boolean = false,
+) {
+    val T = focivoTokens()
+    val context = LocalContext.current
+    val link = remember(squad.inviteCode) { squadJoinLink(squad.inviteCode) }
+    var toastMsg by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(toastMsg) {
+        if (toastMsg != null) {
+            kotlinx.coroutines.delay(2200)
+            toastMsg = null
+        }
+    }
+
+    fun copyLink() {
+        copySquadInviteLink(context, link)
+        toastMsg = "Invite link copied."
+    }
+
+    val st = standings
+    val maxWeekly = (st?.maxOfOrNull { it.weeklySeconds } ?: 1L).coerceAtLeast(1L)
+    val isOwner = myUserId != null && myUserId == squad.ownerUserId
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item { SquadTopAppBar("Group", onBack) }
+            item { SquadDetailHeaderCard(squad = squad, onCopyCode = ::copyLink) }
+            if (!st.isNullOrEmpty()) {
+                item { SquadDetailStatsBand(standings = st) }
+            }
+            item {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("STANDINGS · THIS WEEK", style = focivoEyebrow())
+                    IconButton(onClick = onRefresh, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = T.muted, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+            if (st == null) {
+                item {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(120.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(color = T.accent, modifier = Modifier.size(28.dp))
+                    }
+                }
+            } else if (st.isEmpty()) {
+                item {
+                    Text(
+                        "No members yet — share the invite code.",
+                        style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 13.sp, color = T.muted),
+                    )
+                }
+            } else {
+                // (c) Top-3 podium above the regular list.
+                item { SquadDetailPodium(top = st.take(3)) }
+                // (e) Member rows unchanged.
+                items(st, key = { it.member.id }) { standing ->
+                    SquadMemberRow(
+                        standing = standing,
+                        maxWeeklySeconds = maxWeekly,
+                        onClick = { onMemberClick(standing.member) },
+                    )
+                }
+            }
+            item {
+                SquadInviteShareSection(
+                    squad = squad,
+                    link = link,
+                    onCopyLink = ::copyLink,
+                    onShareWhatsApp = onShareWhatsApp,
+                    onShareMore = onShareMore,
+                    onDownloadCard = onDownloadCard,
+                )
+            }
+            item {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { if (!leaving) onLeaveOrDelete() }
+                        )
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        if (leaving) "Working..." else if (isOwner) "Delete group" else "Leave group",
+                        style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Color(0xFFE5484D)),
+                    )
+                }
+            }
+        }
+        // Inline "copied" toast — same style as the invite screen's.
+        if (toastMsg != null) {
+            Text(
+                toastMsg!!,
+                style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 12.5.sp, color = Color.White),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 32.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF242A25))
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            )
+        }
+    }
+}
+
+/** (a) Group header: large picture, serif-italic name, bio, member count, code + copy. */
+@Composable
+private fun SquadDetailHeaderCard(squad: Squad, onCopyCode: () -> Unit) {
+    val T = focivoTokens()
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(T.surface)
+            .border(1.dp, T.line, RoundedCornerShape(24.dp))
+            .padding(20.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SquadPictureThumb(pictureUrl = squad.pictureUrl, name = squad.name, size = 84.dp)
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    squad.name,
+                    style = TextStyle(
+                        fontFamily = SerifItalicFontFamily, fontWeight = FontWeight.Bold,
+                        fontSize = 26.sp, color = T.text,
+                    ),
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
+                if (!squad.bio.isNullOrBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        squad.bio,
+                        style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 13.sp, color = T.muted),
+                        maxLines = 3, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                Modifier
+                    .clip(CircleShape)
+                    .background(T.softAccent)
+                    .border(1.dp, T.chipBorder, CircleShape)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null, onClick = onCopyCode
+                    )
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    "CODE ${squad.inviteCode}",
+                    style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 2.sp, color = T.accentText),
+                )
+            }
+            Text(
+                "${squad.memberCount} member${if (squad.memberCount == 1) "" else "s"}",
+                style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 12.5.sp, color = T.muted),
+            )
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = onCopyCode, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Default.ContentCopy, contentDescription = "Copy invite link", tint = T.accentText, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+/** (b) Stats band: combined weekly focus, average per member, active members — all REAL. */
+@Composable
+private fun SquadDetailStatsBand(standings: List<SquadStanding>) {
+    val T = focivoTokens()
+    // Locked members' seconds are zeroed server-side; excluded explicitly for clarity.
+    val visible = standings.filterNot { it.isLocked }
+    val total = visible.sumOf { it.weeklySeconds }
+    val average = if (standings.isNotEmpty()) total / standings.size else 0L
+    val active = visible.count { it.weeklySeconds > 0 }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(T.surface)
+            .border(1.dp, T.line, RoundedCornerShape(24.dp))
+            .padding(vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SquadStatCell(label = "TOTAL THIS WEEK", value = squadDetailHm(total), modifier = Modifier.weight(1f))
+        Box(Modifier.width(1.dp).height(44.dp).background(T.line))
+        SquadStatCell(label = "AVG PER MEMBER", value = squadDetailHm(average), modifier = Modifier.weight(1f))
+        Box(Modifier.width(1.dp).height(44.dp).background(T.line))
+        SquadStatCell(label = "ACTIVE", value = "$active", modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun SquadStatCell(label: String, value: String, modifier: Modifier = Modifier) {
+    val T = focivoTokens()
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            value,
+            style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = T.accentText),
+            maxLines = 1,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            label,
+            style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.Medium, fontSize = 9.sp, letterSpacing = 1.sp, color = T.muted),
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+        )
+    }
+}
+
+/**
+ * (c) Top-3 podium reusing the share-card aesthetic (SquadStandingsCardPng):
+ * 1st center elevated with the gold crown, lime gradient platforms, serif
+ * rank numbers. Locked members show name + lock, never their time.
+ */
+@Composable
+private fun SquadDetailPodium(top: List<SquadStanding>) {
+    val order = listOfNotNull(top.getOrNull(1), top.getOrNull(0), top.getOrNull(2))
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(SquadInk)
+            .border(1.dp, SquadRowLine, RoundedCornerShape(28.dp))
+            .padding(top = 16.dp, start = 12.dp, end = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            "TOP 3 · THIS WEEK",
+            style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 10.sp, letterSpacing = 3.sp, color = SquadLime),
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            order.forEachIndexed { i, s ->
+                val isFirst = s.rank == 1
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.width(100.dp),
+                ) {
+                    Box(
+                        modifier = Modifier.padding(top = if (isFirst) 14.dp else 0.dp),
+                        contentAlignment = Alignment.TopCenter,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(if (isFirst) 54.dp else 46.dp)
+                                .then(
+                                    if (s.isMe) Modifier.border(3.dp, SquadLime, CircleShape)
+                                    else Modifier
+                                )
+                                .clip(CircleShape),
+                        ) {
+                            LeaderboardAvatar(
+                                avatarUrl = s.member.avatarUrl,
+                                displayName = s.member.displayName,
+                                modifier = Modifier.fillMaxSize(),
+                                isCurrentUser = s.isMe,
+                                textSizeSp = 15,
+                            )
+                        }
+                        if (isFirst) {
+                            // Gold crown floating above the winner (vector, never an emoji).
+                            SquadCrown(
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .offset(y = (-14).dp)
+                                    .size(24.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        s.member.displayName,
+                        style = squadSans(12.5f, FontWeight.SemiBold, Color.White),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 6.dp).widthIn(max = 96.dp),
+                    )
+                    if (s.isLocked) {
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = "Private profile",
+                            tint = Color.White.copy(alpha = .5f),
+                            modifier = Modifier.size(14.dp).padding(bottom = 4.dp),
+                        )
+                    } else {
+                        Text(
+                            squadDetailHm(s.weeklySeconds),
+                            style = squadSans(12f, FontWeight.Normal, Color.White.copy(alpha = .65f)),
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
+                    }
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(when (s.rank) { 1 -> 62.dp; 2 -> 48.dp; else -> 36.dp })
+                            .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(SquadLime.copy(alpha = .38f), SquadLime.copy(alpha = .06f))
+                                )
+                            )
+                            .border(1.dp, SquadLime.copy(alpha = .25f), RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)),
+                        contentAlignment = Alignment.TopCenter,
+                    ) {
+                        Text(
+                            "${s.rank}",
+                            style = squadSerif(24f, Color.White),
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                }
+                if (i < order.size - 1) Spacer(Modifier.width(10.dp))
+            }
+        }
+    }
+}
+
+/** (d) Invite link + share-group-card actions, visible on the page. */
+@Composable
+private fun SquadInviteShareSection(
+    squad: Squad,
+    link: String,
+    onCopyLink: () -> Unit,
+    onShareWhatsApp: () -> Unit,
+    onShareMore: () -> Unit,
+    onDownloadCard: () -> Unit,
+) {
+    val T = focivoTokens()
+    Column {
+        Text("INVITE & SHARE", style = focivoEyebrow())
+        Spacer(Modifier.height(12.dp))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(T.surface)
+                .border(1.dp, T.line, RoundedCornerShape(20.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null, onClick = onCopyLink
+                )
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "INVITE CODE",
+                    style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 10.sp, letterSpacing = 3.sp, color = T.muted),
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    squad.inviteCode,
+                    style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.Bold, fontSize = 20.sp, letterSpacing = 4.sp, color = T.accentText),
+                )
+                Text(
+                    link,
+                    style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 11.5.sp, color = T.muted),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(onClick = onCopyLink, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Default.ContentCopy, contentDescription = "Copy invite link", tint = T.muted, modifier = Modifier.size(18.dp))
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Share the standings card",
+            style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 12.5.sp, color = T.muted),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(10.dp))
+        SquadShareActions(
+            onWhatsApp = onShareWhatsApp,
+            onMore = onShareMore,
+            onDownload = onDownloadCard,
         )
     }
 }
