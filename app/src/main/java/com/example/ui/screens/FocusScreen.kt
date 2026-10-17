@@ -57,6 +57,7 @@ import com.example.ui.components.BuddyMascot
 import com.example.ui.components.CustomizeTimerSheet
 import com.example.ui.components.DeepFocusActiveBanner
 import com.example.ui.components.DeepFocusSettingsSheet
+import com.example.ui.components.StrictAdminExplainerSheet
 import com.example.ui.components.DistractionDialog
 import com.example.ui.components.MascotPose
 import com.example.ui.components.PreStudyAppBlockSheet
