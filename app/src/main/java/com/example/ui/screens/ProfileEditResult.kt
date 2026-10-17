@@ -3,11 +3,10 @@ package com.example.ui.screens
 /**
  * v1.3.0 — result of the Profile edit dialog.
  *
- * The dialog currently edits display name + avatar only; the remaining
- * fields default to "keep current" semantics — callers that do not collect
- * them pass the user's existing preference values through so a save never
- * wipes data the dialog did not show. When the dialog grows goal/class/
- * exam/visibility controls, pass the edited values here directly.
+ * The dialog edits display name, avatar, study goal, class, target exam
+ * and the public/private visibility toggle. All fields are written to
+ * local preferences on save; name/goal/avatar/visibility also sync to
+ * the Supabase leaderboard on a best-effort basis.
  */
 data class ProfileEditResult(
     val displayName: String,

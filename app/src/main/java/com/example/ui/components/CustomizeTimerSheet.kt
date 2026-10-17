@@ -65,6 +65,7 @@ import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.components.RollingNumber
 import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.util.PomodoroConfig
@@ -566,12 +567,15 @@ fun CustomizeTimerSheet(
                             fontSize = 12.sp,
                             color = textSecondary
                         )
-                        Text(
-                            text = "$focusPoints",
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = T.accentText
+                        // Motion Lab #7 — points balance rolls like an odometer.
+                        RollingNumber(
+                            value = focusPoints,
+                            style = androidx.compose.ui.text.TextStyle(
+                                fontFamily = PoppinsFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = T.accentText
+                            )
                         )
                     }
                     TimerFacePicker(

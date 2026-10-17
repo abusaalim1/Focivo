@@ -34,7 +34,10 @@ data class LeaderboardUser(
     val streak: Int = 1,
     val subjectTag: String = "Study",
     val avatarUrl: String? = null,
-    val isCurrentUser: Boolean = false
+    val isCurrentUser: Boolean = false,
+    // v1.3.0: profile visibility — private users are hidden from other
+    // users' leaderboard surfaces. Defaults true (legacy rows predate the flag).
+    val isPublic: Boolean = true
 )
 
 data class HallOfFameItem(
@@ -186,7 +189,9 @@ class FirebaseSyncManager(private val context: Context) {
                         streak = dto.streak,
                         subjectTag = dto.subject_tag,
                         avatarUrl = dto.avatar_url,
-                        isCurrentUser = dto.user_id == currentUserId
+                        isCurrentUser = dto.user_id == currentUserId,
+                        // v1.3.0: null = legacy row / column missing -> public.
+                        isPublic = dto.is_public ?: true
                     )
                 }.sortedByDescending { it.weeklyStudySeconds } // default sorting for This Week
                 _leaderboardUsers.value = mappedList

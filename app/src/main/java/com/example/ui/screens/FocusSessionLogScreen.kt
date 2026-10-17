@@ -70,6 +70,7 @@ import com.example.ui.components.PremiumButton
 import com.example.ui.components.GlassCard
 import com.example.ui.components.MascotPose
 import com.example.ui.components.RegainMascotView
+import com.example.ui.components.RollingText
 import com.example.ui.theme.focivoHeadline
 import com.example.ui.theme.focivoTokens
 import com.example.ui.theme.PoppinsFontFamily
@@ -496,7 +497,8 @@ private fun SummaryStatItem(
                 modifier = Modifier.size(17.dp)
             )
         }
-        Text(
+        // Motion Lab #7 — stat values roll like an odometer when they change.
+        RollingText(
             text = value,
             style = MaterialTheme.typography.titleMedium.copy(
                 fontFamily = PoppinsFontFamily,
@@ -712,7 +714,8 @@ private fun FocusSessionLogCard(
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))
-                        Text(
+                        // Motion Lab #7 — points badge rolls when the value changes.
+                        RollingText(
                             text = "+${session.focusPointsEarned} FP",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontFamily = PoppinsFontFamily,

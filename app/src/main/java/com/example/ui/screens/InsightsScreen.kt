@@ -61,6 +61,7 @@ import com.example.R
 import com.example.data.model.FocusSessionEntity
 import com.example.data.model.ReflectionEntity
 import com.example.data.model.UserPreferencesEntity
+import com.example.ui.components.RollingText
 import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SerifItalicFontFamily
@@ -269,7 +270,7 @@ fun InsightsScreen(
                 subtitle = state.peakWindow,
             ) {
                 if (state.peakBoostPercent > 0) {
-                    T("+${state.peakBoostPercent}%", 13, FontWeight.SemiBold, C.Accent)
+                    RollingT("+${state.peakBoostPercent}%", 13, FontWeight.SemiBold, C.Accent)
                 }
             }
             InfoRow(
@@ -290,7 +291,7 @@ fun InsightsScreen(
                         Box(Modifier.size(8.dp).clip(CircleShape).background(C.Accent))
                         Spacer(Modifier.width(12.dp))
                         T(subject, 14, FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        T(formatted, 13, FontWeight.SemiBold, if (i == 0) C.Accent else C.Muted)
+                        RollingT(formatted, 13, FontWeight.SemiBold, if (i == 0) C.Accent else C.Muted)
                     }
                     if (i < state.subjectRows.lastIndex) Spacer(Modifier.height(10.dp))
                 }
@@ -320,7 +321,7 @@ private fun Header(goal: Float) {
             val goalText = if (goal % 1f == 0f) "${goal.toInt()}h"
             else String.format(Locale.US, "%.1fh", goal)
             T("Goal ", 12, color = C.Muted)
-            T(goalText, 12, FontWeight.SemiBold, C.Accent)
+            RollingT(goalText, 12, FontWeight.SemiBold, C.Accent)
             T(" / day", 12, color = C.Muted)
         }
     }
@@ -346,7 +347,8 @@ private fun Hero(s: InsightsUiState) {
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                T(formatMinutes(s.todayMinutes), 28, FontWeight.Bold, spacing = -0.5f, serif = true)
+                // Motion Lab #7 — today's focus total rolls like an odometer.
+                RollingT(formatMinutes(s.todayMinutes), 28, FontWeight.Bold, spacing = -0.5f, serif = true)
                 T("today", 11, color = C.Muted)
             }
         }
@@ -371,7 +373,7 @@ private fun Hero(s: InsightsUiState) {
                     )
                     Spacer(Modifier.width(6.dp))
                     val sign = if (up) "+" else "-"
-                    T("$sign${kotlin.math.abs(s.vsLastWeekPercent)}% vs last week", 12, FontWeight.SemiBold, C.Accent)
+                    RollingT("$sign${kotlin.math.abs(s.vsLastWeekPercent)}% vs last week", 12, FontWeight.SemiBold, C.Accent)
                 }
             }
         }
@@ -397,7 +399,7 @@ private fun WeekCard(s: InsightsUiState) {
             val totalText = if (s.weekTotalHours >= 0.1f)
                 String.format(Locale.US, "%.1f hrs total", s.weekTotalHours)
             else "${s.weekMinutes.sum()}m total"
-            T(totalText, 12, color = C.Muted)
+            RollingT(totalText, 12, color = C.Muted)
         }
         Spacer(Modifier.height(26.dp))
 
@@ -464,7 +466,8 @@ private fun StatsRow(s: InsightsUiState) {
 @Composable
 private fun StatItem(value: String, label: String, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        T(value, 24, FontWeight.Bold, spacing = -0.4f, serif = true)
+        // Motion Lab #7 — stat values roll like an odometer when they change.
+        RollingT(value, 24, FontWeight.Bold, spacing = -0.4f, serif = true)
         Spacer(Modifier.height(2.dp))
         T(label.uppercase(), 10, FontWeight.Medium, C.Muted, spacing = 0.6f)
     }
@@ -510,7 +513,7 @@ private fun Legend(label: String, percent: Int, dot: Color) {
         Box(Modifier.size(7.dp).clip(CircleShape).background(dot))
         Spacer(Modifier.width(6.dp))
         T("$label ", 12, color = C.Muted)
-        T("$percent%", 12, FontWeight.SemiBold)
+        RollingT("$percent%", 12, FontWeight.SemiBold)
     }
 }
 
@@ -581,6 +584,35 @@ private fun T(
 @Composable
 private fun Eyebrow(text: String) =
     T(text.uppercase(), 12, FontWeight.SemiBold, C.Muted, spacing = 1.7f)
+
+/**
+ * Motion Lab #7 — rolling twin of [T]: identical style, but digit
+ * characters roll like an odometer when the value changes.
+ * Values are never transformed — animation only.
+ */
+@Composable
+private fun RollingT(
+    text: String,
+    size: Int,
+    weight: FontWeight = FontWeight.Medium,
+    color: Color = C.Ink,
+    spacing: Float = 0f,
+    modifier: Modifier = Modifier,
+    serif: Boolean = false,
+) {
+    RollingText(
+        text = text,
+        modifier = modifier,
+        style = TextStyle(
+            fontFamily = if (serif) SerifItalic else PoppinsFontFamily,
+            fontSize = size.sp,
+            fontWeight = weight,
+            color = color,
+            letterSpacing = spacing.sp,
+            lineHeight = (size * 1.45f).sp,
+        )
+    )
+}
 
 private fun formatMinutes(m: Int): String =
     if (m < 60) "${m}m" else "${m / 60}h ${m % 60}m".replace(" 0m", "")

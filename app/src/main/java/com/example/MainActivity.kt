@@ -843,21 +843,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onOpenMascot = { isMascotOpen = true },
                                         onCheckForUpdates = { viewModel.checkForAppUpdates(context, isManual = true) },
                                         onLogout = { showSignOutConfirmationDialog = true },
-                                        onUpdateProfile = { newName, avatarBytes ->
-                                            // The dialog edits name + avatar only: pass the
-                                            // current values through for the rest so the save
-                                            // never wipes fields the dialog did not collect.
-                                            val prefs = viewModel.userPreferences.value
-                                            viewModel.updateUserProfile(
-                                                com.example.ui.screens.ProfileEditResult(
-                                                    displayName = newName,
-                                                    avatarBytes = avatarBytes,
-                                                    studyGoal = prefs?.primaryStudyGoal.orEmpty(),
-                                                    studyClass = prefs?.studentClassLevel.orEmpty(),
-                                                    targetExam = prefs?.targetExam.orEmpty(),
-                                                    isPublic = prefs?.isProfilePublic ?: true
-                                                )
-                                            )
+                                        onUpdateProfile = { result ->
+                                            viewModel.updateUserProfile(result)
                                         }
                                     )
                                 }

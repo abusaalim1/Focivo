@@ -217,7 +217,11 @@ fun LeaderboardScreen(
     }
 
     val effectiveUsers = remember(users, currentEntry, selectedFilter) {
-        val remoteWithoutMe = users.filterNot { it.isCurrentUser || it.displayName.equals(currentUserName, ignoreCase = true) }
+        val remoteWithoutMe = users
+            .filterNot { it.isCurrentUser || it.displayName.equals(currentUserName, ignoreCase = true) }
+            // v1.3.0: private profiles are hidden from other users' surfaces.
+            // The current user always sees their own entry (built locally above).
+            .filter { it.isPublic }
         val allUsers = listOf(currentEntry) + remoteWithoutMe
         when (selectedFilter) {
             "Today" -> allUsers.sortedByDescending { it.todayStudySeconds }

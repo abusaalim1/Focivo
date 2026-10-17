@@ -155,6 +155,11 @@ data class SupabaseStudyLeaderboardDto(
     val streak: Int = 1,
     val subject_tag: String = "General Study",
     var avatar_url: String? = null,
+    // v1.3.0: profile visibility flag. Null (legacy rows / column missing)
+    // decodes to null and is treated as PUBLIC on read; explicitNulls=false
+    // means a null is never encoded, so the SDK upsert can never fail on a
+    // missing column. Written only via the dedicated best-effort update.
+    val is_public: Boolean? = null,
     val last_updated: String? = null
 )
 
