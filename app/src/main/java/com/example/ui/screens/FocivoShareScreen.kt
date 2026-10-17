@@ -634,7 +634,7 @@ private fun RingCard(date: String, m: Int, d: Int, n: String) {
 
         // .chips
         Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            Chip("✓ Completed", Color(0xFF161B17), Edge, Color.White)
+            Chip("Completed", Color(0xFF161B17), Edge, Color.White)
             Chip(distractionLabel(d), Color(0xFF161B17), Edge, Color.White)
         }
 

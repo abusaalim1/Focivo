@@ -1403,11 +1403,11 @@ class SupabaseService {
 
         Log.i(TAG, "[LeaderboardSync] BEFORE WRITE: Executing UPDATE/UPSERT public.study_leaderboard SET display_name='${leaderboardDto.display_name}', study_seconds=${leaderboardDto.study_seconds}, streak=${leaderboardDto.streak} WHERE user_id='$userId'")
 
-        // v1.2 avatar-robustness: the stats write NEVER carries avatar_url.
-        // Proven live 2026-10-15 — the avatar_url column does not exist on
-        // study_leaderboard, so any payload containing it fails the whole
-        // sync; and an explicit null would wipe a previously stored avatar.
-        // The avatar is synced separately, only when non-blank (best-effort).
+        // Avatar-robustness: the stats write NEVER carries avatar_url.
+        // The avatar_url column exists on study_leaderboard since
+        // 2026-10-17, but an explicit null would wipe a previously stored
+        // avatar — so nulls are stripped and the avatar is synced
+        // separately, only when non-blank (best-effort).
         val statsOnly = leaderboardDto.copy(avatar_url = null)
         val statsResult: Result<Boolean> = try {
             client.from("study_leaderboard").upsert(statsOnly)

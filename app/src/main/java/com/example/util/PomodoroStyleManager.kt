@@ -8,9 +8,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * v1.2.3 — "Pomodoro design" picker persistence (Customize Timer sheet).
+ * v1.2.3+ — "Pomodoro design" picker persistence (Customize Timer sheet).
  *
- * All four designs are free (no locks). The selection is stored as the
+ * v1.2.4 laddered the four designs: every design has an unlock cost
+ * (ContentLocks), so the picker must gate selection behind the same
+ * point-ladder used by timer faces. The selection is stored as the
  * [PomodoroStyle] enum name in SharedPreferences, exactly like the timer
  * face id. TICK_RING is the default.
  */
