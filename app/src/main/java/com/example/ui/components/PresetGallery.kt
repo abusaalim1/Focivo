@@ -93,8 +93,9 @@ data class AvatarPreset(
 }
 
 /**
- * Structured avatar gallery. Id ranges (owner spec 2026-10-17, rev 20:12):
- * - Boys FREE: a01–a10 | Boys LOCKED: a16–a20 (500 pts), a21–a25 (1000 pts)
+ * Structured avatar gallery. Id ranges (owner spec 2026-10-17, rev 20:20 —
+ * HUMANS ONLY; animal/character avatars removed):
+ * - Boys FREE: a41–a50 | Boys LOCKED: a51–a55 (500 pts), a56–a60 (1000 pts)
  * - Girls FREE: a11–a15, a26–a30 | Girls LOCKED: a31–a35 (500 pts), a36–a40 (1000 pts)
  * Missing asset files are omitted (no crash, no placeholder art).
  */
@@ -110,10 +111,10 @@ fun avatarPresets(context: android.content.Context): List<AvatarPreset> {
         (from..to).map { prefix + it.toString().padStart(2, '0') }
 
     val defs = mutableListOf<AvatarPreset>()
-    // Boys
-    idRange("a", 1, 10).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, 0) }
-    idRange("a", 16, 20).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, AVATAR_UNLOCK_TIER_1) }
-    idRange("a", 21, 25).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, AVATAR_UNLOCK_TIER_2) }
+    // Boys (humans only)
+    idRange("a", 41, 50).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, 0) }
+    idRange("a", 51, 55).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, AVATAR_UNLOCK_TIER_1) }
+    idRange("a", 56, 60).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, AVATAR_UNLOCK_TIER_2) }
     // Girls
     idRange("a", 11, 15).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, 0) }
     idRange("a", 26, 30).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, 0) }
