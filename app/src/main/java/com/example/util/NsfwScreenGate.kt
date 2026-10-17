@@ -4,10 +4,11 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
 import androidx.annotation.VisibleForTesting
-import org.tensorflow.lite.support.image.ImageProcessor
-import org.tensorflow.lite.support.image.TensorImage
-import org.tensorflow.lite.support.image.ops.ResizeOp
-import org.tensorflow.lite.task.vision.classifier.ImageClassifier
+import org.tensorflow.lite.Interpreter
+import java.io.FileInputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.channels.FileChannel
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -24,8 +25,10 @@ import kotlin.concurrent.withLock
  * The weights are bundled at `app/src/main/assets/nsfw_model.tflite`, converted
  * to full-int8 TFLite (5,013,856 bytes) from the project's own 1.2.0 release.
  *
- * Output classes, in index order: drawings, hentai, neutral, porn, sexy.
- * explicitScore = p(porn) + p(hentai).
+ * Inference runs on the plain `org.tensorflow:tensorflow-lite` Interpreter
+ * (no task-vision — keeps the APK under 50 MB). Input: uint8 RGB 224x224.
+ * Output classes, in index order: drawings, hentai, neutral, porn, sexy
+ * (uint8, dequantized with scale 1/256). explicitScore = p(porn) + p(hentai).
  *
  * Calibration contract (owner, non-negotiable):
  * - REJECT only when explicitScore >= [REJECT_THRESHOLD] (0.85) — high confidence only.
@@ -47,13 +50,16 @@ object NsfwScreenGate {
     private const val MODEL_ASSET_PATH = "nsfw_model.tflite"
     private const val INPUT_SIZE = 224
 
-    // Class indices in the bundled model (see class_labels.txt in the release).
+    // Class indices in the bundled model (drawings, hentai, neutral, porn, sexy).
     private const val IDX_HENTAI = 1
     private const val IDX_PORN = 3
 
+    /** Output dequantization: uint8 value * 1/256 (zero point 0). */
+    private const val OUTPUT_SCALE = 1f / 256f
+
     private val lock = ReentrantLock()
 
-    @Volatile private var classifier: ImageClassifier? = null
+    @Volatile private var interpreter: Interpreter? = null
 
     @Volatile private var loadFailed = false
 
@@ -69,25 +75,21 @@ object NsfwScreenGate {
         testOverride = score
     }
 
-    /** Test-only: reset cached classifier / failure flag / override. */
+    /** Test-only: reset cached interpreter / failure flag / override. */
     @VisibleForTesting
     fun resetForTest() {
         lock.withLock {
             try {
-                classifier?.close()
+                interpreter?.close()
             } catch (_: Throwable) {
                 // Best effort only.
             }
-            classifier = null
+            interpreter = null
             loadFailed = false
         }
         testOverride = null
     }
 
-    /**
-     * Screens [bitmap] and returns [Verdict.ALLOW] or [Verdict.REJECT].
-     * Fails open (ALLOW) on any model load / inference failure.
-     */
     /**
      * Convenience for image pickers: decodes [uri] (downsampled, capped at
      * 1024px) and screens it. An undecodable uri fails open (ALLOW) — the
@@ -120,28 +122,19 @@ object NsfwScreenGate {
         } catch (_: Exception) { null }
     }
 
+    /**
+     * Screens [bitmap] and returns [Verdict.ALLOW] or [Verdict.REJECT].
+     * Fails open (ALLOW) on any model load / inference failure.
+     */
     fun screenImage(context: Context, bitmap: Bitmap): Verdict {
         testOverride?.let { stubbed ->
             return gate(stubbed)
         }
-        val active = getOrLoadClassifier(context) ?: return Verdict.ALLOW
+        val active = getOrLoadInterpreter(context) ?: return Verdict.ALLOW
         return try {
-            val tensorImage = ImageProcessor.Builder()
-                .add(ResizeOp(INPUT_SIZE, INPUT_SIZE, ResizeOp.ResizeMethod.BILINEAR))
-                .build()
-                .process(TensorImage.fromBitmap(bitmap))
-            var hentai = 0f
-            var porn = 0f
-            lock.withLock {
-                for (classifications in active.classify(tensorImage)) {
-                    for (category in classifications.categories) {
-                        when (category.index) {
-                            IDX_HENTAI -> hentai = maxOf(hentai, category.score)
-                            IDX_PORN -> porn = maxOf(porn, category.score)
-                        }
-                    }
-                }
-            }
+            val scores = classify(active, bitmap)
+            val hentai = scores[IDX_HENTAI]
+            val porn = scores[IDX_PORN]
             val explicitScore = hentai + porn
             Log.d(TAG, "screened image: hentai=$hentai porn=$porn explicit=$explicitScore")
             val verdict = gate(explicitScore)
@@ -154,6 +147,31 @@ object NsfwScreenGate {
             Log.w(TAG, "NSFW inference failed — failing open (ALLOW)", t)
             logGuardHub(context, "ALLOW", "gate failed-open: inference error")
             Verdict.ALLOW
+        }
+    }
+
+    /**
+     * Runs the quantized model on [bitmap] and returns the 5 dequantized class
+     * probabilities in index order (drawings, hentai, neutral, porn, sexy).
+     */
+    private fun classify(active: Interpreter, bitmap: Bitmap): FloatArray {
+        val resized = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, true)
+        try {
+            val pixels = IntArray(INPUT_SIZE * INPUT_SIZE)
+            resized.getPixels(pixels, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE)
+            val input = ByteBuffer.allocateDirect(INPUT_SIZE * INPUT_SIZE * 3)
+                .order(ByteOrder.nativeOrder())
+            for (pixel in pixels) {
+                input.put(((pixel shr 16) and 0xFF).toByte())
+                input.put(((pixel shr 8) and 0xFF).toByte())
+                input.put((pixel and 0xFF).toByte())
+            }
+            input.rewind()
+            val output = Array(1) { ByteArray(5) }
+            lock.withLock { active.run(input, output) }
+            return FloatArray(5) { i -> (output[0][i].toInt() and 0xFF) * OUTPUT_SCALE }
+        } finally {
+            try { resized.recycle() } catch (_: Exception) { }
         }
     }
 
@@ -173,15 +191,17 @@ object NsfwScreenGate {
     private fun gate(explicitScore: Float): Verdict =
         if (explicitScore >= REJECT_THRESHOLD) Verdict.REJECT else Verdict.ALLOW
 
-    private fun getOrLoadClassifier(context: Context): ImageClassifier? = lock.withLock {
-        classifier?.let { return it }
+    private fun getOrLoadInterpreter(context: Context): Interpreter? = lock.withLock {
+        interpreter?.let { return it }
         if (loadFailed) return null
         return try {
-            val options = ImageClassifier.ImageClassifierOptions.builder()
-                .setMaxResults(5)
-                .build()
-            ImageClassifier.createFromFileAndOptions(context, MODEL_ASSET_PATH, options)
-                .also { classifier = it }
+            val mapped = context.assets.openFd(MODEL_ASSET_PATH).use { afd ->
+                FileInputStream(afd.fileDescriptor).channel.map(
+                    FileChannel.MapMode.READ_ONLY, afd.startOffset, afd.declaredLength
+                )
+            }
+            Interpreter(mapped, Interpreter.Options().setNumThreads(2))
+                .also { interpreter = it }
         } catch (t: Throwable) {
             // Fail open permanently for this process; the user is never blocked.
             loadFailed = true

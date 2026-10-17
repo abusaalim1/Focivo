@@ -22,6 +22,12 @@ android {
     versionName = "1.3.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    // v1.3.2: ship ARM ABIs only (x86/x86_64 are emulator-only and the TFLite
+    // native lib nearly doubled the APK). Keeps the release APK under 50 MB.
+    ndk {
+      abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+    }
   }
 
   signingConfigs {
@@ -152,7 +158,8 @@ dependencies {
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
   // v1.3.2: on-device NSFW image gate (profile/group pictures).
-  implementation(libs.tflite.task.vision)
+  // Plain tensorflow-lite (not task-vision): keeps the release APK under 50 MB.
+  implementation(libs.tflite)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
