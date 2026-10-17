@@ -54,9 +54,9 @@ data class PomodoroUiState(
 
 enum class PomodoroStyle(val label: String, val unlockPoints: Int = 0) {
     TICK_RING("Tick Ring", 0),
-    ACTIVITY_RINGS("Activity Rings", 1000),
-    SESSION_STACK("Session Stack", 2500),
-    TYPOGRAPHIC("Typographic", 5000);
+    ACTIVITY_RINGS("Activity Rings", 750),
+    SESSION_STACK("Session Stack", 1800),
+    TYPOGRAPHIC("Typographic", 3500);
 
     /**
      * v1.2.4 — lock model matches the timer faces exactly (threshold-based,

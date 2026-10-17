@@ -127,7 +127,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFFF8A65), Color(0xFFFFB74D), Color(0xFFE64A19)),
             glowColor = Color(0xFFFF8A65),
             accent = Color(0xFFFF8A65),
-            unlockPoints = 100
+            unlockPoints = 80
         ),
         TimerTheme(
             id = "sakura",
@@ -137,7 +137,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFF48FB1), Color(0xFFF8BBD0), Color(0xFFEC407A)),
             glowColor = Color(0xFFF48FB1),
             accent = Color(0xFFF48FB1),
-            unlockPoints = 250
+            unlockPoints = 200
         ),
         TimerTheme(
             id = "midnight",
@@ -147,7 +147,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFB39DDB), Color(0xFF9575CD), Color(0xFF7E57C2)),
             glowColor = Color(0xFF9575CD),
             accent = Color(0xFF9575CD),
-            unlockPoints = 500
+            unlockPoints = 400
         ),
         TimerTheme(
             id = "desert",
@@ -157,7 +157,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFFFD54F), Color(0xFFFFE082), Color(0xFFFF8F00)),
             glowColor = Color(0xFFFFD54F),
             accent = Color(0xFFFFD54F),
-            unlockPoints = 750
+            unlockPoints = 600
         ),
         TimerTheme(
             id = "royal",
@@ -167,7 +167,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFFFC107), Color(0xFFFFECB3), Color(0xFFFFA000)),
             glowColor = Color(0xFFFFC107),
             accent = Color(0xFFFFC107),
-            unlockPoints = 1000
+            unlockPoints = 750
         ),
         TimerTheme(
             id = "crimson",
@@ -177,7 +177,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFFF5252), Color(0xFFFF8A80), Color(0xFFC62828)),
             glowColor = Color(0xFFFF5252),
             accent = Color(0xFFFF5252),
-            unlockPoints = 1500
+            unlockPoints = 1000
         ),
         TimerTheme(
             id = "lavender",
@@ -187,7 +187,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFCE93D8), Color(0xFFE1BEE7), Color(0xFFAB47BC)),
             glowColor = Color(0xFFCE93D8),
             accent = Color(0xFFCE93D8),
-            unlockPoints = 2000
+            unlockPoints = 1500
         ),
         TimerTheme(
             id = "amber",
@@ -197,7 +197,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFFFB300), Color(0xFFFFD54F), Color(0xFFFF8F00)),
             glowColor = Color(0xFFFFB300),
             accent = Color(0xFFFFB300),
-            unlockPoints = 2500
+            unlockPoints = 1800
         ),
         TimerTheme(
             id = "mint",
@@ -207,7 +207,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFF69F0AE), Color(0xFFB9F6CA), Color(0xFF00C853)),
             glowColor = Color(0xFF69F0AE),
             accent = Color(0xFF69F0AE),
-            unlockPoints = 2750
+            unlockPoints = 2000
         ),
         // Round-4b: 12 new distinct premium themes (runtime-resolved assets).
         TimerTheme(
@@ -218,7 +218,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFF4DD0E1), Color(0xFF80DEEA), Color(0xFF00ACC1)),
             glowColor = Color(0xFF4DD0E1),
             accent = Color(0xFF4DD0E1),
-            unlockPoints = 3000
+            unlockPoints = 2200
         ),
         TimerTheme(
             id = "rain",
@@ -228,7 +228,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFF90A4AE), Color(0xFFB0BEC5), Color(0xFF607D8B)),
             glowColor = Color(0xFF90A4AE),
             accent = Color(0xFF90A4AE),
-            unlockPoints = 3500
+            unlockPoints = 2500
         ),
         TimerTheme(
             id = "bamboo",
@@ -238,7 +238,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFF9CCC65), Color(0xFFC5E1A5), Color(0xFF689F38)),
             glowColor = Color(0xFF9CCC65),
             accent = Color(0xFF9CCC65),
-            unlockPoints = 4000
+            unlockPoints = 3000
         ),
         TimerTheme(
             id = "autumn",
@@ -248,7 +248,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFFF7043), Color(0xFFFFAB91), Color(0xFFD84315)),
             glowColor = Color(0xFFFF7043),
             accent = Color(0xFFFF7043),
-            unlockPoints = 4500
+            unlockPoints = 3200
         ),
         TimerTheme(
             id = "coffee",
@@ -258,7 +258,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFA1887F), Color(0xFFD7CCC8), Color(0xFF795548)),
             glowColor = Color(0xFFA1887F),
             accent = Color(0xFFA1887F),
-            unlockPoints = 5000
+            unlockPoints = 3500
         ),
         TimerTheme(
             id = "winter",
@@ -268,7 +268,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFF81D4FA), Color(0xFFB3E5FC), Color(0xFF039BE5)),
             glowColor = Color(0xFF81D4FA),
             accent = Color(0xFF81D4FA),
-            unlockPoints = 6000
+            unlockPoints = 4500
         ),
         TimerTheme(
             id = "rose",
@@ -278,7 +278,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFF06292), Color(0xFFF8BBD0), Color(0xFFC2185B)),
             glowColor = Color(0xFFF06292),
             accent = Color(0xFFF06292),
-            unlockPoints = 7000
+            unlockPoints = 5000
         ),
         TimerTheme(
             id = "ember",
@@ -288,7 +288,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFFF6E40), Color(0xFFFFAB91), Color(0xFFBF360C)),
             glowColor = Color(0xFFFF6E40),
             accent = Color(0xFFFF6E40),
-            unlockPoints = 8000
+            unlockPoints = 6000
         ),
         TimerTheme(
             id = "storm",
@@ -298,7 +298,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFF7E8BB8), Color(0xFFAEB9D6), Color(0xFF455182)),
             glowColor = Color(0xFF7E8BB8),
             accent = Color(0xFF7E8BB8),
-            unlockPoints = 9000
+            unlockPoints = 6500
         ),
         TimerTheme(
             id = "crystal",
@@ -308,7 +308,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFF4FC3F7), Color(0xFFB3E5FC), Color(0xFF0288D1)),
             glowColor = Color(0xFF4FC3F7),
             accent = Color(0xFF4FC3F7),
-            unlockPoints = 10000
+            unlockPoints = 7500
         ),
         TimerTheme(
             id = "galaxy",
@@ -318,7 +318,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFBA68C8), Color(0xFFE1BEE7), Color(0xFF7B1FA2)),
             glowColor = Color(0xFFBA68C8),
             accent = Color(0xFFBA68C8),
-            unlockPoints = 12000
+            unlockPoints = 9000
         ),
         TimerTheme(
             id = "lantern",
@@ -328,7 +328,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFFFB74D), Color(0xFFFFE0B2), Color(0xFFEF6C00)),
             glowColor = Color(0xFFFFB74D),
             accent = Color(0xFFFFB74D),
-            unlockPoints = 15000
+            unlockPoints = 11000
         ),
         // v1.5.0: Ambient round — living code-drawn backdrops (no image
         // assets, zero APK weight). Each reuses an existing mascot pose so
@@ -342,7 +342,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFF8BBD0), Color(0xFFF48FB1), Color(0xFFD81B60)),
             glowColor = Color(0xFFF48FB1),
             accent = Color(0xFFF48FB1),
-            unlockPoints = 18000
+            unlockPoints = 13000
         ),
         TimerTheme(
             id = "firefly_forest",
@@ -353,7 +353,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFC5E1A5), Color(0xFF9CCC65), Color(0xFF558B2F)),
             glowColor = Color(0xFF9CCC65),
             accent = Color(0xFF9CCC65),
-            unlockPoints = 22000
+            unlockPoints = 16000
         ),
         TimerTheme(
             id = "sunset_dunes",
@@ -364,7 +364,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFFFCC80), Color(0xFFFFB74D), Color(0xFFE65100)),
             glowColor = Color(0xFFFFB74D),
             accent = Color(0xFFFFB74D),
-            unlockPoints = 26000
+            unlockPoints = 19000
         ),
         TimerTheme(
             id = "aurora_veil",
@@ -375,7 +375,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFB39DDB), Color(0xFF4DD0E1), Color(0xFF5E35B1)),
             glowColor = Color(0xFF7C4DFF),
             accent = Color(0xFF7C4DFF),
-            unlockPoints = 30000
+            unlockPoints = 22000
         ),
         TimerTheme(
             id = "monsoon_rain",
@@ -386,7 +386,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFB3D5F0), Color(0xFF90CAF9), Color(0xFF4A6E8C)),
             glowColor = Color(0xFF90CAF9),
             accent = Color(0xFF90CAF9),
-            unlockPoints = 35000
+            unlockPoints = 25000
         ),
         TimerTheme(
             id = "ember_rise",
@@ -397,7 +397,7 @@ object TimerThemeManager {
             arcColors = listOf(Color(0xFFFFCC80), Color(0xFFFF6E40), Color(0xFFBF360C)),
             glowColor = Color(0xFFFF6E40),
             accent = Color(0xFFFF6E40),
-            unlockPoints = 40000
+            unlockPoints = 30000
         )
     )
 

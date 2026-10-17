@@ -47,19 +47,19 @@ object TimerFaceManager {
             id = "glass",
             name = "Glass Card",
             tagline = "Frosted centered card",
-            unlockPoints = 500
+            unlockPoints = 400
         ),
         TimerFace(
             id = "arc",
             name = "Half Arc",
             tagline = "Half-donut progress arc",
-            unlockPoints = 1500
+            unlockPoints = 1000
         ),
         TimerFace(
             id = "editorial",
             name = "Editorial",
             tagline = "Oversized numerals, thin line",
-            unlockPoints = 3500
+            unlockPoints = 2500
         ),
         // v1.2.3 — nine new clock styles (FocivoClock). Ids are prefixed
         // because "editorial" is already taken above. Locks follow the
@@ -68,55 +68,55 @@ object TimerFaceManager {
             id = "clock_orbit",
             name = "Orbit",
             tagline = "Thin ring, glowing orbiting dot",
-            unlockPoints = 500
+            unlockPoints = 400
         ),
         TimerFace(
             id = "clock_flip",
             name = "Flip",
             tagline = "Soft flip-clock cards",
-            unlockPoints = 1500
+            unlockPoints = 1000
         ),
         TimerFace(
             id = "clock_liquid",
             name = "Liquid",
             tagline = "Water level slowly drains",
-            unlockPoints = 150
+            unlockPoints = 100
         ),
         TimerFace(
             id = "clock_editorial",
             name = "Editorial Clock",
             tagline = "Huge serif, hairline progress",
-            unlockPoints = 7000
+            unlockPoints = 5000
         ),
         TimerFace(
             id = "clock_dial",
             name = "Dial",
             tagline = "Sweeping dial with live wedge",
-            unlockPoints = 2500
+            unlockPoints = 1800
         ),
         TimerFace(
             id = "clock_horizon",
             name = "Horizon",
             tagline = "Sun travels across a calm arc",
-            unlockPoints = 250
+            unlockPoints = 200
         ),
         TimerFace(
             id = "clock_stack",
             name = "Stack",
             tagline = "Minutes over seconds, vertical meter",
-            unlockPoints = 3500
+            unlockPoints = 2500
         ),
         TimerFace(
             id = "clock_breathe",
             name = "Breathe",
             tagline = "Soft glowing orb that breathes",
-            unlockPoints = 200
+            unlockPoints = 150
         ),
         TimerFace(
             id = "clock_bars",
             name = "Bars",
             tagline = "Quiet equalizer bars fill up",
-            unlockPoints = 5000
+            unlockPoints = 3500
         )
     )
 
