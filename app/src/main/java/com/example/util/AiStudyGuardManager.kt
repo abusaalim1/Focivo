@@ -526,6 +526,8 @@ object AiStudyGuardManager {
                 putExtra(FocusShieldService.EXTRA_DURATION_SECONDS, lockDurationSeconds)
                 putExtra(FocusShieldService.EXTRA_IS_PUNISHMENT, true)
                 putExtra(FocusShieldService.EXTRA_BLOCKED_LIST, warning.packageName)
+                // v1.3.1: 3-hour punishment locks log src=PUNISHMENT.
+                putExtra(FocusShieldService.EXTRA_SOURCE, "PUNISHMENT")
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
@@ -996,6 +998,32 @@ object AiStudyGuardManager {
             it.verdict == "SKIPPED" && "${it.app}|${it.stage}|${it.reason}" == key
         }
         return newest === entry
+    }
+
+    /**
+     * v1.3.1 hotfix (owner order 2026-10-17, item B): EVERY session start —
+     * timer or shield — is logged with its source so any future
+     * "it started by itself" report is diagnosable from one Guard Hub
+     * screenshot. Sources: TAP (explicit user tap), WIDGET, RESTORE
+     * (expiry-validated restore), SCHEDULE (in-window schedule engine),
+     * POMODORO, EXTENSION, LOCKIN, PUNISHMENT, SERVICE.
+     */
+    fun logSessionStart(
+        context: Context,
+        sessionType: String,
+        source: String,
+        detail: String = ""
+    ) {
+        try {
+            logGuardActivity(
+                context = context,
+                app = sessionType.take(32),
+                stage = "session-start",
+                verdict = "STARTED",
+                reason = "src=$source",
+                snippet = detail.take(60)
+            )
+        } catch (_: Exception) { }
     }
 
     /**

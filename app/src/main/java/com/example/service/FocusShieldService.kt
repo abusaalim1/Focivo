@@ -49,6 +49,9 @@ class FocusShieldService : Service() {
         const val EXTRA_DURATION_SECONDS = "extra_duration_seconds"
         const val EXTRA_BLOCKED_LIST = "extra_blocked_list"
         const val EXTRA_IS_PUNISHMENT = "extra_is_punishment"
+        // v1.3.1 (owner order 2026-10-17, item B): shield starts log their
+        // source in Guard Hub (SCHEDULE/TAP/PUNISHMENT/WIDGET).
+        const val EXTRA_SOURCE = "extra_source"
         const val EXTRA_PUNISHMENT_REASON = "extra_punishment_reason"
 
         const val PREFS_NAME = "regain_shield_prefs"
@@ -174,6 +177,13 @@ class FocusShieldService : Service() {
                 Log.d("FocusShieldService", "[ProcessRestart] Restoring shield for $effectiveSec seconds on packages: $allBlockedPackages")
                 safeStartForeground(NOTIFICATION_ID, buildNotification(effectiveSec, isPunishment, punishedPkg))
                 startMonitoring(effectiveSec, allBlockedPackages, isPunishment, punishedPkg)
+                // v1.3.1: process-restart shield recovery is a RESTORE in Guard Hub.
+                try {
+                    com.example.util.AiStudyGuardManager.logSessionStart(
+                        this, "Focus Shield", "RESTORE",
+                        "process restart; effective=${effectiveSec}s pkgs=${allBlockedPackages.size}"
+                    )
+                } catch (_: Exception) { }
                 return START_STICKY
             } else {
                 Log.d("FocusShieldService", "[ProcessRestart] No active schedule or shield on restart; stopping service")
@@ -208,6 +218,15 @@ class FocusShieldService : Service() {
         _isPunishmentLock.value = isPunishment
         safeStartForeground(NOTIFICATION_ID, buildNotification(durationSeconds, isPunishment, punishedPackage))
         startMonitoring(durationSeconds, blockedPackages, isPunishment, punishedPackage)
+        // v1.3.1: Guard Hub provenance for EVERY shield start.
+        try {
+            val source = intent.getStringExtra(EXTRA_SOURCE)
+                ?: if (isPunishment) "PUNISHMENT" else "SCHEDULE"
+            com.example.util.AiStudyGuardManager.logSessionStart(
+                this, "Focus Shield", source,
+                "duration=${durationSeconds}s pkgs=${blockedPackages.size}"
+            )
+        } catch (_: Exception) { }
 
         return START_STICKY
     }
@@ -407,6 +426,9 @@ class FocusShieldService : Service() {
             edit.putString(PREF_KEY_BLOCKED_LIST, sanitized.joinToString(","))
         }
         edit.apply()
+        // v1.3.1: arm the durable strict-session record at the shield start
+        // choke point (expiry-validated across process death/reboot).
+        try { com.example.util.StrictSessionStore.arm(this, endTime) } catch (_: Exception) {}
 
         monitorJob = serviceScope.launch {
             var secondsLeft = totalSeconds
@@ -601,6 +623,8 @@ class FocusShieldService : Service() {
             // true. Schedule-derived packages are re-derived live anyway.
             .putString(PREF_KEY_BLOCKED_LIST, "")
             .apply()
+        // v1.3.1: a finished shield session can never resurrect the guard.
+        try { com.example.util.StrictSessionStore.disarm(this) } catch (_: Exception) {}
 
         val finishIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -648,6 +672,8 @@ class FocusShieldService : Service() {
             // too — see onShieldTimerComplete for the rationale.
             .putString(PREF_KEY_BLOCKED_LIST, "")
             .apply()
+        // v1.3.1: same no-resurrection guarantee on the explicit stop path.
+        try { com.example.util.StrictSessionStore.disarm(this) } catch (_: Exception) {}
 
         try {
             if (wakeLock?.isHeld == true) {
