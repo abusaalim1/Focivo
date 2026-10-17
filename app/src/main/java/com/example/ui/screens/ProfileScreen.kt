@@ -1437,40 +1437,29 @@ fun ProfileScreen(
         var editedClass by remember { mutableStateOf(userPreferences?.studentClassLevel.orEmpty()) }
         var editedExam by remember { mutableStateOf(userPreferences?.targetExam.orEmpty()) }
         var editedIsPublic by remember { mutableStateOf(userPreferences?.isProfilePublic ?: true) }
-        var selectedPhotoUri by remember { mutableStateOf<android.net.Uri?>(null) }
         // v1.3.2 item 8: preset avatar reference (e.g. preset:avatar:a03).
         // Pre-select the current value when it is already a preset ref.
         val currentPresetRef = userPreferences?.currentUserPhotoUrl
             ?.takeIf { com.example.ui.components.isPresetRef(it) }
         var selectedPresetRef by remember { mutableStateOf(currentPresetRef) }
-        // v1.3.2 item 8: photo edit flow is a chooser — upload (existing
-        // path) or a bundled preset avatar.
+        // v1.3.2 item 8 (rev 2026-10-17): profile picture = preset avatars ONLY,
+        // no gallery/file upload. Two sections (Boys/Girls), 10 free + 10 locked each.
         var showPhotoChooser by remember { mutableStateOf(false) }
-        val photoPickerLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.PickVisualMedia()
-        ) { uri ->
-            if (uri != null) {
-                selectedPresetRef = null
-                selectedPhotoUri = uri
-            }
-        }
+        val focusPoints = userPreferences?.focusPoints ?: 0
+        val isAdmin = remember(context) { com.example.util.ContentLocks.isAdminUnlocked(context) }
 
         if (showPhotoChooser) {
             com.example.ui.components.PresetPhotoChooserSheet(
                 mode = com.example.ui.components.PresetChooserMode.AVATAR,
                 initialSelection = selectedPresetRef,
-                onUploadPhoto = {
-                    showPhotoChooser = false
-                    photoPickerLauncher.launch(
-                        androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                },
+                onUploadPhoto = { /* AVATAR mode: presets only, no upload */ },
                 onPresetSelected = { ref ->
                     showPhotoChooser = false
-                    selectedPhotoUri = null
                     selectedPresetRef = ref
                 },
                 onDismiss = { showPhotoChooser = false },
+                focusPoints = focusPoints,
+                isAdmin = isAdmin,
             )
         }
 
@@ -1501,13 +1490,6 @@ fun ProfileScreen(
                         if (selectedPresetRef != null) {
                             com.example.ui.components.PresetImage(
                                 ref = selectedPresetRef!!,
-                                contentDescription = "Selected Avatar",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else if (selectedPhotoUri != null) {
-                            AsyncImage(
-                                model = selectedPhotoUri,
                                 contentDescription = "Selected Avatar",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -1665,32 +1647,11 @@ fun ProfileScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val avatarBytes = selectedPhotoUri?.let { uri ->
-                            try {
-                                val inputStream = context.contentResolver.openInputStream(uri)
-                                val bitmap = BitmapFactory.decodeStream(inputStream)
-                                inputStream?.close()
-                                if (bitmap != null) {
-                                    val maxDim = 512
-                                    val scaledBitmap = if (bitmap.width > maxDim || bitmap.height > maxDim) {
-                                        val aspect = bitmap.width.toFloat() / bitmap.height.toFloat()
-                                        val (w, h) = if (aspect >= 1f) maxDim to (maxDim / aspect).toInt() else (maxDim * aspect).toInt() to maxDim
-                                        Bitmap.createScaledBitmap(bitmap, w, h, true)
-                                    } else {
-                                        bitmap
-                                    }
-                                    val baos = ByteArrayOutputStream()
-                                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 85, baos)
-                                    baos.toByteArray()
-                                } else null
-                            } catch (e: Exception) {
-                                null
-                            }
-                        }
+                        // v1.3.2 rev: profile picture = presets only; no upload, no avatarBytes.
                         onUpdateProfile(
                             ProfileEditResult(
                                 displayName = editedName.trim(),
-                                avatarBytes = avatarBytes,
+                                avatarBytes = null,
                                 studyGoal = editedGoal.trim(),
                                 studyClass = editedClass.trim(),
                                 targetExam = editedExam.trim(),

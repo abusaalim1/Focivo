@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,14 +58,69 @@ import com.example.ui.theme.focivoTokens
 
 /**
  * Focivo 1.3.2, item 8 — premium chooser for profile pictures and group
- * pictures. Two choices at the top: "Upload photo" (calls the caller's
- * existing upload path, untouched) or "Choose a preset"
- * (a 3-column grid of bundled presets with a lime selected ring).
+ * pictures.
+ *
+ * AVATAR mode (Edit Profile): preset avatars ONLY, no upload. Two sections
+ * (Boys / Girls), each with 10 FREE + 10 LOCKED avatars on the points ladder
+ * (Scholar 1000 pts, Grandmaster 5000 pts). Locked tiles show lock + price.
+ * GROUP mode (Create Group): "Upload photo" + flat preset grid, no locks.
  *
  * Design language: focivoTokens, Poppins body labels, Instrument Serif
  * italic headline. English only, zero emojis.
  */
 enum class PresetChooserMode { AVATAR, GROUP }
+
+/** Avatar gallery section. */
+enum class AvatarSection { BOYS, GIRLS }
+
+/** Points tiers for locked avatars (points are never spent — threshold unlock). */
+const val AVATAR_UNLOCK_SCHOLAR = 1000
+const val AVATAR_UNLOCK_GRANDMASTER = 5000
+
+/**
+ * A single avatar preset with its section and lock threshold.
+ * unlockPoints = 0 → FREE.
+ */
+data class AvatarPreset(
+    val id: String,
+    val section: AvatarSection,
+    val unlockPoints: Int = 0,
+) {
+    val ref: String get() = presetRefForAvatar(id)
+    val isFree: Boolean get() = unlockPoints <= 0
+    fun isUnlocked(userPoints: Int, isAdmin: Boolean): Boolean =
+        isAdmin || userPoints >= unlockPoints
+}
+
+/**
+ * Structured avatar gallery. Id ranges (owner spec 2026-10-17):
+ * - Boys FREE: a01–a10 | Boys LOCKED: a16–a20 (Scholar), a21–a25 (Grandmaster)
+ * - Girls FREE: a11–a15, a26–a30 | Girls LOCKED: a31–a35 (Scholar), a36–a40 (Grandmaster)
+ * Missing asset files are omitted (no crash, no placeholder art).
+ */
+fun avatarPresets(context: android.content.Context): List<AvatarPreset> {
+    val available = try {
+        (context.assets.list("presets/avatars") ?: emptyArray())
+            .filter { it.endsWith(".webp", ignoreCase = true) }
+            .map { it.substringBeforeLast(".") }
+            .toSet()
+    } catch (_: Exception) { emptySet() }
+
+    fun idRange(prefix: String, from: Int, to: Int): List<String> =
+        (from..to).map { prefix + it.toString().padStart(2, '0') }
+
+    val defs = mutableListOf<AvatarPreset>()
+    // Boys
+    idRange("a", 1, 10).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, 0) }
+    idRange("a", 16, 20).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, AVATAR_UNLOCK_SCHOLAR) }
+    idRange("a", 21, 25).forEach { defs += AvatarPreset(it, AvatarSection.BOYS, AVATAR_UNLOCK_GRANDMASTER) }
+    // Girls
+    idRange("a", 11, 15).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, 0) }
+    idRange("a", 26, 30).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, 0) }
+    idRange("a", 31, 35).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, AVATAR_UNLOCK_SCHOLAR) }
+    idRange("a", 36, 40).forEach { defs += AvatarPreset(it, AvatarSection.GIRLS, AVATAR_UNLOCK_GRANDMASTER) }
+    return defs.filter { it.id in available }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +131,10 @@ fun PresetPhotoChooserSheet(
     onDismiss: () -> Unit,
     initialSelection: String? = null,
     modifier: Modifier = Modifier,
+    /** Focus points for avatar lock checks (AVATAR mode only). */
+    focusPoints: Int = 0,
+    /** Admin bypass for avatar locks (AVATAR mode only). */
+    isAdmin: Boolean = false,
 ) {
     val tokens = focivoTokens()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -102,6 +162,8 @@ fun PresetPhotoChooserSheet(
             onSelectionChange = { selection = it },
             onUploadPhoto = onUploadPhoto,
             onPresetConfirmed = { selection?.let(onPresetSelected) },
+            focusPoints = focusPoints,
+            isAdmin = isAdmin,
         )
     }
 }
@@ -118,6 +180,8 @@ fun PresetChooserContent(
     onUploadPhoto: () -> Unit,
     onPresetConfirmed: () -> Unit,
     modifier: Modifier = Modifier,
+    focusPoints: Int = 0,
+    isAdmin: Boolean = false,
 ) {
     val tokens = focivoTokens()
     val context = LocalContext.current
@@ -152,7 +216,10 @@ fun PresetChooserContent(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Upload your own photo, or choose one of the built-in designs.",
+            text = if (mode == PresetChooserMode.AVATAR)
+                "Choose one of the built-in avatars."
+            else
+                "Upload your own photo, or choose one of the built-in designs.",
             style = TextStyle(
                 fontFamily = PoppinsFontFamily,
                 fontSize = 13.sp,
@@ -161,21 +228,23 @@ fun PresetChooserContent(
         )
         Spacer(Modifier.height(16.dp))
 
-        // ——— Upload photo ————————————————————————————————
-        PresetChooserOptionRow(
-            icon = {
-                Icon(
-                    Icons.Default.CloudUpload,
-                    contentDescription = null,
-                    tint = tokens.accentText,
-                    modifier = Modifier.size(22.dp),
-                )
-            },
-            title = "Upload photo",
-            subtitle = "From your gallery",
-            onClick = onUploadPhoto,
-        )
-        Spacer(Modifier.height(10.dp))
+        // ——— Upload photo (GROUP mode only; AVATAR is presets-only) ————
+        if (mode == PresetChooserMode.GROUP) {
+            PresetChooserOptionRow(
+                icon = {
+                    Icon(
+                        Icons.Default.CloudUpload,
+                        contentDescription = null,
+                        tint = tokens.accentText,
+                        modifier = Modifier.size(22.dp),
+                    )
+                },
+                title = "Upload photo",
+                subtitle = "From your gallery",
+                onClick = onUploadPhoto,
+            )
+            Spacer(Modifier.height(10.dp))
+        }
 
         // ——— Choose a preset header ——————————————————————
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -207,7 +276,15 @@ fun PresetChooserContent(
         }
         Spacer(Modifier.height(12.dp))
 
-        if (ids.isEmpty()) {
+        if (mode == PresetChooserMode.AVATAR) {
+            AvatarSectionsGrid(
+                presets = remember { avatarPresets(context) },
+                selectedRef = selectedRef,
+                onSelectionChange = onSelectionChange,
+                focusPoints = focusPoints,
+                isAdmin = isAdmin,
+            )
+        } else if (ids.isEmpty()) {
             Text(
                 text = "No presets available right now.",
                 style = TextStyle(
@@ -359,6 +436,141 @@ private fun PresetChooserOptionRow(
                     fontSize = 12.sp,
                     color = tokens.muted,
                 ),
+            )
+        }
+    }
+}
+
+/**
+ * Avatar gallery with Boys/Girls sections. Each section shows its presets
+ * in a 3-column grid; locked tiles show a lock + points price and are not
+ * selectable until unlocked (or admin).
+ */
+@Composable
+private fun AvatarSectionsGrid(
+    presets: List<AvatarPreset>,
+    selectedRef: String?,
+    onSelectionChange: (String?) -> Unit,
+    focusPoints: Int,
+    isAdmin: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = focivoTokens()
+    Column(modifier = modifier.fillMaxWidth()) {
+        AvatarSection.entries.forEach { section ->
+            val sectionPresets = presets.filter { it.section == section }
+            if (sectionPresets.isNotEmpty()) {
+                Text(
+                    text = if (section == AvatarSection.BOYS) "Boys" else "Girls",
+                    style = TextStyle(
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
+                        color = tokens.text,
+                    ),
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    contentPadding = PaddingValues(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.heightIn(max = 336.dp),
+                ) {
+                    items(sectionPresets, key = { it.id }) { preset ->
+                        val unlocked = preset.isUnlocked(focusPoints, isAdmin)
+                        val selected = preset.ref == selectedRef
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(tokens.surface2)
+                                .border(
+                                    width = if (selected) 2.5.dp else 1.dp,
+                                    color = if (selected) RegainLimePrimary else tokens.line,
+                                    shape = RoundedCornerShape(20.dp),
+                                )
+                                .then(
+                                    if (unlocked) Modifier.clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = { onSelectionChange(preset.ref) },
+                                    ) else Modifier
+                                )
+                                .testTag("preset_tile_${preset.id}"),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            PresetImage(
+                                ref = preset.ref,
+                                contentDescription = "Avatar ${preset.id}",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(96.dp)
+                                    .clip(RoundedCornerShape(20.dp)),
+                                contentScale = ContentScale.Crop,
+                            )
+                            if (!unlocked) {
+                                // Locked overlay: dim + lock + price
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .background(Color.Black.copy(alpha = 0.55f)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            Icons.Default.Lock,
+                                            contentDescription = "Locked",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(22.dp),
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            text = "${preset.unlockPoints} pts",
+                                            style = TextStyle(
+                                                fontFamily = PoppinsFontFamily,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 11.sp,
+                                                color = Color.White,
+                                            ),
+                                        )
+                                    }
+                                }
+                            } else if (selected) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(6.dp)
+                                        .size(22.dp)
+                                        .clip(CircleShape)
+                                        .background(RegainLimePrimary),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Color(0xFF0D1B05),
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+        if (presets.isEmpty()) {
+            Text(
+                text = "No avatars available right now.",
+                style = TextStyle(
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 13.sp,
+                    color = tokens.muted,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                textAlign = TextAlign.Center,
             )
         }
     }
