@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.core.app.ApplicationProvider
 import android.content.Context
+import com.example.ui.components.DeepFocusSettingsSheet
 import com.example.ui.components.StrictAdminDisableSheet
 import com.example.ui.components.StrictAdminExplainerSheet
 import com.example.ui.components.ThemedScreenBackground
@@ -98,6 +99,26 @@ class StrictAdminSheetScreenshotsTest {
     fun disable_light() {
         shot(false, "admin_disable_light") {
             StrictAdminDisableSheet(onOpenSettings = {}, onDismiss = {})
+        }
+    }
+
+    /**
+     * The Deep Focus sheet with the honest uninstall-protection STATUS row.
+     * In Robolectric no device admin is active, so the row shows the OFF
+     * state ("tap to activate") — the exact state the owner saw before this
+     * fix, now reported honestly instead of claiming protection.
+     */
+    @Test
+    fun settings_sheet_dark() {
+        shot(true, "admin_settings_sheet_dark") {
+            DeepFocusSettingsSheet(onDismiss = {})
+        }
+    }
+
+    @Test
+    fun settings_sheet_light() {
+        shot(false, "admin_settings_sheet_light") {
+            DeepFocusSettingsSheet(onDismiss = {})
         }
     }
 }
