@@ -258,7 +258,12 @@ fun StudyHubSheet(
                     HubActionRow(
                         icon3dRes = themeTileRes,
                         iconCustom = if (themeTileRes == null) {
-                            { AuroraBackground(modifier = Modifier.fillMaxSize()) }
+                            val ambientKind = selectedTheme.ambientKind
+                            if (ambientKind != null) {
+                                { AmbientBackdrop(kind = ambientKind, modifier = Modifier.fillMaxSize()) }
+                            } else {
+                                { AuroraBackground(modifier = Modifier.fillMaxSize()) }
+                            }
                         } else null,
                         title = "Themes",
                         subtitle = "${selectedTheme.name} — backdrop, mascot and glow",

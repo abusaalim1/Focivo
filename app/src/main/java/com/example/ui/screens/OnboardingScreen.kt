@@ -97,7 +97,7 @@ fun OnboardingScreen(
     val steps = listOf(
         Pair("Hi, I'm Civo — think of me as your focus companion. I'll help you block distractions, build strong study habits, and stay on track!", "Eliminate modern cognitive noise. Organize your daily priorities and dedicate pure unbroken time to your essential work."),
         Pair("Build deeper focus habits with me.", "Harness science-backed focus cadences, customizable deep-work intervals, and calm generative ambient soundscapes."),
-        Pair("Track your study growth effortless.", "Insightful metrics without judgment. Observe your peak focus hours, consistency streaks, and energy flow effortlessly."),
+        Pair("Track your study growth effortless.", "Insightful metrics without judgment. Observe your peak focus hours, consistency, and energy flow effortlessly."),
         Pair("Set your daily focus goal with Civo.", "Choose a sustainable target. You can adjust this anytime in your preferences."),
         Pair("What's your biggest distraction when you're trying to focus?", "Pick the one that steals your focus most often — I'll suggest the right apps to block.")
     )

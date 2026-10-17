@@ -173,7 +173,8 @@ private fun prog(t: Float, delayMs: Int, durMs: Int, e: Easing): Float =
 
 /* ═══════════════════════════ Helpers (same logic as the JS) ═══════════════════════════ */
 
-private fun hm(m: Int) =
+/** "45m" / "1h 05m" — shared with SessionCompleteScreen's celebrate stage. */
+internal fun hm(m: Int) =
     if (m < 60) "${m}m" else "${m / 60}h ${(m % 60).toString().padStart(2, '0')}m"
 
 private fun message(m: Int) = when {
@@ -633,7 +634,7 @@ private fun RingCard(date: String, m: Int, d: Int, n: String) {
 
         // .chips
         Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            Chip("✓ Completed", Color(0xFF161B17), Edge, Color.White)
+            Chip("Completed", Color(0xFF161B17), Edge, Color.White)
             Chip(distractionLabel(d), Color(0xFF161B17), Edge, Color.White)
         }
 
@@ -654,12 +655,27 @@ private fun Quote(text: String, color: Color) {
 
 /* ═══════════════════════════ Card 2 — today ═══════════════════════════ */
 
+/**
+ * v1.3.0 — week-graph bar fractions for the "Total focus today" card.
+ * [week] = 7 per-day study minutes (oldest..today) from real session data.
+ * Returns 7 fill fractions (0..1): each bar is STRICTLY proportional to that
+ * day's real minutes (v / max), with a minimal 8% floor so a zero day still
+ * renders a stub (same floor as the owner's HTML: Math.max(8, v/mx*100)).
+ * Shorter lists are padded with zero days at the end (today side), matching
+ * the pre-v1.3.0 behavior; production always passes exactly 7.
+ * Unit-tested in WeekBarFractionsTest.
+ */
+internal fun weekBarFractions(week: List<Int>): List<Float> {
+    val wk = (week + List(7) { 0 }).take(7)
+    val mx = wk.max().coerceAtLeast(1)
+    return wk.map { v -> max(8f, v.toFloat() / mx * 100f) / 100f }
+}
+
 @Composable
 private fun TodayCard(todayTotal: Int, sessions: Int, week: List<Int>) {
     // Real data only: today's total minutes, today's session count, and the
     // last-7-day minutes (oldest..today; the last bar is today, lime).
-    val wk = (week + List(7) { 0 }).take(7)
-    val mx = wk.max().coerceAtLeast(1)
+    val fractions = weekBarFractions(week)
     val fg = Color(0xFF14180F)
 
     CardFrame(drawBg = { drawRect(Color(0xFFF3F1E8)) }) {
@@ -672,6 +688,13 @@ private fun TodayCard(todayTotal: Int, sessions: Int, week: List<Int>) {
         )
         Text(hm(todayTotal), style = sf(76f, 1f, fg), modifier = Modifier.padding(top = 34.dp))
 
+        // .sb — session count, like the owner's HTML ("N sessions").
+        Text(
+            "$sessions ${if (sessions == 1) "session" else "sessions"}",
+            style = ts(Outfit, 13f, lh = 1.4f, color = fg.copy(alpha = .65f)),
+            modifier = Modifier.padding(top = 8.dp),
+        )
+
         // .bars
         Row(
             Modifier
@@ -682,8 +705,7 @@ private fun TodayCard(todayTotal: Int, sessions: Int, week: List<Int>) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
-            wk.forEachIndexed { i, v ->
-                val frac = max(8f, v.toFloat() / mx * 100f) / 100f
+            fractions.forEachIndexed { i, frac ->
                 Box(
                     Modifier
                         .weight(1f)

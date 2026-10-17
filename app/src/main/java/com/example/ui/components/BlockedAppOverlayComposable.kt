@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -87,6 +88,12 @@ import java.util.Locale
  *     closes the blocked app to home — strict-mode rules unchanged)
  *
  * Blocking behavior is untouched — presentation only.
+ *
+ * v1.3.0 — windowed variant (owner order 2026-10-17): when [windowedMode]
+ * is "floating" or "split", the layout compacts for the small window and
+ * the copy switches to the window-specific message ("You can't open <app>
+ * in a small window — you've locked this app. Unlock it from Focivo to use
+ * it."). English only, no emojis. Null = the existing fullscreen layout.
  */
 @Composable
 fun BlockedAppOverlay(
@@ -105,6 +112,11 @@ fun BlockedAppOverlay(
     nextPriority: String? = null,
     /** Overrides the rotating focus tip (null -> deterministic pick by day). */
     focusTip: String? = null,
+    /**
+     * v1.3.0: "floating" | "split" | null — renders the compact
+     * window-bounded variant with the small-window message when non-null.
+     */
+    windowedMode: String? = null,
     onExitApp: () -> Unit,
     onOpenFocusly: () -> Unit
 ) {
@@ -112,6 +124,10 @@ fun BlockedAppOverlay(
 
     val accentColor = if (isPunishment) Color(0xFFFF5252) else V150Lime
     val screenBg = Color(0xFF0A0A0B)
+
+    // v1.3.0 — the windowed block fits inside the offending split pane /
+    // freeform window: tighter spacing, smaller mascot, no suggestion card.
+    val windowed = windowedMode == "floating" || windowedMode == "split"
 
     // Live remaining timer state (same sources as before)
     var remainingSeconds by remember(initialDurationSec) {
@@ -177,26 +193,33 @@ fun BlockedAppOverlay(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(if (windowed) 10.dp else 28.dp))
 
             // 1 — Blocked app icon in a soft white circle + blocked badge
             BlockedAppIconBadge(
                 appName = appName,
                 blockedPackage = blockedPackage,
-                accentColor = accentColor
+                accentColor = accentColor,
+                badgeSize = if (windowed) 76.dp else 112.dp
             )
 
-            Spacer(modifier = Modifier.height(22.dp))
+            Spacer(modifier = Modifier.height(if (windowed) 12.dp else 22.dp))
 
             // 2 — Headline
             Text(
-                text = "$appName is blocked during focus",
+                text = when (windowedMode) {
+                    // v1.3.0: the window-specific message (owner order
+                    // 2026-10-17). English only, no emojis.
+                    "split" -> "You can't open $appName in split-screen"
+                    "floating" -> "You can't open $appName in a small window"
+                    else -> "$appName is blocked during focus"
+                },
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontFamily = BlockSerifItalic,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    fontSize = 23.sp,
-                    lineHeight = 30.sp
+                    fontSize = if (windowed) 20.sp else 23.sp,
+                    lineHeight = if (windowed) 26.sp else 30.sp
                 ),
                 textAlign = TextAlign.Center,
                 maxLines = 3,
@@ -204,6 +227,19 @@ fun BlockedAppOverlay(
             )
 
             Spacer(modifier = Modifier.height(8.dp))
+
+            // v1.3.0: the windowed message names the exact reason.
+            if (windowed) {
+                Text(
+                    text = "You've locked this app during focus. Unlock it from Focivo to use it.",
+                    color = Color(0xFFB9B9BE),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
 
             Text(
                 text = if (remainingSeconds > 0) "Unlocks automatically in $timeFormatted"
@@ -214,16 +250,19 @@ fun BlockedAppOverlay(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(26.dp))
+            Spacer(modifier = Modifier.height(if (windowed) 14.dp else 26.dp))
 
             // 3 — Guard mascot, large, on a soft glow
+            val mascotOuter = if (windowed) 104.dp else 196.dp
+            val mascotGlow = if (windowed) 100.dp else 188.dp
+            val mascotImg = if (windowed) 92.dp else 176.dp
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(196.dp)
+                modifier = Modifier.size(mascotOuter)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(188.dp)
+                        .size(mascotGlow)
                         .clip(CircleShape)
                         .background(
                             Brush.radialGradient(
@@ -237,29 +276,32 @@ fun BlockedAppOverlay(
                 Image(
                     painter = painterResource(id = mascotRes),
                     contentDescription = "Focivo guard mascot",
-                    modifier = Modifier.size(176.dp),
+                    modifier = Modifier.size(mascotImg),
                     contentScale = ContentScale.Fit
                 )
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(if (windowed) 14.dp else 28.dp))
 
-            // 4 — Suggestion card
-            SuggestionCard(
-                nextPriorityTitle = resolvedPriority,
-                tip = resolvedTip,
-                accentColor = accentColor,
-                onLinkClick = onOpenFocusly
-            )
+            // 4 — Suggestion card (fullscreen only; the windowed block stays
+            // compact so it fits inside a small window).
+            if (!windowed) {
+                SuggestionCard(
+                    nextPriorityTitle = resolvedPriority,
+                    tip = resolvedTip,
+                    accentColor = accentColor,
+                    onLinkClick = onOpenFocusly
+                )
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
             // 5 — ONE primary white pill
             Button(
                 onClick = onExitApp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(58.dp)
+                    .height(if (windowed) 52.dp else 58.dp)
                     .shadow(elevation = 8.dp, shape = RoundedCornerShape(50), spotColor = Color.White.copy(alpha = 0.25f)),
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(
@@ -271,13 +313,13 @@ fun BlockedAppOverlay(
                 Text(
                     text = "Stay in Focus",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    fontSize = if (windowed) 15.sp else 16.sp,
                     color = NearBlack,
                     maxLines = 1
                 )
             }
 
-            Spacer(modifier = Modifier.height(30.dp))
+            Spacer(modifier = Modifier.height(if (windowed) 14.dp else 30.dp))
         }
     }
 }
@@ -316,12 +358,16 @@ private fun formatBlockRemaining(totalSeconds: Int): String {
 /**
  * The blocked app's real icon in a soft white circle with a small blocked
  * badge; falls back to a neutral drawn tile (no trademarked assets).
+ *
+ * v1.3.0: [badgeSize] lets the windowed block variant shrink the badge for
+ * small windows (default keeps the fullscreen size).
  */
 @Composable
 private fun BlockedAppIconBadge(
     appName: String,
     blockedPackage: String,
-    accentColor: Color
+    accentColor: Color,
+    badgeSize: Dp = 112.dp
 ) {
     val context = LocalContext.current
     val appIconBitmap = remember(blockedPackage) {
@@ -329,12 +375,12 @@ private fun BlockedAppIconBadge(
     }
 
     Box(
-        modifier = Modifier.size(112.dp),
+        modifier = Modifier.size(badgeSize),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .size(104.dp)
+                .size(badgeSize * 0.93f)
                 .shadow(elevation = 10.dp, shape = CircleShape, spotColor = Color.Black.copy(alpha = 0.35f))
                 .clip(CircleShape)
                 .background(Color.White),
@@ -345,7 +391,7 @@ private fun BlockedAppIconBadge(
                     bitmap = appIconBitmap.asImageBitmap(),
                     contentDescription = "$appName icon",
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(badgeSize * 0.57f)
                         .clip(RoundedCornerShape(16.dp)),
                     contentScale = ContentScale.Crop
                 )
@@ -353,7 +399,7 @@ private fun BlockedAppIconBadge(
                 // Neutral tile: soft lime-tinted rounded square with the app's initial.
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(badgeSize * 0.57f)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFF1F1F22)),
                     contentAlignment = Alignment.Center
@@ -361,7 +407,7 @@ private fun BlockedAppIconBadge(
                     Text(
                         text = appName.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "A",
                         color = V150Lime,
-                        fontSize = 30.sp,
+                        fontSize = (badgeSize.value * 0.27f).sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                 }
@@ -372,8 +418,8 @@ private fun BlockedAppIconBadge(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .offset(x = 4.dp, y = 4.dp)
-                .size(34.dp)
+                .offset(x = badgeSize * 0.036f, y = badgeSize * 0.036f)
+                .size(badgeSize * 0.30f)
                 .clip(CircleShape)
                 .background(Color(0xFFD93636))
                 .border(2.5.dp, Color.White, CircleShape),
@@ -383,7 +429,7 @@ private fun BlockedAppIconBadge(
                 imageVector = Icons.Default.Lock,
                 contentDescription = "Blocked",
                 tint = Color.White,
-                modifier = Modifier.size(17.dp)
+                modifier = Modifier.size(badgeSize * 0.15f)
             )
         }
     }

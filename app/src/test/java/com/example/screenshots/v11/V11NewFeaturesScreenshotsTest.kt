@@ -98,15 +98,6 @@ class V11NewFeaturesScreenshotsTest {
     }
 
     @Test
-    fun v11_face_ring_dark() {
-        initManagers()
-        themed(dark = true) {
-            TimerFaceHost(faceId = "ring", params = faceParams())
-        }
-        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/face_ring_dark.png")
-    }
-
-    @Test
     fun v11_face_digits_dark() {
         initManagers()
         themed(dark = true) {
@@ -143,12 +134,12 @@ class V11NewFeaturesScreenshotsTest {
     }
 
     @Test
-    fun v11_face_break_phase() {
+    fun v11_face_break_phase_digits() {
         initManagers()
         themed(dark = true) {
-            TimerFaceHost(faceId = "ring", params = faceParams(isBreak = true))
+            TimerFaceHost(faceId = "digits", params = faceParams(isBreak = true))
         }
-        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/face_ring_break_phase.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v11/face_digits_break_phase.png")
     }
 
     @Test

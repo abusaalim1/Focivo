@@ -1,0 +1,34 @@
+name: V123 Guard Unit Tests
+
+# Temporary verification workflow for the v1.2.3 guard fixes (run manually,
+# then delete). Compiles the app and runs the guard classifier regression
+# tests. Nothing touches main.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  guard-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Run guard regression tests
+        run: gradle :app:testDebugUnitTest --tests "com.example.GuardClassifierRegressionTest" --tests "com.example.OnDeviceStudyClassifierTest" --tests "com.example.StrictPauseGateTest" --tests "com.example.FocivoBrainParityTest" --rerun-tasks --no-configuration-cache --stacktrace
+
+      - name: Dump test results
+        if: always()
+        run: python3 -c "import glob,xml.etree.ElementTree as ET;[print(tc.get('classname'),'::',tc.get('name'),'->','PASS' if not (list(tc.iter('failure'))+list(tc.iter('error'))) else 'FAIL') for f in glob.glob('app/build/test-results/testDebugUnitTest/TEST-com.example.GuardClassifierRegressionTest.xml')+glob.glob('app/build/test-results/testDebugUnitTest/TEST-com.example.OnDeviceStudyClassifierTest.xml')+glob.glob('app/build/test-results/testDebugUnitTest/TEST-com.example.FocivoBrainParityTest.xml') for tc in ET.parse(f).getroot().iter('testcase')];[print(chr(61)*70,tc.get('classname'),'::',tc.get('name'),'MESSAGE:',(fl.get('message')or '')[:800],'STACK:',(fl.text or '')[:4000]) for f in glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml') for tc in ET.parse(f).getroot().iter('testcase') for fl in list(tc.iter('failure'))+list(tc.iter('error')]"

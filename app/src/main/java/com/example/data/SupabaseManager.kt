@@ -155,6 +155,11 @@ data class SupabaseStudyLeaderboardDto(
     val streak: Int = 1,
     val subject_tag: String = "General Study",
     var avatar_url: String? = null,
+    // v1.3.0: profile visibility flag. Null (legacy rows / column missing)
+    // decodes to null and is treated as PUBLIC on read; explicitNulls=false
+    // means a null is never encoded, so the SDK upsert can never fail on a
+    // missing column. Written only via the dedicated best-effort update.
+    val is_public: Boolean? = null,
     val last_updated: String? = null
 )
 
@@ -242,10 +247,10 @@ object SupabaseManager {
                     encodeDefaults = true
                     // v1.2: nulls are NEVER sent as explicit JSON nulls. The app's
                     // DTO upserts must omit unknown/null columns (not null them):
-                    // study_leaderboard.avatar_url does not exist on the live DB,
-                    // so an explicit "avatar_url": null fails the whole upsert
-                    // with PostgREST 42703; on users it would null-wipe a stored
-                    // avatar. Code that must write a real NULL uses
+                    // study_leaderboard.avatar_url EXISTS on the live DB since
+                    // 2026-10-17, but explicit "avatar_url": null is still never
+                    // sent here — it would wipe a previously stored avatar.
+                    // Code that must write a real NULL uses
                     // updateUserProfileColumns() with an explicit JsonNull.
                     explicitNulls = false
                 })

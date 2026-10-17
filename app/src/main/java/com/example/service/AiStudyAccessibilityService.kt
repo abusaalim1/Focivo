@@ -28,6 +28,8 @@ import com.example.util.StudyAllowlistManager
 import com.example.util.StudyGuardKnowledge
 import com.example.util.YouTubeStudyGuardManager
 import com.example.util.YouTubeVideoClassifier
+import com.example.util.brain.BrainBundleLoader
+import com.example.util.brain.FocivoCombinedBrain
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -87,9 +89,12 @@ class AiStudyAccessibilityService : AccessibilityService() {
         // v1.2.3 (Tasks 6 & 9): warm both on-device classifier brains off the
         // main thread so the first title/screen never pays the bundle-parse
         // cost on the accessibility callback thread.
+        // v1.3.0 (Worker E): also warm the ported Focivo repo brain
+        // (model + lexicon + channels).
         serviceScope.launch {
             runCatching { LocalTitleClassifier.get(applicationContext) }
             runCatching { LocalTitleClassifier.getContent(applicationContext) }
+            runCatching { BrainBundleLoader.get(applicationContext) }
         }
         // v1.2.3-hotfix: start the real 5s multi-window sweep loop.
         a11yMainHandler.removeCallbacks(mwSweepRunnable)
@@ -157,6 +162,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     enforceMultiWindowProtections(
                         System.currentTimeMillis(), "timer-sweep"
                     )
+                    // v1.3.0: also re-glue here — covers window moves the OS
+                    // didn't report as TYPE_WINDOWS_CHANGED.
+                    glueWindowedOverlayToWindow()
                 }
             } catch (_: Exception) { }
             a11yMainHandler.postDelayed(this, 5000L)
@@ -165,6 +173,31 @@ class AiStudyAccessibilityService : AccessibilityService() {
     private var a11yBlockView: androidx.compose.ui.platform.ComposeView? = null
     private var a11yBlockHost: com.example.ui.overlay.OverlayLifecycleHost? = null
     private var a11yBlockWm: WindowManager? = null
+    // v1.2.4: bounds the current block overlay is clipped to (null =
+    // fullscreen). Split-pane / freeform interceptions cover ONLY the
+    // offending window so the rest of the screen stays usable.
+    private var a11yBlockBounds: android.graphics.Rect? = null
+    // v1.3.0: windowed block variant ("floating" | "split" | null) — the
+    // compact small-window message for split-pane / freeform intercepts.
+    // Null = the existing fullscreen copy.
+    private val a11yWindowedMode = androidx.compose.runtime.mutableStateOf<String?>(null)
+    // v1.3.0: the blocked package whose small window is currently tracked
+    // (glue loop + z-order watchdog). ONLY ever a blocked package — never
+    // another app's window.
+    private var mwTrackedPkg: String? = null
+    // v1.3.0: glue loop throttle (re-measures the tracked window on every
+    // window-set change + the 5s sweep).
+    private var lastGlueMs = 0L
+    private var lastGlueLogMs = 0L
+    // v1.3.0: z-order watchdog state. Armed when a window-bounded overlay is
+    // placed; evaluated once after 4s. A touch-consuming overlay means any
+    // tap/scroll/navigation inside the blocked app's window proves the OEM
+    // composited the app ABOVE our overlay (vivo freeform layers do this).
+    private var zWatchPkg: String? = null
+    private var zWatchStrongHits = 0
+    private var zWatchScrollHits = 0
+    private var zWatchStartMs = 0L
+    private val zWatchRunnable = Runnable { evaluateZOrderWatchdog() }
     private val a11yBlockedPackage = androidx.compose.runtime.mutableStateOf("")
     private val a11yAppName = androidx.compose.runtime.mutableStateOf("")
     private val a11yDurationSec = androidx.compose.runtime.mutableStateOf(0)
@@ -222,16 +255,32 @@ class AiStudyAccessibilityService : AccessibilityService() {
         else a11yMainHandler.post(action)
     }
 
-    private fun a11yOverlayParams(): WindowManager.LayoutParams {
+    /**
+     * v1.2.4 — window-bounded block overlay (owner order 2026-10-16 19:57):
+     * when a blocked app is caught in a split pane or a freeform/small
+     * window, [bounds] (the offending AccessibilityWindowInfo bounds in
+     * screen coordinates) clips the TYPE_ACCESSIBILITY_OVERLAY to exactly
+     * that window — the block appears INSIDE the small window, never on
+     * the launcher/home. Null bounds = the existing fullscreen path.
+     */
+    private fun a11yOverlayParams(bounds: android.graphics.Rect? = null): WindowManager.LayoutParams {
+        val useBounds = bounds != null && bounds.width() > 0 && bounds.height() > 0
         return WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
+            if (useBounds) bounds!!.width() else WindowManager.LayoutParams.MATCH_PARENT,
+            if (useBounds) bounds!!.height() else WindowManager.LayoutParams.MATCH_PARENT,
             // Renders above ALL app windows (incl. OEM freeform layers) —
             // the strongest layer a third-party app can use.
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             android.graphics.PixelFormat.TRANSLUCENT
         ).apply {
+            if (useBounds) {
+                // bounds are screen coordinates (getBoundsInScreen) and
+                // FLAG_LAYOUT_IN_SCREEN keeps the window in screen space.
+                x = bounds!!.left
+                y = bounds!!.top
+                gravity = android.view.Gravity.TOP or android.view.Gravity.START
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -256,7 +305,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
         durationSec: Int = 0,
         reason: String? = null,
         isPunishment: Boolean = false,
-        warningVariant: Boolean = false
+        warningVariant: Boolean = false,
+        // v1.2.4: offending window bounds (screen coords) — clips the
+        // overlay to exactly that window. Null = fullscreen path.
+        windowBounds: android.graphics.Rect? = null,
+        // v1.3.0: "floating" | "split" — the compact small-window message
+        // for split-pane / freeform interceptions. Null = fullscreen copy.
+        windowedMode: String? = null
     ): Boolean {
         if (a11yBlockView != null) {
             a11yBlockedPackage.value = blockedPackage
@@ -264,6 +319,16 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yDurationSec.value = durationSec
             a11yReason.value = reason
             a11yPunishment.value = isPunishment
+            a11yWindowedMode.value = windowedMode
+            // Reposition to the offending window when a (different) bound
+            // is supplied — e.g. fullscreen overlay followed by a
+            // small-window intercept of the same package.
+            if (windowBounds != null && windowBounds != a11yBlockBounds) {
+                a11yBlockBounds = android.graphics.Rect(windowBounds)
+                try {
+                    a11yBlockWm?.updateViewLayout(a11yBlockView, a11yOverlayParams(a11yBlockBounds))
+                } catch (_: Exception) { }
+            }
             return true
         }
         val host = com.example.ui.overlay.OverlayLifecycleHost()
@@ -273,6 +338,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yDurationSec.value = durationSec
             a11yReason.value = reason
             a11yPunishment.value = isPunishment
+            a11yWindowedMode.value = windowedMode
             val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
             val view = androidx.compose.ui.platform.ComposeView(this).apply {
                 host.installOn(this)
@@ -286,6 +352,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                             isPunishment = a11yPunishment.value,
                             mascotRes = if (warningVariant) com.example.R.drawable.mascot_warning_transparent
                             else com.example.R.drawable.mascot_blocked,
+                            windowedMode = a11yWindowedMode.value,
                             onExitApp = { a11yExitToHome() },
                             onOpenFocusly = { a11yOpenFocivo() }
                         )
@@ -300,7 +367,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 }
             }
             host.show()
-            wm.addView(view, a11yOverlayParams())
+            // v1.2.4: clip to the offending window when bounds were given.
+            a11yBlockBounds = windowBounds?.let { android.graphics.Rect(it) }
+            wm.addView(view, a11yOverlayParams(a11yBlockBounds))
             a11yBlockView = view
             a11yBlockHost = host
             a11yBlockWm = wm
@@ -330,6 +399,10 @@ class AiStudyAccessibilityService : AccessibilityService() {
 
     /** Hide the accessibility-layer block overlay if visible. Main thread. */
     fun hideA11yBlockOverlay() {
+        // v1.3.0: a hidden overlay owns no window — drop the glue tracking
+        // and the z-order watchdog with it.
+        disarmZOrderWatchdog()
+        mwTrackedPkg = null
         runOnA11yMain {
             val view = a11yBlockView ?: return@runOnA11yMain
             try { a11yBlockWm?.removeView(view) } catch (_: Exception) { }
@@ -337,7 +410,232 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yBlockView = null
             a11yBlockHost = null
             a11yBlockWm = null
+            a11yBlockBounds = null
+            a11yWindowedMode.value = null
             a11yBlockDrawn = false
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // v1.3.0 — window-bounded block: glue + z-order watchdog (owner order
+    // 2026-10-17).
+    //
+    // ROOT CAUSE (owner's vivo V2403, rounds 1-3): the full-screen block
+    // fires, the draw listener fires, but the freeform window floats
+    // UNBLOCKED on top / the split pane still shows the locked app. The
+    // overlay drew — it just lost the z-order fight to the OEM's small-window
+    // container. Two mechanisms close the gap:
+    //
+    // (a) GLUE: the bounds-matched overlay is re-measured against the live
+    //     window list on every TYPE_WINDOWS_CHANGED (and the 5s sweep) and
+    //     repositioned with updateViewLayout when the window moves/resizes.
+    // (b) Z-ORDER WATCHDOG: the bounds overlay is deliberately
+    //     touch-consuming, so any tap/scroll/navigation inside the blocked
+    //     app's window while it is up proves the overlay lost z-order. On
+    //     proof, GLOBAL_ACTION_HOME collapses the small window and the
+    //     existing overlay expands into the fullscreen block notice.
+    //
+    // Both mechanisms act ONLY on the tracked blocked package — never on
+    // another app's window. On stock Android (overlay wins z-order) the
+    // watchdog simply records "clean" and disarms.
+    // ------------------------------------------------------------------
+
+    /**
+     * Starts tracking a freshly placed window-bounded block: the glue loop
+     * repositions the overlay as the window moves, and the z-order watchdog
+     * verifies the overlay actually won the layer fight. Call only with the
+     * blocked package — never another app's window.
+     */
+    private fun trackWindowedBlock(pkg: String, mode: String, bounds: android.graphics.Rect) {
+        mwTrackedPkg = pkg
+        armZOrderWatchdog(pkg)
+        Log.i(TAG, "[MultiWindow] tracking $mode window for $pkg " +
+            "(${bounds.width()}x${bounds.height()}@${bounds.left},${bounds.top}) — glue + z-order watch armed")
+    }
+
+    /**
+     * Keeps the window-bounded block overlay GLUED to the offending window:
+     * re-measures the tracked blocked window and repositions the overlay
+     * with updateViewLayout when it moved/resized. A window that grew to
+     * cover the display becomes the fullscreen block. A window that is gone
+     * is left alone — the existing hide / re-intercept paths own that.
+     */
+    private fun glueWindowedOverlayToWindow() {
+        val now = System.currentTimeMillis()
+        if (now - lastGlueMs < 700L) return
+        lastGlueMs = now
+        val trackedPkg = mwTrackedPkg ?: return
+        if (a11yBlockView == null || a11yBlockBounds == null) return
+        if (!trackedPkg.equals(a11yBlockedPackage.value, ignoreCase = true)) return
+        runOnA11yMain {
+            try {
+                val wins = try { windows } catch (_: Exception) { null } ?: return@runOnA11yMain
+                val target = wins.firstOrNull {
+                    try {
+                        it.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
+                            it.root?.packageName?.toString().equals(trackedPkg, ignoreCase = true)
+                    } catch (_: Exception) { false }
+                } ?: return@runOnA11yMain // Window gone — hide/re-intercept paths own this.
+                val r = Rect()
+                try { target.getBoundsInScreen(r) } catch (_: Exception) { return@runOnA11yMain }
+                if (r.width() <= 0 || r.height() <= 0) return@runOnA11yMain
+                val view = a11yBlockView ?: return@runOnA11yMain
+                val (dispW, dispH) = getDisplaySizePx()
+                if (dispW > 0 && dispH > 0 &&
+                    r.width() >= dispW * 0.95f && r.height() >= dispH * 0.95f
+                ) {
+                    // The window grew to cover the display — expand the
+                    // overlay into the fullscreen block (message stays).
+                    a11yBlockBounds = null
+                    a11yBlockWm?.updateViewLayout(view, a11yOverlayParams(null))
+                    logGlue("fullscreen-expand", "${r.width()}x${r.height()}")
+                    return@runOnA11yMain
+                }
+                val old = a11yBlockBounds ?: return@runOnA11yMain
+                val moved = kotlin.math.abs(r.left - old.left) + kotlin.math.abs(r.top - old.top) +
+                    kotlin.math.abs(r.width() - old.width()) + kotlin.math.abs(r.height() - old.height())
+                if (moved > 6) {
+                    val nb = android.graphics.Rect(r)
+                    a11yBlockBounds = nb
+                    a11yBlockWm?.updateViewLayout(view, a11yOverlayParams(nb))
+                    logGlue(
+                        "repositioned",
+                        "${old.width()}x${old.height()}@${old.left},${old.top} -> " +
+                            "${nb.width()}x${nb.height()}@${nb.left},${nb.top}"
+                    )
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    /** Throttled Guard Hub evidence for glue actions. */
+    private fun logGlue(action: String, detail: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastGlueLogMs < 30_000L) return
+        lastGlueLogMs = now
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, a11yAppName.value.ifBlank { "guard" },
+                "window-glue", action, detail
+            )
+        } catch (_: Exception) { }
+    }
+
+    /**
+     * Arms the z-order watchdog for a freshly placed window-bounded overlay.
+     * Evaluated once after 4s; disarmed on hide. Watches ONLY the blocked
+     * package — never another app's window.
+     */
+    private fun armZOrderWatchdog(pkg: String) {
+        disarmZOrderWatchdog()
+        zWatchPkg = pkg
+        zWatchStrongHits = 0
+        zWatchScrollHits = 0
+        zWatchStartMs = System.currentTimeMillis()
+        a11yMainHandler.postDelayed(zWatchRunnable, 4000L)
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, a11yAppName.value.ifBlank { pkg },
+                "zorder-watch", "armed",
+                "pkg=$pkg oem=${Build.MANUFACTURER} window=4s"
+            )
+        } catch (_: Exception) { }
+    }
+
+    private fun disarmZOrderWatchdog() {
+        zWatchPkg = null
+        zWatchStrongHits = 0
+        zWatchScrollHits = 0
+        zWatchStartMs = 0L
+        a11yMainHandler.removeCallbacks(zWatchRunnable)
+    }
+
+    /**
+     * Z-order watchdog event counting. The window-bounded overlay consumes
+     * every touch (no NOT_TOUCHABLE flag), so interactive events from the
+     * blocked package while it is up prove the OEM composited the app window
+     * ABOVE our overlay. Scrolls alone are weak evidence (autoplay feeds
+     * scroll themselves): one strong hit (tap / long-press / in-app
+     * navigation) — or three scrolls — arms the escalation.
+     */
+    private fun countZOrderWatchEvent(pkg: String, eventType: Int) {
+        val watchPkg = zWatchPkg ?: return
+        if (!pkg.equals(watchPkg, ignoreCase = true)) return
+        if (a11yBlockView == null || a11yBlockBounds == null || !a11yBlockDrawn) return
+        when (eventType) {
+            AccessibilityEvent.TYPE_VIEW_CLICKED,
+            AccessibilityEvent.TYPE_VIEW_LONG_CLICKED,
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                zWatchStrongHits++
+                Log.w(TAG, "[ZOrderWatch] strong hit #$zWatchStrongHits for $pkg " +
+                    "(${AccessibilityEvent.eventTypeToString(eventType)}) — overlay may have lost z-order")
+            }
+            AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
+                zWatchScrollHits++
+            }
+        }
+    }
+
+    /** One-shot 4s evaluation of the z-order watchdog. */
+    private fun evaluateZOrderWatchdog() {
+        val pkg = zWatchPkg
+        if (pkg == null || a11yBlockView == null || a11yBlockBounds == null) {
+            disarmZOrderWatchdog()
+            return
+        }
+        if (!a11yBlockDrawn) {
+            // Never composited — the no-draw braces watchdog in
+            // BlockOverlayManager owns this case, not the z-order path.
+            disarmZOrderWatchdog()
+            return
+        }
+        val lost = zWatchStrongHits >= 1 || zWatchScrollHits >= 3
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, a11yAppName.value.ifBlank { pkg },
+                "zorder-watch", if (lost) "lost" else "clean",
+                "strong=$zWatchStrongHits scroll=$zWatchScrollHits oem=${Build.MANUFACTURER}"
+            )
+        } catch (_: Exception) { }
+        if (lost) escalateZOrderLoss(pkg) else disarmZOrderWatchdog()
+    }
+
+    /**
+     * Z-order escalation: the OEM won the layer fight, so collapse the small
+     * window with GLOBAL_ACTION_HOME and expand the existing overlay into
+     * the fullscreen block notice (the small-window message stays — it is
+     * still why the app was blocked). Only the blocked app's window is ever
+     * targeted; HOME is a system action, never a touch on another app's
+     * window.
+     */
+    private fun escalateZOrderLoss(pkg: String) {
+        disarmZOrderWatchdog()
+        // The tracked window is being collapsed — forget it.
+        mwTrackedPkg = null
+        Log.w(TAG, "[ZOrderWatch] escalating: GLOBAL_ACTION_HOME for $pkg " +
+            "(overlay lost z-order on ${Build.MANUFACTURER})")
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                applicationContext, a11yAppName.value.ifBlank { pkg },
+                "zorder-escalation", "home",
+                "action=GLOBAL_ACTION_HOME (collapse small window); block notice -> fullscreen"
+            )
+        } catch (_: Exception) { }
+        try {
+            performGlobalAction(GLOBAL_ACTION_HOME)
+        } catch (t: Throwable) {
+            Log.e(TAG, "[ZOrderWatch] GLOBAL_ACTION_HOME failed: ${t.message}")
+        }
+        // Show the block notice: expand the already-placed overlay to the
+        // fullscreen block layout.
+        runOnA11yMain {
+            val view = a11yBlockView ?: return@runOnA11yMain
+            a11yBlockBounds = null
+            try {
+                a11yBlockWm?.updateViewLayout(view, a11yOverlayParams(null))
+            } catch (t: Throwable) {
+                Log.e(TAG, "[ZOrderWatch] fullscreen expand failed: ${t.message}")
+            }
         }
     }
 
@@ -607,6 +905,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 // v1.2.3: ANY visible blocked window triggers — the old code
                 // only covered floating/split and relied on the event-package
                 // path for fullscreen, which misses already-open apps.
+                // v1.2.4 (owner 2026-10-16 19:57): the block UI must cover ONLY
+                // the offending window — a blocked app in a split pane or a
+                // freeform/small window gets the block INSIDE that window,
+                // never a fullscreen block over the launcher/home. The
+                // detected window bounds ride into the overlay layout; the
+                // fullscreen path keeps the existing fullscreen overlay.
+                val overlayBounds = if (mode == "fullscreen") null else android.graphics.Rect(rect)
                 if (nowTime - lastGeneralAppInterceptTimeMs > 2500L || lastGeneralInterceptedPkg != pkg) {
                     lastGeneralAppInterceptTimeMs = nowTime
                     lastGeneralInterceptedPkg = pkg
@@ -615,7 +920,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     try {
                         AiStudyGuardManager.logGuardActivity(
                             ctx, friendlyName, "multiwindow-detect", "intercept",
-                            "src=windows-list mode=$mode bounds=${rect.width()}x${rect.height()} trigger=$triggerSrc"
+                            "src=windows-list mode=$mode bounds=${rect.width()}x${rect.height()} " +
+                                "overlay=" + (overlayBounds?.let { "window ${it.width()}x${it.height()}@${it.left},${it.top}" } ?: "fullscreen") +
+                                " trigger=$triggerSrc"
                         )
                     } catch (_: Exception) { }
                     BlockOverlayManager.intercept(
@@ -625,8 +932,19 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         durationSec = try { FocusShieldService.getRemainingSeconds(ctx) } catch (_: Exception) { 0 },
                         reason = "$friendlyName is locked during your active focus session.",
                         isPunishment = false,
-                        multiWindowMode = mode
+                        multiWindowMode = mode,
+                        windowBounds = overlayBounds
                     )
+                    // v1.3.0: when the intercept placed a window-bounded
+                    // overlay, track that window — the glue loop repositions
+                    // the overlay as the window moves, and the z-order
+                    // watchdog verifies the overlay won the layer fight.
+                    // Fullscreen keeps the existing fullscreen path.
+                    if (overlayBounds != null && mode != "fullscreen" &&
+                        isA11yBlockOverlayShowing()
+                    ) {
+                        trackWindowedBlock(pkg, mode, android.graphics.Rect(rect))
+                    }
                 }
                 logMwSummary(
                     "trigger=$triggerSrc windows=${appWins.size} " +
@@ -713,19 +1031,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     playerEvidence = playerEvidence,
                     titleSource = titleSource,
                     title = title.take(60),
+                    fullTitle = title,
                     pEntBand = pEntBand,
                     verdict = verdict,
                     action = action
                 )
             )
         } catch (_: Exception) { }
-    }
-
-    /** p_ent band label for the hub card (title bundle: study <= 0.20, block >= threshold). */
-    private fun pEntBandLabel(pEnt: Double, blockThreshold: Double): String = when {
-        pEnt >= blockThreshold -> ">= %.2f entertainment".format(Locale.ROOT, blockThreshold)
-        pEnt <= LocalTitleClassifier.STRONG_STUDY_MAX_P_ENT -> "<= 0.20 study"
-        else -> "0.20-%.2f uncertain".format(Locale.ROOT, blockThreshold)
     }
 
     @Suppress("DEPRECATION")
@@ -844,10 +1156,19 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     enforceMultiWindowProtections(
                         System.currentTimeMillis(), "windows-changed"
                     )
+                    // v1.3.0: keep the window-bounded block overlay glued to
+                    // the offending window as it moves/resizes.
+                    glueWindowedOverlayToWindow()
                 }
             }
 
             val pkg = event.packageName?.toString() ?: return
+
+            // v1.3.0 — z-order watchdog counting: the window-bounded overlay
+            // consumes every touch, so interactive events from the tracked
+            // blocked package while it is up prove the OEM composited the
+            // app window ABOVE our overlay.
+            countZOrderWatchEvent(pkg, eventType)
 
             // 1. Never block self (Focivo)
             if (pkg.equals(applicationContext.packageName, ignoreCase = true)) {
@@ -859,9 +1180,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
             // itself can't be intercepted, but landing on the launcher re-shows the
             // focus overlay. Placed BEFORE the essential-apps early return because
             // launchers are permanently protected everywhere else.
+            // v1.2.3 phantom-lock fix (RC2 belt-and-braces): ALSO require a real
+            // study period, like every other intercept path — the persisted
+            // deep-focus flag must never be the sole authority.
             if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
                 DeepFocusManager.isDeepFocusSessionActive(applicationContext) &&
                 StrictModeManager.isBlockHomeScreenEnabled(applicationContext) &&
+                AiStudyGuardManager.isStudyPeriodActive(applicationContext) &&
                 EssentialAppsGuard.isLauncherPackage(applicationContext, pkg)
             ) {
                 val nowHome = System.currentTimeMillis()
@@ -1425,43 +1750,38 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                     //       on-device block.
                                     //   p_ent < 0.20  -> study -> allow locally
                                     //       (no Gemini call needed).
-                                    //   middle        -> Gemini arbiter below
-                                    //       (no key -> existing fail-open).
-                                    // Task-5 hard rules stay supreme: quick-block
-                                    // confidence gating, fail-open, and the
-                                    // discipline semantics are unchanged.
+                                    // v1.3.0 (Worker E): combined brain for screen text —
+                                    // repo brain + v3 content brain. Order inside the
+                                    // judge: corrections -> doubt gate -> combined
+                                    // score -> our bands (p >= 0.80 allow,
+                                    // p <= 0.31 block, middle -> Gemini arbiter
+                                    // below; no key -> existing fail-open).
+                                    // A doubt phrasing can never block once the
+                                    // judge sees it.
                                     val screenText = buildString {
                                         if (!extraction.screenTitle.isNullOrBlank()) append(extraction.screenTitle).append(". ")
                                         extraction.textSnippets.forEach { append(it).append(" ") }
                                     }.trim()
-                                    val contentClf = LocalTitleClassifier.getContent(applicationContext)
-                                    val contentPEnt = if (contentClf != null && screenText.isNotBlank()) {
-                                        contentClf.pEntertainment(screenText)
-                                    } else null
-                                    val contentThreshold = contentClf?.blockThreshold ?: 0.69
-                                    // v1.2.3 (final assembly): explicit study-doubt
-                                    // gate BEFORE the content block band — a doubt
-                                    // phrasing is STUDY, never a block.
-                                    val isDoubt = screenText.isNotBlank() &&
-                                            OnDeviceStudyClassifier.isStudyDoubt(screenText)
+                                    val judgment = runCatching {
+                                        FocivoCombinedBrain.judgeScreen(applicationContext, screenText)
+                                    }.getOrNull()
+                                    val pStr = judgment?.pCombined?.let {
+                                        "p=%.3f".format(Locale.ROOT, it)
+                                    } ?: "no-score"
                                     when {
-                                        isDoubt -> {
-                                            val pEntStr = if (contentPEnt != null) {
-                                                "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
-                                            } else "no-score"
-                                            Log.i(TAG, "[Browser AI Guard] Study doubt detected in $browserLabel ($pEntStr) — allowing")
-                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "STUDY", "study-doubt-allow $pEntStr", urlOrTitle)
+                                        judgment?.tag == "doubt" -> {
+                                            Log.i(TAG, "[Browser AI Guard] Study doubt detected in $browserLabel ($pStr) — allowing")
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "STUDY", "study-doubt-allow $pStr", urlOrTitle)
                                             AiStudyGuardManager.onStudyActivityDetected(
                                                 context = applicationContext,
                                                 packageName = pkg,
                                                 messageText = urlOrTitle
                                             )
                                         }
-                                        contentPEnt != null && contentPEnt >= contentThreshold -> {
-                                            val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
-                                            val reason = "Non-study screen content detected [local-content $pEntStr]"
+                                        judgment?.decision == FocivoCombinedBrain.Decision.BLOCK -> {
+                                            val reason = "Non-study screen content detected [combined-brain $pStr]"
                                             Log.w(TAG, "[Browser AI Guard] $reason in $browserLabel")
-                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "NON_STUDY", "local-content $pEntStr", urlOrTitle)
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "NON_STUDY", "combined-brain $pStr", urlOrTitle)
                                             AiStudyGuardManager.onNonStudyDetected(
                                                 context = applicationContext,
                                                 packageName = pkg,
@@ -1469,9 +1789,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                                 reason = reason
                                             )
                                         }
-                                        contentPEnt != null && contentPEnt < LocalTitleClassifier.STRONG_STUDY_MAX_P_ENT -> {
-                                            val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
-                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "STUDY", "local-content $pEntStr", urlOrTitle)
+                                        judgment?.decision == FocivoCombinedBrain.Decision.ALLOW -> {
+                                            AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "STUDY", "combined-brain $pStr", urlOrTitle)
                                             AiStudyGuardManager.onStudyActivityDetected(
                                                 context = applicationContext,
                                                 packageName = pkg,
@@ -1479,9 +1798,8 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                             )
                                         }
                                         else -> {
-                                            if (contentPEnt != null) {
-                                                val pEntStr = "p_ent=%.3f".format(Locale.ROOT, contentPEnt)
-                                                AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "UNCERTAIN", "local-content $pEntStr->gemini", urlOrTitle)
+                                            if (judgment?.pCombined != null) {
+                                                AiStudyGuardManager.logGuardActivity(applicationContext, browserLabel, "screen-local", "UNCERTAIN", "combined-brain $pStr->gemini", urlOrTitle)
                                             }
                                             // Ambient screen check with Gemini
                                             serviceScope.launch {
@@ -1676,21 +1994,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
     }
 
     private fun processYouTubeVideoTitle(title: String, channel: String?, metadata: String?, titleSource: String = ""): Boolean {
-        // v1.2.3 (owner 2026-10-16): study-doubt gate FIRST — mirrors the
-        // browser path. A doubt phrasing ("doubt class", "I don't understand
-        // ...", "how is X different from Y") is STUDY and can never block,
-        // before any classifier or knowledge rule sees the title.
-        if (OnDeviceStudyClassifier.isStudyDoubt(title)) {
-            Log.i(TAG, "[YouTube Guard] Study doubt in title — allowing: '$title'")
-            AiStudyGuardManager.logGuardActivity(
-                applicationContext, "YouTube", "youtube-doubt", "STUDY", "study-doubt-allow", title
-            )
-            recordYouTubeEval(
-                titleSource = titleSource, title = title,
-                pEntBand = "doubt", verdict = "STUDY", action = "allowed"
-            )
-            return false
-        }
+        // v1.3.0 (Worker E): evaluation order is now
+        //   user channel lists -> combined brain -> knowledge -> quick -> Gemini,
+        // where the combined brain itself runs
+        //   repo channels -> corrections -> doubt gate -> combined score -> our bands.
+        // The doubt gate moved INSIDE the combined judge (FocivoCombinedBrain):
+        // the user's own channel lists and their explicit corrections outrank
+        // the heuristic doubt shield; a doubt phrasing still can never block
+        // once the judge sees it.
 
         // v1.2.3 (B): the user's channel BLOCKLIST beats everything — an
         // explicitly blocked channel is blocked outright whenever its video
@@ -1731,48 +2042,59 @@ class AiStudyAccessibilityService : AccessibilityService() {
             return false
         }
 
-        // v1.1.8: curated offline knowledge first — instant (<1ms), zero network.
-        // v1.2.3 (Task 6, bundle v3): on-device title classifier is the FIRST
-        // title judge, ahead of the knowledge pack. Fully offline (no key,
-        // no network, <1ms): TF-IDF + logistic regression bundle (assets,
-        // v3: 15,109 terms). Held-out 99.73% acc with ZERO false-blocks at
-        // p_ent >= 0.65.
-        //   p_ent >= 0.65 -> ENTERTAINMENT -> same discipline flow as a
-        //                   high-confidence knowledge NON_STUDY.
-        //   p_ent <= 0.20 -> STRONG_STUDY -> allow locally (zero entertainment
-        //                   titles at/below 0.20 in the 5233-title corpus).
-        //   middle        -> UNCERTAIN -> fall through to the existing
-        //                   knowledge -> quick -> Gemini chain below (Gemini
-        //                   arbitrates when a key exists; no key -> the
-        //                   existing fail-open rules apply).
+        // v1.3.0 (Worker E): the combined on-device brain is the FIRST title
+        // judge, ahead of the knowledge pack. Fully offline (no key, no
+        // network, <2ms): ported Focivo repo brain (channel lists + 354 cue
+        // rules + 33k ML weights + user corrections) averaged with the v3
+        // TF-IDF brain: p_combined = 0.5*p_repo + 0.5*p_v3 (single-brain
+        // fallback when the other bundle is missing).
+        // Bands (P_study): >= 0.80 -> ALLOW; <= 0.35 -> BLOCK (high
+        // confidence only); middle -> UNCERTAIN -> fall through to the
+        // existing knowledge -> quick -> Gemini chain below (Gemini
+        // arbitrates when a key exists; no key -> the existing fail-open
+        // rules apply).
+        // Inside the judge: repo channels -> corrections -> doubt gate ->
+        // combined score. The user's own channel lists above still win; a
+        // doubt phrasing can never block once the judge sees it.
         // Hard rules stay supreme: this only ever sees actual-playback titles
-        // (callers gate on player evidence), and user channel lists above win.
+        // (callers gate on player evidence).
         if (title.isNotBlank()) {
-            val localClassifier = LocalTitleClassifier.get(applicationContext)
-            if (localClassifier == null) {
+            val judgment = runCatching {
+                FocivoCombinedBrain.judgeTitle(applicationContext, title, channel)
+            }.getOrNull()
+            if (judgment == null) {
                 AiStudyGuardManager.logGuardActivity(
                     applicationContext, "YouTube", "youtube-local", "UNCERTAIN",
-                    "bundle-load-failed->existing-chain", title
+                    "combined-brain-error->existing-chain", title
                 )
             } else {
-                val localPEnt = localClassifier.pEntertainment(title)
-                val pEntStr = "p_ent=%.3f".format(Locale.ROOT, localPEnt)
-                when (localClassifier.decide(localPEnt)) {
-                    LocalTitleClassifier.TitleDecision.ENTERTAINMENT -> {
+                val pStr = judgment.pCombined?.let { "p=%.3f".format(Locale.ROOT, it) } ?: "no-score"
+                val band = when (judgment.tag) {
+                    "doubt" -> "doubt"
+                    "correction" -> "correction"
+                    "repo-channel" -> "repo-channel"
+                    else -> FocivoCombinedBrain.pBandLabel(
+                        judgment.pCombined,
+                        FocivoCombinedBrain.TITLE_BLOCK_P,
+                        FocivoCombinedBrain.TITLE_ALLOW_P
+                    )
+                }
+                when (judgment.decision) {
+                    FocivoCombinedBrain.Decision.BLOCK -> {
                         AiStudyGuardManager.logGuardActivity(
                             applicationContext, "YouTube", "youtube-local", "NON_STUDY",
-                            "local-classifier $pEntStr", title
+                            "combined-brain $pStr [${judgment.tag}]", title
                         )
                         recordYouTubeEval(
                             titleSource = titleSource, title = title,
-                            pEntBand = pEntBandLabel(localPEnt, localClassifier.blockThreshold),
+                            pEntBand = band,
                             verdict = "NON_STUDY", action = "stage-1 warning"
                         )
                         val now = System.currentTimeMillis()
                         if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
                             lastYouTubeAiInterceptTimeMs = now
                             val reason =
-                                "Non-study content detected: \"$title\" [local-classifier $pEntStr]"
+                                "Non-study content detected: \"$title\" [combined-brain $pStr]"
                             Log.w(TAG, "[YouTube Guard] $reason")
                             YouTubeStudyGuardManager.recordBlockedVideo(
                                 context = applicationContext,
@@ -1790,22 +2112,22 @@ class AiStudyAccessibilityService : AccessibilityService() {
                         }
                         return true
                     }
-                    LocalTitleClassifier.TitleDecision.STRONG_STUDY -> {
+                    FocivoCombinedBrain.Decision.ALLOW -> {
                         AiStudyGuardManager.logGuardActivity(
                             applicationContext, "YouTube", "youtube-local", "STUDY",
-                            "local-classifier $pEntStr", title
+                            "combined-brain $pStr [${judgment.tag}]", title
                         )
                         recordYouTubeEval(
                             titleSource = titleSource, title = title,
-                            pEntBand = pEntBandLabel(localPEnt, localClassifier.blockThreshold),
+                            pEntBand = band,
                             verdict = "STUDY", action = "allowed"
                         )
                         return false
                     }
-                    LocalTitleClassifier.TitleDecision.UNCERTAIN -> {
+                    FocivoCombinedBrain.Decision.UNCERTAIN -> {
                         AiStudyGuardManager.logGuardActivity(
                             applicationContext, "YouTube", "youtube-local", "UNCERTAIN",
-                            "local-classifier $pEntStr->existing-chain", title
+                            "combined-brain $pStr->existing-chain", title
                         )
                     }
                 }

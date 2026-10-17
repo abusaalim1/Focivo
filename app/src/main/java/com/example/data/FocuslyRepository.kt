@@ -361,7 +361,10 @@ class FocuslyRepository(private val context: Context) {
                 donationPromptDismissedCount = obj.optInt("donationPromptDismissedCount", 0),
                 neverShowDonationPrompt = obj.optBoolean("neverShowDonationPrompt", false),
                 lastViewedSundayRecapWeek = obj.optString("lastViewedSundayRecapWeek", ""),
-                autoBlockStudyAppsWithoutAsking = obj.optBoolean("autoBlockStudyAppsWithoutAsking", false)
+                autoBlockStudyAppsWithoutAsking = obj.optBoolean("autoBlockStudyAppsWithoutAsking", false),
+                // v1.3.0 — profile customization fields (default public, legacy rows predate the flag).
+                targetExam = obj.optString("targetExam", ""),
+                isProfilePublic = obj.optBoolean("isProfilePublic", true)
             )
             if (guestPrefs == null) {
                 GuestDataStorageManager.getInstance(context).saveGuestPreferences(prefs)
@@ -434,6 +437,9 @@ class FocuslyRepository(private val context: Context) {
                 put("neverShowDonationPrompt", prefs.neverShowDonationPrompt)
                 put("lastViewedSundayRecapWeek", prefs.lastViewedSundayRecapWeek)
                 put("autoBlockStudyAppsWithoutAsking", prefs.autoBlockStudyAppsWithoutAsking)
+                // v1.3.0 — profile customization fields.
+                put("targetExam", prefs.targetExam)
+                put("isProfilePublic", prefs.isProfilePublic)
             }
             localDataPrefs.edit().putString("user_preferences", obj.toString()).commit()
             GuestDataStorageManager.getInstance(context).saveGuestPreferences(prefs)

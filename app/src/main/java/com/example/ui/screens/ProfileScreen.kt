@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -85,6 +86,7 @@ import com.example.data.model.FocusSessionEntity
 import com.example.data.model.UserPreferencesEntity
 import com.example.ui.components.GlassCard
 import com.example.ui.components.LiquidGlassCard
+import com.example.ui.components.RollingText
 import com.example.ui.components.pressFeedback
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SerifItalicFontFamily
@@ -236,7 +238,7 @@ fun ProfileScreen(
     onOpenMascot: () -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
     onLogout: () -> Unit = {},
-    onUpdateProfile: (newName: String, avatarBytes: ByteArray?) -> Unit = { _, _ -> },
+    onUpdateProfile: (ProfileEditResult) -> Unit = {},
     modifier: Modifier = Modifier,
     // v1.4.0-round2: test hook — screenshot tests open a badge directly
     initialSelectedBadgeTitle: String? = null
@@ -589,19 +591,62 @@ fun ProfileScreen(
                                                 )
                                             }
                                         }
-                                        if (userEmail.isNotBlank()) {
+                                        val studyGoalText = userPreferences?.primaryStudyGoal?.trim().orEmpty()
+                                        val studyClassText = userPreferences?.studentClassLevel?.trim().orEmpty()
+                                        val targetExamText = userPreferences?.targetExam?.trim().orEmpty()
+                                        val isPublicProfile = userPreferences?.isProfilePublic ?: true
+                                        if (studyGoalText.isNotBlank()) {
                                             Spacer(modifier = Modifier.height(1.dp))
                                             Text(
-                                                text = userEmail,
+                                                text = studyGoalText,
+                                                style = MaterialTheme.typography.bodySmall.copy(
+                                                    fontFamily = SerifItalicFontFamily,
+                                                    fontSize = 13.sp,
+                                                    color = T.accentText
+                                                ),
+                                                maxLines = 2
+                                            )
+                                        }
+                                        val classExamLine = listOf(studyClassText, targetExamText)
+                                            .filter { it.isNotBlank() }
+                                            .joinToString(" · ")
+                                        if (classExamLine.isNotBlank()) {
+                                            Text(
+                                                text = classExamLine,
                                                 style = MaterialTheme.typography.bodySmall.copy(
                                                     fontFamily = PoppinsFontFamily,
                                                     fontSize = 12.sp,
                                                     color = textSecondary
+                                                ),
+                                                maxLines = 1
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .testTag("profile_privacy_pill")
+                                                .clip(RoundedCornerShape(20.dp))
+                                                .background(
+                                                    if (isPublicProfile) T.accent.copy(alpha = 0.16f)
+                                                    else textSecondary.copy(alpha = 0.14f)
+                                                )
+                                                .clickable { showEditProfileDialog = true }
+                                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = if (isPublicProfile) "Public Profile" else "Private Profile",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontFamily = PoppinsFontFamily,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontSize = 11.sp,
+                                                    color = if (isPublicProfile) T.accentText else textSecondary
                                                 )
                                             )
                                         }
                                         Spacer(modifier = Modifier.height(3.dp))
-                                        Text(
+                                        // Motion Lab #7 — profile stat numbers roll like an odometer.
+                                        RollingText(
                                             text = "$sessionCount Completed Sessions · $hoursFocused Logged",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontFamily = PoppinsFontFamily,
@@ -661,7 +706,8 @@ fun ProfileScreen(
                                 )
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
+                                // Motion Lab #7 — stat values roll like an odometer when they change.
+                                RollingText(
                                     text = value,
                                     style = MaterialTheme.typography.titleLarge.copy(
                                         fontFamily = PoppinsFontFamily,
@@ -1384,6 +1430,10 @@ fun ProfileScreen(
     }
 
     if (showEditProfileDialog) {        var editedName by remember { mutableStateOf(userName) }
+        var editedGoal by remember { mutableStateOf(userPreferences?.primaryStudyGoal.orEmpty()) }
+        var editedClass by remember { mutableStateOf(userPreferences?.studentClassLevel.orEmpty()) }
+        var editedExam by remember { mutableStateOf(userPreferences?.targetExam.orEmpty()) }
+        var editedIsPublic by remember { mutableStateOf(userPreferences?.isProfilePublic ?: true) }
         var selectedPhotoUri by remember { mutableStateOf<android.net.Uri?>(null) }
         val photoPickerLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.PickVisualMedia()
@@ -1472,6 +1522,110 @@ fun ProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = editedGoal,
+                        onValueChange = { editedGoal = it },
+                        label = { Text("Study Goal") },
+                        placeholder = { Text("e.g. Crack JEE with daily deep work") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = editedClass,
+                            onValueChange = { editedClass = it },
+                            label = { Text("Class") },
+                            placeholder = { Text("Class 11") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        OutlinedTextField(
+                            value = editedExam,
+                            onValueChange = { editedExam = it },
+                            label = { Text("Target Exam") },
+                            placeholder = { Text("JEE / NEET") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+
+                    if (userEmail.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(textSecondary.copy(alpha = 0.08f))
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = "Account Email",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = PoppinsFontFamily,
+                                    color = textSecondary,
+                                    fontSize = 11.sp
+                                )
+                            )
+                            Text(
+                                text = userEmail,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = PoppinsFontFamily,
+                                    fontWeight = FontWeight.Medium,
+                                    color = textPrimary,
+                                    fontSize = 14.sp
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("profile_public_switch")
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { editedIsPublic = !editedIsPublic }
+                            .padding(horizontal = 4.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Public Profile",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = PoppinsFontFamily,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = textPrimary,
+                                    fontSize = 14.sp
+                                )
+                            )
+                            Text(
+                                text = if (editedIsPublic) "Others can see your name, avatar, goal and stats"
+                                else "Only you can see your profile",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = PoppinsFontFamily,
+                                    color = textSecondary,
+                                    fontSize = 12.sp
+                                )
+                            )
+                        }
+                        Switch(
+                            checked = editedIsPublic,
+                            onCheckedChange = { editedIsPublic = it }
+                        )
+                    }
                 }
             },
             confirmButton = {
@@ -1499,7 +1653,16 @@ fun ProfileScreen(
                                 null
                             }
                         }
-                        onUpdateProfile(editedName.trim(), avatarBytes)
+                        onUpdateProfile(
+                            ProfileEditResult(
+                                displayName = editedName.trim(),
+                                avatarBytes = avatarBytes,
+                                studyGoal = editedGoal.trim(),
+                                studyClass = editedClass.trim(),
+                                targetExam = editedExam.trim(),
+                                isPublic = editedIsPublic
+                            )
+                        )
                         showEditProfileDialog = false
                     }
                 ) {

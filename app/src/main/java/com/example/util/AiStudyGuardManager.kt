@@ -1057,6 +1057,13 @@ object AiStudyGuardManager {
         val playerEvidence: Boolean = false,
         val titleSource: String = "",
         val title: String = "",
+        /**
+         * v1.3.0 (Worker E): the FULL untruncated title. The display [title]
+         * is truncated to 60 chars, which would poison correction keys —
+         * the Guard Hub override buttons ("Was study" / "Not study") record
+         * [fullTitle] into FocivoBrainCorrections instead.
+         */
+        val fullTitle: String = "",
         val pEntBand: String = "",
         val verdict: String = "",
         val action: String = ""

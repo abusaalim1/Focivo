@@ -76,6 +76,7 @@ import com.example.util.PermissionUtils
 import com.example.util.ShortsLockManager
 import com.example.util.StrictModeManager
 import com.example.util.YouTubeStudyGuardManager
+import com.example.util.brain.FocivoBrainCorrections
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -708,6 +709,51 @@ fun AiStudyGuardHubSheet(
                                 fontSize = 11.sp,
                                 color = textSecondary
                             )
+                            // v1.3.0 (Worker E): user corrections — layer 4 of
+                            // the on-device brain. The override is recorded
+                            // against the FULL title and checked FIRST on
+                            // future judgments.
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Wrong verdict? Correct it — your call is remembered first next time.",
+                                fontSize = 11.5.sp,
+                                lineHeight = 15.sp,
+                                color = textSecondary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            var correctionNote by remember(lastEval.ts) { mutableStateOf<String?>(null) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val corrTitle = lastEval.fullTitle.ifBlank { lastEval.title }
+                                CorrectionPill(
+                                    label = "Was study",
+                                    borderColor = accentLime,
+                                    textColor = textPrimary,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    FocivoBrainCorrections.record(context, corrTitle, true)
+                                    correctionNote = "Saved — treated as study from now on."
+                                }
+                                CorrectionPill(
+                                    label = "Not study",
+                                    borderColor = Color(0xFFE05252),
+                                    textColor = textPrimary,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    FocivoBrainCorrections.record(context, corrTitle, false)
+                                    correctionNote = "Saved — treated as non-study from now on."
+                                }
+                            }
+                            if (correctionNote != null) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = correctionNote!!,
+                                    fontSize = 11.5.sp,
+                                    color = accentLime
+                                )
+                            }
                         }
                     }
                 }
@@ -848,14 +894,42 @@ private fun GuardStatusRow(
     }
 }
 
+/**
+ * v1.3.0 (Worker E): small bordered pill button for the Guard Hub
+ * correction overrides ("Was study" / "Not study").
+ */
+@Composable
+private fun CorrectionPill(
+    label: String,
+    borderColor: Color,
+    textColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .border(1.dp, borderColor.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 9.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = textColor
+        )
+    }
+}
+
 @Composable
 private fun GuardEvalRow(
     label: String,
     value: String,
     valueColor: Color,
     textSecondary: Color
-) {
-    Row(
+) {    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp),

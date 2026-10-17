@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -15,6 +16,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,8 +39,13 @@ import com.example.ui.timer.PomodoroUiState
 
 /**
  * v1.2.3 — "Pomodoro design" picker row for the Customize Timer sheet.
- * Four lock-free style cards with small live previews (scaled real renders
+ * Four style cards with small live previews (scaled real renders
  * of FocivoPomodoro, mid-focus running state). TICK_RING is the default.
+ *
+ * v1.2.4 — designs are point-locked like timer faces (TICK_RING free at 0;
+ * ACTIVITY_RINGS 1000; SESSION_STACK 2500; TYPOGRAPHIC 5000; admin account
+ * unlocks all). Locked cards show a lock + cost; tapping one calls
+ * [onLockedTap] so the sheet can explain the lock.
  */
 @Composable
 fun PomodoroDesignPicker(
@@ -44,7 +53,10 @@ fun PomodoroDesignPicker(
     onStyleTap: (PomodoroStyle) -> Unit,
     textPrimary: Color,
     cardBorder: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    focusPoints: Int = 0,
+    isAdmin: Boolean = false,
+    onLockedTap: (PomodoroStyle) -> Unit = {}
 ) {
     // Static preview state: first focus session, mid-way, running.
     val previewState = PomodoroUiState(
@@ -65,9 +77,12 @@ fun PomodoroDesignPicker(
     ) {
         PomodoroStyle.values().forEach { style ->
             val isSelected = style == selectedStyle
+            val isLocked = !style.isUnlocked(focusPoints, isAdmin)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { onStyleTap(style) }
+                modifier = Modifier.clickable {
+                    if (isLocked) onLockedTap(style) else onStyleTap(style)
+                }
             ) {
                 Box(
                     modifier = Modifier
@@ -92,6 +107,33 @@ fun PomodoroDesignPicker(
                             onSkip = {},
                             onReset = {}
                         )
+                    }
+                    // v1.2.4: locked designs are dimmed with a lock badge.
+                    if (isLocked) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color(0x990A0A0B)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Locked",
+                                    tint = Color(0xFFB6F13A),
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "${style.unlockPoints} pts",
+                                    fontFamily = PoppinsFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFB6F13A),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
                     }
                     Box(
                         modifier = Modifier

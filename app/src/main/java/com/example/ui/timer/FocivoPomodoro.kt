@@ -50,8 +50,19 @@ data class PomodoroUiState(
     val mins get() = totalSec / 60
 }
 
-enum class PomodoroStyle(val label: String) {
-    TICK_RING("Tick Ring"), ACTIVITY_RINGS("Activity Rings"), SESSION_STACK("Session Stack"), TYPOGRAPHIC("Typographic")
+enum class PomodoroStyle(val label: String, val unlockPoints: Int = 0) {
+    TICK_RING("Tick Ring", 0),
+    ACTIVITY_RINGS("Activity Rings", 1000),
+    SESSION_STACK("Session Stack", 2500),
+    TYPOGRAPHIC("Typographic", 5000);
+
+    /**
+     * v1.2.4 — lock model matches the timer faces exactly (threshold-based,
+     * points never spent; isAdmin = owner admin account frees everything).
+     * Previously these four designs were lock-free.
+     */
+    fun isUnlocked(userPoints: Int, isAdmin: Boolean = false): Boolean =
+        isAdmin || com.example.util.ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
 }
 
 /* ================= ENTRY POINT ================= */

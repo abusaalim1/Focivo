@@ -148,9 +148,30 @@ class MainActivity : ComponentActivity() {
     private fun handleActivityIntent(intent: Intent?, viewModel: FocuslyViewModel) {
         handleShieldIntent(intent, viewModel)
         handleAuthIntent(intent, viewModel)
+        handleSquadJoinIntent(intent, viewModel)
         handleSundayRecapIntent(intent, viewModel)
         handleWidgetIntent(intent, viewModel)
         handleStrictUninstallIntent(intent, viewModel)
+    }
+
+    /**
+     * v1.3.0 — Squads invite deep link. Primary: the https App Link
+     * https://focivoapp.vercel.app/join/<code> (assetlinks.json verified);
+     * fallback: the focivo://join/<code> custom scheme.
+     */
+    private fun handleSquadJoinIntent(intent: Intent?, viewModel: FocuslyViewModel) {
+        val data = intent?.data ?: return
+        val scheme = data.scheme?.lowercase()
+        val host = data.host?.lowercase()
+        val code: String? = when {
+            scheme == "https" && host == "focivoapp.vercel.app" &&
+                data.pathSegments.size >= 2 && data.pathSegments[0] == "join" ->
+                data.pathSegments[1]
+            scheme == "focivo" && host == "join" ->
+                data.pathSegments.firstOrNull()
+            else -> null
+        }
+        if (!code.isNullOrBlank()) viewModel.handleSquadJoinLink(code)
     }
 
     private fun handleStrictUninstallIntent(intent: Intent?, viewModel: FocuslyViewModel) {
@@ -333,6 +354,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     var showSignOutConfirmationDialog by rememberSaveable { mutableStateOf(false) }
     // v1.3.1: strict-mode end-early confirmation (Regain parity — "you cannot end your session early").
     var showStrictEndConfirmDialog by remember { mutableStateOf(false) }
+    // v1.3.0 (owner order 2026-10-17): strict-mode Pause is forbidden — the
+    // tap shows the same premium animated explanation as Stop.
+    var showStrictPauseDialog by remember { mutableStateOf(false) }
 
     // Real-time network connectivity observation
     LaunchedEffect(Unit) {
@@ -409,25 +433,23 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     // Screen navigation states
     var isSplashFinished by remember { mutableStateOf(false) }
     // v1.2: owner-supplied animated splash (ui.splash.FocivoSplash, used as-is).
-    // The variant is decided ONCE per cold start, after the session restore
-    // finishes: an existing session (signed-in OR guest) -> short RETURNING
-    // animation; no session -> full NEW_USER animation, whose finish preselects
-    // the Create Account tab on the auth screen.
-    var splashVariant by remember { mutableStateOf<SplashVariant?>(null) }
+    // v1.2.4: the variant is decided SYNCHRONOUSLY at first composition from
+    // local persisted session state (SharedPreferences) — there is no async
+    // flip. Signed-in/guest users NEVER see the 8s new-user animation;
+    // true first-run users never see the returning one. (The old
+    // LaunchedEffect defaulted to NEW_USER while auth restored, so signed-in
+    // users briefly saw the new-user splash before the variant flipped.)
+    val hasSessionAtLaunch = remember { hasLocalSessionAtLaunch(context) }
+    var splashVariant by remember {
+        mutableStateOf(if (hasSessionAtLaunch) SplashVariant.RETURNING else SplashVariant.NEW_USER)
+    }
     var splashWantsCreateAccount by remember { mutableStateOf(false) }
     // v1.2.3: real user data for the WelcomeScene (name / today's
     // minutes), read from the same on-device stores the share cards use.
-    var splashWelcomeInfo by remember { mutableStateOf(WelcomeInfo()) }
-
-    LaunchedEffect(isAuthChecking, currentUser) {
-        if (!isAuthChecking && splashVariant == null) {
-            if (currentUser != null) {
-                splashVariant = SplashVariant.RETURNING
-                splashWelcomeInfo = loadSplashWelcomeInfo(context)
-            } else {
-                splashVariant = SplashVariant.NEW_USER
-            }
-        }
+    var splashWelcomeInfo by remember {
+        mutableStateOf(
+            if (hasSessionAtLaunch) loadSplashWelcomeInfo(context) else WelcomeInfo()
+        )
     }
     var isSettingsOpen by remember { mutableStateOf(false) }
     // v1.1: Mascot Buddy dedicated screen.
@@ -435,7 +457,21 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     var isAlarmHubOpen by remember { mutableStateOf(false) }
     var isAutoScheduleOpen by remember { mutableStateOf(false) }
     var isSessionLogOpen by remember { mutableStateOf(false) }
+    // v1.3.0: Squads (friends competition) — entered from HOME only.
+    var isSquadsOpen by remember { mutableStateOf(false) }
+    var squadJoinCode by remember { mutableStateOf<String?>(null) }
     var showTaskBottomSheet by remember { mutableStateOf(false) }
+
+    // v1.3.0: consume a squad deep link (https://focivoapp.vercel.app/join/<code>)
+    // by opening the squads layer on the join screen.
+    val pendingSquadJoinCode by viewModel.pendingSquadJoinCode.collectAsState()
+    LaunchedEffect(pendingSquadJoinCode) {
+        pendingSquadJoinCode?.let { code ->
+            squadJoinCode = code
+            isSquadsOpen = true
+            viewModel.consumeSquadJoinCode()
+        }
+    }
 
     val taskSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val alarmHubSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -460,6 +496,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
         showCompletionScreen && completedSessionSummary != null ->
             ({ viewModel.dismissCompletionScreen() })
         isSessionLogOpen -> ({ isSessionLogOpen = false })
+        isSquadsOpen -> ({ isSquadsOpen = false; squadJoinCode = null })
         isAutoScheduleOpen -> ({ isAutoScheduleOpen = false })
         isAppLimitsOpen -> ({ isAppLimitsOpen = false })
         isAiGuardHubOpen -> ({ viewModel.closeAiGuardHub() })
@@ -498,6 +535,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
             // v1.2: NEW_USER -> Auth with Create Account preselected;
             // RETURNING -> falls through to the existing routing below
             // (onboarding checks / guest skip / main shell — untouched).
+            // v1.2.4: the variant is decided synchronously at launch and
+            // never flipped, so the correct animation plays from frame one.
             FocivoSplash(
                 variant = splashVariant ?: SplashVariant.NEW_USER,
                 welcome = splashWelcomeInfo,
@@ -686,7 +725,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         scheduledBlocksCount = scheduledBlocks.size,
                                         onOpenAlarmStudio = { isAlarmHubOpen = true },
                                         onOpenShieldHub = { viewModel.openShieldHub() },
-                                        onOpenAutoSchedule = { isAutoScheduleOpen = true }
+                                        onOpenAutoSchedule = { isAutoScheduleOpen = true },
+                                        // v1.3.0: squads entry lives on HOME (owner explicit).
+                                        onOpenSquads = { squadJoinCode = null; isSquadsOpen = true }
                                     )
                                 }
                                 NavTab.FOCUS.name -> {
@@ -723,7 +764,17 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onStartFromStrictGuardPrompt = { viewModel.continueSessionStartAfterPrompt() },
                                         onDismissStrictGuardPrompt = { viewModel.dismissStrictGuardPrompt() },
                                         onStartTimer = { viewModel.requestStudySessionStart() },
-                                        onPauseTimer = { viewModel.pauseTimer() },
+                                        onPauseTimer = {
+                                            // v1.3.0 (owner order 2026-10-17): strict-mode
+                                            // Pause is forbidden — the tap is a no-op and
+                                            // shows the strict explanation dialog, the
+                                            // same premium treatment as Stop.
+                                            if (viewModel.attemptPauseTimer() ==
+                                                com.example.util.StrictPauseGate.Result.BLOCKED_STRICT
+                                            ) {
+                                                showStrictPauseDialog = true
+                                            }
+                                        },
                                         onResumeTimer = { viewModel.resumeTimer() },
                                         onFinishEarly = {
                                             // v1.2.3 (Task 10): strict mode FULL lock-in —
@@ -792,8 +843,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onOpenMascot = { isMascotOpen = true },
                                         onCheckForUpdates = { viewModel.checkForAppUpdates(context, isManual = true) },
                                         onLogout = { showSignOutConfirmationDialog = true },
-                                        onUpdateProfile = { name, avatarBytes ->
-                                            viewModel.updateProfileNameAndAvatar(name, avatarBytes)
+                                        onUpdateProfile = { result ->
+                                            viewModel.updateUserProfile(result)
                                         }
                                     )
                                 }
@@ -1036,6 +1087,37 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                     )
                 }
 
+                // Full-screen Squads (v1.3.0, friends competition) — entered from
+                // HOME only (owner explicit). System Back handled centrally.
+                if (isSquadsOpen) {
+                    val weekStartMillis = remember {
+                        java.util.Calendar.getInstance().apply {
+                            val dayOfWeek = get(java.util.Calendar.DAY_OF_WEEK)
+                            val daysToSubtract = (dayOfWeek - java.util.Calendar.MONDAY + 7) % 7
+                            add(java.util.Calendar.DAY_OF_MONTH, -daysToSubtract)
+                            set(java.util.Calendar.HOUR_OF_DAY, 0)
+                            set(java.util.Calendar.MINUTE, 0)
+                            set(java.util.Calendar.SECOND, 0)
+                            set(java.util.Calendar.MILLISECOND, 0)
+                        }.timeInMillis
+                    }
+                    val myWeeklyMinutes = remember(sessions, weekStartMillis) {
+                        (sessions.filter { it.completedAt >= weekStartMillis }
+                            .sumOf { it.durationSeconds } / 60).toInt()
+                    }
+                    com.example.ui.screens.SquadsFlowScreen(
+                        onBack = { isSquadsOpen = false; squadJoinCode = null },
+                        prefillJoinCode = squadJoinCode,
+                        myUserId = com.example.data.SupabaseService.getInstance().getCurrentUserId(),
+                        myDisplayName = userPreferences?.currentUserName
+                            ?.takeIf { it.isNotBlank() }
+                            ?: currentUser?.fullName?.takeIf { it.isNotBlank() }
+                            ?: "Student",
+                        myAvatarUrl = currentUser?.photoUrl,
+                        myWeeklyMinutes = myWeeklyMinutes,
+                    )
+                }
+
                 // Full-screen Past Focus Sessions Log Screen (Firestore Cloud Storage)
                 // v1.2.3: system Back is handled by the centralized handler
                 // (top of this composable) — no local handler needed.
@@ -1088,6 +1170,16 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 if (showStrictEndConfirmDialog) {
                     com.example.ui.components.StrictLockDialog(
                         onDismiss = { showStrictEndConfirmDialog = false }
+                    )
+                }
+
+                // v1.3.0 (owner order 2026-10-17): strict-mode Pause is
+                // forbidden — the tap shows the same premium animated
+                // explanation (small mascot + animated text) as Stop.
+                if (showStrictPauseDialog) {
+                    com.example.ui.components.StrictLockDialog(
+                        mode = com.example.ui.components.StrictLockMode.PAUSE,
+                        onDismiss = { showStrictPauseDialog = false }
                     )
                 }
 
@@ -1148,4 +1240,22 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
             } // CompositionLocalProvider (v1.4.0-round2 theme accent)
         }
     }
+}
+
+/**
+ * v1.2.4 — synchronous splash-variant decision (owner bug 2026-10-16 19:57:
+ * signed-in users briefly saw the 8s new-user splash before the async
+ * session restore flipped the variant).
+ *
+ * Reads the same persisted stores the async restore uses, but
+ * synchronously from SharedPreferences at first composition: any stored
+ * user id (signed-in account) or an explicit guest session means the
+ * RETURNING variant. Only a true first run (no stored session at all)
+ * gets NEW_USER. The variant is then never flipped during the launch.
+ */
+internal fun hasLocalSessionAtLaunch(context: android.content.Context): Boolean = try {
+    AndroidPreferenceSessionManager.getStoredUserId(context) != null ||
+        AndroidPreferenceSessionManager.isGuestSession(context)
+} catch (_: Throwable) {
+    false
 }

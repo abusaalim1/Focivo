@@ -59,5 +59,8 @@ data class UserPreferencesEntity(
     val neverShowDonationPrompt: Boolean = false,
     val lastViewedSundayRecapWeek: String = "",
     val autoBlockStudyAppsWithoutAsking: Boolean = false,
-    val isDeepFocusEnabled: Boolean = false
+    val isDeepFocusEnabled: Boolean = false,
+    // v1.3.0 - profile customization: target exam + public/private visibility.
+    val targetExam: String = "",
+    val isProfilePublic: Boolean = true
 )

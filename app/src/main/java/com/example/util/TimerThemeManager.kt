@@ -68,8 +68,9 @@ data class TimerTheme(
     val onBackdropContent: Color = Color(0xFFF7F8F4)
 ) {
     // Content lock model (points never spent): ALL_CONTENT_UNLOCKED frees every timer theme.
-    fun isUnlocked(userPoints: Int): Boolean =
-        ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
+    // v1.2.4: isAdmin (owner admin account) frees everything — single choke point, no scattered conditionals.
+    fun isUnlocked(userPoints: Int, isAdmin: Boolean = false): Boolean =
+        isAdmin || ALL_CONTENT_UNLOCKED || userPoints >= unlockPoints
 }
 
 object TimerThemeManager {
@@ -83,7 +84,7 @@ object TimerThemeManager {
             name = "Aurora",
             backdropRes = null, // code-drawn aurora canvas (unchanged from v1.3.1)
             mascotPose = MascotPose.STUDY_HAPPY, // round-3: happy default study face
-            arcColors = emptyList(), // unused — AuroraTimer uses its built-in palette
+            arcColors = emptyList(), // unused — the aurora canvas is code-drawn
             glowColor = Color.Transparent,
             accent = Color(0xFF8CE000),
             unlockPoints = 0,
@@ -406,9 +407,9 @@ object TimerThemeManager {
      * when the user's Focus Points balance meets the theme's threshold.
      * Returns false (and changes nothing) when locked.
      */
-    fun trySelectTheme(context: Context, id: String, userPoints: Int): Boolean {
+    fun trySelectTheme(context: Context, id: String, userPoints: Int, isAdmin: Boolean = ContentLocks.isAdminUnlocked(context)): Boolean {
         val theme = getTheme(id)
-        if (!theme.isUnlocked(userPoints)) {
+        if (!theme.isUnlocked(userPoints, isAdmin)) {
             Log.i(TAG, "Theme ${theme.name} is locked (${userPoints}/${theme.unlockPoints} pts)")
             return false
         }
@@ -420,8 +421,8 @@ object TimerThemeManager {
      * Round-4: call when the balance is (re)loaded. If the persisted theme is
      * no longer affordable (rules changed), fall back to Aurora gracefully.
      */
-    fun validateSelection(context: Context, userPoints: Int) {
-        if (!_selectedTheme.value.isUnlocked(userPoints)) {
+    fun validateSelection(context: Context, userPoints: Int, isAdmin: Boolean = ContentLocks.isAdminUnlocked(context)) {
+        if (!_selectedTheme.value.isUnlocked(userPoints, isAdmin)) {
             selectTheme(context, "aurora")
         }
     }

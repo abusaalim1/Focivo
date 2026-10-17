@@ -1188,6 +1188,56 @@ class SupabaseService {
         }
 
     /**
+     * v1.3.0: best-effort profile-visibility write for public.study_leaderboard
+     * — ONLY the is_public column. Mirrors the avatar_url pattern: the column
+     * very likely does NOT exist yet (owner dashboard step pending), so a
+     * missing column is caught and logged, never propagated as a failure.
+     * Once added server-side
+     * (ALTER TABLE study_leaderboard ADD COLUMN is_public boolean DEFAULT true),
+     * privacy flags start syncing with no app update needed. Until then the
+     * flag is enforced locally: private users are hidden from other users'
+     * leaderboard surfaces on this device.
+     */
+    suspend fun updateLeaderboardProfilePublic(userId: String, isPublic: Boolean): Result<Boolean> =
+        withContext(Dispatchers.IO) {
+            if (userId.isBlank()) return@withContext Result.success(false)
+            return@withContext try {
+                client.from("study_leaderboard").update(mapOf("is_public" to isPublic)) {
+                    filter { eq("user_id", userId) }
+                }
+                Log.i(TAG, "[LeaderboardPrivacy] study_leaderboard is_public=$isPublic synced for user_id=$userId")
+                Result.success(true)
+            } catch (e: Exception) {
+                Log.w(
+                    TAG,
+                    "[LeaderboardPrivacy] study_leaderboard is_public write failed " +
+                        "(column may not exist yet): ${e.message}"
+                )
+                Result.success(false)
+            }
+        }
+
+    /**
+     * v1.3.0: targeted study-goal write — ONLY the subject_tag column
+     * (proven to exist on study_leaderboard). The user's study goal text is
+     * what other users see under their name on the leaderboard when public.
+     */
+    suspend fun updateLeaderboardSubjectTag(userId: String, goalText: String): Result<Boolean> =
+        withContext(Dispatchers.IO) {
+            if (userId.isBlank() || goalText.isBlank()) return@withContext Result.success(false)
+            return@withContext try {
+                client.from("study_leaderboard").update(mapOf("subject_tag" to goalText)) {
+                    filter { eq("user_id", userId) }
+                }
+                Log.i(TAG, "[LeaderboardGoal] study_leaderboard subject_tag updated for user_id=$userId")
+                Result.success(true)
+            } catch (e: Exception) {
+                Log.w(TAG, "[LeaderboardGoal] study_leaderboard subject_tag write failed: ${e.message}")
+                Result.success(false)
+            }
+        }
+
+    /**
      * v1.2: reads the currently stored users.avatar_url (null when the row
      * is absent or unreadable, e.g. RLS). Used to refill the DTO before an
      * SDK upsert so a null/blank incoming avatar never wipes the stored one.
@@ -1353,11 +1403,11 @@ class SupabaseService {
 
         Log.i(TAG, "[LeaderboardSync] BEFORE WRITE: Executing UPDATE/UPSERT public.study_leaderboard SET display_name='${leaderboardDto.display_name}', study_seconds=${leaderboardDto.study_seconds}, streak=${leaderboardDto.streak} WHERE user_id='$userId'")
 
-        // v1.2 avatar-robustness: the stats write NEVER carries avatar_url.
-        // Proven live 2026-10-15 — the avatar_url column does not exist on
-        // study_leaderboard, so any payload containing it fails the whole
-        // sync; and an explicit null would wipe a previously stored avatar.
-        // The avatar is synced separately, only when non-blank (best-effort).
+        // Avatar-robustness: the stats write NEVER carries avatar_url.
+        // The avatar_url column exists on study_leaderboard since
+        // 2026-10-17, but an explicit null would wipe a previously stored
+        // avatar — so nulls are stripped and the avatar is synced
+        // separately, only when non-blank (best-effort).
         val statsOnly = leaderboardDto.copy(avatar_url = null)
         val statsResult: Result<Boolean> = try {
             client.from("study_leaderboard").upsert(statsOnly)

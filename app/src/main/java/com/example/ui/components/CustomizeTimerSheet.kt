@@ -26,6 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
@@ -59,8 +61,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.FocuslyRepository
+import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.RegainLimePrimary
+import com.example.ui.theme.SecondaryTextLight
+import com.example.ui.components.RollingNumber
 import com.example.ui.theme.focivoTokens
+import com.example.ui.theme.isAppInDarkTheme
 import com.example.util.PomodoroConfig
 import com.example.util.PomodoroStyleManager
 import com.example.util.TimerFaceManager
@@ -154,12 +161,25 @@ fun CustomizeTimerSheet(
     var lastPresetId by remember { mutableStateOf(loadLastPomodoroPresetId(context)) }
     var lockedDialogTheme by remember { mutableStateOf<TimerTheme?>(null) }
     var lockedDialogFace by remember { mutableStateOf<com.example.util.TimerFace?>(null) }
+    var lockedDialogPomo by remember { mutableStateOf<com.example.ui.timer.PomodoroStyle?>(null) }
 
     val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
     val selectedFace by TimerFaceManager.selectedFace.collectAsState()
     val prefsFlow = remember(context) { FocuslyRepository.getInstance(context).userPreferences }
     val prefs by prefsFlow.collectAsState(initial = null)
     val focusPoints = prefs?.focusPoints ?: 0
+    // v1.2.4: owner admin account unlocks all content — computed once,
+    // consumed by every lock check on this screen (single choke point).
+    val isAdmin = remember(context) { com.example.util.ContentLocks.isAdminUnlocked(context) }
+    // v1.2.4: progressive disclosure — essentials up front, everything
+    // else under "More options" (no feature removal, just de-cluttered).
+    var showMoreOptions by remember { mutableStateOf(false) }
+
+    // v1.2.4: validate the persisted pomodoro design once real points are
+    // loaded (falls back to Tick Ring if the saved design is locked).
+    LaunchedEffect(prefs, isAdmin) {
+        if (prefs != null) PomodoroStyleManager.validateSelection(context, focusPoints, isAdmin)
+    }
 
     // Motion Lab "Theme unlock": celebrate genuinely-new threshold crossings
     // for timer themes AND timer faces (threshold model — an unlock moment =
@@ -168,13 +188,13 @@ fun CustomizeTimerSheet(
     // celebrate. The first queued item shows; the rest wait their turn.
     val themeUnlocks = rememberNewlyUnlockedIds(
         allIds = TimerThemeManager.THEMES.map { it.id },
-        isUnlocked = { id -> TimerThemeManager.getTheme(id).isUnlocked(focusPoints) },
+        isUnlocked = { id -> TimerThemeManager.getTheme(id).isUnlocked(focusPoints, isAdmin) },
         focusPoints = focusPoints,
         seenKey = "unlock_seen_timer_themes"
     )
     val faceUnlocks = rememberNewlyUnlockedIds(
         allIds = TimerFaceManager.FACES.map { it.id },
-        isUnlocked = { id -> TimerFaceManager.getFace(id).isUnlocked(focusPoints) },
+        isUnlocked = { id -> TimerFaceManager.getFace(id).isUnlocked(focusPoints, isAdmin) },
         focusPoints = focusPoints,
         seenKey = "unlock_seen_timer_faces"
     )
@@ -238,6 +258,13 @@ fun CustomizeTimerSheet(
             lockedFace = lockedFace,
             focusPoints = focusPoints,
             onDismiss = { lockedDialogFace = null }
+        )
+    }
+    lockedDialogPomo?.let { style ->
+        LockedPomodoroDesignDialog(
+            style = style,
+            focusPoints = focusPoints,
+            onDismiss = { lockedDialogPomo = null }
         )
     }
 
@@ -390,6 +417,21 @@ fun CustomizeTimerSheet(
                     )
                 }
 
+                // v1.2.4: "More options" — sound, alarm, theme, timer
+                // style and pomodoro design live behind progressive
+                // disclosure so the sheet stays simple (nothing removed).
+                item {
+                    MoreOptionsExpander(
+                        expanded = showMoreOptions,
+                        onToggle = { showMoreOptions = !showMoreOptions },
+                        textPrimary = textPrimary,
+                        textSecondary = textSecondary,
+                        cardBg = cardBg,
+                        cardBorder = cardBorder,
+                        accent = T.accent
+                    )
+                }
+                if (showMoreOptions) {
                 item {
                     CustomizeSectionLabel(text = "Quick picks", textSecondary = textSecondary)
                     Spacer(modifier = Modifier.height(8.dp))
@@ -449,7 +491,7 @@ fun CustomizeTimerSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         TimerThemeManager.THEMES.forEach { theme ->
-                            val isLocked = !theme.isUnlocked(focusPoints)
+                            val isLocked = !theme.isUnlocked(focusPoints, isAdmin)
                             val isSelected = theme.id == selectedTheme.id
                             Row(
                                 modifier = Modifier
@@ -525,12 +567,15 @@ fun CustomizeTimerSheet(
                             fontSize = 12.sp,
                             color = textSecondary
                         )
-                        Text(
-                            text = "$focusPoints",
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = T.accentText
+                        // Motion Lab #7 — points balance rolls like an odometer.
+                        RollingNumber(
+                            value = focusPoints,
+                            style = androidx.compose.ui.text.TextStyle(
+                                fontFamily = PoppinsFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = T.accentText
+                            )
                         )
                     }
                     TimerFacePicker(
@@ -545,7 +590,8 @@ fun CustomizeTimerSheet(
                         },
                         textPrimary = textPrimary,
                         cardBorder = cardBorder,
-                        scrollState = timerFaceScrollState ?: rememberScrollState()
+                        scrollState = timerFaceScrollState ?: rememberScrollState(),
+                        isAdmin = isAdmin,
                     )
                 }
 
@@ -558,10 +604,14 @@ fun CustomizeTimerSheet(
                     val pomoDesign by PomodoroStyleManager.selectedStyle.collectAsState()
                     PomodoroDesignPicker(
                         selectedStyle = pomoDesign,
-                        onStyleTap = { PomodoroStyleManager.selectStyle(context, it) },
+                        onStyleTap = { PomodoroStyleManager.trySelectStyle(context, it, focusPoints, isAdmin) },
                         textPrimary = textPrimary,
-                        cardBorder = cardBorder
+                        cardBorder = cardBorder,
+                        focusPoints = focusPoints,
+                        isAdmin = isAdmin,
+                        onLockedTap = { lockedDialogPomo = it }
                     )
+                }
                 }
 
                 item {
@@ -668,6 +718,102 @@ private fun CustomizeSectionLabel(text: String, textSecondary: Color) {
         letterSpacing = 1.76.sp,
         color = textSecondary,
         modifier = Modifier.padding(start = 4.dp)
+    )
+}
+
+/**
+ * v1.2.4 — "More options" expander for the Customize Timer sheet.
+ * Progressive disclosure: essentials (subject, duration, pomodoro showcase)
+ * stay visible; sound, theme, timer style and pomodoro design tuck behind
+ * this row so new users are not overwhelmed. Nothing is removed.
+ */
+@Composable
+internal fun MoreOptionsExpander(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    textPrimary: Color,
+    textSecondary: Color,
+    cardBg: Color,
+    cardBorder: Color,
+    accent: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(cardBg)
+            .border(1.dp, cardBorder, RoundedCornerShape(16.dp))
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "More options",
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                color = textPrimary
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Sound, theme, timer style & pomodoro design",
+                fontFamily = PoppinsFontFamily,
+                fontSize = 11.5.sp,
+                color = textSecondary
+            )
+        }
+        Icon(
+            imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+            contentDescription = if (expanded) "Collapse" else "Expand",
+            tint = accent,
+            modifier = Modifier.size(22.dp)
+        )
+    }
+}
+
+/**
+ * v1.2.4 — locked-pomodoro-design explainer, mirroring the locked timer
+ * face dialog (same copy rhythm, same premium tone).
+ */
+@Composable
+internal fun LockedPomodoroDesignDialog(
+    style: com.example.ui.timer.PomodoroStyle,
+    focusPoints: Int,
+    onDismiss: () -> Unit
+) {
+    val isDark = isAppInDarkTheme()
+    val textPrimary = if (isDark) Color(0xFFF0F4ED) else NearBlack
+    val textSecondary = if (isDark) Color(0xFFA0A89E) else SecondaryTextLight
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Locked pomodoro design",
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 19.sp,
+                color = textPrimary
+            )
+        },
+        text = {
+            Text(
+                text = "Collect ${(style.unlockPoints - focusPoints).coerceAtLeast(1)} more Focus Points to unlock ${style.label}. You earn 1 point per focused minute.",
+                fontFamily = PoppinsFontFamily,
+                fontSize = 13.sp,
+                color = textSecondary
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "Got it",
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    color = RegainLimePrimary
+                )
+            }
+        }
     )
 }
 
