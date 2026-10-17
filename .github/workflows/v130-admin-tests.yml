@@ -46,10 +46,10 @@ jobs:
           gradle-version: 9.3.1
 
       - name: Unit tests (gate truth table)
-        run: ./gradlew :app:testDebugUnitTest --tests "com.example.UninstallProtectionGateTest" --rerun-tasks --no-configuration-cache
+        run: gradle :app:testDebugUnitTest --tests "com.example.UninstallProtectionGateTest" --rerun-tasks --no-configuration-cache
 
       - name: Screenshot tests (admin sheets)
-        run: ./gradlew :app:recordRoborazziDebug --tests "com.example.screenshots.StrictAdminSheetScreenshotsTest" --rerun-tasks --no-configuration-cache
+        run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.StrictAdminSheetScreenshotsTest" --rerun-tasks --no-configuration-cache
 
       - name: Upload screenshots
         if: always()
