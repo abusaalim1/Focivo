@@ -13,7 +13,7 @@ import kotlin.random.Random
 /**
  * v1.3.0 — Squads backend access (PostgREST on the main Supabase project).
  *
- * Schema: supabase/squads_schema.sql. As of 2026-10-17 the Management-API DDL
+ * Schema: supabase/focivo_schema.sql. As of 2026-10-17 the Management-API DDL
  * is 403-blocked (token lacks database_read), so the tables may not exist
  * yet. Every call maps a missing-table error to [SquadsUnavailable] so the UI
  * can show the graceful "setting up" state instead of crashing.

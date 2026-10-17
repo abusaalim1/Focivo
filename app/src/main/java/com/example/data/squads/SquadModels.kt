@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 /**
  * v1.3.0 — Squads (friends competition) models.
  *
- * Backend schema: supabase/squads_schema.sql (tables `squads` and
+ * Backend schema: supabase/focivo_schema.sql (tables `squads` and
  * `squad_members` on the main project). Competition ranking is computed
  * from REAL study time on public.study_leaderboard — no per-member stats
  * live in the squads tables.

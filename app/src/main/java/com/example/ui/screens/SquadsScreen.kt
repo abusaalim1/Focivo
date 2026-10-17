@@ -459,7 +459,7 @@ private fun SquadHubScreen(
             else -> {
                 LazyColumn(
                     Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 22.dp, bottom = 40.dp),
+                    contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 40.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     item {
@@ -680,7 +680,7 @@ private fun SquadCreateScreen(
         SquadTopAppBar("New squad", onBack)
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 22.dp, bottom = 40.dp),
+            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 40.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
@@ -1224,7 +1224,7 @@ private fun SquadDetailScreen(
                 val maxWeekly = (st?.maxOfOrNull { it.weeklySeconds } ?: 1L).coerceAtLeast(1L)
                 LazyColumn(
                     Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 22.dp, bottom = 40.dp),
+                    contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 40.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     item {
