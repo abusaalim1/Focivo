@@ -42,7 +42,7 @@ data class SquadStanding(
     val isMe: Boolean,
 )
 
-const val SQUADS_MAX_MEMBERS = 8
+const val SQUADS_MAX_MEMBERS = 100 // v1.3.2: owner raised groups to "bohot sare" — cap is 100
 const val SQUADS_JOIN_BASE_URL = "https://focivoapp.vercel.app/join"
 
 fun squadJoinLink(code: String): String = "$SQUADS_JOIN_BASE_URL/$code"

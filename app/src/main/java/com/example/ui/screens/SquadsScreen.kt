@@ -102,6 +102,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.util.Locale
+import com.example.ui.components.NsfwRejectionSheet
 
 /**
  * v1.3.0 — Squads (friends competition). Entered from the HOME screen only
@@ -233,13 +234,13 @@ private fun SquadsUnavailableCard(onRetry: () -> Unit) {
         FeatureIcon(drawableRes = R.drawable.ic3d_people, contentDescription = null, size = 56.dp)
         Spacer(Modifier.height(12.dp))
         Text(
-            "Squads are being set up",
+            "Groups are being set up",
             style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = T.text),
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "The squad arena is almost ready. Try again soon.",
+            "The group arena is almost ready. Try again soon.",
             style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 13.sp, color = T.muted),
             textAlign = TextAlign.Center,
         )
@@ -419,7 +420,7 @@ fun SquadHubScreen(
                     if (it is SquadsUnavailable) unavailable = true
                     else {
                         android.util.Log.w("Squads", "fetchMySquads failed: ${it.message}")
-                        error = "Could not load squads. Check your connection and try again."
+                        error = "Could not load groups. Check your connection and try again."
                     }
                 }
         }
@@ -427,7 +428,7 @@ fun SquadHubScreen(
     LaunchedEffect(myUserId) { refresh() }
 
     Column(Modifier.fillMaxSize()) {
-        SquadTopAppBar("Squads", onBack)
+        SquadTopAppBar("Groups", onBack)
         when {
             myUserId.isNullOrBlank() -> {
                 Column(
@@ -440,13 +441,13 @@ fun SquadHubScreen(
                     FeatureIcon(drawableRes = R.drawable.ic3d_people, contentDescription = null, size = 56.dp)
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "Sign in to use squads",
+                        "Sign in to use groups",
                         style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = T.text),
                         textAlign = TextAlign.Center,
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Squads need an account so your friends can find you on the leaderboard.",
+                        "Groups need an account so your friends can find you on the leaderboard.",
                         style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 13.sp, color = T.muted),
                         textAlign = TextAlign.Center,
                     )
@@ -488,7 +489,7 @@ fun SquadHubScreen(
                             ) {
                                 Column {
                                     Text(
-                                        "Create squad",
+                                        "Create group",
                                         style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = T.onAccent),
                                     )
                                     Spacer(Modifier.height(4.dp))
@@ -559,7 +560,7 @@ fun SquadHubScreen(
                                 FeatureIcon(drawableRes = R.drawable.ic3d_trophy, contentDescription = null, size = 52.dp)
                                 Spacer(Modifier.height(10.dp))
                                 Text(
-                                    "No squads yet",
+                                    "No groups yet",
                                     style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = T.text),
                                 )
                                 Spacer(Modifier.height(4.dp))
@@ -669,9 +670,17 @@ fun SquadCreateScreen(
     var creating by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
+    // v1.3.2: on-device NSFW screen — explicit pictures are rejected with
+    // a premium sheet before they can be set as the group picture.
+    var showNsfwRejection by remember { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             scope.launch(Dispatchers.IO) {
+                val verdict = com.example.util.NsfwScreenGate.screenUri(context, uri)
+                if (verdict == com.example.util.NsfwScreenGate.Verdict.REJECT) {
+                    withContext(Dispatchers.Main) { showNsfwRejection = true }
+                    return@launch
+                }
                 val encoded = encodePickedSquadPicture(context, uri)
                 withContext(Dispatchers.Main) {
                     if (encoded != null) pictureDataUri = encoded
@@ -680,9 +689,18 @@ fun SquadCreateScreen(
             }
         }
     }
+    if (showNsfwRejection) {
+        NsfwRejectionSheet(
+            onDismiss = { showNsfwRejection = false },
+            onChooseAnother = {
+                showNsfwRejection = false
+                picker.launch("image/*")
+            }
+        )
+    }
 
     Column(Modifier.fillMaxSize()) {
-        SquadTopAppBar("New squad", onBack)
+        SquadTopAppBar("New group", onBack)
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 40.dp),
@@ -695,7 +713,7 @@ fun SquadCreateScreen(
                     Spacer(Modifier.width(14.dp))
                     Column {
                         Text(
-                            "Squad picture",
+                            "Group picture",
                             style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = T.text),
                         )
                         Spacer(Modifier.height(4.dp))
@@ -718,7 +736,7 @@ fun SquadCreateScreen(
                     }
                 }
             }
-            item { SquadTextField(value = name, onValueChange = { name = it; error = null }, label = "Squad name", maxChars = 48) }
+            item { SquadTextField(value = name, onValueChange = { name = it; error = null }, label = "Group name", maxChars = 48) }
             item {
                 SquadTextField(
                     value = bio, onValueChange = { bio = it }, label = "Bio (optional)",
@@ -741,7 +759,7 @@ fun SquadCreateScreen(
             }
             item {
                 SquadPrimaryButton(
-                    text = if (creating) "Creating..." else "Create squad",
+                    text = if (creating) "Creating..." else "Create group",
                     enabled = !creating && name.isNotBlank() && !myUserId.isNullOrBlank(),
                 ) {
                     creating = true
@@ -759,8 +777,8 @@ fun SquadCreateScreen(
                         res.onSuccess { onCreated(it) }
                             .onFailure {
                                 error = if (it is SquadsUnavailable)
-                                    "Squads are being set up — try again soon."
-                                else it.message ?: "Could not create the squad."
+                                    "Groups are being set up — try again soon."
+                                else it.message ?: "Could not create the group."
                             }
                     }
                 }
@@ -809,7 +827,7 @@ fun SquadInviteScreen(
 
     fun copyLink() {
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText("Squad invite", link))
+        cm.setPrimaryClip(ClipData.newPlainText("Group invite", link))
         toastMsg = "Invite link copied."
         scope.launch {
             kotlinx.coroutines.delay(2200)
@@ -832,12 +850,12 @@ fun SquadInviteScreen(
     fun shareInvite(toWhatsApp: Boolean) {
         scope.launch {
             val bitmap = renderInvitePng()
-            val text = "Join my study squad \"${squad.name}\" on Focivo! Code: ${squad.inviteCode} — $link"
+            val text = "Join my study group \"${squad.name}\" on Focivo! Code: ${squad.inviteCode} — $link"
             if (bitmap == null) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Couldn't render the card — sharing text instead.", Toast.LENGTH_SHORT).show()
                 }
-                if (toWhatsApp) shareToWhatsApp(context, text) else shareGeneric(context, text, "Share squad invite")
+                if (toWhatsApp) shareToWhatsApp(context, text) else shareGeneric(context, text, "Share group invite")
                 return@launch
             }
             val uri = writeShareCardToCache(context, bitmap)
@@ -846,10 +864,10 @@ fun SquadInviteScreen(
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Couldn't prepare the image — sharing text instead.", Toast.LENGTH_SHORT).show()
                 }
-                if (toWhatsApp) shareToWhatsApp(context, text) else shareGeneric(context, text, "Share squad invite")
+                if (toWhatsApp) shareToWhatsApp(context, text) else shareGeneric(context, text, "Share group invite")
                 return@launch
             }
-            shareCardViaSystemSheet(context, text, toWhatsApp, uri, "Share squad invite")
+            shareCardViaSystemSheet(context, text, toWhatsApp, uri, "Share group invite")
         }
     }
 
@@ -993,7 +1011,7 @@ fun SquadInviteScreen(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                "Open squad",
+                "Open group",
                 style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF0D110E)),
             )
         }
@@ -1027,13 +1045,13 @@ fun SquadJoinScreen(
                 .onSuccess { foundName = it?.name }
                 .onFailure {
                     foundName = null
-                    if (it is SquadsUnavailable) error = "Squads are being set up — try again soon."
+                    if (it is SquadsUnavailable) error = "Groups are being set up — try again soon."
                 }
         }
     }
 
     Column(Modifier.fillMaxSize()) {
-        SquadTopAppBar(if (prefillCode.isNotBlank()) "Join squad" else "Join with code", onBack)
+        SquadTopAppBar(if (prefillCode.isNotBlank()) "Join group" else "Join with code", onBack)
         Column(
             Modifier
                 .fillMaxSize()
@@ -1042,7 +1060,7 @@ fun SquadJoinScreen(
         ) {
             if (prefillCode.isNotBlank()) {
                 Text(
-                    "You were invited to join a study squad.",
+                    "You were invited to join a study group.",
                     style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 14.sp, color = T.muted),
                 )
             }
@@ -1058,7 +1076,7 @@ fun SquadJoinScreen(
             )
             if (foundName != null) {
                 Text(
-                    "Squad: $foundName",
+                    "Group: $foundName",
                     style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = T.accentText),
                 )
             }
@@ -1070,12 +1088,12 @@ fun SquadJoinScreen(
             }
             if (myUserId.isNullOrBlank()) {
                 Text(
-                    "Sign in to join squads.",
+                    "Sign in to join groups.",
                     style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 13.sp, color = T.muted),
                 )
             } else {
                 SquadPrimaryButton(
-                    text = if (joining) "Joining..." else "Join squad",
+                    text = if (joining) "Joining..." else "Join group",
                     enabled = !joining && code.trim().length >= 4,
                 ) {
                     joining = true
@@ -1090,8 +1108,8 @@ fun SquadJoinScreen(
                         joining = false
                         res.onSuccess { onJoined(it) }
                             .onFailure {
-                                error = if (it is SquadsUnavailable) "Squads are being set up — try again soon."
-                                else it.message ?: "Could not join the squad."
+                                error = if (it is SquadsUnavailable) "Groups are being set up — try again soon."
+                                else it.message ?: "Could not join the group."
                             }
                     }
                 }
@@ -1136,7 +1154,7 @@ fun SquadDetailScreen(
                 val mine = myUserId?.let { SquadRepository.fetchMySquads(it).getOrNull() }.orEmpty()
                 squad = mine.firstOrNull { it.id == squadId }
                 if (squad == null) {
-                    error = "Could not open this squad."
+                    error = "Could not open this group."
                     return@launch
                 }
             }
@@ -1163,12 +1181,12 @@ fun SquadDetailScreen(
                     SquadStandingsCardPng(squad = s, standings = st)
                 }
             }
-            val text = "\"${s.name}\" squad standings this week on Focivo — join with code ${s.inviteCode}: ${squadJoinLink(s.inviteCode)}"
+            val text = "\"${s.name}\" group standings this week on Focivo — join with code ${s.inviteCode}: ${squadJoinLink(s.inviteCode)}"
             if (bitmap == null) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Couldn't render the card — sharing text instead.", Toast.LENGTH_SHORT).show()
                 }
-                if (toWhatsApp) shareToWhatsApp(context, text) else shareGeneric(context, text, "Share squad standings")
+                if (toWhatsApp) shareToWhatsApp(context, text) else shareGeneric(context, text, "Share group standings")
                 return@launch
             }
             val uri = writeShareCardToCache(context, bitmap)
@@ -1177,10 +1195,10 @@ fun SquadDetailScreen(
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Couldn't prepare the image — sharing text instead.", Toast.LENGTH_SHORT).show()
                 }
-                if (toWhatsApp) shareToWhatsApp(context, text) else shareGeneric(context, text, "Share squad standings")
+                if (toWhatsApp) shareToWhatsApp(context, text) else shareGeneric(context, text, "Share group standings")
                 return@launch
             }
-            shareCardViaSystemSheet(context, text, toWhatsApp, uri, "Share squad standings")
+            shareCardViaSystemSheet(context, text, toWhatsApp, uri, "Share group standings")
         }
     }
 
@@ -1212,19 +1230,19 @@ fun SquadDetailScreen(
     Column(Modifier.fillMaxSize()) {
         when {
             unavailable -> {
-                SquadTopAppBar("Squad", onBack)
+                SquadTopAppBar("Group", onBack)
                 Column(Modifier.padding(horizontal = 22.dp)) { SquadsUnavailableCard(onRetry = ::refresh) }
             }
             squad == null && error == null -> {
-                SquadTopAppBar("Squad", onBack)
+                SquadTopAppBar("Group", onBack)
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = T.accent)
                 }
             }
             squad == null -> {
-                SquadTopAppBar("Squad", onBack)
+                SquadTopAppBar("Group", onBack)
                 Text(
-                    error ?: "Could not open this squad.",
+                    error ?: "Could not open this group.",
                     style = TextStyle(fontFamily = PoppinsFontFamily, fontSize = 13.sp, color = T.muted),
                     modifier = Modifier.padding(22.dp),
                 )
@@ -1349,7 +1367,7 @@ fun SquadDetailScreen(
                                                 .onFailure {
                                                     Toast.makeText(
                                                         context,
-                                                        it.message ?: "Could not leave the squad.",
+                                                        it.message ?: "Could not leave the group.",
                                                         Toast.LENGTH_SHORT
                                                     ).show()
                                                 }
@@ -1360,7 +1378,7 @@ fun SquadDetailScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                if (leaving) "Working..." else if (isOwner) "Delete squad" else "Leave squad",
+                                if (leaving) "Working..." else if (isOwner) "Delete group" else "Leave group",
                                 style = TextStyle(fontFamily = PoppinsFontFamily, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Color(0xFFE5484D)),
                             )
                         }

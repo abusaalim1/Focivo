@@ -58,6 +58,11 @@ object AppUpdateManager {
     private const val PREFS_NAME = "focivo_app_update_prefs"
     private const val KEY_LAST_CHECK_TIMESTAMP = "last_update_check_time"
     private const val KEY_DISMISSED_VERSION = "dismissed_version_code"
+    // v1.3.2: one notification per version, ever. Persisted last-notified
+    // versionCode — a given version triggers AT MOST ONE status-bar
+    // notification across every check path (app-open + scheduled). A
+    // genuinely newer versionCode notifies once.
+    private const val KEY_LAST_NOTIFIED_VERSION = "last_notified_version_code"
     // v1.1.3: dismissal only suppresses the auto dialog for 24h so it re-shows
     // on next launch/day instead of being hidden forever.
     private const val KEY_DISMISSED_AT = "dismissed_version_at"
@@ -255,6 +260,23 @@ object AppUpdateManager {
             .edit()
             .putInt(KEY_HOME_OVERLAY_DISMISSED_VERSION, versionCode)
             .apply()
+    }
+
+    /**
+     * v1.3.2: notification gate. Returns true the FIRST time a version asks to
+     * notify and persists it, so the same version can never notify twice —
+     * no matter how many check paths fire (app open, daily alarm). A newer
+     * versionCode returns true again (one notification for the new version).
+     */
+    fun claimNotifyForVersion(context: Context, versionCode: Int): Boolean {
+        return try {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (prefs.getInt(KEY_LAST_NOTIFIED_VERSION, 0) >= versionCode) return false
+            prefs.edit().putInt(KEY_LAST_NOTIFIED_VERSION, versionCode).apply()
+            true
+        } catch (_: Exception) {
+            false // fail closed: never spam when storage is unavailable
+        }
     }
 
     /**

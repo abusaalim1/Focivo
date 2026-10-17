@@ -69,7 +69,7 @@ private fun squadHm(minutes: Int): String =
 /** Rank message under a member's name — English only, no emojis (vector crown drawn instead). */
 private fun squadRankMessage(rank: Int, me: Boolean): String = when {
     rank == 1 && me -> "You are on top. Hold the crown."
-    rank == 1 -> "Leads the squad this week."
+    rank == 1 -> "Leads the group this week."
     rank == 2 && me -> "One spot from the top. Push."
     rank == 2 -> "Chasing the leader."
     rank == 3 && me -> "Podium finish. Keep climbing."
@@ -410,7 +410,7 @@ fun SquadInviteCardPng(
             modifier = Modifier.padding(top = 10.dp),
         )
         Text(
-            "Join \u201C${squad.name}\u201D on Focivo. Block distractions, climb the squad leaderboard.",
+            "Join \u201C${squad.name}\u201D on Focivo. Block distractions, climb the group leaderboard.",
             style = squadSans(13f, FontWeight.Medium, SquadInk.copy(alpha = .8f), lh = 1.4f),
             modifier = Modifier.padding(top = 8.dp).widthIn(max = 280.dp),
         )

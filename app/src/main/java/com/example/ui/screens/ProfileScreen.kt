@@ -102,6 +102,10 @@ import com.example.ui.theme.isAppInDarkTheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // v1.2.3 design-unification — owner's clean-redesign language:
 // Poppins body, Instrument Serif italic for the page headline,
@@ -1435,12 +1439,37 @@ fun ProfileScreen(
         var editedExam by remember { mutableStateOf(userPreferences?.targetExam.orEmpty()) }
         var editedIsPublic by remember { mutableStateOf(userPreferences?.isProfilePublic ?: true) }
         var selectedPhotoUri by remember { mutableStateOf<android.net.Uri?>(null) }
+        // v1.3.2: on-device NSFW screen — explicit pictures are rejected with
+        // a premium sheet before they can be set as the profile picture.
+        var showNsfwRejection by remember { mutableStateOf(false) }
+        val editScope = rememberCoroutineScope()
         val photoPickerLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.PickVisualMedia()
         ) { uri ->
             if (uri != null) {
-                selectedPhotoUri = uri
+                editScope.launch(Dispatchers.IO) {
+                    val verdict = com.example.util.NsfwScreenGate.screenUri(context, uri)
+                    withContext(Dispatchers.Main) {
+                        if (verdict == com.example.util.NsfwScreenGate.Verdict.REJECT) {
+                            showNsfwRejection = true
+                        } else {
+                            selectedPhotoUri = uri
+                        }
+                    }
+                }
             }
+        }
+
+        if (showNsfwRejection) {
+            com.example.ui.components.NsfwRejectionSheet(
+                onDismiss = { showNsfwRejection = false },
+                onChooseAnother = {
+                    showNsfwRejection = false
+                    photoPickerLauncher.launch(
+                        androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                }
+            )
         }
 
         AlertDialog(

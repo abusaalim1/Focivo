@@ -18,8 +18,8 @@ android {
     applicationId = "com.aistudio.focusly.kqpzxr"
     minSdk = 24
     targetSdk = 36
-    versionCode = 28
-    versionName = "1.3.1"
+    versionCode = 29
+    versionName = "1.3.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -151,6 +151,8 @@ dependencies {
   implementation(libs.okhttp)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
+  // v1.3.2: on-device NSFW image gate (profile/group pictures).
+  implementation(libs.tflite.task.vision)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)

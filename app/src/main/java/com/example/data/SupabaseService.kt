@@ -1160,13 +1160,10 @@ class SupabaseService {
      * v1.2: targeted avatar write for public.study_leaderboard — ONLY the
      * avatar_url column, and ONLY when non-blank. Never null-wipes.
      *
-     * Proven live 2026-10-15: the avatar_url column does NOT exist on the
-     * study_leaderboard table (PostgREST 42703) and the 'avatars' storage
-     * bucket is missing, so remote leaderboard avatars currently cannot
-     * persist. This write is therefore best-effort: a missing column is
-     * caught and logged, never propagated as a failure. Once the column is
-     * added server-side (ALTER TABLE study_leaderboard ADD COLUMN avatar_url
-     * text), avatars start syncing with no app update needed.
+     * v1.3.2: the avatar_url column now EXISTS on study_leaderboard (owner ran
+     * the schema SQL 2026-10-17; verified live via REST round-trip — an anon
+     * read-back returns the written avatar_url). Avatars therefore sync to
+     * other users. The write stays best-effort (caught, never propagated).
      */
     suspend fun updateLeaderboardAvatarUrl(userId: String, avatarUrl: String): Result<Boolean> =
         withContext(Dispatchers.IO) {

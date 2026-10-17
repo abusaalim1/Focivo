@@ -114,7 +114,7 @@ object SquadRepository {
                 }
             }
             val code = inviteCode
-                ?: return@withContext Result.failure(Exception("Could not create the squad. Please try again."))
+                ?: return@withContext Result.failure(Exception("Could not create the group. Please try again."))
             // Owner auto-joins as member #1 (best-effort; squad still exists if this fails).
             runCatching {
                 client.from("squad_members").insert(buildJsonObject {
@@ -142,8 +142,8 @@ object SquadRepository {
     }
 
     /**
-     * Join a squad by invite code. Enforces the 8-member cap (owner spec) and
-     * rejects duplicates. Returns the joined squad on success.
+     * Join a group by invite code. Enforces the 100-member cap (v1.3.2 owner spec)
+     * and rejects duplicates. Returns the joined group on success.
      */
     suspend fun joinSquad(
         code: String,
@@ -153,13 +153,13 @@ object SquadRepository {
     ): Result<Squad> = withContext(Dispatchers.IO) {
         try {
             val squad = fetchSquadByCode(code).getOrElse { return@withContext Result.failure(it) }
-                ?: return@withContext Result.failure(NoSuchElementException("No squad found for that code."))
+                ?: return@withContext Result.failure(NoSuchElementException("No group found for that code."))
             val members = fetchMembersInternal(squad.id)
             if (members.any { it.user_id == userId }) {
                 return@withContext Result.success(squad.copy(memberCount = members.size))
             }
             if (members.size >= SQUADS_MAX_MEMBERS) {
-                return@withContext Result.failure(IllegalStateException("This squad is full (8 members)."))
+                return@withContext Result.failure(IllegalStateException("This group is full (100 members)."))
             }
             client.from("squad_members").insert(buildJsonObject {
                 put("id", java.util.UUID.randomUUID().toString())
@@ -229,8 +229,12 @@ object SquadRepository {
                     SupabaseService.getInstance().fetchLeaderboard()
                 }.getOrElse { emptyList() }
                 val byUser = leaderboard.associateBy { it.user_id }
-                val ranked = members.map { m ->
+                val ranked = members.mapNotNull { m ->
                     val row = byUser[m.userId]
+                    // v1.3.2: private profiles (is_public=false) show neither
+                    // stats nor avatar to other users — including fellow group
+                    // members. The member still sees their own entry.
+                    if (m.userId != myUserId && row?.is_public == false) return@mapNotNull null
                     SquadStanding(
                         member = m,
                         weeklySeconds = row?.weekly_study_seconds ?: 0L,

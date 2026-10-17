@@ -189,6 +189,9 @@ private fun ClockStyleFace(
                 remainingSec = params.remainingSeconds,
                 totalSec = params.totalSeconds,
                 accent = accent,
+                // v1.3.2: backdrop-appropriate ink (Aurora light canvas gets dark
+                // digits; dark backdrops keep white). Fixes invisible digits.
+                content = backdropPrimary(params.theme, isDark),
                 modifier = Modifier.size(300.dp)
             )
         }
@@ -200,7 +203,7 @@ private fun ClockStyleFace(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 9.sp,
                 letterSpacing = 2.sp,
-                color = faceTextSecondary(isDark).copy(alpha = 0.75f)
+                color = backdropSecondary(params.theme, isDark)
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
@@ -330,7 +333,10 @@ private fun FaceTappableTime(
     letterSpacing: TextUnit = (-1).sp,
     textAlign: TextAlign = TextAlign.Center,
     horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // v1.3.2: explicit ink override for faces that draw the digits on a CARD
+    // surface (GlassCard) rather than the backdrop. Null = backdrop ink.
+    color: Color? = null
 ) {
     val isDark = isAppInDarkTheme()
     val tappable = params.onTimeClick != null && !params.isRunning
@@ -344,7 +350,7 @@ private fun FaceTappableTime(
             fontWeight = FontWeight.Bold,
             fontSize = fontSize,
             letterSpacing = letterSpacing,
-            color = backdropPrimary(params.theme, isDark),
+            color = color ?: backdropPrimary(params.theme, isDark),
             textAlign = textAlign,
             modifier = Modifier.then(
                 if (tappable) Modifier.clickable(
@@ -361,7 +367,7 @@ private fun FaceTappableTime(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 9.sp,
                 letterSpacing = 2.sp,
-                color = faceTextSecondary(isDark).copy(alpha = 0.75f)
+                color = backdropSecondary(params.theme, isDark)
             )
         }
     }
@@ -436,10 +442,10 @@ private fun faceTextSecondary(isDark: Boolean): Color =
  * heuristic only when no theme is attached.
  */
 private fun backdropPrimary(theme: TimerTheme?, isDark: Boolean): Color =
-    theme?.onBackdropContent ?: faceTextPrimary(isDark)
+    theme?.backdropContent(isDark) ?: faceTextPrimary(isDark)
 
 private fun backdropSecondary(theme: TimerTheme?, isDark: Boolean): Color =
-    theme?.onBackdropContent?.copy(alpha = 0.72f) ?: faceTextSecondary(isDark)
+    theme?.backdropContent(isDark)?.copy(alpha = 0.72f) ?: faceTextSecondary(isDark)
 
 // ---------------------------------------------------------------------------
 // Face 2 — Minimal Digits: huge type, no ring, hairline progress.
@@ -480,7 +486,7 @@ private fun MinimalDigitsFace(
         )
         Spacer(modifier = Modifier.height(20.dp))
         // Hairline progress — track tint follows the backdrop, not the app theme.
-        val onBackdrop = params.theme?.onBackdropContent
+        val onBackdrop = params.theme?.backdropContent(isDark)
         val trackColor = when {
             onBackdrop != null -> onBackdrop.copy(alpha = 0.18f)
             isDark -> Color(0x33FFFFFF)
@@ -557,7 +563,14 @@ private fun GlassCardFace(
                     onTagClick = params.onTagClick
                 )
                 Spacer(modifier = Modifier.height(14.dp))
-                FaceTappableTime(params = params, fontSize = 64.sp, letterSpacing = (-0.5).sp)
+                // v1.3.2: the glass card is a LIGHT surface in light app mode —
+                // backdrop ink (light) rendered the digits invisible on it.
+                FaceTappableTime(
+                    params = params,
+                    fontSize = 64.sp,
+                    letterSpacing = (-0.5).sp,
+                    color = faceTextPrimary(isDark)
+                )
                 Spacer(modifier = Modifier.height(12.dp))
                 // Rounded progress bar
                 Box(
@@ -565,7 +578,7 @@ private fun GlassCardFace(
                         .fillMaxWidth()
                         .height(10.dp)
                         .clip(CircleShape)
-                        .background(if (isDark) Color(0x2AFFFFFF) else Color(0x14000000))
+                        .background(backdropSecondary(params.theme, isDark).copy(alpha = 0.35f))
                 ) {
                     Box(
                         modifier = Modifier
@@ -658,7 +671,7 @@ private fun HalfArcFace(
         ((params.totalSeconds - params.remainingSeconds).toFloat() / params.totalSeconds).coerceIn(0f, 1f)
     } else 0f
     val accent = if (params.isBreak) FaceMint else FaceLime
-    val trackColor = if (isDark) Color(0x2EFFFFFF) else Color(0x16000000)
+    val trackColor = backdropSecondary(params.theme, isDark).copy(alpha = 0.4f)
 
     Column(
         modifier = modifier
@@ -714,7 +727,7 @@ private fun HalfArcFace(
                     fontSize = 11.sp,
                     letterSpacing = 1.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = faceTextSecondary(isDark)
+                    color = backdropSecondary(params.theme, isDark)
                 )
             }
         }
@@ -776,7 +789,7 @@ private fun EditorialFace(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(3.dp)
-                .background(if (isDark) Color(0x2AFFFFFF) else Color(0x14000000))
+                .background(backdropSecondary(params.theme, isDark).copy(alpha = 0.35f))
         ) {
             Box(
                 modifier = Modifier
@@ -796,7 +809,7 @@ private fun EditorialFace(
                 fontFamily = PoppinsFontFamily,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
-                color = faceTextSecondary(isDark),
+                color = backdropSecondary(params.theme, isDark),
                 modifier = Modifier.weight(1f)
             )
             if (params.onTagClick != null && !params.isRunning && !params.isBreak) {

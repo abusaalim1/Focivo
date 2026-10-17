@@ -1,0 +1,17 @@
+nsfw_model.tflite — on-device NSFW image classifier weights
+=============================================================
+Source: "nsfw_model" by GantMan / Infinite Red
+https://github.com/GantMan/nsfw_model
+Release 1.2.0 asset: mobilenet_v2_140_224 (MobileNetV2, 224x224, 5 classes:
+drawings, hentai, neutral, porn, sexy)
+
+License: MIT License, Copyright (c) 2020 The nsfw_model Developers
+(see https://github.com/GantMan/nsfw_model/blob/master/LICENSE.md).
+Used in Focivo under the MIT terms (commercial use permitted).
+
+Conversion: project's own SavedModel converted to full-integer-quantized
+TFLite (uint8 in/out) for on-device Android inference. No weights were
+retrained or modified; only post-training quantization was applied.
+
+Used by: com.example.util.NsfwScreenGate (Focivo 1.3.2, item 6) —
+profile / group picture screening. Fully on-device; no image leaves the phone.
