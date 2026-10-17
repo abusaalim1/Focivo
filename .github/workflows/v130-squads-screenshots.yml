@@ -1,10 +1,14 @@
-name: V130 Squads Screenshots
+name: V130 Final Verify
 
-# v1.3.0 squads verify: runs the Robolectric/Roborazzi screenshot tests for
-# the squad share cards on the feat/v130-squads branch and uploads the PNGs
-# as an artifact. The owner reviews these before ANY merge or release.
+# v1.3.0 FINAL assembly verify (branch feat/v130-squads):
+#  1. compileDebugKotlin (fails fast on Kotlin errors)
+#  2. FULL unit test suite (:app:testDebugUnitTest)
+#  3. V130 screenshot tests in record mode (V130Squads* cards + V130Final*
+#     full-screen sweep: Home/squads hub-create-invite-join-detail,
+#     session-complete, customize timer, profile + edit profile, Focus)
+# Uploads the PNGs as an artifact for eyeball verification.
 #
-# Trigger: push to THIS branch only. Nothing touches main.
+# Trigger: push to THIS branch only + manual dispatch. Nothing touches main.
 # Note: this repo has no gradle wrapper committed, so we provision Gradle
 # via gradle/actions/setup-gradle like the debug build workflow does.
 #
@@ -17,9 +21,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  screenshots:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,26 +42,51 @@ jobs:
       - name: Compile app (fails fast on Kotlin errors)
         run: gradle :app:compileDebugKotlin --stacktrace
 
-      - name: Run V130 squads screenshot tests (record mode, forced real renders)
-        run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.V130Squads*" --rerun-tasks --no-configuration-cache --stacktrace
+      - name: Run FULL unit test suite
+        run: gradle :app:testDebugUnitTest --rerun-tasks --no-configuration-cache --stacktrace
 
-      - name: Dump test failure stacks
+      - name: Dump unit test results
+        if: always()
+        run: |
+          python3 -c "
+          import glob, xml.etree.ElementTree as ET
+          total = passed = failed = errors = 0
+          bad = []
+          for f in glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml'):
+              for tc in ET.parse(f).getroot().iter('testcase'):
+                  total += 1
+                  fails = list(tc.iter('failure')) + list(tc.iter('error'))
+                  if fails:
+                      failed += 1
+                      bad.append((tc.get('classname'), tc.get('name'), (fails[0].get('message') or '')[:300]))
+                  else:
+                      passed += 1
+          print(f'UNIT TESTS: total={total} passed={passed} failed={failed}')
+          for c, n, m in bad: print('FAIL:', c, '::', n, '::', m)
+          "
+
+      - name: Run V130 screenshot tests (record mode, forced real renders)
+        run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.V130*" --rerun-tasks --no-configuration-cache --stacktrace
+
+      - name: Dump screenshot test failure stacks
         if: always()
         run: python3 -c "import glob,xml.etree.ElementTree as ET;[print(chr(61)*70,tc.get('classname'),'::',tc.get('name'),'MESSAGE:',(fl.get('message')or '')[:800],'STACK:',(fl.text or '')[:4000]) for f in glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml') for tc in ET.parse(f).getroot().iter('testcase') for fl in list(tc.iter('failure'))+list(tc.iter('error'))]"
 
       - name: Locate generated PNGs
         if: always()
         run: |
-          echo "=== V130 squads screenshot dir ==="
-          find app/src/test/screenshots/v130-squads -type f 2>/dev/null | head -40
-          echo "=== PNG count ==="
+          echo "=== v130-squads PNGs ==="
           find app/src/test/screenshots/v130-squads -name '*.png' 2>/dev/null | wc -l
+          echo "=== v130-final PNGs ==="
+          find app/src/test/screenshots/v130-final -name '*.png' 2>/dev/null | wc -l
+          find app/src/test/screenshots/v130-final -name '*.png' 2>/dev/null | head -40
 
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v130-squads-screenshots
+          name: v130-final-screenshots
           path: |
             app/src/test/screenshots/v130-squads/
+            app/src/test/screenshots/v130-final/
           if-no-files-found: error
