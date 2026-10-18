@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -153,10 +154,22 @@ private enum class GuardOptInTarget { AI_GUARD, YT_FILTER }
 @Composable
 fun GuardControlCluster(
     onOpenScreenTimeBudgets: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /**
+     * Text color for the toggle labels, drawn directly on the Study
+     * screen's ambient timer-theme backdrop. Callers MUST pass the
+     * theme's backdrop content color (TimerTheme.backdropContent) —
+     * the raw design-token text color is unreadable on dark backdrops
+     * in light app mode (and vice versa). Defaults to the token text
+     * color for standalone (non-backdrop) renders.
+     */
+    contentColor: Color = Color.Unspecified,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val T = focivoTokens()
+    // Resolved label color: backdrop-aware when the caller provides it.
+    val labelColor = if (contentColor != Color.Unspecified) contentColor else T.text
 
     val isStrictOn by StrictModeManager.isStrictModeState.collectAsState()
     val isYtFilterOn by YouTubeStudyGuardManager.isFilterEnabledState.collectAsState()
@@ -225,6 +238,7 @@ fun GuardControlCluster(
             icon = Icons.Default.Lock,
             label = "Strict",
             isOn = isStrictOn,
+            labelColor = labelColor,
             onIconClick = onStrictIconTap,
             onLabelClick = { explainerKey = GuardExplainerKey.STRICT },
             iconTestTag = "guard_cluster_strict_icon",
@@ -234,6 +248,7 @@ fun GuardControlCluster(
             icon = Icons.Default.Shield,
             label = "AI Guard",
             isOn = isAiGuardOn,
+            labelColor = labelColor,
             onIconClick = onGuardIconTap,
             onLabelClick = { explainerKey = GuardExplainerKey.AI_GUARD },
             iconTestTag = "guard_cluster_guard_icon",
@@ -243,6 +258,7 @@ fun GuardControlCluster(
             icon = Icons.Default.OndemandVideo,
             label = "YT Filter",
             isOn = isYtFilterOn,
+            labelColor = labelColor,
             onIconClick = onYtFilterIconTap,
             onLabelClick = { explainerKey = GuardExplainerKey.YT_FILTER },
             iconTestTag = "guard_cluster_ytfilter_icon",
@@ -254,6 +270,7 @@ fun GuardControlCluster(
             label = "Limits",
             stateCaption = "Budgets",
             isOn = null,
+            labelColor = labelColor,
             onIconClick = onOpenScreenTimeBudgets,
             onLabelClick = onOpenScreenTimeBudgets,
             iconTestTag = "guard_cluster_limits_icon",
@@ -308,6 +325,7 @@ private fun GuardToggleRow(
     icon: ImageVector,
     label: String,
     isOn: Boolean?,
+    labelColor: Color,
     onIconClick: () -> Unit,
     onLabelClick: () -> Unit,
     iconTestTag: String,
@@ -372,7 +390,11 @@ private fun GuardToggleRow(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 12.5.sp,
                 lineHeight = 15.sp,
-                color = if (isOn == null || on) T.text else T.muted
+                // Full-alpha backdrop content color in every state: the
+                // on/off state lives on the icon button (lime vs dim).
+                // Dimming the label here would drop it below the contrast
+                // floor on theme backdrops (v1.3.3 item 9 rule).
+                color = labelColor
             )
             Text(
                 text = caption,
@@ -380,7 +402,7 @@ private fun GuardToggleRow(
                 fontWeight = FontWeight.Medium,
                 fontSize = 10.sp,
                 lineHeight = 13.sp,
-                color = if (on) T.accentText else T.muted
+                color = labelColor
             )
         }
     }

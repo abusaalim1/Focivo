@@ -594,6 +594,12 @@ fun FocusScreen(
                     ) {
                         GuardControlCluster(
                             onOpenScreenTimeBudgets = onOpenScreenTimeBudgets,
+                            // v1.3.3 (ITEM 5): the labels sit directly on the
+                            // ambient timer-theme backdrop — they must use
+                            // the backdrop content color, never the raw
+                            // design token (unreadable on dark backdrops in
+                            // light app mode, and vice versa).
+                            contentColor = selectedTheme.backdropContent(isDark),
                             modifier = Modifier.weight(0.44f)
                         )
                         Spacer(modifier = Modifier.width(12.dp))

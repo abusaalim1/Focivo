@@ -1,18 +1,30 @@
 package com.example
 
-import com.example.service.AiStudyAccessibilityService
+import android.content.Context
+import android.provider.Settings
+import androidx.test.core.app.ApplicationProvider
 
 /**
- * Test-only helper: flips AiStudyAccessibilityService's service-connected
- * flag so guard tests can simulate the granted accessibility permission.
+ * Test-only helper: simulates the granted accessibility permission by
+ * registering Focivo's AiStudyAccessibilityService in Settings.Secure —
+ * the exact signal AiStudyGuardManager.isAccessibilityPermissionGranted()
+ * reads on a real device (after the live-service fast path, which never
+ * fires in Robolectric).
  *
- * Uses reflection deliberately: the flag lives in the service's companion
- * and its Kotlin visibility has churned while other workers edit the file —
- * reflection keeps these tests compiling regardless.
+ * Deliberately avoids touching the service's companion flag: its Kotlin
+ * visibility has churned while other workers edit the file, and the
+ * Settings path is the production code path anyway.
  */
 fun setAiStudyServiceConnectedForTest(connected: Boolean) {
-    val companion = AiStudyAccessibilityService.Companion
-    val field = companion.javaClass.getDeclaredField("isServiceConnected")
-    field.isAccessible = true
-    field.setBoolean(companion, connected)
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val value = if (connected) {
+        "${context.packageName}/com.example.service.AiStudyAccessibilityService"
+    } else {
+        ""
+    }
+    Settings.Secure.putString(
+        context.contentResolver,
+        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        value
+    )
 }

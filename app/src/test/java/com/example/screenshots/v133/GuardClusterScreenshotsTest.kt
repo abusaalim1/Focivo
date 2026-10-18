@@ -98,19 +98,31 @@ class GuardClusterScreenshotsTest {
 
     // -- Cluster alone ------------------------------------------------------
 
+    /**
+     * Renders the cluster exactly as FocusScreen does: labels in the
+     * timer theme's backdrop content color (v1.3.3 item 9 rule).
+     */
+    private fun clusterShot(dark: Boolean) {
+        val theme = TimerThemeManager.selectedTheme.value
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+        ) {
+            GuardControlCluster(
+                onOpenScreenTimeBudgets = {},
+                contentColor = theme.backdropContent(dark)
+            )
+        }
+    }
+
     @Test
     fun cluster_dark_mixedStates() {
         TimerThemeManager.init(context)
         TimerThemeManager.selectTheme(context, "midnight")
         setToggleStates(strict = true, guard = true, ytFilter = false)
         themed(dark = true) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
-            ) {
-                GuardControlCluster(onOpenScreenTimeBudgets = {})
-            }
+            clusterShot(dark = true)
         }
         capture("cluster_dark_mixed")
         resetToggleStates()
@@ -122,13 +134,7 @@ class GuardClusterScreenshotsTest {
         TimerThemeManager.selectTheme(context, "aurora")
         setToggleStates(strict = false, guard = false, ytFilter = false)
         themed(dark = false) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
-            ) {
-                GuardControlCluster(onOpenScreenTimeBudgets = {})
-            }
+            clusterShot(dark = false)
         }
         capture("cluster_light_all_off")
         resetToggleStates()
@@ -140,15 +146,25 @@ class GuardClusterScreenshotsTest {
         TimerThemeManager.selectTheme(context, "midnight")
         setToggleStates(strict = true, guard = true, ytFilter = true)
         themed(dark = true) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
-            ) {
-                GuardControlCluster(onOpenScreenTimeBudgets = {})
-            }
+            clusterShot(dark = true)
         }
         capture("cluster_dark_all_on")
+        resetToggleStates()
+    }
+
+    /**
+     * The reported bug: light app mode + dark ambient backdrop (midnight
+     * theme) — labels must stay readable via the backdrop content color.
+     */
+    @Test
+    fun cluster_light_darkBackdrop() {
+        TimerThemeManager.init(context)
+        TimerThemeManager.selectTheme(context, "midnight")
+        setToggleStates(strict = true, guard = false, ytFilter = false)
+        themed(dark = false) {
+            clusterShot(dark = false)
+        }
+        capture("cluster_light_dark_backdrop")
         resetToggleStates()
     }
 
@@ -261,5 +277,41 @@ class GuardClusterScreenshotsTest {
     @Test
     fun study_with_cluster_light() {
         studyScreen(dark = false, name = "study_with_cluster_light")
+    }
+
+    /**
+     * Light app mode + dark midnight backdrop: the exact reported scenario
+     * for the label-contrast fix.
+     */
+    @Test
+    fun study_with_cluster_light_darkBackdrop() {
+        TimerThemeManager.init(context)
+        TimerThemeManager.selectTheme(context, "midnight")
+        setToggleStates(strict = true, guard = false, ytFilter = false)
+        themed(dark = false) {
+            FocusScreen(
+                remainingSeconds = 1500,
+                targetSeconds = 1500,
+                isRunning = false,
+                currentMode = "Deep Work",
+                currentTaskTitle = "Physics",
+                distractionsCount = 0,
+                ambientSound = "Rain",
+                userPreferences = fakePrefs(),
+                onStartTimer = {},
+                onPauseTimer = {},
+                onResumeTimer = {},
+                onFinishEarly = {},
+                onAddFiveMinutes = {},
+                onSkipBreak = {},
+                onSelectMode = { _, _ -> },
+                onSelectAmbientSound = {},
+                onLogDistraction = {},
+                onUpdateTaskTitle = {},
+                onOpenScreenTimeBudgets = {}
+            )
+        }
+        capture("study_with_cluster_light_dark_backdrop")
+        resetToggleStates()
     }
 }
