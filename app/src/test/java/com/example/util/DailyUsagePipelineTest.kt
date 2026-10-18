@@ -12,6 +12,11 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * v1.3.3 — DailyUsagePipeline: the single source of truth for usage stats.
@@ -204,6 +209,140 @@ class DailyUsagePipelineTest {
         DailyUsagePipeline.invalidate()
         DailyUsagePipeline.getSnapshot(context)
         assertEquals(2, queryCount)
+    }
+
+    // ---------- v1.3.4: daily-interval fallback must stay inside today ----------
+
+    private val MIN = 60_000L
+
+    /** 2026-10-18 10:09 IST (the owner's report moment) -> local-midnight anchor. */
+    private fun istDayStart(): Long {
+        val tz = TimeZone.getTimeZone("Asia/Kolkata")
+        val cal = Calendar.getInstance(tz, Locale.US)
+        cal.set(2026, Calendar.OCTOBER, 18, 10, 9, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return DailyUsagePipeline.dayStartMillis(cal.timeInMillis)
+    }
+
+    @Test
+    fun `mergeDailyIntervalStats drops the previous-day bucket even when larger`() {
+        val defaultTz = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"))
+            val dayStart = istDayStart()
+            val merged = mutableMapOf("com.a" to 235 * MIN) // today so far: 3h55m
+            DailyUsagePipeline.mergeDailyIntervalStats(
+                merged,
+                listOf(
+                    // yesterday's full-day bucket: 4h — must NOT leak into today
+                    DailyUsagePipeline.DailyBucketSample("com.a", 240 * MIN, dayStart - 86_400_000L)
+                ),
+                dayStart
+            )
+            assertEquals(235 * MIN, merged["com.a"])
+        } finally {
+            TimeZone.setDefault(defaultTz)
+        }
+    }
+
+    @Test
+    fun `mergeDailyIntervalStats keeps max for today's own bucket`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val merged = mutableMapOf("com.a" to 600 * MIN)
+        DailyUsagePipeline.mergeDailyIntervalStats(
+            merged,
+            listOf(DailyUsagePipeline.DailyBucketSample("com.a", 900 * MIN, dayStart)),
+            dayStart
+        )
+        assertEquals(900 * MIN, merged["com.a"])
+    }
+
+    @Test
+    fun `mergeDailyIntervalStats does not double-count overlapping buckets`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val merged = mutableMapOf("com.a" to 600 * MIN)
+        DailyUsagePipeline.mergeDailyIntervalStats(
+            merged,
+            listOf(DailyUsagePipeline.DailyBucketSample("com.a", 600 * MIN, dayStart)),
+            dayStart
+        )
+        assertEquals(600 * MIN, merged["com.a"]) // NOT 1200
+    }
+
+    @Test
+    fun `mergeDailyIntervalStats drops buckets starting one millisecond before midnight`() {
+        val defaultTz = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"))
+            val dayStart = istDayStart()
+            val merged = mutableMapOf("com.a" to 10 * MIN)
+            DailyUsagePipeline.mergeDailyIntervalStats(
+                merged,
+                listOf(
+                    // bucket that ENDS exactly at midnight starts 1ms before it
+                    DailyUsagePipeline.DailyBucketSample("com.a", 500 * MIN, dayStart - 1L)
+                ),
+                dayStart
+            )
+            assertEquals(10 * MIN, merged["com.a"])
+        } finally {
+            TimeZone.setDefault(defaultTz)
+        }
+    }
+
+    @Test
+    fun `mergeDailyIntervalStats skips zero and negative buckets`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val merged = mutableMapOf("com.a" to 10 * MIN)
+        DailyUsagePipeline.mergeDailyIntervalStats(
+            merged,
+            listOf(
+                DailyUsagePipeline.DailyBucketSample("com.a", 0L, dayStart),
+                DailyUsagePipeline.DailyBucketSample("com.a", -5L, dayStart)
+            ),
+            dayStart
+        )
+        assertEquals(10 * MIN, merged["com.a"])
+    }
+
+    @Test
+    fun `merged per-app numbers aggregate to a consistent header total`() {
+        // The Study header total is sum(perApp); the same merged map feeds
+        // the per-app rows and the budgets — this pins that invariant.
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val merged = mutableMapOf(
+            "com.a" to 68 * MIN, // like YouTube at 1h08m on the owner's device
+            "com.b" to 60 * MIN,
+            "com.c" to 57 * MIN
+        )
+        DailyUsagePipeline.mergeDailyIntervalStats(
+            merged,
+            listOf(
+                DailyUsagePipeline.DailyBucketSample("com.a", 240 * MIN, dayStart - 86_400_000L),
+                DailyUsagePipeline.DailyBucketSample("com.b", 120 * MIN, dayStart)
+            ),
+            dayStart
+        )
+        val samples = merged.map { (pkg, ms) -> DailyUsagePipeline.UsageSample(pkg, ms) }
+        val (perApp, total) = DailyUsagePipeline.aggregate(samples)
+        assertEquals(68 * MIN, perApp["com.a"]) // yesterday's 240m did NOT leak
+        assertEquals(120 * MIN, perApp["com.b"]) // today's fallback took the max
+        assertEquals(68 * MIN + 120 * MIN + 57 * MIN, total)
+        assertEquals(perApp.values.sum(), total)
+    }
+
+    @Test
+    fun `dayStartMillis is local midnight in Asia Kolkata`() {
+        val defaultTz = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"))
+            val dayStart = istDayStart()
+            val fmt = SimpleDateFormat("HH:mm:ss", Locale.US)
+            fmt.timeZone = TimeZone.getTimeZone("Asia/Kolkata")
+            assertEquals("00:00:00", fmt.format(Date(dayStart)))
+        } finally {
+            TimeZone.setDefault(defaultTz)
+        }
     }
 
     @Test

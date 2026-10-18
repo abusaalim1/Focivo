@@ -304,23 +304,49 @@ object FocivoNotifications {
      * v1.3.2: the gate lives in AppUpdateManager as a persisted
      * last-notified versionCode, shared by every check path (app-open check +
      * scheduled daily check). Respects the in-app overlay dismissal.
+     * v1.3.4: FORCE updates additionally re-notify at most once per 24h
+     * until the user updates or a newer version replaces this one.
      * Stable notification id [ID_UPDATE_AVAILABLE] keeps the shade clean.
      */
-    fun postUpdateAvailable(context: Context, versionName: String, versionCode: Int) {
+    fun postUpdateAvailable(
+        context: Context,
+        versionName: String,
+        versionCode: Int,
+        isForceUpdate: Boolean = false
+    ) {
         // Dedupe with the stored overlay dismissal for the same version.
         try {
             if (com.example.util.AppUpdateManager.isUpdateOverlayDismissed(context, versionCode)) return
         } catch (_: Exception) { }
         // Central gate: one notification per versionCode, across all paths.
-        if (!com.example.util.AppUpdateManager.claimNotifyForVersion(context, versionCode)) return
-        post(
-            context,
-            CHANNEL_UPDATES, "App Updates", "New version alerts",
-            NotificationManager.IMPORTANCE_HIGH,
-            ID_UPDATE_AVAILABLE,
-            "Focivo $versionName is here",
-            "New themes and fixes. Tap to update."
-        )
+        if (com.example.util.AppUpdateManager.claimNotifyForVersion(context, versionCode)) {
+            if (isForceUpdate) {
+                // Arm the 24h re-notify gate for this force version.
+                com.example.util.AppUpdateManager.recordForceUpdateNotified(context, versionCode)
+            }
+            post(
+                context,
+                CHANNEL_UPDATES, "App Updates", "New version alerts",
+                NotificationManager.IMPORTANCE_HIGH,
+                ID_UPDATE_AVAILABLE,
+                "Focivo $versionName is here",
+                "New themes and fixes. Tap to update."
+            )
+            return
+        }
+        // Already notified once: only FORCE updates may nag again (24h gate).
+        if (isForceUpdate &&
+            com.example.util.AppUpdateManager.claimForceRenotify(context, versionCode)
+        ) {
+            post(
+                context,
+                CHANNEL_UPDATES, "App Updates", "New version alerts",
+                NotificationManager.IMPORTANCE_HIGH,
+                ID_UPDATE_AVAILABLE,
+                "Focivo $versionName is waiting",
+                "Please update to continue using Focivo."
+            )
+        }
     }
 
     /** 2. Schedule reminder — 10 minutes before a scheduled study block starts. */
@@ -478,7 +504,7 @@ object FocivoNotifications {
             }
             if (info != null && info.isUpdateAvailable && info.checkSucceeded) {
                 // postUpdateAvailable dedupes per version internally.
-                postUpdateAvailable(context, info.latestVersionName, info.latestVersionCode)
+                postUpdateAvailable(context, info.latestVersionName, info.latestVersionCode, info.isForceUpdate)
             }
         } catch (_: Exception) { }
     }
