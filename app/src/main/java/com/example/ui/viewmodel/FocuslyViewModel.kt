@@ -119,6 +119,11 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         data object Idle : PasswordResetState
         data object Sending : PasswordResetState
         data object Sent : PasswordResetState
+        /** v1.3.3 (ITEM 10): OTP code verification states. */
+        data object VerifyingCode : PasswordResetState
+        data object CodeVerified : PasswordResetState
+        data class CodeWrong(val message: String) : PasswordResetState
+        data class CodeExpired(val message: String) : PasswordResetState
         data class Error(val message: String) : PasswordResetState
         data object Updating : PasswordResetState
         data object Updated : PasswordResetState
@@ -131,19 +136,79 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     private val _pendingPasswordRecovery = MutableStateFlow(false)
     val pendingPasswordRecovery: StateFlow<Boolean> = _pendingPasswordRecovery.asStateFlow()
 
+    /**
+     * v1.3.3 (ITEM 10): OTP-code recovery flow. The email that received the
+     * code is kept so the code can be verified / resent against it.
+     */
+    val recoveryCodeFlow = RecoveryCodeFlow(viewModelScope)
+    private var recoveryEmail: String? = null
+
+    /** Email the recovery code was sent to (shown in the code sheet). */
+    fun getRecoveryEmail(): String = recoveryEmail ?: ""
+
     fun requestPasswordReset(email: String) {
         viewModelScope.launch {
             _passwordResetState.value = PasswordResetState.Sending
+            recoveryEmail = email.trim().lowercase()
             val result = authManager.requestPasswordReset(email)
             _passwordResetState.value = result.fold(
-                onSuccess = { PasswordResetState.Sent },
+                onSuccess = {
+                    recoveryCodeFlow.markCodeSent()
+                    PasswordResetState.Sent
+                },
                 onFailure = { PasswordResetState.Error(it.message ?: "Could not send the recovery email.") }
             )
         }
     }
 
+    /** v1.3.3 (ITEM 10): submit the 6-digit recovery code for verification. */
+    fun verifyRecoveryCode(code: String) {
+        val email = recoveryEmail ?: return
+        recoveryCodeFlow.submitCode(email, code)
+    }
+
+    /** v1.3.3 (ITEM 10): resend the recovery code; throttled by the flow's 60s cooldown. */
+    fun resendRecoveryCode() {
+        val email = recoveryEmail ?: return
+        if (!recoveryCodeFlow.canResend()) return
+        requestPasswordReset(email)
+    }
+
     fun clearPasswordReset() {
+        recoveryCodeFlow.resetToEntry()
         _passwordResetState.value = PasswordResetState.Idle
+    }
+
+    /**
+     * v1.3.3 (ITEM 10): mirrors [RecoveryCodeFlow.codeState] into
+     * [passwordResetState] so AuthScreen can drive the code sheet. On
+     * Verified the recovery session already exists, so the EXISTING
+     * new-password path is opened via [_pendingPasswordRecovery].
+     */
+    private fun observeRecoveryCodeFlow() {
+        viewModelScope.launch {
+            recoveryCodeFlow.codeState.collect { codeState ->
+                when (codeState) {
+                    is RecoveryCodeFlow.CodeState.Verifying ->
+                        _passwordResetState.value = PasswordResetState.VerifyingCode
+                    is RecoveryCodeFlow.CodeState.Verified -> {
+                        _passwordResetState.value = PasswordResetState.CodeVerified
+                        _pendingPasswordRecovery.value = true
+                    }
+                    is RecoveryCodeFlow.CodeState.WrongCode ->
+                        _passwordResetState.value = PasswordResetState.CodeWrong(
+                            "That code isn't right - check and try again."
+                        )
+                    is RecoveryCodeFlow.CodeState.ExpiredCode ->
+                        _passwordResetState.value = PasswordResetState.CodeExpired(
+                            "This code has expired - tap Resend for a new one."
+                        )
+                    is RecoveryCodeFlow.CodeState.Error ->
+                        _passwordResetState.value = PasswordResetState.Error(codeState.message)
+                    is RecoveryCodeFlow.CodeState.Entry -> { /* sheet entry state; no UI change */ }
+                }
+            }
+        }
     }
 
     /** Called from the "set new password" screen after a recovery deep link. */
@@ -681,6 +746,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         com.example.util.AiStudyGuardManager.punishmentLogs
 
     init {
+        observeRecoveryCodeFlow()
         viewModelScope.launch {
             try {
                 coldStartInit()
