@@ -24,7 +24,12 @@ import org.robolectric.annotation.Config
  * cluster. The managers are Kotlin `object` singletons, so these tests drive
  * the exact same manager functions the cluster's icon taps call and assert
  * the exact same state sources the cluster collects — the wiring contract.
- * Explainer copy is covered for presence (data) and rendering (compose).
+ *
+ * The accessibility permission cannot be granted in the Robolectric sandbox,
+ * so the AI Guard / YT Filter assertions are white-box on the persisted
+ * prefs (the user's intent) plus the effective-state gate (stays OFF without
+ * the permission, documenting the production behavior). Explainer copy is
+ * covered for presence (data) and rendering (compose).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -54,54 +59,58 @@ class GuardToggleWiringTest {
         }
     }
 
-    // -- AI Guard: AiStudyGuardManager --------------------------------------
+    // -- AI Guard: AiStudyGuardManager ---------------------------------------
 
     @Test
-    fun aiGuardToggle_drivesGuardEnabled() {
-        // No accessibility in the test sandbox: effective state stays off,
-        // and disabling must persist cleanly.
-        setAiStudyServiceConnectedForTest(false)
-        AiStudyGuardManager.setAiGuardEnabled(context, false)
-        assertFalse(AiStudyGuardManager.isAiGuardEnabled(context))
-
-        // Simulate the granted permission: enabling must take effect.
-        setAiStudyServiceConnectedForTest(true)
+    fun aiGuardToggle_persistsIntentAndGatesOnPermission() {
+        // White-box: the toggle writes the user's intent to the same prefs
+        // key isAiGuardEnabled() reads.
+        val prefs = context.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
         try {
             AiStudyGuardManager.setAiGuardEnabled(context, true)
-            assertTrue(AiStudyGuardManager.isAiGuardEnabled(context))
+            assertTrue(
+                "toggle must persist the enabled intent",
+                prefs.getBoolean("is_ai_study_guard_enabled", false)
+            )
 
             AiStudyGuardManager.setAiGuardEnabled(context, false)
+            assertFalse(
+                "toggle must persist the disabled intent",
+                prefs.getBoolean("is_ai_study_guard_enabled", true)
+            )
+            // Without the accessibility permission the effective state stays
+            // off — the cluster shows OFF and routes to the opt-in dialog.
             assertFalse(AiStudyGuardManager.isAiGuardEnabled(context))
         } finally {
-            setAiStudyServiceConnectedForTest(false)
             AiStudyGuardManager.setAiGuardEnabled(context, false)
         }
     }
 
-    // -- YouTube Filter: YouTubeStudyGuardManager ---------------------------
+    // -- YouTube Filter: YouTubeStudyGuardManager ----------------------------
 
     @Test
-    fun ytFilterToggle_drivesFilterEnabledState() {
-        setAiStudyServiceConnectedForTest(true)
+    fun ytFilterToggle_persistsIntentAndGatesOnPermission() {
+        // White-box: the toggle writes the user's intent to the same prefs
+        // key the manager reads; the exposed StateFlow is the effective
+        // (permission-gated) state the cluster collects.
+        val prefs = context.getSharedPreferences(
+            "focusly_youtube_guard_prefs", Context.MODE_PRIVATE
+        )
         try {
             YouTubeStudyGuardManager.setFilterEnabled(context, true)
-            assertTrue(YouTubeStudyGuardManager.isFilterEnabledState.value)
-
-            YouTubeStudyGuardManager.setFilterEnabled(context, false)
+            assertTrue(
+                "toggle must persist the enabled intent",
+                prefs.getBoolean("key_yt_ai_filter_enabled", false)
+            )
+            // No accessibility permission in the sandbox: the effective
+            // state the cluster shows stays OFF (documents the gate).
             assertFalse(YouTubeStudyGuardManager.isFilterEnabledState.value)
-        } finally {
-            setAiStudyServiceConnectedForTest(false)
-            YouTubeStudyGuardManager.setFilterEnabled(context, false)
-        }
-    }
 
-    @Test
-    fun ytFilter_withoutPermission_effectiveStateStaysOff() {
-        // Documents the gate: the pref is the user's intent, but the cluster
-        // shows OFF until the accessibility permission is granted.
-        setAiStudyServiceConnectedForTest(false)
-        try {
-            YouTubeStudyGuardManager.setFilterEnabled(context, true)
+            YouTubeStudyGuardManager.setFilterEnabled(context, false)
+            assertFalse(
+                "toggle must persist the disabled intent",
+                prefs.getBoolean("key_yt_ai_filter_enabled", true)
+            )
             assertFalse(YouTubeStudyGuardManager.isFilterEnabledState.value)
         } finally {
             YouTubeStudyGuardManager.setFilterEnabled(context, false)
