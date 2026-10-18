@@ -170,6 +170,15 @@ fun SettingsScreen(
         onDispose { settingsLifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // v1.3.3 — Focus Shield grant row: live state, refreshed on ON_RESUME so
+    // grants made in system Settings show instantly when the user returns.
+    var shieldPermissionsOk by remember {
+        mutableStateOf(com.example.util.PermissionStates.hasCoreShieldPermissions(context))
+    }
+    com.example.util.RefreshOnResume {
+        shieldPermissionsOk = com.example.util.PermissionStates.hasCoreShieldPermissions(context)
+    }
+
     val themeOptions = listOf("System", "Light", "Dark")
     val currentThemeIndex = when (userPreferences?.themeMode) {
         "light" -> 1
@@ -572,14 +581,11 @@ fun SettingsScreen(
             }
         }
 
-        // Focus Shield (App Blocker) Hub
+        // Focus Shield (App Blocker) Hub — v1.3.3: shield grant state is
+        // hoisted and re-read from the REAL system grants on every ON_RESUME,
+        // so a permission granted in Settings updates the row on return.
         item {
-            val hasShieldPerms = remember(context) {
-                com.example.util.PermissionUtils.hasUsageStatsPermission(context) &&
-                com.example.util.PermissionUtils.hasOverlayPermission(context) &&
-                com.example.util.AiStudyGuardManager.isAccessibilityPermissionGranted(context)
-            }
-            val isShieldEnabled = (userPreferences?.isAppBlockerEnabled ?: false) && hasShieldPerms
+            val isShieldEnabled = (userPreferences?.isAppBlockerEnabled ?: false) && shieldPermissionsOk
             GlassCard(
                 modifier = Modifier
                     .fillMaxWidth()

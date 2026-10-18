@@ -124,6 +124,10 @@ fun DeepFocusSettingsSheet(
     val adminActive = remember(adminRefreshTick) {
         DeviceAdminGuard.isAdminActive(context)
     }
+    // v1.3.3 — re-read the REAL device-admin state every time the sheet host
+    // resumes (the system activation screen is outside our process), so the
+    // row never shows a stale "not active" after the user grants it.
+    com.example.util.RefreshOnResume { adminRefreshTick += 1 }
     val protectionState = remember(isStrictModeEnabled, uninstallProtection, adminActive) {
         UninstallProtectionGate.decide(
             strictEnabled = isStrictModeEnabled,

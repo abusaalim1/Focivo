@@ -304,10 +304,15 @@ fun ProfileScreen(
         sessions.filter { it.completedAt > 0 && it.durationSeconds > 0 }.map { sdf.format(Date(it.completedAt)) }.toSet().size
     }
 
-    val hasShieldPermissions = remember(context) {
-        com.example.util.PermissionUtils.hasUsageStatsPermission(context) &&
-        com.example.util.PermissionUtils.hasOverlayPermission(context) &&
-        com.example.util.AiStudyGuardManager.isAccessibilityPermissionGranted(context)
+    // v1.3.3 — live shield state: re-read from the REAL system grants on every
+    // ON_RESUME so a permission granted in Settings shows instantly on return.
+    var hasShieldPermissions by remember {
+        mutableStateOf(
+            com.example.util.PermissionStates.hasCoreShieldPermissions(context)
+        )
+    }
+    com.example.util.RefreshOnResume {
+        hasShieldPermissions = com.example.util.PermissionStates.hasCoreShieldPermissions(context)
     }
     val isShieldActive = hasShieldPermissions && (userPreferences?.isAppBlockerEnabled == true)
 

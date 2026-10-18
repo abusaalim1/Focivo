@@ -57,7 +57,9 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.components.CivoChatBubble
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.focivoTokens
+import com.example.util.PermissionStates
 import com.example.util.PermissionUtils
+import com.example.util.RefreshOnResume
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,11 +73,18 @@ fun NotificationAlarmPermissionSheet(
     val coroutineScope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    // v1.3.3 — live permission states, re-read from the REAL system grant on
+    // every ON_RESUME (returning from Settings updates the rows instantly).
     var hasNotifPermission by remember {
-        mutableStateOf(PermissionUtils.hasNotificationPermission(context))
+        mutableStateOf(PermissionStates.isNotificationGranted(context))
     }
     var hasExactAlarm by remember {
-        mutableStateOf(PermissionUtils.hasExactAlarmPermission(context))
+        mutableStateOf(PermissionStates.canScheduleExactAlarms(context))
+    }
+
+    RefreshOnResume {
+        hasNotifPermission = PermissionStates.isNotificationGranted(context)
+        hasExactAlarm = PermissionStates.canScheduleExactAlarms(context)
     }
 
     fun dismissSheet(action: () -> Unit) {
