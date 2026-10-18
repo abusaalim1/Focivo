@@ -19,3 +19,11 @@ debug.keystore
 
 # Google AI Studio metadata
 .aistudio/
+
+
+# Owner-ordered hygiene (2026-10-18): never commit signing keys or service configs
+*.jks
+*.keystore
+*.p12
+*.pem
+google-services.json
