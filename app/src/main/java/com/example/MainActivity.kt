@@ -455,6 +455,17 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
         )
     }
     var isSettingsOpen by remember { mutableStateOf(false) }
+    // v1.3.3 (item 8b): global screen-time budget, mirrored from the manager
+    // store; refreshed whenever Settings opens.
+    var screenTimeBudgetMinutes by remember {
+        mutableStateOf(com.example.util.ScreenTimeBudgetManager.getGlobalBudgetMinutes(context))
+    }
+    LaunchedEffect(isSettingsOpen) {
+        if (isSettingsOpen) {
+            screenTimeBudgetMinutes =
+                com.example.util.ScreenTimeBudgetManager.getGlobalBudgetMinutes(context)
+        }
+    }
     // v1.1: Mascot Buddy dedicated screen.
     var isMascotOpen by remember { mutableStateOf(false) }
     var isAlarmHubOpen by remember { mutableStateOf(false) }
@@ -682,13 +693,17 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onOpenAlarmStudio = { isAlarmHubOpen = true },
                                         onOpenShieldHub = { viewModel.openShieldHub() },
                                         onOpenAiGuardHub = { viewModel.openAiGuardHub() },
-                                        // v1.3.3 (ITEM 5): guard control cluster -> budgets.
-                                        onOpenScreenTimeBudgets = { isScreenTimeBudgetsOpen = true },
                                         onUpdateHaptics = { viewModel.updateHaptics(it) },
                                         onUpdateChimes = { viewModel.updateChimes(it) },
                                         onCheckForUpdates = { viewModel.checkForAppUpdates(context, isManual = true) },
                                         isCheckingForUpdates = isCheckingForUpdates,
                                         manualUpdateMessage = manualUpdateCheckResult,
+                                        // v1.3.3 (item 8b): global screen-time budget.
+                                        screenTimeBudgetMinutes = screenTimeBudgetMinutes,
+                                        onUpdateScreenTimeBudget = { minutes ->
+                                            com.example.util.ScreenTimeBudgetManager.setGlobalBudgetMinutes(context, minutes)
+                                            screenTimeBudgetMinutes = minutes
+                                        },
                                         onLogout = {
                                             showSignOutConfirmationDialog = true
                                         }
@@ -818,6 +833,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onUpdateTaskTitle = { viewModel.setCurrentTaskTitle(it) },
                                         onOpenShieldHub = { viewModel.openShieldHub() },
                                         onOpenAiGuardHub = { viewModel.openAiGuardHub() },
+                                        // v1.3.3 (ITEM 5): guard control cluster -> budgets.
+                                        onOpenScreenTimeBudgets = { isScreenTimeBudgetsOpen = true },
                                         // v1.1: Mascot Buddy screen.
                                         onOpenMascot = { isMascotOpen = true },
                                         // v1.1: Pomodoro engine.
