@@ -84,15 +84,24 @@ object DailyUsagePipeline {
             // clipped to [dayStartMs, nowMs] — Digital Wellbeing fidelity.
             var eventCount = 0
             try {
-                val query = UsageEventsQuery.Builder(dayStartMs, nowMs)
-                    .setEventTypes(
-                        UsageEvents.Event.ACTIVITY_RESUMED,
-                        UsageEvents.Event.ACTIVITY_PAUSED,
-                        UsageEvents.Event.DEVICE_SHUTDOWN,
-                        UsageEvents.Event.DEVICE_STARTUP
-                    )
-                    .build()
-                val usageEvents = usageStatsManager.queryEvents(query)
+                // UsageEventsQuery.Builder is API 34+; the deprecated
+                // queryEvents(begin, end) covers API 21-33 (minSdk is 24).
+                val usageEvents = if (android.os.Build.VERSION.SDK_INT >=
+                    android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                ) {
+                    val query = UsageEventsQuery.Builder(dayStartMs, nowMs)
+                        .setEventTypes(
+                            UsageEvents.Event.ACTIVITY_RESUMED,
+                            UsageEvents.Event.ACTIVITY_PAUSED,
+                            UsageEvents.Event.DEVICE_SHUTDOWN,
+                            UsageEvents.Event.DEVICE_STARTUP
+                        )
+                        .build()
+                    usageStatsManager.queryEvents(query)
+                } else {
+                    @Suppress("DEPRECATION")
+                    usageStatsManager.queryEvents(dayStartMs, nowMs)
+                }
                 val events = mutableListOf<AppUsageEvent>()
                 if (usageEvents != null) {
                     val ev = UsageEvents.Event()
