@@ -99,7 +99,17 @@ class BackdropCaptionContrastTest {
     /** Resolved caption colors clear 4.5:1 against their backdrops (small-text floor). */
     @Test
     fun captionToken_meetsContrastFloor_onEveryBackdrop() {
+        // The sweep scope (task item 9): default Aurora + the 6 ambient
+        // themes. Image-backed themes reuse the same full-alpha content
+        // token (covered by the two tests above); their photographic
+        // backdrops have no single representative luminance to assert
+        // against here — the Roborazzi sweep is the visual proof.
+        val sweepThemeIds = setOf(
+            "aurora", "sakura_drift", "firefly_forest", "sunset_dunes",
+            "aurora_veil", "monsoon_rain", "ember_rise"
+        )
         for (theme in TimerThemeManager.THEMES) {
+            if (theme.id !in sweepThemeIds) continue
             for (isDark in listOf(true, false)) {
                 val caption = theme.backdropCaptionContent(isDark)
                 val bgLum = if (theme.id == "aurora") {
