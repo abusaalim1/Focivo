@@ -25,7 +25,6 @@ object ScreenTimeBudgetManager {
     private const val TAG = "ScreenTimeBudgetManager"
     private const val PREFS = "screen_time_budget_prefs"
 
-    private const val KEY_BUDGET_MINUTES = "global_budget_minutes"
     private const val KEY_BREAK_ENDS_AT_MS = "break_ends_at_ms"
     private const val KEY_BREAK_DAY = "break_day"
     private const val KEY_TRIGGERS_DAY = "break_triggers_day"
@@ -72,15 +71,25 @@ object ScreenTimeBudgetManager {
     // ------------------------------------------------------------------
     // Budget store
     // ------------------------------------------------------------------
+    // v1.3.3: the budget VALUE lives in ScreenTimeBudgetStore (ITEM 5's
+    // canonical store — its contract asks all editors to drive it rather
+    // than creating parallel prefs). This manager owns the break runtime
+    // state + enforcement; the value itself is single-sourced.
 
     /** 0 (or negative) = global budget is OFF. */
     fun getGlobalBudgetMinutes(context: Context): Int {
-        return prefs(context).getInt(KEY_BUDGET_MINUTES, 0)
+        return if (ScreenTimeBudgetStore.isGlobalLimitEnabled(context)) {
+            ScreenTimeBudgetStore.getGlobalLimitMinutes(context)
+        } else {
+            0
+        }
     }
 
     fun setGlobalBudgetMinutes(context: Context, minutes: Int) {
-        prefs(context).edit().putInt(KEY_BUDGET_MINUTES, minutes.coerceAtLeast(0)).apply()
-        Log.d(TAG, "global budget set to ${minutes.coerceAtLeast(0)}m")
+        val m = minutes.coerceAtLeast(0)
+        ScreenTimeBudgetStore.setGlobalLimitMinutes(context, m)
+        ScreenTimeBudgetStore.setGlobalLimitEnabled(context, m > 0)
+        Log.d(TAG, "global budget set to ${m}m")
     }
 
     // ------------------------------------------------------------------

@@ -174,8 +174,12 @@ class ScreenTimeBudgetManagerTest {
                     ) = fakeSamples
                 }
             DailyUsagePipeline.invalidate()
+            // Break runtime state (my prefs) + the canonical budget value
+            // (ScreenTimeBudgetStore, shared with the ITEM 5 editor).
             context.getSharedPreferences("screen_time_budget_prefs", Context.MODE_PRIVATE)
                 .edit().clear().apply()
+            ScreenTimeBudgetStore.setGlobalLimitEnabled(context, false)
+            ScreenTimeBudgetStore.setGlobalLimitMinutes(context, 0)
         }
 
         @After

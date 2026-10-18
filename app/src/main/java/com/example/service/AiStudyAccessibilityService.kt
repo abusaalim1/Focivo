@@ -1473,13 +1473,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     Log.w(TAG, "[Screen-Time Break] Global budget exceeded; blocking $pkg")
                     val friendlyName = FocusShieldService.friendlyAppName(applicationContext, pkg)
                     val budgetMins = com.example.util.ScreenTimeBudgetManager.getGlobalBudgetMinutes(applicationContext)
-                    BlockOverlayManager.intercept(
+                    BlockOverlayManager.interceptScreenTimeBreak(
                         context = applicationContext,
                         blockedPackage = pkg,
                         appName = friendlyName,
-                        durationSec = (breakDecision.remainingMs / 1000L).toInt().coerceAtLeast(1),
-                        reason = com.example.util.ScreenTimeBudgetManager.breakReason(applicationContext, budgetMins),
-                        isPunishment = false
+                        remainingSec = (breakDecision.remainingMs / 1000L).toInt(),
+                        budgetLabel = com.example.util.ScreenTimeBudgetManager.budgetLabel(budgetMins),
+                        reason = com.example.util.ScreenTimeBudgetManager.breakReason(applicationContext, budgetMins)
                     )
                     return
                 }
