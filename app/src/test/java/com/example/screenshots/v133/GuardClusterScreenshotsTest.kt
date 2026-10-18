@@ -13,7 +13,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.model.UserPreferencesEntity
-import com.example.service.AiStudyAccessibilityService
+import com.example.setAiStudyServiceConnectedForTest
 import com.example.ui.components.GuardControlCluster
 import com.example.ui.components.GuardExplainerContent
 import com.example.ui.components.GuardExplainerKey
@@ -86,14 +86,14 @@ class GuardClusterScreenshotsTest {
      */
     private fun setToggleStates(strict: Boolean, guard: Boolean, ytFilter: Boolean) {
         StrictModeManager.setStrictModeEnabled(context, strict)
-        AiStudyAccessibilityService.isServiceConnected = guard
+        setAiStudyServiceConnectedForTest(guard)
         AiStudyGuardManager.setAiGuardEnabled(context, guard)
         YouTubeStudyGuardManager.setFilterEnabled(context, ytFilter)
     }
 
     private fun resetToggleStates() {
         setToggleStates(strict = true, guard = false, ytFilter = false)
-        AiStudyAccessibilityService.isServiceConnected = false
+        setAiStudyServiceConnectedForTest(false)
     }
 
     // -- Cluster alone ------------------------------------------------------

@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
-import com.example.service.AiStudyAccessibilityService
 import com.example.ui.components.GuardExplainerContent
 import com.example.ui.components.GuardExplainerKey
 import com.example.ui.components.guardExplainerContent
@@ -61,12 +60,12 @@ class GuardToggleWiringTest {
     fun aiGuardToggle_drivesGuardEnabled() {
         // No accessibility in the test sandbox: effective state stays off,
         // and disabling must persist cleanly.
-        AiStudyAccessibilityService.isServiceConnected = false
+        setAiStudyServiceConnectedForTest(false)
         AiStudyGuardManager.setAiGuardEnabled(context, false)
         assertFalse(AiStudyGuardManager.isAiGuardEnabled(context))
 
         // Simulate the granted permission: enabling must take effect.
-        AiStudyAccessibilityService.isServiceConnected = true
+        setAiStudyServiceConnectedForTest(true)
         try {
             AiStudyGuardManager.setAiGuardEnabled(context, true)
             assertTrue(AiStudyGuardManager.isAiGuardEnabled(context))
@@ -74,7 +73,7 @@ class GuardToggleWiringTest {
             AiStudyGuardManager.setAiGuardEnabled(context, false)
             assertFalse(AiStudyGuardManager.isAiGuardEnabled(context))
         } finally {
-            AiStudyAccessibilityService.isServiceConnected = false
+            setAiStudyServiceConnectedForTest(false)
             AiStudyGuardManager.setAiGuardEnabled(context, false)
         }
     }
@@ -83,7 +82,7 @@ class GuardToggleWiringTest {
 
     @Test
     fun ytFilterToggle_drivesFilterEnabledState() {
-        AiStudyAccessibilityService.isServiceConnected = true
+        setAiStudyServiceConnectedForTest(true)
         try {
             YouTubeStudyGuardManager.setFilterEnabled(context, true)
             assertTrue(YouTubeStudyGuardManager.isFilterEnabledState.value)
@@ -91,7 +90,7 @@ class GuardToggleWiringTest {
             YouTubeStudyGuardManager.setFilterEnabled(context, false)
             assertFalse(YouTubeStudyGuardManager.isFilterEnabledState.value)
         } finally {
-            AiStudyAccessibilityService.isServiceConnected = false
+            setAiStudyServiceConnectedForTest(false)
             YouTubeStudyGuardManager.setFilterEnabled(context, false)
         }
     }
@@ -100,7 +99,7 @@ class GuardToggleWiringTest {
     fun ytFilter_withoutPermission_effectiveStateStaysOff() {
         // Documents the gate: the pref is the user's intent, but the cluster
         // shows OFF until the accessibility permission is granted.
-        AiStudyAccessibilityService.isServiceConnected = false
+        setAiStudyServiceConnectedForTest(false)
         try {
             YouTubeStudyGuardManager.setFilterEnabled(context, true)
             assertFalse(YouTubeStudyGuardManager.isFilterEnabledState.value)
