@@ -1,4 +1,4 @@
-package com.example.screenshots.guardcluster
+package com.example.screenshots.v133
 
 import android.content.Context
 import androidx.compose.foundation.layout.Box
@@ -42,7 +42,7 @@ import org.robolectric.annotation.GraphicsMode
  * real phone size (Pixel 8). The cluster, each toggle's on/off states, each
  * premium explainer sheet, the screen-time budgets entry, and the full
  * Study screen with the cluster — dark AND light. PNGs land in
- * app/src/test/screenshots/guard-cluster/.
+ * app/src/test/screenshots/v133/.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -70,7 +70,7 @@ class GuardClusterScreenshotsTest {
     }
 
     private fun capture(name: String) {
-        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/guard-cluster/$name.png")
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/v133/guardcluster_$name.png")
     }
 
     private fun fakePrefs() = UserPreferencesEntity(
