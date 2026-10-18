@@ -42,8 +42,9 @@ jobs:
         #  - TimerRemainingTimeTest.kt: unresolved setCurrentTimeMillis /
         #    setElapsedRealtime helpers
         #  - PermissionStatesTest.kt: unresolved strOpToOp
-        #  - V133UsageBudgetScreenshotsTest.kt: missing onRoot import
-        # (ITEM 5's GuardToggleWiringTest / GuardClusterScreenshotsTest were
+        # (V133UsageBudgetScreenshotsTest was removed from this list 2026-10-18:
+        # the missing onRoot import is fixed and it compiles in the green
+        # build-apk test-compile, so it now runs its Roborazzi screenshots.)        # (ITEM 5's GuardToggleWiringTest / GuardClusterScreenshotsTest were
         # removed from this list 2026-10-18: they compile again after the
         # reflection-helper fix, proven by the green build-apk test-compile.)
         run: |
@@ -52,7 +53,6 @@ jobs:
             app/src/test/java/com/example/MemberProfileStatsTest.kt \
             app/src/test/java/com/example/TimerRemainingTimeTest.kt \
             app/src/test/java/com/example/util/PermissionStatesTest.kt \
-            app/src/test/java/com/example/screenshots/v133/V133UsageBudgetScreenshotsTest.kt \
           ; do
             if [ -f "$f" ]; then echo "quarantining $f"; mv "$f" /tmp/quarantined-tests/; fi
           done
