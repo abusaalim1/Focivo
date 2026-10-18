@@ -1076,7 +1076,10 @@ class AiStudyAccessibilityService : AccessibilityService() {
      *      detection, throttled at 1.5s so the user can never complete the
      *      flow mid-session),
      *   3. shows the premium StrictUninstallBlockedOverlay (window-safe),
-     *   4. logs EVERY intercept to Guard Hub.
+     *   4. logs EVERY intercept to Guard Hub,
+     *   5. posts a high-priority alert notification with the real session
+     *      end time (v1.3.3 item 6b) — throttled by the same intercept path,
+     *      session-scoped, auto-cancelled at session end.
      * Session-scoped only: outside a protected session this is a no-op and
      * uninstall/deactivation are 100% normal.
      */
@@ -1144,6 +1147,12 @@ class AiStudyAccessibilityService : AccessibilityService() {
             reason = tamper.userReason,
             isPunishment = false
         )
+        // 4. v1.3.3 (item 6b): high-priority alert notification alongside the
+        // overlay + BACK. This call sits INSIDE the throttled intercept path
+        // above, so at most one notification fires per re-fire window; the
+        // notifier re-checks the protected-session scope itself and logs
+        // every post to Guard Hub.
+        com.example.util.StrictTamperAlertNotifier.notifyIntercept(applicationContext, tamper)
     }
 
     private fun pauseMediaPlayback() {
