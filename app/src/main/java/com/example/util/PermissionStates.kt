@@ -47,20 +47,14 @@ object PermissionStates {
         return try {
             val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? android.app.AppOpsManager
                 ?: return false
-            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                appOps.unsafeCheckOpNoThrow(
-                    android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
-                    Process.myUid(),
-                    context.packageName
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                appOps.checkOpNoThrow(
-                    android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
-                    Process.myUid(),
-                    context.packageName
-                )
-            }
+            // checkOpNoThrow is the non-deprecated form on API 36+
+            // (unsafeCheckOpNoThrow was deprecated in 36); both are the same
+            // non-throwing mode read.
+            val mode = appOps.checkOpNoThrow(
+                android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                context.packageName
+            )
             mode == android.app.AppOpsManager.MODE_ALLOWED
         } catch (_: Exception) {
             false
