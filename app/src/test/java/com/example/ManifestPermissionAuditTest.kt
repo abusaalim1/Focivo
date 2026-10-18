@@ -18,13 +18,16 @@ import org.w3c.dom.Element
  * Before/after (v1.3.3):
  *   REMOVED  KILL_BACKGROUND_PROCESSES     — never used by any code (grep:
  *                                      zero references in Kotlin/resources)
- *   REMOVED  REQUEST_INSTALL_PACKAGES      — updater hands the APK to the system
- *                                      installer via ACTION_VIEW + FileProvider;
- *                                      no PackageInstaller session API is used
  *   KEPT     QUERY_ALL_PACKAGES            — owner constraint 2026-10-18: the
  *                                      blocked-apps picker is a feature and may
  *                                      not be narrowed without proof-tested
  *                                      parity, so it stays as-declared
+ *
+ * Correction (v1.3.5): REQUEST_INSTALL_PACKAGES was removed in v1.3.3 as
+ * "unused", but the in-app updater CALLS PackageManager.canRequestPackageInstalls(),
+ * which THROWS SecurityException (owner crash report 2026-10-18) when the
+ * permission is undeclared. It is legitimately required by the self-update
+ * feature, so it is declared again and must NOT be on the banned list.
  *   ADDED    canPerformGestures (a11y)     — guard genuinely performs
  *                                      GLOBAL_ACTION_BACK / HOME
  */
@@ -36,7 +39,8 @@ class ManifestPermissionAuditTest {
   private val bannedPermissions = setOf(
     // Removed in v1.3.3 — genuinely unused, with grep evidence (Play Protect red flags)
     "android.permission.KILL_BACKGROUND_PROCESSES",
-    "android.permission.REQUEST_INSTALL_PACKAGES",
+    // v1.3.5: NOT banned — legitimately required by the in-app updater
+    // (canRequestPackageInstalls crashes without it; owner report 2026-10-18).
     // Never existed — Focivo has no calling/SMS/contacts/phone features
     "android.permission.REQUEST_DELETE_PACKAGES",
     "android.permission.CALL_PHONE",
