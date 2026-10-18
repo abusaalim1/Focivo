@@ -4,8 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInfo
 import android.net.Uri
-import android.os.Build
-import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
 import io.github.jan.supabase.postgrest.from
@@ -473,57 +471,26 @@ object AppUpdateManager {
     }
 
     /**
-     * v1.3.5: canRequestPackageInstalls() THROWS SecurityException (instead of
-     * returning false) when REQUEST_INSTALL_PACKAGES is not declared — that's
-     * what crashed the Update button on live 1.3.3/1.3.4. Never let this throw:
-     * treat any failure as "not permitted" and continue to the settings or
-     * browser fallbacks.
-     */
-    private fun canInstallUnknownApps(appContext: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
-        return try {
-            appContext.packageManager.canRequestPackageInstalls()
-        } catch (e: SecurityException) {
-            Log.w(TAG, "canRequestPackageInstalls threw (permission undeclared?) — treating as not permitted", e)
-            false
-        } catch (e: Exception) {
-            Log.w(TAG, "canRequestPackageInstalls failed — treating as not permitted", e)
-            false
-        }
-    }
-
-    /**
-     * v1.2: replaces the old browser-only behavior. Existing call sites
+     * v1.1.2: replaces the old browser-only behavior. Existing call sites
      * (AppUpdateDialog.onDownloadClick, HomeUpdateOverlay.onUpdateNow via
      * FocuslyViewModel.downloadAndInstallUpdate) keep working unchanged —
      * this now downloads and installs in-app instead of opening Chrome.
+     *
+     * Install handoff (v1.1.2 rework): the downloaded APK is handed to the
+     * SYSTEM installer through an ACTION_VIEW FileProvider intent
+     * ([installApk]) — never via PackageInstaller session APIs and never via
+     * PackageManager.canRequestPackageInstalls(). If our package lacks the
+     * "install unknown apps" grant, Android's own installer gate appears
+     * (with its own Settings shortcut); on any startActivity failure we fall
+     * back to the browser download URL. Because no canRequestPackageInstalls()
+     * call remains anywhere in the app, the REQUEST_INSTALL_PACKAGES
+     * declaration was removed from the manifest in the same change — removing
+     * one without the other is what caused the 1.3.3/1.3.4 crash, and must
+     * never happen again (see the merged-manifest risk gate).
      */
     fun launchDownload(context: Context, downloadUrl: String) {
         if (downloadUrl.isBlank()) return
         val appContext = context.applicationContext
-
-        // Android 8+: installing an APK from the app requires the
-        // "install unknown apps" grant for our own package. Route the user to
-        // that settings page first; they tap Update again afterwards.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            !canInstallUnknownApps(appContext)
-        ) {
-            Log.i(TAG, "Install-unknown-apps not granted; routing to settings")
-            try {
-                val settingsIntent = Intent(
-                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                    Uri.parse("package:${appContext.packageName}")
-                ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                appContext.startActivity(settingsIntent)
-                _downloadState.value = UpdateDownloadState.Failed(
-                    "Please allow \"Install unknown apps\" for Focivo, then tap Update again."
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to open unknown-app-sources settings", e)
-                openInBrowser(appContext, downloadUrl)
-            }
-            return
-        }
 
         _downloadState.value = UpdateDownloadState.Downloading(0)
         updateScope.launch {
@@ -532,7 +499,7 @@ object AppUpdateManager {
                     _downloadState.value = UpdateDownloadState.Downloading(pct)
                 }
                 _downloadState.value = UpdateDownloadState.Installing
-                installApk(appContext, apkFile)
+                installApk(appContext, apkFile, downloadUrl)
                 // The system installer takes over from here; reset so a later
                 // dialog never shows a stale state if the user backs out.
                 _downloadState.value = UpdateDownloadState.Idle
@@ -593,7 +560,15 @@ object AppUpdateManager {
         return outFile
     }
 
-    private fun installApk(context: Context, apkFile: File) {
+    /**
+     * v1.1.2: hands the downloaded APK to the SYSTEM installer. The system
+     * installer owns the "allow installs from this source" gate (with its own
+     * Settings shortcut) — Focivo never calls canRequestPackageInstalls(),
+     * so no SecurityException path can exist here. Any startActivity failure
+     * falls back to the browser download URL; the 1.3.5 dialog-level browser
+     * escape hatch remains as well.
+     */
+    private fun installApk(context: Context, apkFile: File, downloadUrl: String) {
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
@@ -603,7 +578,15 @@ object AppUpdateManager {
             setDataAndType(uri, "application/vnd.android.package-archive")
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
-        context.startActivity(installIntent)
+        try {
+            context.startActivity(installIntent)
+        } catch (e: Exception) {
+            Log.e(TAG, "System installer unavailable; falling back to browser", e)
+            _downloadState.value = UpdateDownloadState.Failed(
+                "Could not open the installer. The download link has been opened in your browser instead."
+            )
+            openInBrowser(context, downloadUrl)
+        }
     }
 
     /** v1.3.5: public escape hatch — open the update URL in the browser.

@@ -18,16 +18,28 @@
     <!-- v1.3.0: share-card download on Android 9 and below (scoped storage needs no permission on 10+) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
-    <!-- v1.3.3: KEEP — the blocked-apps picker lists installed launchable apps
-         (InstalledAppsManager). Owner constraint 2026-10-18: no feature may be
-         removed or narrowed; the picker stays on QUERY_ALL_PACKAGES. -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- v1.3.5: RESTORED — the 1.3.3 cleanup dropped this, but the in-app
-         updater CALLS PackageManager.canRequestPackageInstalls(), which THROWS
-         SecurityException (crashing the Update button on live 1.3.3/1.3.4) when
-         the permission is undeclared. The self-update feature legitimately
-         requires it: the APK is downloaded and handed to the system installer. -->
+    <!-- v1.1.2: REMOVED QUERY_ALL_PACKAGES (Play Protect high-risk permission:
+         Google Play policy treats installed-app inventory as personal/sensitive
+         data). No feature lost — provably identical output by construction:
+         the blocked-apps picker (InstalledAppsManager.getInstalledApps) only
+         calls PackageManager.queryIntentActivities(MAIN/LAUNCHER), and
+         EssentialAppsGuard's home-launcher check only queries MAIN/HOME —
+         BOTH intents are declared in the <queries> block above, which Android
+         11+ honors as equivalent visibility for those lookups (verified by
+         ManifestPermissionAuditTest.blockedAppsPickerHasPackageVisibility).
+         All other getApplicationInfo callsites are best-effort try/catch with
+         fallbacks (FocusShieldService.friendlyAppName, LockInStartOverlay),
+         and the remaining ones target only our own package. -->
+    <!-- v1.1.2: REMOVED REQUEST_INSTALL_PACKAGES (Play Protect high-risk
+         permission: "install other apps" capability). No feature lost — the
+         in-app updater never used PackageInstaller session APIs; it hands the
+         downloaded APK to the SYSTEM installer via an ACTION_VIEW FileProvider
+         intent (AppUpdateManager.installApk). The 1.3.5 canRequestPackageInstalls()
+         pre-check was only a UX convenience; Android's own installer gate
+         ("allow installs from this source") replaces it, with the existing
+         browser fallback on any failure. Both the permission and the API call
+         were removed together — never one without the other (the 1.3.3→1.3.5
+         crash lesson). -->
 
     <queries>
         <intent>

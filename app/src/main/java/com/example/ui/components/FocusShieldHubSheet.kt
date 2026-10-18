@@ -101,7 +101,10 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.focivoTokens
 import com.example.util.AiStudyGuardManager
 import com.example.util.AppIconView
+import com.example.util.DailyUsagePipeline
 import com.example.util.DeviceAppInfo
+import com.example.util.PermissionUtils
+import com.example.util.ScreenTimeReadiness
 
 object FocusShieldPermissions {
     // v1.3.3 — single live-query source of truth is PermissionStates; these
@@ -420,6 +423,15 @@ fun FocusShieldHubSheet(
     var hasAccessibilityPermission by remember {
         mutableStateOf(AiStudyGuardManager.isAccessibilityPermissionGranted(context))
     }
+    // v1.1.3 (FIX 2): Screen time readiness card state — battery exemption
+    // plus pipeline freshness. Both are re-queried on ON_RESUME alongside
+    // the other permissions so the card never shows a stale grant state.
+    var hasBatteryExemption by remember {
+        mutableStateOf(PermissionUtils.isBatteryOptimizationDisabled(context))
+    }
+    var lastUsageComputedAtMs by remember {
+        mutableStateOf<Long?>(DailyUsagePipeline.lastQueriedAtMs())
+    }
     var isScheduledBlockActive by remember {
         mutableStateOf(ScheduledBlockScheduler.isScheduleCurrentlyActive(context))
     }
@@ -453,6 +465,11 @@ fun FocusShieldHubSheet(
                 hasUsagePermission = FocusShieldPermissions.hasUsageStatsPermission(context)
                 hasOverlayPermission = FocusShieldPermissions.hasOverlayPermission(context)
                 hasAccessibilityPermission = AiStudyGuardManager.isAccessibilityPermissionGranted(context)
+                // v1.1.3 (FIX 2): re-check battery exemption + pipeline
+                // freshness — the Screen time card must reflect grants the
+                // user just made in system settings.
+                hasBatteryExemption = PermissionUtils.isBatteryOptimizationDisabled(context)
+                lastUsageComputedAtMs = DailyUsagePipeline.lastQueriedAtMs()
                 isScheduledBlockActive = ScheduledBlockScheduler.isScheduleCurrentlyActive(context)
                 isAiGuardEnabled = AiStudyGuardManager.isAiGuardEnabled(context)
                 com.example.util.ShortsLockManager.init(context)
@@ -1349,6 +1366,47 @@ fun FocusShieldHubSheet(
                         )
                     }
                 }
+            }
+
+            // ---------------------------------------------------------------
+            // Screen time (v1.1.3 FIX 2) — readiness of the usage pipeline
+            // that feeds the Study header, per-app budgets and budget
+            // enforcement. Lives next to Limits because limits consume the
+            // same numbers. Every state is a live query (ON_RESUME +
+            // post-refresh) — never a cached claim.
+            // ---------------------------------------------------------------
+            item {
+                Spacer(modifier = Modifier.height(34.dp))
+                ShieldEyebrow(title = "Screen time")
+                Spacer(modifier = Modifier.height(12.dp))
+                ScreenTimeReadinessCard(
+                    readiness = ScreenTimeReadiness.ReadinessInput(
+                        usageAccessGranted = hasUsagePermission,
+                        batteryExemptionGranted = hasBatteryExemption,
+                        lastComputedAtMs = lastUsageComputedAtMs
+                    ),
+                    onGrantUsageAccess = {
+                        FocusShieldPermissions.openUsageAccessSettings(context)
+                    },
+                    onRequestBatteryExemption = {
+                        PermissionUtils.openBatteryOptimizationSettings(context)
+                    },
+                    onRefresh = {
+                        if (hasUsagePermission) {
+                            com.example.util.DailyUsagePipeline.getSnapshot(
+                                context,
+                                forceRefresh = true
+                            )
+                        } else {
+                            FocusShieldPermissions.openUsageAccessSettings(context)
+                        }
+                        // Re-read the live states after the refresh attempt so
+                        // the card moves immediately instead of on next resume.
+                        hasUsagePermission =
+                            FocusShieldPermissions.hasUsageStatsPermission(context)
+                        lastUsageComputedAtMs = DailyUsagePipeline.lastQueriedAtMs()
+                    }
+                )
             }
 
             // ---------------------------------------------------------------

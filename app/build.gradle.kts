@@ -18,8 +18,8 @@ android {
     applicationId = "com.aistudio.focusly.kqpzxr"
     minSdk = 24
     targetSdk = 36
-    versionCode = 33
-    versionName = "1.1.1"
+    versionCode = 35
+    versionName = "1.1.3"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

@@ -32,8 +32,9 @@ import com.example.ui.theme.focivoTokens
  * v1.3.3 (item 1) — the two stat cards at the TOP of the Study screen.
  *
  * - "Usage Time": today's total device screen time from [com.example.util.DailyUsagePipeline].
- *   When usage permission is missing the value reads "--" and tapping the
- *   card opens the premium usage-permission sheet (caller-owned).
+ *   When usage permission is missing the value reads "--" with the sub-label
+ *   "Usage access needed" (honest grant state, never a fabricated number);
+ *   tapping the card opens the premium usage-permission sheet (caller-owned).
  * - "Focus Time": today's completed focus minutes from the session log.
  *
  * Design system: cream/dark token surfaces, lime accent, Poppins labels +
@@ -60,7 +61,11 @@ fun StudyTopStatsHeader(
             } else {
                 formatStatDuration(usageMillis ?: 0L)
             },
-            subLabel = if (!hasUsagePermission) "Tap to enable" else "screen time today",
+            // v1.1.3 (FIX 2) HONESTY rule: when PACKAGE_USAGE_STATS is missing
+            // the card names the missing grant ("Usage access needed") instead
+            // of implying a number or a stale value. Tapping routes to the
+            // premium grant sheet (caller-owned).
+            subLabel = if (!hasUsagePermission) "Usage access needed" else "screen time today",
             icon = Icons.Default.Timer,
             onClick = onUsageCardClick,
             clickable = true,

@@ -380,4 +380,15 @@ object DailyUsagePipeline {
     fun invalidate() {
         synchronized(cacheLock) { cached = null }
     }
+
+    /**
+     * v1.1.3 (FIX 2) — read-only freshness accessor for the Block hub's
+     * "Screen time" readiness card: when the usage numbers were last computed
+     * (null when no snapshot has been computed this app-open). Never triggers
+     * a query and never requires the permission — callers combine it with
+     * [hasUsagePermission] to decide what to show.
+     */
+    fun lastQueriedAtMs(): Long? {
+        synchronized(cacheLock) { return cached?.queriedAtMs }
+    }
 }

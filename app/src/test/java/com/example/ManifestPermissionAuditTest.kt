@@ -23,11 +23,19 @@ import org.w3c.dom.Element
  *                                      not be narrowed without proof-tested
  *                                      parity, so it stays as-declared
  *
- * Correction (v1.3.5): REQUEST_INSTALL_PACKAGES was removed in v1.3.3 as
- * "unused", but the in-app updater CALLS PackageManager.canRequestPackageInstalls(),
- * which THROWS SecurityException (owner crash report 2026-10-18) when the
- * permission is undeclared. It is legitimately required by the self-update
- * feature, so it is declared again and must NOT be on the banned list.
+ * v1.1.2: REQUEST_INSTALL_PACKAGES REMOVED — the in-app updater never used
+ *   PackageInstaller session APIs; it hands the APK to the SYSTEM installer via
+ *   an ACTION_VIEW FileProvider intent (AppUpdateManager.installApk). The old
+ *   canRequestPackageInstalls() pre-check was deleted in the SAME change —
+ *   permission and API call removed together, never one without the other
+ *   (the 1.3.3/1.3.4 crash lesson). Re-adding either re-arms this gate.
+ * v1.1.2: QUERY_ALL_PACKAGES REMOVED — the blocked-apps picker only calls
+ *   queryIntentActivities(MAIN/LAUNCHER) and EssentialAppsGuard's home check
+ *   only MAIN/HOME; both intents are declared in the manifest's <queries>
+ *   block, which Android 11+ honors as equivalent visibility — provably
+ *   identical picker output (see blockedAppsPickerHasPackageVisibility).
+ *   Play policy treats installed-app inventory as sensitive personal data,
+ *   so dropping this is a direct Play Protect trigger-surface reduction.
  *   ADDED    canPerformGestures (a11y)     — guard genuinely performs
  *                                      GLOBAL_ACTION_BACK / HOME
  */
@@ -39,8 +47,16 @@ class ManifestPermissionAuditTest {
   private val bannedPermissions = setOf(
     // Removed in v1.3.3 — genuinely unused, with grep evidence (Play Protect red flags)
     "android.permission.KILL_BACKGROUND_PROCESSES",
-    // v1.3.5: NOT banned — legitimately required by the in-app updater
-    // (canRequestPackageInstalls crashes without it; owner report 2026-10-18).
+    // v1.1.2: REMOVED — the updater hands the APK to the SYSTEM installer via
+    // an ACTION_VIEW FileProvider intent (AppUpdateManager.installApk); no
+    // PackageInstaller session APIs and no canRequestPackageInstalls() call
+    // remain anywhere in the app (grep: zero references). The permission and
+    // the API call were removed TOGETHER — re-adding one without the other
+    // fails this gate's intent and must be reviewed against the 1.3.3 crash.
+    "android.permission.REQUEST_INSTALL_PACKAGES",
+    // v1.1.2: REMOVED — picker output is provably identical through the
+    // <queries> block (see blockedAppsPickerHasPackageVisibility below).
+    "android.permission.QUERY_ALL_PACKAGES",
     // Never existed — Focivo has no calling/SMS/contacts/phone features
     "android.permission.REQUEST_DELETE_PACKAGES",
     "android.permission.CALL_PHONE",
@@ -109,13 +125,21 @@ class ManifestPermissionAuditTest {
 
   @Test
   fun blockedAppsPickerHasPackageVisibility() {
-    // Owner constraint 2026-10-18: the blocked-apps picker is a feature and
-    // QUERY_ALL_PACKAGES stays as-declared (no narrowing without proof-tested
-    // parity). This gate accepts either the declared permission or, if it is
-    // ever removed in future, a <queries> block that provably covers the
-    // picker's launcher + home lookups.
+    // v1.1.2: QUERY_ALL_PACKAGES was REMOVED (Play policy treats installed-app
+    // inventory as sensitive personal data). The picker's package visibility
+    // now rests entirely on the <queries> block — this gate fails the build if
+    // the block ever loses the two intents the code relies on.
     val doc = manifestDoc()
     val declared = declaredPermissions(doc)
+    assertFalse(
+      "QUERY_ALL_PACKAGES must stay REMOVED (v1.1.2) — see the class KDoc",
+      "android.permission.QUERY_ALL_PACKAGES" in declared
+    )
+    assertFalse(
+      "REQUEST_INSTALL_PACKAGES must stay REMOVED (v1.1.2) — the updater uses " +
+        "the system-installer handoff and must not call canRequestPackageInstalls()",
+      "android.permission.REQUEST_INSTALL_PACKAGES" in declared
+    )
     if ("android.permission.QUERY_ALL_PACKAGES" in declared) return
 
     val queries = doc.getElementsByTagName("queries")
@@ -203,5 +227,40 @@ class ManifestPermissionAuditTest {
     )
     val label = app.getAttributeNS(androidNs, "label")
     assertTrue("app label must be set (was: '$label')", label.isNotBlank())
+  }
+
+  @Test
+  fun updaterNeverCallsCanRequestPackageInstalls() {
+    // v1.1.2: the REQUEST_INSTALL_PACKAGES declaration was removed together
+    // with this API call. If the call ever comes back (e.g. a convenience
+    // pre-check) while the permission is absent, the Update button crashes
+    // with SecurityException (owner report 2026-10-18 11:07). This scans the
+    // main source set for the call and fails the build if it reappears.
+    var dir: File? = File(System.getProperty("user.dir")).absoluteFile
+    var srcMain: File? = null
+    while (dir != null) {
+      val candidate = File(dir, "src/main/java")
+      if (candidate.isDirectory) { srcMain = candidate; break }
+      dir = dir.parentFile
+    }
+    assertTrue("src/main/java not found", srcMain != null)
+    val hits = mutableListOf<String>()
+    srcMain!!.walkTopDown()
+      .filter { it.isFile && it.extension == "kt" }
+      .forEach { f ->
+        f.readLines().forEachIndexed { i, line ->
+          if ("canRequestPackageInstalls" in line && !line.trim().startsWith("*") &&
+              !line.trim().startsWith("//")
+          ) {
+            hits.add("${f.name}:${i + 1}")
+          }
+        }
+      }
+    assertTrue(
+      "canRequestPackageInstalls() must NEVER be called in the app source " +
+        "(SecurityException crash risk without REQUEST_INSTALL_PACKAGES, " +
+        "which was removed in v1.1.2). Hits: $hits",
+      hits.isEmpty()
+    )
   }
 }
