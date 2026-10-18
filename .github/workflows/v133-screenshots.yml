@@ -10,6 +10,8 @@ name: v133 Item Screenshots
 # via gradle/actions/setup-gradle like the debug build workflow does.
 
 on:
+  push:
+    branches: [fix/v133-round]
   workflow_dispatch:
 
 jobs:
