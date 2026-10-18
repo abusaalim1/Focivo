@@ -28,6 +28,12 @@ import com.example.util.StudyAllowlistManager
 import com.example.util.StudyGuardKnowledge
 import com.example.util.YouTubeStudyGuardManager
 import com.example.util.YouTubeVideoClassifier
+import com.example.util.YouTubePlaybackGate
+import com.example.util.YouTubeGuardOrchestrator
+import com.example.util.YouTubeTitleJudge
+import com.example.util.YtGateNode
+import com.example.util.YtPlaybackSignals
+import com.example.util.YtPlayerSurface
 import com.example.util.brain.BrainBundleLoader
 import com.example.util.brain.FocivoCombinedBrain
 import kotlinx.coroutines.CoroutineScope
@@ -84,6 +90,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
         // v1.3.1: deep-focus home-screen block throttle
         private var lastHomeScreenInterceptMs: Long = 0L
         private var lastHomeInterceptedPkg: String? = null
+        // v1.3.3 (ITEM 2): YouTube observe-path hub log throttle (per title).
+        private var lastYtObserveKey: String? = null
+        private var lastYtObserveMs: Long = 0L
     }
 
     override fun onServiceConnected() {
@@ -207,6 +216,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
     private val a11yDurationSec = androidx.compose.runtime.mutableStateOf(0)
     private val a11yReason = androidx.compose.runtime.mutableStateOf<String?>(null)
     private val a11yPunishment = androidx.compose.runtime.mutableStateOf(false)
+    // v1.3.3 (item 8b): screen-time break variant payload.
+    private val a11yBreakInfo =
+        androidx.compose.runtime.mutableStateOf<com.example.ui.components.BreakOverlayInfo?>(null)
 
     private var a11yShortsView: androidx.compose.ui.platform.ComposeView? = null
     private var a11yShortsHost: com.example.ui.overlay.OverlayLifecycleHost? = null
@@ -1002,6 +1014,10 @@ class AiStudyAccessibilityService : AccessibilityService() {
     // unthrottled but meaningful: it is written only when the evidence state
     // CHANGES (playing <-> not-playing), so the feed shows exactly when the
     // chain considered a video "playing" without drowning in per-event spam.
+    // v1.3.3 (ITEM 2): the boolean is now ENFORCEABILITY (real player
+    // surface + actual playback in progress), not mere player-shaped
+    // pixels. The home feed's muted inline autoplay preview no longer
+    // flips this to true.
     private var lastYouTubePlayerEvidence: Boolean? = null
 
     private fun logPlayerEvidence(hasPlayer: Boolean, signals: String) {
@@ -1462,13 +1478,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     Log.w(TAG, "[Screen-Time Break] Global budget exceeded; blocking $pkg")
                     val friendlyName = FocusShieldService.friendlyAppName(applicationContext, pkg)
                     val budgetMins = com.example.util.ScreenTimeBudgetManager.getGlobalBudgetMinutes(applicationContext)
-                    BlockOverlayManager.interceptScreenTimeBreak(
+                    BlockOverlayManager.intercept(
                         context = applicationContext,
                         blockedPackage = pkg,
                         appName = friendlyName,
-                        remainingSec = (breakDecision.remainingMs / 1000L).toInt(),
-                        budgetLabel = com.example.util.ScreenTimeBudgetManager.budgetLabel(budgetMins),
-                        reason = com.example.util.ScreenTimeBudgetManager.breakReason(applicationContext, budgetMins)
+                        durationSec = (breakDecision.remainingMs / 1000L).toInt().coerceAtLeast(1),
+                        reason = com.example.util.ScreenTimeBudgetManager.breakReason(applicationContext, budgetMins),
+                        isPunishment = false
                     )
                     return
                 }
@@ -1515,63 +1531,141 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                 }
                             }
 
-                            // 7B. Intelligent YouTube AI Content Filter (Analyzes active video title & channel with Gemini AI)
+                            // 7B. Intelligent YouTube AI Content Filter.
+                            // v1.3.3 (ITEM 2, owner 2026-10-18): restructured
+                            // around the explicit playback gate
+                            // (YouTubePlaybackGate). Browsing surfaces (home /
+                            // search / subscriptions / channel pages) are
+                            // OBSERVED quietly — titles may be judged and
+                            // cached for responsiveness, but the block overlay
+                            // is UNREACHABLE from those paths. Enforcement
+                            // happens ONLY via enforceIfPlayingYouTube(),
+                            // which requires a real player surface AND
+                            // playback in progress. The old 1.2.3 gate
+                            // mistook the home feed's muted inline autoplay
+                            // preview (full-width player_view) for playback
+                            // and verdict-scored feed-card titles — that
+                            // false positive is now structurally impossible:
+                            // muted previews are INLINE_PREVIEW, and
+                            // mayEnforce() is false for them by construction.
                             if (isYouTubeAiFilterOn) {
-                                // v1.2.3 (A2): hardened evidence gate — ONLY actual
-                                // video playback (watch screen, miniplayer, Shorts
-                                // player, or a large inline player) is evaluated.
-                                // Home/feed/search surfaces and muted autoplay
-                                // previews can NEVER produce a verdict, no matter
-                                // what the recommendations say.
                                 val (dispW, _) = getDisplaySizePx()
-                                val watchScreen = ShortsSurfaceDetector.hasYouTubeWatchScreen(rootNode)
-                                val hasPlayer = ShortsSurfaceDetector.isYouTubeVideoPlayerSurface(rootNode, dispW)
-                                // v1.2.3 (owner 2026-10-16): player evidence is
-                                // a real, unthrottled hub entry (state-change
-                                // only) — the owner sees exactly when the
-                                // chain considered a video "playing".
-                                logPlayerEvidence(hasPlayer, ShortsSurfaceDetector.debugYouTubeSignals(rootNode))
-                                if (!hasPlayer) {
-                                    // v1.1.9 diagnostic
-                                    AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-title", "no-player-evidence")
-                                    recordYouTubeEval(
-                                        titleSource = "no-player", title = "",
-                                        playerEvidence = false, verdict = "SKIPPED",
-                                        action = "not evaluated"
-                                    )
+                                val audioActive = try {
+                                    (applicationContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)
+                                        ?.isMusicActive == true
+                                } catch (_: Exception) { false }
+                                // Single snapshot walk for the gate (children
+                                // recycled as we go; the extractor below
+                                // re-reads the tree itself).
+                                val gateView = snapshotYtGateNode(rootNode)
+                                val signals = if (gateView != null) {
+                                    YouTubePlaybackGate.detect(gateView, audioActive, dispW)
                                 } else {
-                                    val activeVideo = extractPlayingYouTubeVideo(rootNode, watchScreen)
+                                    YtPlaybackSignals(YtPlayerSurface.NONE, false, "surface=NONE playing=false sig=snapshot-failed")
+                                }
+                                // v1.2.3 (owner 2026-10-16): player evidence
+                                // is a real, unthrottled hub entry
+                                // (state-change only). v1.3.3: it now
+                                // reports ENFORCEABILITY (surface + actual
+                                // playback), not mere player-shaped pixels.
+                                logPlayerEvidence(signals.enforceable, signals.evidence)
+
+                                val activeVideo = extractPlayingYouTubeVideo(
+                                    rootNode,
+                                    watchScreen = signals.surface == YtPlayerSurface.WATCH_SCREEN
+                                )?.let { info ->
                                     // v1.2.3 (B3): channel-extraction evidence for the hub.
                                     try {
                                         AiStudyGuardManager.logGuardActivity(
                                             applicationContext, "YouTube", "youtube-channel",
-                                            if (activeVideo?.channel.isNullOrBlank()) "not-detected" else "seen",
-                                            "src=" + (activeVideo?.channelSrc ?: "no-pattern-matched"),
-                                            activeVideo?.channel ?: (activeVideo?.title ?: "")
+                                            if (info.channel.isNullOrBlank()) "not-detected" else "seen",
+                                            "src=" + (info.channelSrc ?: "no-pattern-matched"),
+                                            info.channel ?: info.title
                                         )
                                     } catch (_: Exception) { }
-                                    if (activeVideo != null && activeVideo.title.isNotBlank() && activeVideo.title.length >= 4) {
-                                        val sourceTag = if (watchScreen) "watch-screen" else "miniplayer/shorts"
-                                        val blocked = processYouTubeVideoTitle(activeVideo.title, activeVideo.channel, activeVideo.metadata, sourceTag)
-                                        if (blocked) return
-                                    } else {
-                                        // v1.1.6 fallback: title view-ids not exposed (e.g. fullscreen/custom player).
-                                        // Scan prominent on-screen text instead of silently skipping detection.
-                                        val fallbackTitle = extractFallbackVideoTitle(rootNode)
-                                        if (!fallbackTitle.isNullOrBlank()) {
-                                            Log.d(TAG, "[YouTube AI Guard] Primary title extraction missed; using fallback title: '$fallbackTitle'")
-                                            val blocked = processYouTubeVideoTitle(fallbackTitle, null, "fallback_title_scan", "fallback-scan")
-                                            if (blocked) return
-                                        } else {
-                                            // v1.1.9 diagnostic: nothing title-like on screen.
-                                            AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-title", "title-null")
-                                            recordYouTubeEval(
-                                                titleSource = "title-null", title = "",
-                                                verdict = "SKIPPED", action = "allowed (fail-open)"
+                                    YouTubeGuardOrchestrator.ActiveVideo(
+                                        title = info.title,
+                                        channel = info.channel,
+                                        metadata = info.metadata,
+                                        source = if (signals.surface == YtPlayerSurface.WATCH_SCREEN) "watch-screen" else "miniplayer/shorts"
+                                    )
+                                } ?: run {
+                                    // v1.1.6 fallback: title view-ids not
+                                    // exposed (e.g. fullscreen/custom player).
+                                    // NOTE (v1.3.3): on browse surfaces this
+                                    // scans feed cards — the result feeds ONLY
+                                    // the observe path (never enforcement).
+                                    val fallbackTitle = extractFallbackVideoTitle(rootNode)
+                                    if (!fallbackTitle.isNullOrBlank() && fallbackTitle.length >= 4) {
+                                        Log.d(TAG, "[YouTube AI Guard] Primary title extraction missed; using fallback title: '$fallbackTitle'")
+                                        YouTubeGuardOrchestrator.ActiveVideo(
+                                            title = fallbackTitle, channel = null,
+                                            metadata = "fallback_title_scan", source = "fallback-scan"
+                                        )
+                                    } else null
+                                }
+
+                                val action = YouTubeGuardOrchestrator.handle(
+                                    YouTubeGuardOrchestrator.Inputs(
+                                        isYouTubeForeground = true,
+                                        isStudyPeriod = isStudyPeriod,
+                                        filterEnabled = true,
+                                        signals = signals,
+                                        video = activeVideo,
+                                        judge = youTubeJudgeDeps()
+                                    )
+                                )
+                                var enforced = false
+                                when (action) {
+                                    is YouTubeGuardOrchestrator.Action.Inert -> {
+                                        // Unreachable here (filter on), kept for exhaustiveness.
+                                    }
+                                    is YouTubeGuardOrchestrator.Action.NoVideo -> {
+                                        // v1.1.9 diagnostic: nothing title-like on screen.
+                                        AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-title", "title-null")
+                                        recordYouTubeEval(
+                                            titleSource = "title-null", title = "",
+                                            playerEvidence = signals.enforceable,
+                                            verdict = "SKIPPED", action = "allowed (fail-open)"
+                                        )
+                                    }
+                                    is YouTubeGuardOrchestrator.Action.Observe -> {
+                                        logYouTubeObserved(action.video, action.result, signals)
+                                    }
+                                    is YouTubeGuardOrchestrator.Action.Allowed -> {
+                                        // Playing video judged study — quiet hub entry, nothing else.
+                                        logYouTubeObserved(action.video, action.result, signals)
+                                    }
+                                    is YouTubeGuardOrchestrator.Action.Enforce -> {
+                                        // THE choke point — the only caller
+                                        // besides the Gemini tail below.
+                                        logYouTubeTrace(action.video, action.result)
+                                        enforced = enforceIfPlayingYouTube(
+                                            signals, action.video, action.reason, action.viaBlocklist
+                                        )
+                                    }
+                                    is YouTubeGuardOrchestrator.Action.AwaitGemini -> {
+                                        // Sync pipeline uncertain on a PLAYING
+                                        // video: launch the Gemini tail. It
+                                        // re-verifies the gate on a FRESH
+                                        // tree read before enforcing.
+                                        recordYouTubeEval(
+                                            titleSource = action.video.source, title = action.video.title,
+                                            playerEvidence = signals.enforceable,
+                                            verdict = "UNCERTAIN", action = "gemini check pending"
+                                        )
+                                        val pendingVideo = action.video
+                                        serviceScope.launch {
+                                            val geminiVerdict = GeminiContentClassifier.evaluateWithGemini(
+                                                title = pendingVideo.title,
+                                                channel = pendingVideo.channel,
+                                                metadata = pendingVideo.metadata
                                             )
+                                            handleYouTubeGeminiTail(pendingVideo, geminiVerdict)
                                         }
                                     }
                                 }
+                                if (enforced) return
                             } else {
                                 // v1.1.9 diagnostic
                                 AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube", "filter-disabled")
@@ -2126,308 +2220,311 @@ class AiStudyAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun processYouTubeVideoTitle(title: String, channel: String?, metadata: String?, titleSource: String = ""): Boolean {
-        // v1.3.0 (Worker E): evaluation order is now
-        //   user channel lists -> combined brain -> knowledge -> quick -> Gemini,
-        // where the combined brain itself runs
-        //   repo channels -> corrections -> doubt gate -> combined score -> our bands.
-        // The doubt gate moved INSIDE the combined judge (FocivoCombinedBrain):
-        // the user's own channel lists and their explicit corrections outrank
-        // the heuristic doubt shield; a doubt phrasing still can never block
-        // once the judge sees it.
+    // ------------------------------------------------------------------
+    // v1.3.3 (ITEM 2 — YouTube guard over-blocking fix, owner 2026-10-18).
+    //
+    // The old processYouTubeVideoTitle() mixed classification and
+    // enforcement in one function and was reachable from browse surfaces
+    // (the 1.2.3 "player evidence" gate fired on the home feed's muted
+    // inline autoplay preview, then the fallback title scan grabbed a feed
+    // card title — instant block on open).
+    //
+    // New structure:
+    //   section 7B  -> YouTubeGuardOrchestrator.handle() (pure routing)
+    //   enforce*    -> enforceIfPlayingYouTube() — THE single enforcement
+    //                  choke point — the only call sites are the Enforce
+    //                  action branch in 7B and handleYouTubeGeminiTail().
+    //   observe*    -> logYouTubeObserved() — quiet OBSERVED hub entries.
+    // Classification order is unchanged (blocklist -> allowlist ->
+    // combined brain with the doubt gate inside -> knowledge bands ->
+    // quick -> Gemini tail), and the OFF-by-default filter toggle
+    // semantics are untouched (the judge is never consulted when the
+    // toggle is off — the orchestrator returns Inert).
+    // ------------------------------------------------------------------
 
-        // v1.2.3 (B): the user's channel BLOCKLIST beats everything — an
-        // explicitly blocked channel is blocked outright whenever its video
-        // plays during study. Same semantics as the app blocklist: immediate,
-        // no warning flow. The lock screen names the real reason.
-        if (BlockedChannelsManager.isBlockedChannel(applicationContext, channel)) {
-            val now = System.currentTimeMillis()
-            if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
-                lastYouTubeAiInterceptTimeMs = now
-                val reason = "Blocked channel: ${channel?.trim()} is on your blocked-channels list."
-                Log.w(TAG, "[YouTube Guard] $reason Video: '$title'")
-                AiStudyGuardManager.logGuardActivity(
-                    applicationContext, "YouTube", "youtube-blocklist", "NON_STUDY",
-                    "channel-blocklist", "${channel?.trim()} | $title"
-                )
-                YouTubeStudyGuardManager.recordBlockedVideo(
-                    context = applicationContext, title = title, channel = channel, reason = reason
-                )
-                pauseMediaPlayback()
-                com.example.service.BlockOverlayManager.intercept(
-                    context = applicationContext,
-                    blockedPackage = "com.google.android.youtube",
-                    appName = "YouTube",
-                    durationSec = FocusShieldService.getRemainingSeconds(applicationContext),
-                    reason = reason,
-                    isPunishment = false
-                )
-            }
-            recordYouTubeEval(titleSource = titleSource, title = title, verdict = "NON_STUDY", action = "blocked (channel blocklist)")
-            return true
+    private data class YtGateNodeSnap(
+        override val viewId: String,
+        override val text: String,
+        override val contentDescription: String,
+        override val className: String,
+        override val boundsWidthPx: Int,
+        override val children: List<YtGateNode>
+    ) : YtGateNode
+
+    /**
+     * Eager, lowercased snapshot of the node tree for the pure playback
+     * gate. Children are recycled as the walk proceeds; the title
+     * extractors re-read rootNode themselves afterwards (getChild returns
+     * fresh pooled instances, so sequential traversals are safe — the
+     * existing code already does this).
+     */
+    private fun snapshotYtGateNode(root: AccessibilityNodeInfo, depth: Int = 0): YtGateNode? {
+        if (depth > 14) return null
+        val viewId = try { root.viewIdResourceName?.lowercase(Locale.ROOT) ?: "" } catch (_: Exception) { "" }
+        val text = try { root.text?.toString()?.lowercase(Locale.ROOT) ?: "" } catch (_: Exception) { "" }
+        val desc = try { root.contentDescription?.toString()?.lowercase(Locale.ROOT) ?: "" } catch (_: Exception) { "" }
+        val cls = try { root.className?.toString()?.lowercase(Locale.ROOT) ?: "" } catch (_: Exception) { "" }
+        val width = try {
+            val r = Rect()
+            root.getBoundsInScreen(r)
+            r.width()
+        } catch (_: Exception) { 0 }
+        val kids = ArrayList<YtGateNode>()
+        val n = try { root.childCount } catch (_: Exception) { 0 }
+        for (i in 0 until n) {
+            val c = try { root.getChild(i) } catch (_: Exception) { null } ?: continue
+            snapshotYtGateNode(c, depth + 1)?.let { kids.add(it) }
+            try { c.recycle() } catch (_: Exception) {}
+        }
+        return YtGateNodeSnap(viewId, text, desc, cls, width, kids)
+    }
+
+    /** Wires the pure title pipeline to the real platform-backed judges. */
+    private fun youTubeJudgeDeps(): YouTubeTitleJudge.Deps = object : YouTubeTitleJudge.Deps {
+        override fun isChannelBlocklisted(channel: String?): Boolean =
+            BlockedChannelsManager.isBlockedChannel(applicationContext, channel)
+
+        override fun isChannelAllowlisted(channel: String?): Boolean =
+            StudyAllowlistManager.isStudyChannel(applicationContext, channel)
+
+        override fun judgeBrain(title: String, channel: String?): YouTubeTitleJudge.BrainVerdict {
+            val j = runCatching { FocivoCombinedBrain.judgeTitle(applicationContext, title, channel) }.getOrNull()
+                ?: return YouTubeTitleJudge.BrainVerdict(YouTubeTitleJudge.BrainDecision.UNCERTAIN, "error", null)
+            return YouTubeTitleJudge.BrainVerdict(
+                when (j.decision) {
+                    FocivoCombinedBrain.Decision.BLOCK -> YouTubeTitleJudge.BrainDecision.BLOCK
+                    FocivoCombinedBrain.Decision.ALLOW -> YouTubeTitleJudge.BrainDecision.ALLOW
+                    else -> YouTubeTitleJudge.BrainDecision.UNCERTAIN
+                },
+                j.tag, j.pCombined
+            )
         }
 
-        // v1.2.2 (B1): the user's own study-channel allowlist always wins —
-        // a channel they explicitly trust is never verdict-scored.
-        if (StudyAllowlistManager.isStudyChannel(applicationContext, channel)) {
-            AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-allowlist", "STUDY", "allowlisted-channel", title)
-            recordYouTubeEval(titleSource = titleSource, title = title, verdict = "STUDY", action = "allowed (channel allowlist)")
+        override fun scoreKnowledge(title: String, channel: String?): YouTubeTitleJudge.KnowledgeVerdict {
+            val d = StudyGuardKnowledge.scoreVideoDetailed(title, channel)
+            return YouTubeTitleJudge.KnowledgeVerdict(
+                when (d.verdict) {
+                    StudyGuardKnowledge.Verdict.STUDY -> YouTubeTitleJudge.KnowledgeDecision.STUDY
+                    StudyGuardKnowledge.Verdict.NON_STUDY -> YouTubeTitleJudge.KnowledgeDecision.NON_STUDY
+                    else -> YouTubeTitleJudge.KnowledgeDecision.UNCERTAIN
+                },
+                d.score, d.evidence
+            )
+        }
+
+        override fun quickEvaluate(title: String, channel: String?, metadata: String?): YouTubeTitleJudge.QuickVerdict {
+            val q = GeminiContentClassifier.quickEvaluate(title = title, channel = channel, metadata = metadata)
+            return YouTubeTitleJudge.QuickVerdict(q.isStudyAllowed, q.isAdult, q.confidence, q.reason, q.category)
+        }
+    }
+
+    /** Guard Hub p-band label for the "Last YouTube evaluation" card. */
+    private fun youTubePBand(result: YouTubeTitleJudge.Result): String {
+        return when (result.brainTag) {
+            "doubt", "correction", "repo-channel" -> result.brainTag
+            "" -> ""
+            else -> FocivoCombinedBrain.pBandLabel(
+                result.brainP, FocivoCombinedBrain.TITLE_BLOCK_P, FocivoCombinedBrain.TITLE_ALLOW_P
+            )
+        }
+    }
+
+    /** Per-stage Guard Hub trace for one judged title (same stage labels as before the refactor). */
+    private fun logYouTubeTrace(video: YouTubeGuardOrchestrator.ActiveVideo, result: YouTubeTitleJudge.Result) {
+        for (t in result.trace) {
+            AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", t.stage, t.verdict, t.detail, video.title)
+        }
+    }
+
+    /**
+     * Quiet OBSERVED hub entry for the observe path (browse surfaces and
+     * allowed videos). Never enforces — enforcement lives only in
+     * enforceIfPlayingYouTube().
+     */
+    private fun logYouTubeObserved(
+        video: YouTubeGuardOrchestrator.ActiveVideo,
+        result: YouTubeTitleJudge.Result,
+        signals: YtPlaybackSignals
+    ) {
+        logYouTubeTrace(video, result)
+        val key = "${video.title}|${video.channel.orEmpty()}"
+        val now = System.currentTimeMillis()
+        if (key == lastYtObserveKey && now - lastYtObserveMs < 5000L) return
+        lastYtObserveKey = key
+        lastYtObserveMs = now
+        AiStudyGuardManager.logGuardActivity(
+            applicationContext, "YouTube", "youtube-observe", "OBSERVED",
+            "surface=${signals.surface} enforceable=${signals.enforceable} " +
+                    YouTubeGuardOrchestrator.outcomeName(result),
+            video.title
+        )
+        recordYouTubeEval(
+            titleSource = video.source, title = video.title,
+            playerEvidence = signals.enforceable,
+            pEntBand = youTubePBand(result),
+            verdict = "OBSERVED",
+            action = if (signals.enforceable) "observed (playing)" else "observed only — browse surface"
+        )
+    }
+
+    /**
+     * THE enforcement choke point for the YouTube AI content filter.
+     *
+     * Prove the design by grepping for enforceIfPlayingYouTube: the only
+     * call sites are the Action.Enforce branch of section 7B and
+     * handleYouTubeGeminiTail(). Browse-surface observations can never
+     * reach this function — the orchestrator only produces Action.Enforce
+     * when YouTubePlaybackGate.mayEnforce() is true, and the gate is
+     * re-verified here at fire time (the Gemini tail fires seconds after
+     * the original event, when the user may have paused or navigated
+     * away).
+     *
+     * Returns true when enforcement fired (the caller stops processing
+     * this event).
+     */
+    private fun enforceIfPlayingYouTube(
+        signals: YtPlaybackSignals,
+        video: YouTubeGuardOrchestrator.ActiveVideo,
+        reason: String,
+        viaBlocklist: Boolean
+    ): Boolean {
+        if (!YouTubePlaybackGate.mayEnforce(signals)) {
+            AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-enforce", "gate-closed-at-fire")
             return false
         }
-
-        // v1.3.0 (Worker E): the combined on-device brain is the FIRST title
-        // judge, ahead of the knowledge pack. Fully offline (no key, no
-        // network, <2ms): ported Focivo repo brain (channel lists + 354 cue
-        // rules + 33k ML weights + user corrections) averaged with the v3
-        // TF-IDF brain: p_combined = 0.5*p_repo + 0.5*p_v3 (single-brain
-        // fallback when the other bundle is missing).
-        // Bands (P_study): >= 0.80 -> ALLOW; <= 0.35 -> BLOCK (high
-        // confidence only); middle -> UNCERTAIN -> fall through to the
-        // existing knowledge -> quick -> Gemini chain below (Gemini
-        // arbitrates when a key exists; no key -> the existing fail-open
-        // rules apply).
-        // Inside the judge: repo channels -> corrections -> doubt gate ->
-        // combined score. The user's own channel lists above still win; a
-        // doubt phrasing can never block once the judge sees it.
-        // Hard rules stay supreme: this only ever sees actual-playback titles
-        // (callers gate on player evidence).
-        if (title.isNotBlank()) {
-            val judgment = runCatching {
-                FocivoCombinedBrain.judgeTitle(applicationContext, title, channel)
-            }.getOrNull()
-            if (judgment == null) {
-                AiStudyGuardManager.logGuardActivity(
-                    applicationContext, "YouTube", "youtube-local", "UNCERTAIN",
-                    "combined-brain-error->existing-chain", title
-                )
-            } else {
-                val pStr = judgment.pCombined?.let { "p=%.3f".format(Locale.ROOT, it) } ?: "no-score"
-                val band = when (judgment.tag) {
-                    "doubt" -> "doubt"
-                    "correction" -> "correction"
-                    "repo-channel" -> "repo-channel"
-                    else -> FocivoCombinedBrain.pBandLabel(
-                        judgment.pCombined,
-                        FocivoCombinedBrain.TITLE_BLOCK_P,
-                        FocivoCombinedBrain.TITLE_ALLOW_P
-                    )
-                }
-                when (judgment.decision) {
-                    FocivoCombinedBrain.Decision.BLOCK -> {
-                        AiStudyGuardManager.logGuardActivity(
-                            applicationContext, "YouTube", "youtube-local", "NON_STUDY",
-                            "combined-brain $pStr [${judgment.tag}]", title
-                        )
-                        recordYouTubeEval(
-                            titleSource = titleSource, title = title,
-                            pEntBand = band,
-                            verdict = "NON_STUDY", action = "stage-1 warning"
-                        )
-                        val now = System.currentTimeMillis()
-                        if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
-                            lastYouTubeAiInterceptTimeMs = now
-                            val reason =
-                                "Non-study content detected: \"$title\" [combined-brain $pStr]"
-                            Log.w(TAG, "[YouTube Guard] $reason")
-                            YouTubeStudyGuardManager.recordBlockedVideo(
-                                context = applicationContext,
-                                title = title,
-                                channel = channel,
-                                reason = reason
-                            )
-                            pauseMediaPlayback()
-                            AiStudyGuardManager.onNonStudyDetected(
-                                context = applicationContext,
-                                packageName = "com.google.android.youtube",
-                                messageText = title,
-                                reason = reason
-                            )
-                        }
-                        return true
-                    }
-                    FocivoCombinedBrain.Decision.ALLOW -> {
-                        AiStudyGuardManager.logGuardActivity(
-                            applicationContext, "YouTube", "youtube-local", "STUDY",
-                            "combined-brain $pStr [${judgment.tag}]", title
-                        )
-                        recordYouTubeEval(
-                            titleSource = titleSource, title = title,
-                            pEntBand = band,
-                            verdict = "STUDY", action = "allowed"
-                        )
-                        return false
-                    }
-                    FocivoCombinedBrain.Decision.UNCERTAIN -> {
-                        AiStudyGuardManager.logGuardActivity(
-                            applicationContext, "YouTube", "youtube-local", "UNCERTAIN",
-                            "combined-brain $pStr->existing-chain", title
-                        )
-                    }
-                }
-            }
-        }
-
-        // v1.1.8: curated offline knowledge — instant (<1ms), zero network.
-        // v1.2.3 (A): the hard rule — a knowledge NON_STUDY only fires the
-        // discipline flow at HIGH confidence (score <= -4.0: a multi-word
-        // block phrase or 2+ hits). A weak single-word hit (score -2..-4)
-        // falls through to quick→Gemini instead of blocking on thin evidence.
-        val detailed = StudyGuardKnowledge.scoreVideoDetailed(title, channel)
-        when (detailed.verdict) {
-            StudyGuardKnowledge.Verdict.STUDY -> {
-                Log.d(TAG, "[StudyGuardKnowledge] Study video allowed: '$title' ($channel) [${detailed.evidence}]")
-                // v1.1.9 diagnostic
-                AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-knowledge", "STUDY", detailed.evidence, title)
-                recordYouTubeEval(titleSource = titleSource, title = title, verdict = "STUDY", action = "allowed")
-                return false
-            }
-            StudyGuardKnowledge.Verdict.NON_STUDY -> {
-                if (detailed.score > -4.0) {
-                    // Weak signal — treat as UNCERTAIN, fall through.
-                    AiStudyGuardManager.logGuardActivity(
-                        applicationContext, "YouTube", "youtube-knowledge", "UNCERTAIN",
-                        "weak(${detailed.evidence})→quick", title
-                    )
-                } else {
-                    // v1.1.9 diagnostic (log every evaluation, before the action throttle)
-                    AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-knowledge", "NON_STUDY", detailed.evidence, title)
-                    val now = System.currentTimeMillis()
-                    if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
-                        lastYouTubeAiInterceptTimeMs = now
-                        Log.w(TAG, "[StudyGuardKnowledge] Non-study video: '$title' ($channel) [${detailed.evidence}]")
-                        YouTubeStudyGuardManager.recordBlockedVideo(
-                            context = applicationContext,
-                            title = title,
-                            channel = channel,
-                            reason = "Non-study content detected: \"$title\" [${detailed.evidence}]"
-                        )
-                        pauseMediaPlayback()
-                        AiStudyGuardManager.onNonStudyDetected(
-                            context = applicationContext,
-                            packageName = "com.google.android.youtube",
-                            messageText = title,
-                            reason = "Non-study content detected on YouTube: \"$title\" [${detailed.evidence}]"
-                        )
-                    }
-                    recordYouTubeEval(titleSource = titleSource, title = title, verdict = "NON_STUDY", action = "stage-1 warning")
-                    return true
-                }
-            }
-            StudyGuardKnowledge.Verdict.UNCERTAIN -> {
-                // fall through to existing flow below
-            }
-        }
-
-        val quickVerdict = GeminiContentClassifier.quickEvaluate(
-            title = title,
-            channel = channel,
-            metadata = metadata
+        if (!YouTubeStudyGuardManager.isFilterEnabled(applicationContext)) return false
+        if (!AiStudyGuardManager.isStudyPeriodActive(applicationContext)) return false
+        val now = System.currentTimeMillis()
+        if (now - lastYouTubeAiInterceptTimeMs <= 1500L) return false
+        lastYouTubeAiInterceptTimeMs = now
+        Log.w(TAG, "[YouTube Guard] $reason Video: '${video.title}'")
+        YouTubeStudyGuardManager.recordBlockedVideo(
+            context = applicationContext, title = video.title, channel = video.channel, reason = reason
         )
-
-        // v1.2.2 (B2): a quick on-device block needs a CONFIDENT verdict
-        // (confidence >= 0.90 — real extracted-content evidence). Uncertain
-        // verdicts (e.g. "Uncertain / Review Required") never block by
-        // themselves — they fall through to the Gemini check below, and if
-        // Gemini is unavailable the result is FAIL-OPEN (allow).
-        val isConfidentQuickBlock = (!quickVerdict.isStudyAllowed || quickVerdict.isAdult) &&
-                quickVerdict.confidence >= 0.90f
-
-        if (isConfidentQuickBlock) {
-            // v1.1.9 diagnostic (log every evaluation, before the action throttle)
-            AiStudyGuardManager.logGuardActivity(
-                applicationContext, "YouTube", "youtube-quick", "NON_STUDY",
-                "conf=${quickVerdict.confidence} " + quickVerdict.category.ifBlank { "quick" }, title
+        pauseMediaPlayback()
+        if (viaBlocklist) {
+            // v1.2.3 (B): the user's channel BLOCKLIST beats everything —
+            // immediate, no warning flow (same semantics as the app
+            // blocklist). The lock screen names the real reason.
+            com.example.service.BlockOverlayManager.intercept(
+                context = applicationContext,
+                blockedPackage = "com.google.android.youtube",
+                appName = "YouTube",
+                durationSec = FocusShieldService.getRemainingSeconds(applicationContext),
+                reason = reason,
+                isPunishment = false
             )
-            val now = System.currentTimeMillis()
-            if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
-                lastYouTubeAiInterceptTimeMs = now
-                Log.w(TAG, "[YouTube AI Guard] Quick intercepting non-study video: '$title' ($channel) -> ${quickVerdict.reason}")
-                YouTubeStudyGuardManager.recordBlockedVideo(
-                    context = applicationContext,
-                    title = title,
-                    channel = channel,
-                    reason = quickVerdict.reason
-                )
-                pauseMediaPlayback()
-                AiStudyGuardManager.onNonStudyDetected(
-                    context = applicationContext,
-                    packageName = "com.google.android.youtube",
-                    messageText = title,
-                    reason = quickVerdict.reason
-                )
-            }
-            recordYouTubeEval(titleSource = titleSource, title = title, verdict = "NON_STUDY", action = "stage-1 warning")
-            return true
+            recordYouTubeEval(
+                titleSource = video.source, title = video.title,
+                verdict = "NON_STUDY", action = "blocked (channel blocklist)"
+            )
         } else {
-            // v1.1.9 diagnostic
-            AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", "youtube-quick", "UNCERTAIN", "quick-allow→gemini", title)
-            // Launch background Gemini check for deep verification
-            serviceScope.launch {
-                val geminiVerdict = GeminiContentClassifier.evaluateWithGemini(
-                    title = title,
-                    channel = channel,
-                    metadata = metadata
+            AiStudyGuardManager.onNonStudyDetected(
+                context = applicationContext,
+                packageName = "com.google.android.youtube",
+                messageText = video.title,
+                reason = reason
+            )
+            recordYouTubeEval(
+                titleSource = video.source, title = video.title,
+                verdict = "NON_STUDY", action = "stage-1 warning"
+            )
+        }
+        // Guard Hub: explicit PLAY_BLOCK enforcement entry.
+        AiStudyGuardManager.logGuardActivity(
+            applicationContext, "YouTube", "youtube-enforce", "PLAY_BLOCK",
+            reason.take(64), video.title
+        )
+        return true
+    }
+
+    /**
+     * Gemini tail (launched from the Action.AwaitGemini branch): re-verifies
+     * the playback gate on a FRESH tree read at fire time, then routes the
+     * arbiter verdict through the orchestrator — enforcement still funnels
+     * through enforceIfPlayingYouTube().
+     */
+    private fun handleYouTubeGeminiTail(
+        video: YouTubeGuardOrchestrator.ActiveVideo,
+        geminiVerdict: GeminiContentClassifier.ContentVerdict
+    ) {
+        try {
+            // v1.2.2 (B3): honest source handling. AI_UNAVAILABLE means Gemini
+            // never ran — fail open with an honest log entry, NEVER a block.
+            if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.AI_UNAVAILABLE) {
+                AiStudyGuardManager.logGuardActivity(
+                    applicationContext, "YouTube", "youtube-gemini", "STUDY",
+                    "AI check unavailable — allowed", video.title
                 )
-                // v1.2.2 (B3): honest source handling. AI_UNAVAILABLE means
-                // Gemini never ran — fail open with an honest log entry, and
-                // NEVER treat it as a block.
-                if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.AI_UNAVAILABLE) {
-                    AiStudyGuardManager.logGuardActivity(
-                        applicationContext, "YouTube", "youtube-gemini", "STUDY",
-                        "AI check unavailable — allowed", title
-                    )
-                    recordYouTubeEval(
-                        titleSource = titleSource, title = title,
-                        verdict = "STUDY", action = "allowed (fail-open: AI unavailable)"
-                    )
-                    return@launch
-                }
-                if (!geminiVerdict.isStudyAllowed || geminiVerdict.isAdult) {
-                    // v1.1.9 diagnostic — v1.2.2: stage label follows the real
-                    // source (a confident on-device verdict never needed Gemini).
-                    val gemStage = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) "youtube-gemini" else "youtube-quick"
+                recordYouTubeEval(
+                    titleSource = video.source, title = video.title,
+                    verdict = "STUDY", action = "allowed (fail-open: AI unavailable)"
+                )
+                return
+            }
+            val arbiter = if (!geminiVerdict.isStudyAllowed || geminiVerdict.isAdult) {
+                YouTubeGuardOrchestrator.Arbiter.NON_STUDY
+            } else {
+                YouTubeGuardOrchestrator.Arbiter.STUDY
+            }
+            // v1.2.2: stage label follows the real source.
+            val gemStage = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) {
+                "youtube-gemini"
+            } else {
+                "youtube-quick"
+            }
+
+            val freshRoot = try { rootInActiveWindow } catch (_: Exception) { null }
+            if (freshRoot == null) {
+                AiStudyGuardManager.logGuardSkip(applicationContext, "YouTube", "youtube-gemini", "gate-closed-at-fire")
+                return
+            }
+            val gateView = snapshotYtGateNode(freshRoot)
+            val (dispW, _) = getDisplaySizePx()
+            val audioActive = try {
+                (applicationContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.isMusicActive == true
+            } catch (_: Exception) { false }
+            val signals = if (gateView != null) {
+                YouTubePlaybackGate.detect(gateView, audioActive, dispW)
+            } else {
+                YtPlaybackSignals(YtPlayerSurface.NONE, false, "surface=NONE playing=false sig=snapshot-failed")
+            }
+            try { freshRoot.recycle() } catch (_: Exception) {}
+
+            val action = YouTubeGuardOrchestrator.handle(
+                YouTubeGuardOrchestrator.Inputs(
+                    isYouTubeForeground = true,
+                    isStudyPeriod = AiStudyGuardManager.isStudyPeriodActive(applicationContext),
+                    filterEnabled = YouTubeStudyGuardManager.isFilterEnabled(applicationContext),
+                    signals = signals,
+                    video = video,
+                    judge = youTubeJudgeDeps(),
+                    arbiter = arbiter,
+                    arbiterReason = "Non-study content detected: \"${video.title}\" [${geminiVerdict.reason}]"
+                )
+            )
+            when (action) {
+                is YouTubeGuardOrchestrator.Action.Enforce -> {
                     AiStudyGuardManager.logGuardActivity(
                         applicationContext, "YouTube", gemStage, "NON_STUDY",
-                        "conf=${geminiVerdict.confidence} " + geminiVerdict.category.ifBlank { "gemini" }, title
+                        "conf=${geminiVerdict.confidence} " + geminiVerdict.category.ifBlank { "gemini" }, video.title
                     )
-                    val now = System.currentTimeMillis()
-                    if (now - lastYouTubeAiInterceptTimeMs > 1500L) {
-                        lastYouTubeAiInterceptTimeMs = now
-                        Log.w(TAG, "[Gemini AI Guard] Intercepting non-study video: '$title' ($channel) -> ${geminiVerdict.reason}")
-                        YouTubeStudyGuardManager.recordBlockedVideo(
-                            context = applicationContext,
-                            title = title,
-                            channel = channel,
-                            reason = geminiVerdict.reason
-                        )
-                        pauseMediaPlayback()
-                        AiStudyGuardManager.onNonStudyDetected(
-                            context = applicationContext,
-                            packageName = "com.google.android.youtube",
-                            messageText = title,
-                            reason = geminiVerdict.reason
-                        )
-                    }
-                    recordYouTubeEval(
-                        titleSource = titleSource, title = title,
-                        verdict = "NON_STUDY", action = "stage-1 warning"
+                    enforceIfPlayingYouTube(signals, action.video, action.reason, viaBlocklist = false)
+                }
+                is YouTubeGuardOrchestrator.Action.Allowed -> {
+                    AiStudyGuardManager.logGuardActivity(
+                        applicationContext, "YouTube", gemStage, "STUDY", "gemini-allow", video.title
                     )
-                } else {
-                    // v1.1.9 diagnostic — v1.2.2: honest source label.
-                    val allowStage = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) "youtube-gemini" else "youtube-quick"
-                    val allowReason = if (geminiVerdict.source == GeminiContentClassifier.VerdictSource.GEMINI) "gemini-allow" else "quick-allow"
-                    AiStudyGuardManager.logGuardActivity(applicationContext, "YouTube", allowStage, "STUDY", allowReason, title)
                     recordYouTubeEval(
-                        titleSource = titleSource, title = title,
+                        titleSource = video.source, title = video.title,
                         verdict = "STUDY", action = "allowed"
                     )
                 }
+                is YouTubeGuardOrchestrator.Action.Observe -> logYouTubeObserved(action.video, action.result, signals)
+                else -> { /* Inert / NoVideo / AwaitGemini: nothing to do at fire time. */ }
             }
-            recordYouTubeEval(
-                titleSource = titleSource, title = title,
-                verdict = "UNCERTAIN", action = "gemini check pending"
-            )
-            return false
+        } catch (t: Throwable) {
+            Log.e(TAG, "[YouTube AI Guard] Gemini tail failed: ${t.message}")
         }
     }
 
