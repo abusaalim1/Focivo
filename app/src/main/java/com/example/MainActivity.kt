@@ -1294,6 +1294,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                             onDownloadClick = { downloadUrl ->
                                 viewModel.downloadAndInstallUpdate(context, downloadUrl)
                             },
+                            onOpenInBrowser = { downloadUrl ->
+                                AppUpdateManager.openUpdateUrlInBrowser(context, downloadUrl)
+                            },
                             onDismiss = {
                                 viewModel.dismissAppUpdate(context)
                             }

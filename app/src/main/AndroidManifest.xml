@@ -22,10 +22,12 @@
          (InstalledAppsManager). Owner constraint 2026-10-18: no feature may be
          removed or narrowed; the picker stays on QUERY_ALL_PACKAGES. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
-    <!-- v1.3.3: in-app updater downloads the APK and hands it to the SYSTEM
-         package installer via ACTION_VIEW + FileProvider (AppUpdateManager),
-         which needs no install permission — REQUEST_INSTALL_PACKAGES was
-         dropped to keep the risk profile minimal. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- v1.3.5: RESTORED — the 1.3.3 cleanup dropped this, but the in-app
+         updater CALLS PackageManager.canRequestPackageInstalls(), which THROWS
+         SecurityException (crashing the Update button on live 1.3.3/1.3.4) when
+         the permission is undeclared. The self-update feature legitimately
+         requires it: the APK is downloaded and handed to the system installer. -->
 
     <queries>
         <intent>

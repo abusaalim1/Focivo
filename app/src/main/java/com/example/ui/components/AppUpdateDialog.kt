@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -56,7 +57,8 @@ import com.example.util.AppUpdateManager
 fun AppUpdateDialog(
     updateInfo: AppUpdateInfo,
     onDownloadClick: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onOpenInBrowser: (String) -> Unit = {}
 ) {
     val T = focivoTokens()
     val darkSurface = T.bg
@@ -282,6 +284,21 @@ fun AppUpdateDialog(
                             fontFamily = PoppinsFontFamily,
                             textAlign = TextAlign.Center
                         )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        // v1.3.5: escape hatch — after any failed update attempt
+                        // the user can always grab the APK in the browser.
+                        TextButton(
+                            onClick = { onOpenInBrowser(updateInfo.downloadUrl) },
+                            modifier = Modifier.testTag("update_browser_fallback_button")
+                        ) {
+                            Text(
+                                text = "Open download in browser",
+                                color = limeAccent,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = PoppinsFontFamily
+                            )
+                        }
                         Spacer(modifier = Modifier.height(10.dp))
                     }
                     else -> {}
