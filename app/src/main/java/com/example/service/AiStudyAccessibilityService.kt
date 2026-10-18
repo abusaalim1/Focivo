@@ -315,7 +315,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
         windowBounds: android.graphics.Rect? = null,
         // v1.3.0: "floating" | "split" — the compact small-window message
         // for split-pane / freeform interceptions. Null = fullscreen copy.
-        windowedMode: String? = null
+        windowedMode: String? = null,
+        // v1.3.3 (item 8b): screen-time break variant payload.
+        breakInfo: com.example.ui.components.BreakOverlayInfo? = null
     ): Boolean {
         if (a11yBlockView != null) {
             a11yBlockedPackage.value = blockedPackage
@@ -324,6 +326,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yReason.value = reason
             a11yPunishment.value = isPunishment
             a11yWindowedMode.value = windowedMode
+            a11yBreakInfo.value = breakInfo
             // Reposition to the offending window when a (different) bound
             // is supplied — e.g. fullscreen overlay followed by a
             // small-window intercept of the same package.
@@ -1472,9 +1475,6 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     )
                     return
                 }
-            }
-                )
-                return
             }
 
             // 7. YouTube Shorts & AI Study Filter (Active ONLY during scheduled study time or active timer)
