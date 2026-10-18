@@ -14,9 +14,9 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import android.os.SystemClock
 import org.robolectric.shadows.ShadowLegacySystemClock
 
 /**
@@ -155,7 +155,12 @@ class TimerRemainingTimeStoreTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         ShadowLegacySystemClock.setNanoTime(wallStart * 1_000_000L)
-        SystemClock.setCurrentTimeMillis(elapsedStart)
+        // v1.3.3 (item 3, CI fix): SystemClock.setCurrentTimeMillis is hidden
+        // API — uncompilable against android.jar. In LEGACY looper mode
+        // SystemClock.elapsedRealtime() follows the master scheduler, so
+        // advance it directly (this is the elapsed half of what the hidden
+        // call did; the wall-clock half is already set via setNanoTime above).
+        RuntimeEnvironment.getMasterScheduler().advanceTo(elapsedStart)
         // Clean slate: no stale timer flags or anchors leak between tests.
         context.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
             .edit().clear().apply()
@@ -182,7 +187,9 @@ class TimerRemainingTimeStoreTest {
 
         // 10 minutes pass with no ticks (Doze / screen locked).
         ShadowLegacySystemClock.setNanoTime((wallStart + 10 * 60_000L) * 1_000_000L)
-        SystemClock.setCurrentTimeMillis(elapsedStart + 10 * 60_000L)
+        // v1.3.3 (item 3, CI fix): see setUp — advance the scheduler instead
+        // of the hidden SystemClock.setCurrentTimeMillis.
+        RuntimeEnvironment.getMasterScheduler().advanceTo(elapsedStart + 10 * 60_000L)
 
         val after = TimerAnchorStore.getRemainingSeconds(context)
         assertEquals(sessionSecs - 600, after)
