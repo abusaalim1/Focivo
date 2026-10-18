@@ -52,6 +52,7 @@ import com.example.ui.components.RollingText
 import com.example.ui.components.SessionNotificationDigestSheet
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SerifItalicFontFamily
+import com.example.ui.theme.FocivoDarkTokens
 import com.example.util.SessionNotificationDigestManager
 import com.example.util.captureComposedBitmapGuarded
 import com.example.util.saveBitmapToGallery
@@ -393,7 +394,10 @@ private fun SessionFlowCelebrateStage(
                 },
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontFamily = PoppinsFontFamily,
-                    color = Color(0xFFF4F4F5).copy(alpha = 0.55f),
+                    // v1.3.3 (item 9): this screen is dark-always, so the caption
+                    // uses the dark design-system text token at full alpha —
+                    // the hardcoded 0xFFF4F4F5 @ 0.55 alpha was below 4.5:1.
+                    color = FocivoDarkTokens.text,
                     fontSize = 13.sp
                 ),
                 modifier = Modifier.graphicsLayer { alpha = dmmAlpha.value }

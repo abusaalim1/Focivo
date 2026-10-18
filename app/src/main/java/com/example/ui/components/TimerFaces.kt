@@ -500,8 +500,16 @@ private fun faceTextSecondary(isDark: Boolean): Color =
 private fun backdropPrimary(theme: TimerTheme?, isDark: Boolean): Color =
     theme?.backdropContent(isDark) ?: faceTextPrimary(isDark)
 
+/**
+ * v1.3.3 (item 9): backdrop-aware SECONDARY text (hints, captions) drawn on
+ * the selected timer theme's full-bleed backdrop. Previously this reduced
+ * the content color to 0.72 alpha; small text then sat below the 4.5:1
+ * contrast floor on several backdrops, so it now resolves to the full-alpha
+ * [TimerTheme.backdropCaptionContent] token. The no-theme fallback keeps the
+ * app-theme heuristic.
+ */
 private fun backdropSecondary(theme: TimerTheme?, isDark: Boolean): Color =
-    theme?.backdropContent(isDark)?.copy(alpha = 0.72f) ?: faceTextSecondary(isDark)
+    theme?.backdropCaptionContent(isDark) ?: faceTextSecondary(isDark)
 
 // ---------------------------------------------------------------------------
 // Face 2 — Minimal Digits: huge type, no ring, hairline progress.

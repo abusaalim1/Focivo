@@ -652,7 +652,10 @@ fun FocusScreen(
                             text = "Timer, music, themes and protection live in the hub",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = selectedTheme.backdropContent(isDark).copy(alpha = 0.55f),
+                                // v1.3.3 (item 9): captions on the backdrop use the
+                                // full-alpha caption token — the 0.55 alpha dropped
+                                // this below the 4.5:1 floor on Aurora light.
+                                color = selectedTheme.backdropCaptionContent(isDark),
                                 fontSize = 11.sp
                             )
                         )
