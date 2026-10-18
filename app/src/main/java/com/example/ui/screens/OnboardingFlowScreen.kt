@@ -1,7 +1,6 @@
 package com.example.ui.screens
 
 import android.Manifest
-import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.widget.Toast
 import android.content.Intent
@@ -74,7 +73,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.R
 import com.example.data.LeaderboardUser
-import com.example.service.FocivoDeviceAdminReceiver
 import com.example.ui.components.FeatureIcon
 import com.example.ui.components.MascotPose
 import com.example.ui.components.RegainMascotView
@@ -86,7 +84,7 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.RegainLimePrimary
 import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.isAppInDarkTheme
-import com.example.util.AiStudyGuardManager
+import com.example.util.PermissionStates
 import com.example.util.PermissionUtils
 import kotlinx.coroutines.delay
 
@@ -1057,17 +1055,15 @@ fun GroupStepContent(
 // 5. Permissions — one per screen, last
 // ---------------------------------------------------------------------------
 
+// v1.3.3 — single live-query source of truth is PermissionStates.
 private fun isPermissionGranted(context: Context, id: String): Boolean = when (id) {
-    "notifications" -> PermissionUtils.hasNotificationPermission(context)
-    "usage" -> PermissionUtils.hasUsageStatsPermission(context)
-    "overlay" -> PermissionUtils.hasOverlayPermission(context)
-    "battery" -> PermissionUtils.isBatteryOptimizationDisabled(context)
-    "exact_alarm" -> PermissionUtils.hasExactAlarmPermission(context)
-    "accessibility" -> AiStudyGuardManager.isAccessibilityPermissionGranted(context)
-    "device_admin" -> {
-        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-        dpm?.isAdminActive(FocivoDeviceAdminReceiver.getComponentName(context)) == true
-    }
+    "notifications" -> PermissionStates.isNotificationGranted(context)
+    "usage" -> PermissionStates.isUsageAccessGranted(context)
+    "overlay" -> PermissionStates.canDrawOverlays(context)
+    "battery" -> PermissionStates.isBatteryOptimizationDisabled(context)
+    "exact_alarm" -> PermissionStates.canScheduleExactAlarms(context)
+    "accessibility" -> PermissionStates.isAccessibilityEnabled(context)
+    "device_admin" -> PermissionStates.isDeviceAdminActive(context)
     else -> false
 }
 

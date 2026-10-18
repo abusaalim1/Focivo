@@ -14,6 +14,10 @@ import com.example.data.AndroidPreferenceSessionManager
 import com.example.data.FirebaseAuthManager
 import com.example.data.FocuslyRepository
 import com.example.data.FirebaseSyncManager
+import com.example.data.AuthLinkType
+import com.example.data.isRecoveryDeeplink
+import com.example.data.linkTypeOf
+import com.example.data.SignUpResult
 import com.example.data.SupabaseService
 import com.example.data.LeaderboardUser
 import com.example.data.model.AlarmItem
@@ -119,6 +123,11 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         data object Idle : PasswordResetState
         data object Sending : PasswordResetState
         data object Sent : PasswordResetState
+        /** v1.3.3 (ITEM 10): OTP code verification states. */
+        data object VerifyingCode : PasswordResetState
+        data object CodeVerified : PasswordResetState
+        data class CodeWrong(val message: String) : PasswordResetState
+        data class CodeExpired(val message: String) : PasswordResetState
         data class Error(val message: String) : PasswordResetState
         data object Updating : PasswordResetState
         data object Updated : PasswordResetState
@@ -131,19 +140,170 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     private val _pendingPasswordRecovery = MutableStateFlow(false)
     val pendingPasswordRecovery: StateFlow<Boolean> = _pendingPasswordRecovery.asStateFlow()
 
+    /**
+     * v1.3.3 (ITEM 10): OTP-code recovery flow. The email that received the
+     * code is kept so the code can be verified / resent against it.
+     */
+    val recoveryCodeFlow = RecoveryCodeFlow(viewModelScope)
+    private var recoveryEmail: String? = null
+
+    /** Email the recovery code was sent to (shown in the code sheet). */
+    fun getRecoveryEmail(): String = recoveryEmail ?: ""
+
     fun requestPasswordReset(email: String) {
         viewModelScope.launch {
             _passwordResetState.value = PasswordResetState.Sending
+            recoveryEmail = email.trim().lowercase()
             val result = authManager.requestPasswordReset(email)
             _passwordResetState.value = result.fold(
-                onSuccess = { PasswordResetState.Sent },
+                onSuccess = {
+                    recoveryCodeFlow.markCodeSent()
+                    PasswordResetState.Sent
+                },
                 onFailure = { PasswordResetState.Error(it.message ?: "Could not send the recovery email.") }
             )
         }
     }
 
+    /** v1.3.3 (ITEM 10): submit the 6-digit recovery code for verification. */
+    fun verifyRecoveryCode(code: String) {
+        val email = recoveryEmail ?: return
+        recoveryCodeFlow.submitCode(email, code)
+    }
+
+    /** v1.3.3 (ITEM 10): resend the recovery code; throttled by the flow's 60s cooldown. */
+    fun resendRecoveryCode() {
+        val email = recoveryEmail ?: return
+        if (!recoveryCodeFlow.canResend()) return
+        requestPasswordReset(email)
+    }
+
     fun clearPasswordReset() {
+        recoveryCodeFlow.resetToEntry()
         _passwordResetState.value = PasswordResetState.Idle
+    }
+
+    // ------------------------------------------------------------------
+    // v1.3.3 (ITEM 10 extension): SIGNUP OTP-code flow. When signUpWith
+    // returns no session (email confirmation required), the user completes
+    // signup by typing the 6-digit code from the confirmation email instead
+    // of tapping the fragile link. Uses the same RecoveryCodeFlow state
+    // machine as recovery, wired to OtpType.Email.SIGNUP.
+    // ------------------------------------------------------------------
+    val signupCodeFlow = RecoveryCodeFlow(
+        scope = viewModelScope,
+        verifier = { email, code ->
+            SupabaseService.getInstance().verifySignupCode(email, code)
+        }
+    )
+
+    /** Email awaiting signup confirmation; non-null while the signup code sheet is shown. */
+    private val _signupCodeEmail = MutableStateFlow<String?>(null)
+    val signupCodeEmail: StateFlow<String?> = _signupCodeEmail.asStateFlow()
+
+    private var pendingSignupEmail: String? = null
+    private var pendingSignupName: String? = null
+    private var pendingSignupPin: String? = null
+
+    /** v1.3.3 (ITEM 10 extension): submit the 6-digit signup confirmation code. */
+    fun verifySignupCode(code: String) {
+        val email = pendingSignupEmail ?: return
+        signupCodeFlow.submitCode(email, code)
+    }
+
+    /** v1.3.3 (ITEM 10 extension): resend the signup code; throttled by the 60s cooldown. */
+    fun resendSignupCode() {
+        val email = pendingSignupEmail ?: return
+        if (!signupCodeFlow.canResend()) return
+        viewModelScope.launch {
+            val result = SupabaseService.getInstance().resendSignupCode(email)
+            if (result.isSuccess) {
+                signupCodeFlow.markCodeSent()
+            } else {
+                _authError.value = result.exceptionOrNull()?.message
+                    ?: "Could not resend the code. Please try again."
+            }
+        }
+    }
+
+    fun dismissSignupCode() {
+        _signupCodeEmail.value = null
+        signupCodeFlow.resetToEntry()
+    }
+
+    private fun observeSignupCodeFlow() {
+        viewModelScope.launch {
+            signupCodeFlow.codeState.collect { codeState ->
+                if (codeState is RecoveryCodeFlow.CodeState.Verified) {
+                    completeSignupFromCode()
+                }
+            }
+        }
+    }
+
+    /**
+     * v1.3.3 (ITEM 10 extension): the signup code verified - the session now
+     * exists. Runs the post-signup Supabase upserts, then the EXISTING
+     * post-signup path ([completeSignupSuccess]: local row + prefs + app entry).
+     */
+    private fun completeSignupFromCode() {
+        viewModelScope.launch {
+            _isAuthLoading.value = true
+            val email = pendingSignupEmail
+            val name = pendingSignupName.orEmpty()
+            val pin = pendingSignupPin.orEmpty()
+            if (email.isNullOrBlank()) {
+                _authError.value = "We couldn't finish creating your account. Please try signing in."
+                _isAuthLoading.value = false
+                return@launch
+            }
+            val result = SupabaseService.getInstance().completeSignupAfterCodeVerification(email, name)
+            result.onSuccess { uid ->
+                _signupCodeEmail.value = null
+                signupCodeFlow.resetToEntry()
+                pendingSignupEmail = null
+                pendingSignupName = null
+                pendingSignupPin = null
+                completeSignupSuccess(email, pin, name, uid)
+            }.onFailure { err ->
+                _authError.value = err.message
+                    ?: "We couldn't finish creating your account. Please try signing in."
+                _signupCodeEmail.value = null
+                _isAuthLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * v1.3.3 (ITEM 10): mirrors [RecoveryCodeFlow.codeState] into
+     * [passwordResetState] so AuthScreen can drive the code sheet. On
+     * Verified the recovery session already exists, so the EXISTING
+     * new-password path is opened via [_pendingPasswordRecovery].
+     */
+    private fun observeRecoveryCodeFlow() {
+        viewModelScope.launch {
+            recoveryCodeFlow.codeState.collect { codeState ->
+                when (codeState) {
+                    is RecoveryCodeFlow.CodeState.Verifying ->
+                        _passwordResetState.value = PasswordResetState.VerifyingCode
+                    is RecoveryCodeFlow.CodeState.Verified -> {
+                        _passwordResetState.value = PasswordResetState.CodeVerified
+                        _pendingPasswordRecovery.value = true
+                    }
+                    is RecoveryCodeFlow.CodeState.WrongCode ->
+                        _passwordResetState.value = PasswordResetState.CodeWrong(
+                            "That code isn't right - check and try again."
+                        )
+                    is RecoveryCodeFlow.CodeState.ExpiredCode ->
+                        _passwordResetState.value = PasswordResetState.CodeExpired(
+                            "This code has expired - tap Resend for a new one."
+                        )
+                    is RecoveryCodeFlow.CodeState.Error ->
+                        _passwordResetState.value = PasswordResetState.Error(codeState.message)
+                    is RecoveryCodeFlow.CodeState.Entry -> { /* sheet entry state; no UI change */ }
+                }
+            }
+        }
     }
 
     /** Called from the "set new password" screen after a recovery deep link. */
@@ -681,6 +841,8 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         com.example.util.AiStudyGuardManager.punishmentLogs
 
     init {
+        observeRecoveryCodeFlow()
+        observeSignupCodeFlow()
         viewModelScope.launch {
             try {
                 coldStartInit()
@@ -964,14 +1126,23 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             _authError.value = null
             // v1.4.0-round2: password-recovery links land here too. Establish the
             // recovery session, then ask the user for the new password in-app.
-            if (SupabaseService.getInstance().isRecoveryDeeplink(uri)) {
+            if (isRecoveryDeeplink(uri)) {
                 val result = SupabaseService.getInstance().handleAuthDeeplink(uri)
                 result.onSuccess {
                     _pendingPasswordRecovery.value = true
                     _passwordResetState.value = PasswordResetState.Idle
                     _verificationMessage.value = null
                 }.onFailure { err ->
-                    _authError.value = err.message ?: "This recovery link has expired, please request a new one"
+                    // v1.3.3 (ITEM 10 ext): the OTP code from the same email is
+                    // the next step - offer the code sheet when we know the email.
+                    if (recoveryEmail != null) {
+                        _passwordResetState.value = PasswordResetState.Sent
+                        _verificationMessage.value = null
+                        _authError.value = null
+                    } else {
+                        _authError.value = err.message
+                            ?: SupabaseService.DEEPLINK_GENERIC_MESSAGE
+                    }
                 }
                 _isAuthLoading.value = false
                 return@launch
@@ -984,11 +1155,21 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 _showQuestionnaire.value = false
                 _isAuthLoading.value = false
             }.onFailure { err ->
-                val errorText = err.message ?: "This verification link has expired, please request a new one"
-                _authError.value = if (errorText.contains("expired", ignoreCase = true) || errorText.contains("invalid", ignoreCase = true)) {
-                    "This verification link has expired, please request a new one"
+                val errorText = err.message ?: SupabaseService.DEEPLINK_GENERIC_MESSAGE
+                // v1.3.3 (ITEM 10 ext): offer the signup OTP code sheet as the
+                // next step when this session knows the pending signup email.
+                val signupEmail = pendingSignupEmail
+                if (linkTypeOf(uri) == AuthLinkType.SIGNUP &&
+                    signupEmail != null
+                ) {
+                    _signupCodeEmail.value = signupEmail
+                    _authError.value = null
                 } else {
-                    errorText
+                    _authError.value = if (errorText.contains("expired", ignoreCase = true) || errorText.contains("invalid", ignoreCase = true)) {
+                        SupabaseService.DEEPLINK_EXPIRED_MESSAGE
+                    } else {
+                        errorText
+                    }
                 }
                 _verificationMessage.value = null
                 _isAuthLoading.value = false
@@ -1139,62 +1320,95 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             val cleanEmail = email.trim().lowercase()
             val effectiveName = fullName.trim().ifBlank { cleanEmail.substringBefore("@") }
 
-            // 1. Sign up via Supabase Auth
-            val authResult = authManager.signUpWithEmail(cleanEmail, pin, effectiveName)
+            // 1. Sign up via Supabase Auth (typed: confirmation-required is
+            // not a failure - it routes to the OTP code sheet).
+            val authResult = authManager.signUpWithEmailResult(cleanEmail, pin, effectiveName)
             if (authResult.isFailure) {
                 val err = authResult.exceptionOrNull()?.localizedMessage ?: "Sign up failed on Supabase"
                 _authError.value = err
                 _isAuthLoading.value = false
                 return@launch
             }
-            val supabaseUid = authResult.getOrNull()?.uid ?: ""
-
-            val safeId = System.currentTimeMillis()
-            val existingUser = repository.getUserByEmail(cleanEmail)
-            val newUser = if (existingUser != null) {
-                existingUser.copy(
-                    fullName = effectiveName,
-                    firebaseUid = supabaseUid
-                )
-            } else {
-                UserAccountEntity(
-                    id = safeId,
-                    email = cleanEmail,
-                    passwordHash = hashPassword(pin),
-                    fullName = effectiveName,
-                    firebaseUid = supabaseUid,
-                    createdAt = System.currentTimeMillis()
-                )
+            when (val outcome = authResult.getOrNull()) {
+                is SignUpResult.ConfirmationRequired -> {
+                    // v1.3.3 (ITEM 10 ext): no session yet - the 6-digit code
+                    // from the confirmation email completes signup.
+                    pendingSignupEmail = cleanEmail
+                    pendingSignupName = effectiveName
+                    pendingSignupPin = pin
+                    signupCodeFlow.markCodeSent()
+                    _signupCodeEmail.value = cleanEmail
+                    _authError.value = null
+                    _isAuthLoading.value = false
+                    return@launch
+                }
+                is SignUpResult.SignedIn ->
+                    completeSignupSuccess(cleanEmail, pin, effectiveName, outcome.uid)
+                else -> {
+                    _authError.value = "Sign up failed on Supabase"
+                    _isAuthLoading.value = false
+                    return@launch
+                }
             }
-
-            if (existingUser != null) {
-                repository.updateUser(newUser)
-            } else {
-                repository.registerUser(newUser)
-            }
-
-            _currentUser.value = newUser
-
-            val prefs = userPreferences.value ?: UserPreferencesEntity()
-            repository.savePreferences(
-                prefs.copy(
-                    currentUserId = newUser.id,
-                    currentUserEmail = cleanEmail,
-                    currentUserName = effectiveName,
-                    hasCompletedOnboarding = true,
-                    hasCompletedIntakeSurvey = false
-                )
-            )
-
-            // 2. Sync user data with Supabase Postgrest tables
-            if (supabaseUid.isNotBlank()) {
-                repository.syncWithSupabase(supabaseUid)
-            }
-
-            _showQuestionnaire.value = true
-            _authError.value = null
-            _isAuthLoading.value = false
         }
+    }
+
+    /**
+     * v1.3.3 (ITEM 10 ext): shared post-signup completion - local account row,
+     * prefs, Supabase sync, questionnaire flag. Used by the immediate-session
+     * path and by the OTP-code-verified path alike.
+     */
+    private suspend fun completeSignupSuccess(
+        cleanEmail: String,
+        pin: String,
+        effectiveName: String,
+        supabaseUid: String
+    ) {
+        val safeId = System.currentTimeMillis()
+        val existingUser = repository.getUserByEmail(cleanEmail)
+        val newUser = if (existingUser != null) {
+            existingUser.copy(
+                fullName = effectiveName,
+                firebaseUid = supabaseUid
+            )
+        } else {
+            UserAccountEntity(
+                id = safeId,
+                email = cleanEmail,
+                passwordHash = hashPassword(pin),
+                fullName = effectiveName,
+                firebaseUid = supabaseUid,
+                createdAt = System.currentTimeMillis()
+            )
+        }
+
+        if (existingUser != null) {
+            repository.updateUser(newUser)
+        } else {
+            repository.registerUser(newUser)
+        }
+
+        _currentUser.value = newUser
+
+        val prefs = userPreferences.value ?: UserPreferencesEntity()
+        repository.savePreferences(
+            prefs.copy(
+                currentUserId = newUser.id,
+                currentUserEmail = cleanEmail,
+                currentUserName = effectiveName,
+                hasCompletedOnboarding = true,
+                hasCompletedIntakeSurvey = false
+            )
+        )
+
+        // 2. Sync user data with Supabase Postgrest tables
+        if (supabaseUid.isNotBlank()) {
+            repository.syncWithSupabase(supabaseUid)
+        }
+
+        _showQuestionnaire.value = true
+        _authError.value = null
+        _isAuthLoading.value = false
     }
 
     fun signInWithGoogle(context: Context, serverClientId: String? = null, onResult: ((Boolean) -> Unit)? = null) {

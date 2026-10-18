@@ -237,7 +237,9 @@ object SupabaseManager {
             supabaseKey = SUPABASE_KEY
         ) {
             install(Auth) {
-                scheme = "studytracker"
+                // v1.3.3 (ITEM 10): deep-link scheme aligned to "focivo" to match
+                // the redirectUrl sent with auth requests ("focivo://auth-callback").
+                scheme = "focivo"
                 host = "auth-callback"
                 getContext()?.let { ctx ->
                     sessionManager = AndroidPreferenceSessionManager(ctx)

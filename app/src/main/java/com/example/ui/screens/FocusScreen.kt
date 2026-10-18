@@ -36,6 +36,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,12 +60,15 @@ import com.example.ui.components.BuddyMascot
 import com.example.ui.components.CustomizeTimerSheet
 import com.example.ui.components.DeepFocusActiveBanner
 import com.example.ui.components.DeepFocusSettingsSheet
+import com.example.ui.components.GuardControlCluster
+import com.example.ui.components.FocusShieldPermissionSheet
 import com.example.ui.components.StrictAdminExplainerSheet
 import com.example.ui.components.DistractionDialog
 import com.example.ui.components.MascotPose
 import com.example.ui.components.PreStudyAppBlockSheet
 import com.example.util.MascotPose as BuddyMascotPose
 import com.example.ui.components.StudyHubSheet
+import com.example.ui.components.StudyTopStatsHeader
 import com.example.ui.components.StrictGuardPromptSheet
 import com.example.ui.components.TimerFaceHost
 import com.example.ui.components.TimerFaceParams
@@ -138,6 +144,8 @@ fun FocusScreen(
     onUpdateTaskTitle: (String) -> Unit,
     onOpenShieldHub: () -> Unit = {},
     onOpenAiGuardHub: () -> Unit = {},
+    // v1.3.3 (ITEM 5): guard control cluster -> screen-time budget settings.
+    onOpenScreenTimeBudgets: () -> Unit = {},
     // v1.1: Mascot Buddy — opens the dedicated Mascot screen.
     onOpenMascot: () -> Unit = {},
     // v1.1: Pomodoro — live phase state (null when no pomodoro is active).
@@ -154,6 +162,9 @@ fun FocusScreen(
     onSaveBlockedApps: (Set<String>) -> Unit = {},
     // v1.5.0: test hook — screenshot tests open the hub directly.
     initialShowHub: Boolean = false,
+    // v1.3.3 (item 1): today's completed focus minutes for the Study-top
+    // header (computed from the session log, same as the splash/Home).
+    todayFocusMinutes: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
@@ -179,6 +190,44 @@ fun FocusScreen(
     val context = LocalContext.current
     LaunchedEffect(Unit) {
         com.example.util.InstalledAppsManager.preloadApps(context)
+    }
+
+    // v1.3.3 (item 1): Study-top header data — today's total device usage
+    // from the shared DailyUsagePipeline; refreshes on first entry and
+    // whenever the screen resumes (e.g. returning from system settings).
+    var usageMillisToday by remember { mutableStateOf<Long?>(null) }
+    var hasUsagePermission by remember {
+        mutableStateOf(com.example.util.DailyUsagePipeline.hasUsagePermission(context))
+    }
+    var showUsagePermissionSheet by remember { mutableStateOf(false) }
+
+    suspend fun refreshStudyHeaderUsage(force: Boolean) {
+        val granted = withContext(Dispatchers.IO) {
+            com.example.util.DailyUsagePipeline.hasUsagePermission(context)
+        }
+        hasUsagePermission = granted
+        usageMillisToday = if (granted) {
+            withContext(Dispatchers.IO) {
+                com.example.util.DailyUsagePipeline.getSnapshot(context, forceRefresh = force)?.totalMillis
+            }
+        } else {
+            null
+        }
+    }
+
+    LaunchedEffect(Unit) { refreshStudyHeaderUsage(force = false) }
+
+    val focusLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(focusLifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                    refreshStudyHeaderUsage(force = true)
+                }
+            }
+        }
+        focusLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { focusLifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(currentTaskTitle) {
@@ -216,8 +265,8 @@ fun FocusScreen(
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontFamily = PoppinsFontFamily,
                         fontWeight = FontWeight.Bold,
-                        color = selectedTheme.onBackdropContent,
-                        shadow = backdropTitleShadow(selectedTheme.onBackdropContent),
+                        color = selectedTheme.backdropContent(isDark),
+                        shadow = backdropTitleShadow(selectedTheme.backdropContent(isDark)),
                         letterSpacing = 2.sp,
                         fontSize = 14.sp
                     ),
@@ -254,6 +303,26 @@ fun FocusScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
+                // v1.3.3 (item 1): Study-top header — Usage Time (device total
+                // from DailyUsagePipeline) + Focus Time (today's completed
+                // focus minutes from the session log).
+                item {
+                    StudyTopStatsHeader(
+                        usageMillis = usageMillisToday,
+                        hasUsagePermission = hasUsagePermission,
+                        focusMinutesToday = todayFocusMinutes,
+                        onUsageCardClick = {
+                            if (hasUsagePermission) {
+                                kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                                    refreshStudyHeaderUsage(force = true)
+                                }
+                            } else {
+                                showUsagePermissionSheet = true
+                            }
+                        }
+                    )
+                }
+
                 // Session Start Confirmation Banner (Only shown when not running)
                 if (!isRunning && !sessionStartConfirmation.isNullOrBlank()) {
                     item {
@@ -375,7 +444,7 @@ fun FocusScreen(
                                     letterSpacing = 1.5.sp,
                                     fontSize = 11.sp,
                                     color = if (isBreakMode) Color(0xFF69F0AE)
-                                    else selectedTheme.onBackdropContent
+                                    else selectedTheme.backdropContent(isDark)
                                 )
                             )
                         }
@@ -515,32 +584,49 @@ fun FocusScreen(
                     }
                 }
 
-                // 3. The primary action — Start / Pause.
+                // 3. The primary action — Start / Pause. v1.3.3 (ITEM 5):
+                // the guard control cluster sits LEFT of the button (icon
+                // toggles + explainer labels + screen-time limits entry).
                 item {
-                    Box(
-                        modifier = Modifier
-                            .height(58.dp)
-                            .fillMaxWidth(0.78f)
-                            .shadow(
-                                elevation = 6.dp,
-                                shape = CircleShape,
-                                ambientColor = hubAccent.copy(alpha = 0.3f),
-                                spotColor = hubAccent.copy(alpha = 0.4f)
-                            )
-                            .clip(CircleShape)
-                            .background(hubAccent)
-                            .clickable {
-                                if (isRunning) {
-                                    onPauseTimer()
-                                } else if (remainingSeconds < targetSeconds) {
-                                    onResumeTimer()
-                                } else {
-                                    onStartTimer()
-                                }
-                            }
-                            .testTag("play_pause_button"),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        GuardControlCluster(
+                            onOpenScreenTimeBudgets = onOpenScreenTimeBudgets,
+                            // v1.3.3 (ITEM 5): the labels sit directly on the
+                            // ambient timer-theme backdrop — they must use
+                            // the backdrop content color, never the raw
+                            // design token (unreadable on dark backdrops in
+                            // light app mode, and vice versa).
+                            contentColor = selectedTheme.backdropContent(isDark),
+                            modifier = Modifier.weight(0.44f)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .weight(0.56f)
+                                .height(58.dp)
+                                .shadow(
+                                    elevation = 6.dp,
+                                    shape = CircleShape,
+                                    ambientColor = hubAccent.copy(alpha = 0.3f),
+                                    spotColor = hubAccent.copy(alpha = 0.4f)
+                                )
+                                .clip(CircleShape)
+                                .background(hubAccent)
+                                .clickable {
+                                    if (isRunning) {
+                                        onPauseTimer()
+                                    } else if (remainingSeconds < targetSeconds) {
+                                        onResumeTimer()
+                                    } else {
+                                        onStartTimer()
+                                    }
+                                }
+                                .testTag("play_pause_button"),
+                            contentAlignment = Alignment.Center
+                        ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
@@ -563,7 +649,8 @@ fun FocusScreen(
                                 )
                             )
                         }
-                    }
+                        } // end Start/Pause pill
+                    } // end cluster + button Row
                     // Breathing room under the action; the hub hint sits quiet.
                     if (!isRunning) {
                         Spacer(modifier = Modifier.height(6.dp))
@@ -571,7 +658,10 @@ fun FocusScreen(
                             text = "Timer, music, themes and protection live in the hub",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
-                                color = selectedTheme.onBackdropContent.copy(alpha = 0.55f),
+                                // v1.3.3 (item 9): captions on the backdrop use the
+                                // full-alpha caption token — the 0.55 alpha dropped
+                                // this below the 4.5:1 floor on Aurora light.
+                                color = selectedTheme.backdropCaptionContent(isDark),
                                 fontSize = 11.sp
                             )
                         )
@@ -653,6 +743,25 @@ fun FocusScreen(
                     onUpdateTaskTitle(subject)
                 },
                 onStartPomodoro = onStartPomodoro
+            )
+        }
+
+        // v1.3.3 (item 1): premium usage-permission sheet opened from the
+        // Usage Time card when PACKAGE_USAGE_STATS is missing.
+        if (showUsagePermissionSheet) {
+            FocusShieldPermissionSheet(
+                onDismiss = {
+                    showUsagePermissionSheet = false
+                    kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                        refreshStudyHeaderUsage(force = true)
+                    }
+                },
+                onAllGranted = {
+                    showUsagePermissionSheet = false
+                    kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                        refreshStudyHeaderUsage(force = true)
+                    }
+                }
             )
         }
 

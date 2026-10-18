@@ -38,16 +38,10 @@ object DeviceAdminGuard {
     fun componentName(context: Context): ComponentName =
         FocivoDeviceAdminReceiver.getComponentName(context)
 
-    /** True when Focivo is currently an active device admin. */
-    fun isAdminActive(context: Context): Boolean {
-        return try {
-            val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
-            dpm?.isAdminActive(componentName(context)) == true
-        } catch (t: Throwable) {
-            Log.e(TAG, "isAdminActive failed: ${t.message}")
-            false
-        }
-    }
+    /** True when Focivo is currently an active device admin. v1.3.3 — live
+     *  query via PermissionStates; verifies OUR receiver is really active. */
+    fun isAdminActive(context: Context): Boolean =
+        PermissionStates.isDeviceAdminActive(context)
 
     /**
      * Launches the SYSTEM device-admin activation screen for Focivo.

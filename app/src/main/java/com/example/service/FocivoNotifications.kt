@@ -48,6 +48,7 @@ object FocivoNotifications {
     private const val CHANNEL_SCHEDULE = "focivo_schedule_channel"
     private const val CHANNEL_DIGEST = "focivo_digest_channel"
     private const val CHANNEL_RECAP = "focivo_recap_channel"
+    private const val CHANNEL_STRICT_GUARD = "focivo_strict_guard_channel"
 
     private const val ID_SESSION_COMPLETE = 9101
     private const val ID_BREAK_OVER = 9102
@@ -58,6 +59,7 @@ object FocivoNotifications {
     private const val ID_SCHEDULE_REMINDER = 9152
     private const val ID_COMEBACK = 9153
     private const val ID_SUNDAY_RECAP = 9154
+    private const val ID_STRICT_UNINSTALL_ALERT = 9160
 
     private const val LIME_ACCENT = 0xFF8CE000
 
@@ -158,6 +160,37 @@ object FocivoNotifications {
     }
 
     // ------------------------------------------------------------------ types
+
+    /**
+     * v1.3.3 (item 6b) — high-priority tamper alert. Posted when
+     * StrictTamperGuard intercepts an uninstall or device-admin
+     * deactivation attempt during a PROTECTED strict session (in addition
+     * to the back-press + overlay). Dedicated channel so these stay
+     * separable from session/motivation noise; tapping returns to the app
+     * (MainActivity) via the shared content intent. Auto-cancelled when
+     * the session ends (StrictSessionStore.disarm).
+     */
+    fun postStrictUninstallAlert(context: Context, title: String, text: String) {
+        post(
+            context,
+            CHANNEL_STRICT_GUARD, "Strict Guard", "Strict Mode uninstall and admin tamper alerts",
+            NotificationManager.IMPORTANCE_HIGH,
+            ID_STRICT_UNINSTALL_ALERT,
+            title,
+            text,
+            autoCancel = true,
+            priority = NotificationCompat.PRIORITY_HIGH
+        )
+    }
+
+    /** v1.3.3 (item 6b) — clears the tamper alert (session end / expiry). */
+    fun cancelStrictUninstallAlert(context: Context) {
+        try {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                ?: return
+            manager.cancel(ID_STRICT_UNINSTALL_ALERT)
+        } catch (_: Exception) { }
+    }
 
     /** 3. Session complete — real minutes and real Focus Points. */
     fun postSessionComplete(context: Context, minutes: Int, points: Int) {

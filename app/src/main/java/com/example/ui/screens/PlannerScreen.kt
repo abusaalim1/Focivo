@@ -84,7 +84,7 @@ fun PlannerScreen(
     // v1.4.2: top-of-screen text sits on the full-bleed theme backdrop, so it
     // follows the selected theme (not the app dark/light mode).
     val theme by TimerThemeManager.selectedTheme.collectAsState()
-    val onBackdrop = theme.onBackdropContent
+    val onBackdrop = theme.backdropContent(isDark)
     val titleShadow = backdropTitleShadow(onBackdrop)
     var showBottomSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -132,8 +132,8 @@ fun PlannerScreen(
                         Text(
                             text = "WEDNESDAY · SEP 2",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                // v1.4.3: directly on the backdrop — theme color.
-                                color = onBackdrop.copy(alpha = 0.85f),
+                                // v1.4.3: directly on the backdrop — theme color. v1.3.3 (item 9): full-alpha caption token.
+                                color = onBackdrop,
                                 letterSpacing = 2.sp,
                                 fontSize = 11.sp
                             )
@@ -258,8 +258,8 @@ fun PlannerScreen(
                     Text(
                         text = "$completedCount / ${tasks.size} done",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            // v1.4.3: directly on the backdrop — theme color.
-                            color = onBackdrop.copy(alpha = 0.85f)
+                            // v1.4.3: directly on the backdrop — theme color. v1.3.3 (item 9): full-alpha caption token.
+                            color = onBackdrop
                         )
                     )
                 }
@@ -341,7 +341,7 @@ private fun PlannerTaskRow(
                 text = task.scheduledTime,
                 style = MaterialTheme.typography.labelSmall.copy(
                     // v1.4.3: timeline gutter sits on the backdrop — theme color.
-                    color = onBackdrop.copy(alpha = 0.85f),
+                    color = onBackdrop,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )

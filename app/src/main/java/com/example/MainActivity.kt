@@ -67,6 +67,7 @@ import com.example.util.PermissionUtils
 import kotlinx.coroutines.delay
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.FocusScreen
+import java.util.Calendar
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.InsightsScreen
 import com.example.ui.screens.LeaderboardScreen
@@ -276,6 +277,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
     val scheduledBlocks by viewModel.scheduledBlocks.collectAsState()
     val appDailyLimits by viewModel.appDailyLimits.collectAsState()
     var isAppLimitsOpen by remember { mutableStateOf(false) }
+    // v1.3.3 (ITEM 5): screen-time budget settings (route id "screen_time_budgets").
+    var isScreenTimeBudgetsOpen by remember { mutableStateOf(false) }
     val shouldNavigateToStudyTab by viewModel.shouldNavigateToStudyTab.collectAsState()
     var selectedTab by remember { mutableStateOf(NavTab.HOME) }
     // v1.5.0: the onboarding group step can route the user to the leaderboard
@@ -452,6 +455,17 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
         )
     }
     var isSettingsOpen by remember { mutableStateOf(false) }
+    // v1.3.3 (item 8b): global screen-time budget, mirrored from the manager
+    // store; refreshed whenever Settings opens.
+    var screenTimeBudgetMinutes by remember {
+        mutableStateOf(com.example.util.ScreenTimeBudgetManager.getGlobalBudgetMinutes(context))
+    }
+    LaunchedEffect(isSettingsOpen) {
+        if (isSettingsOpen) {
+            screenTimeBudgetMinutes =
+                com.example.util.ScreenTimeBudgetManager.getGlobalBudgetMinutes(context)
+        }
+    }
     // v1.1: Mascot Buddy dedicated screen.
     var isMascotOpen by remember { mutableStateOf(false) }
     var isAlarmHubOpen by remember { mutableStateOf(false) }
@@ -499,6 +513,7 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
         isSquadsOpen -> ({ isSquadsOpen = false; squadJoinCode = null })
         isAutoScheduleOpen -> ({ isAutoScheduleOpen = false })
         isAppLimitsOpen -> ({ isAppLimitsOpen = false })
+        isScreenTimeBudgetsOpen -> ({ isScreenTimeBudgetsOpen = false })
         isAiGuardHubOpen -> ({ viewModel.closeAiGuardHub() })
         isShieldHubOpen -> ({ viewModel.closeShieldHub() })
         isSettingsOpen -> ({ isSettingsOpen = false })
@@ -562,7 +577,19 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 pendingPasswordRecovery = viewModel.pendingPasswordRecovery.collectAsState().value,
                 onForgotPassword = { email -> viewModel.requestPasswordReset(email) },
                 onClearPasswordReset = { viewModel.clearPasswordReset() },
-                onSetNewPassword = { password -> viewModel.completePasswordRecovery(password) }
+                onSetNewPassword = { password -> viewModel.completePasswordRecovery(password) },
+                // v1.3.3 (ITEM 10): OTP code sheets
+                resetEmail = viewModel.getRecoveryEmail(),
+                resendCooldownSeconds = viewModel.recoveryCodeFlow.resendCooldownSeconds.collectAsState().value,
+                onVerifyRecoveryCode = { code -> viewModel.verifyRecoveryCode(code) },
+                onResendRecoveryCode = { viewModel.resendRecoveryCode() },
+                // v1.3.3 (ITEM 10 ext): signup confirmation code sheet
+                signupCodeEmail = viewModel.signupCodeEmail.collectAsState().value,
+                signupCodeState = viewModel.signupCodeFlow.codeState.collectAsState().value,
+                signupResendSeconds = viewModel.signupCodeFlow.resendCooldownSeconds.collectAsState().value,
+                onVerifySignupCode = { code -> viewModel.verifySignupCode(code) },
+                onResendSignupCode = { viewModel.resendSignupCode() },
+                onDismissSignupCode = { viewModel.dismissSignupCode() }
             )
         // v1.4.0: first-launch onboarding ran for guests too — v1.2 REVERSED
         // this (owner-ordered): guest sessions skip onboarding entirely and
@@ -683,6 +710,12 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onCheckForUpdates = { viewModel.checkForAppUpdates(context, isManual = true) },
                                         isCheckingForUpdates = isCheckingForUpdates,
                                         manualUpdateMessage = manualUpdateCheckResult,
+                                        // v1.3.3 (item 8b): global screen-time budget.
+                                        screenTimeBudgetMinutes = screenTimeBudgetMinutes,
+                                        onUpdateScreenTimeBudget = { minutes ->
+                                            com.example.util.ScreenTimeBudgetManager.setGlobalBudgetMinutes(context, minutes)
+                                            screenTimeBudgetMinutes = minutes
+                                        },
                                         onLogout = {
                                             showSignOutConfirmationDialog = true
                                         }
@@ -734,6 +767,23 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                     val hasCoreShieldPerms = PermissionUtils.hasUsageStatsPermission(context) &&
                                         PermissionUtils.hasOverlayPermission(context) &&
                                         AiStudyGuardManager.isAccessibilityPermissionGranted(context)
+
+                                    // v1.3.3 (item 1): today's completed focus
+                                    // minutes for the Study-top header —
+                                    // same session-log math as Home/splash.
+                                    val todayStartMs = remember {
+                                        Calendar.getInstance().apply {
+                                            set(Calendar.HOUR_OF_DAY, 0)
+                                            set(Calendar.MINUTE, 0)
+                                            set(Calendar.SECOND, 0)
+                                            set(Calendar.MILLISECOND, 0)
+                                        }.timeInMillis
+                                    }
+                                    val todayFocusMinutes = remember(sessions, todayStartMs) {
+                                        sessions
+                                            .filter { it.completedAt >= todayStartMs && it.durationSeconds > 0 }
+                                            .sumOf { it.durationSeconds } / 60
+                                    }
 
                                     FocusScreen(
                                         remainingSeconds = remainingSeconds,
@@ -795,6 +845,8 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onUpdateTaskTitle = { viewModel.setCurrentTaskTitle(it) },
                                         onOpenShieldHub = { viewModel.openShieldHub() },
                                         onOpenAiGuardHub = { viewModel.openAiGuardHub() },
+                                        // v1.3.3 (ITEM 5): guard control cluster -> budgets.
+                                        onOpenScreenTimeBudgets = { isScreenTimeBudgetsOpen = true },
                                         // v1.1: Mascot Buddy screen.
                                         onOpenMascot = { isMascotOpen = true },
                                         // v1.1: Pomodoro engine.
@@ -805,7 +857,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                         onSkipPomodoroFocus = { viewModel.skipPomodoroFocusPhase() },
                                         // v1.1: dedicated blocked-apps list.
                                         onRemoveBlockedApp = { pkg -> viewModel.removeBlockedApp(pkg) },
-                                        onSaveBlockedApps = { pkgs -> viewModel.updateBlockedAppsList(pkgs) }
+                                        onSaveBlockedApps = { pkgs -> viewModel.updateBlockedAppsList(pkgs) },
+                                        // v1.3.3 (item 1): Study-top header.
+                                        todayFocusMinutes = todayFocusMinutes
                                     )
                                 }
                                 NavTab.LEADERBOARD.name -> {
@@ -1018,6 +1072,15 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                             } catch (_: Throwable) { }
                             crashReportText = null
                         }
+                    )
+                }
+
+                // Screen-Time Budget Settings (v1.3.3 ITEM 5 — route id
+                // "screen_time_budgets"; full per-app/global editor slots in
+                // via ScreenTimeBudgetEditorSlot, same ScreenTimeBudgetStore).
+                if (isScreenTimeBudgetsOpen) {
+                    com.example.ui.screens.ScreenTimeBudgetsScreen(
+                        onBack = { isScreenTimeBudgetsOpen = false }
                     )
                 }
 

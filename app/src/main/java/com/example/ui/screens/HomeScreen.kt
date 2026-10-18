@@ -33,7 +33,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +59,8 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SerifItalicFontFamily
 import com.example.ui.theme.focivoEyebrow
 import com.example.ui.theme.focivoTokens
+import com.example.util.PermissionStates
+import com.example.util.RefreshOnResume
 import com.example.util.TimerThemeManager
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -93,10 +97,13 @@ fun HomeScreen(
     val appAccent = LocalAppAccent.current // retained for compat; design system uses T.accent
 
     val context = androidx.compose.ui.platform.LocalContext.current
-    val hasShieldPermissions = remember(context) {
-        com.example.util.PermissionUtils.hasUsageStatsPermission(context) &&
-            com.example.util.PermissionUtils.hasOverlayPermission(context) &&
-            com.example.util.AiStudyGuardManager.isAccessibilityPermissionGranted(context)
+    // v1.3.3 — live shield state: re-read from the REAL system grants on every
+    // ON_RESUME so a permission granted in Settings shows instantly on return.
+    var hasShieldPermissions by remember {
+        mutableStateOf(PermissionStates.hasCoreShieldPermissions(context))
+    }
+    RefreshOnResume {
+        hasShieldPermissions = PermissionStates.hasCoreShieldPermissions(context)
     }
     val isShieldActive = hasShieldPermissions && (userPreferences?.isAppBlockerEnabled == true)
 

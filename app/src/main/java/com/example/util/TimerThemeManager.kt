@@ -87,6 +87,17 @@ data class TimerTheme(
      */
     fun backdropContent(isAppDark: Boolean): Color =
         if (isAppDark) onBackdropContentDark ?: onBackdropContent else onBackdropContent
+
+    /**
+     * v1.3.3 (item 9): the ONLY color captions / footnotes / hint text may
+     * use when drawn directly on a theme backdrop (hub hints, timer-face
+     * hints, planner gutter labels). Captions are small text: any alpha
+     * reduction drops them below the 4.5:1 contrast floor (owner screenshot:
+     * the Midnight hub hint under START STUDY was nearly invisible at
+     * 0.55 alpha). This intentionally returns the full-alpha [backdropContent]
+     * token — never reduce its alpha at the call site.
+     */
+    fun backdropCaptionContent(isAppDark: Boolean): Color = backdropContent(isAppDark)
 }
 
 object TimerThemeManager {

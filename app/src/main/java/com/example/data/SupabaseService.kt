@@ -4,6 +4,7 @@ import android.util.Log
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
@@ -25,6 +26,17 @@ class SupabaseService {
 
     companion object {
         private const val TAG = "SupabaseService"
+
+        /**
+         * v1.3.3 (ITEM 10 extension): honest deep-link messages. The expired
+         * message is used ONLY when expiry is actually established; every
+         * other link failure points the user at the OTP code-entry sheet.
+         */
+        const val DEEPLINK_EXPIRED_MESSAGE =
+            "This verification link has expired, please request a new one"
+        const val DEEPLINK_GENERIC_MESSAGE =
+            "We couldn't complete sign-in from that link \u2014 enter the code from your email instead."
+
         @Volatile
         private var instance: SupabaseService? = null
 
@@ -122,6 +134,21 @@ class SupabaseService {
         }
     }
 
+    /**
+     * v1.3.3 (ITEM 10 extension) - HONEST deep-link handling.
+     *
+     * The old fall-through reported "expired" for EVERY imperfect path, including
+     * a successful [exchangeCodeForSession] whose user was momentarily null.
+     * Now:
+     * - "expired" is surfaced ONLY when the server actually returned
+     *   otp_expired / an expired error, or the exchange itself threw an
+     *   expired/invalid error;
+     * - after a successful exchange the user is resolved from the freshly
+     *   imported session with a bounded retry;
+     * - every other failure gets a truthful generic message that points at the
+     *   OTP code-entry sheet as the next step (the caller offers the sheet for
+     *   recovery/signup link types).
+     */
     suspend fun handleAuthDeeplink(uri: android.net.Uri): Result<String> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "handleAuthDeeplink: processing deep link $uri")
@@ -143,16 +170,9 @@ class SupabaseService {
 
             if (!error.isNullOrBlank() || !errorCode.isNullOrBlank() || !errorDescription.isNullOrBlank()) {
                 Log.w(TAG, "Auth deep link returned error: $error, code: $errorCode, desc: $errorDescription")
-                val isExpired = errorCode == "otp_expired" ||
-                        errorDescription?.contains("expired", ignoreCase = true) == true ||
-                        errorDescription?.contains("invalid", ignoreCase = true) == true ||
-                        error?.contains("expired", ignoreCase = true) == true
-                val message = if (isExpired) {
-                    "This verification link has expired, please request a new one"
-                } else {
-                    errorDescription?.replace("+", " ") ?: "This verification link has expired, please request a new one"
-                }
-                return@withContext Result.failure(Exception(message))
+                return@withContext Result.failure(
+                    Exception(deeplinkErrorParamsMessage(error, errorCode, errorDescription))
+                )
             }
 
             // 2. Check for 'code' query parameter (PKCE flow)
@@ -160,16 +180,21 @@ class SupabaseService {
             if (!code.isNullOrBlank()) {
                 Log.d(TAG, "Exchanging PKCE code for session...")
                 client.auth.exchangeCodeForSession(code)
-                val user = client.auth.currentUserOrNull()
-                if (user != null) {
+                // The session import can lag the exchange by a beat; retry
+                // briefly before concluding anything. A successful exchange
+                // with a momentarily-null user is NOT an expired link.
+                val uid = awaitUserSession(getUserId = { client.auth.currentUserOrNull()?.id })
+                if (uid != null) {
                     val ctx = SupabaseManager.getApplicationContext()
                     if (ctx != null) {
                         client.auth.currentSessionOrNull()?.let { session ->
                             AndroidPreferenceSessionManager(ctx).saveSession(session)
                         }
                     }
-                    return@withContext Result.success(user.id)
+                    return@withContext Result.success(uid)
                 }
+                Log.w(TAG, "handleAuthDeeplink: code exchanged but no user resolved from session")
+                return@withContext Result.failure(Exception(DEEPLINK_GENERIC_MESSAGE))
             }
 
             // NOTE: direct raw-token import from custom-scheme deep links was removed.
@@ -183,17 +208,13 @@ class SupabaseService {
                 return@withContext Result.success(user.id)
             }
 
-            Result.failure(Exception("This verification link has expired, please request a new one"))
+            Result.failure(Exception(DEEPLINK_GENERIC_MESSAGE))
         } catch (e: Exception) {
             Log.e(TAG, "handleAuthDeeplink error: ${e.message}", e)
-            val msg = if (e.message?.contains("expired", ignoreCase = true) == true || e.message?.contains("invalid", ignoreCase = true) == true) {
-                "This verification link has expired, please request a new one"
-            } else {
-                e.message ?: "This verification link has expired, please request a new one"
-            }
-            Result.failure(Exception(msg))
+            Result.failure(Exception(deeplinkExceptionMessage(e.message)))
         }
     }
+
 
     /**
      * v1.4.0-round2: password recovery. Sends the Supabase recovery email;
@@ -221,17 +242,6 @@ class SupabaseService {
         }
     }
 
-    /** True when a focivo://auth-callback deep link carries a password-recovery token. */
-    fun isRecoveryDeeplink(uri: android.net.Uri): Boolean {
-        return try {
-            val typeParam = uri.getQueryParameter("type")
-            val frag = uri.fragment ?: ""
-            typeParam.equals("recovery", ignoreCase = true) ||
-                    frag.split("&").any { it.substringBefore("=").equals("type", ignoreCase = true) && it.substringAfter("=", "").equals("recovery", ignoreCase = true) }
-        } catch (_: Exception) {
-            false
-        }
-    }
 
     /** Sets the new password for the user holding the recovery session. */
     suspend fun updatePassword(newPassword: String): Result<Unit> = withContext(Dispatchers.IO) {
@@ -258,6 +268,105 @@ class SupabaseService {
         }
     }
 
+    /**
+     * v1.3.3 (ITEM 10): OTP-code password recovery. Verifies the 6-digit code
+     * from the recovery email via [OtpType.Email.RECOVERY]. On success the
+     * gotrue client imports the recovery session automatically, so the flow
+     * no longer depends on the email link / deep-link scheme at all.
+     * The deep-link path ([handleAuthDeeplink]) is kept as a fallback.
+     */
+    /**
+     * v1.3.3 (ITEM 10): OTP-code password recovery. Verifies the 6-digit code
+     * from the recovery email via [OtpType.Email.RECOVERY]. On success the
+     * gotrue client imports the recovery session automatically, so the flow
+     * no longer depends on the email link / deep-link scheme at all.
+     * The deep-link path ([handleAuthDeeplink]) is kept as a fallback.
+     */
+    suspend fun verifyRecoveryCode(email: String, code: String): RecoveryCodeResult =
+        verifyOtpCode(email, code, OtpType.Email.RECOVERY, "recovery")
+
+    /**
+     * v1.3.3 (ITEM 10 extension): verifies the 6-digit code from the
+     * CONFIRM-SIGNUP email via [OtpType.Email.SIGNUP]. On success the session
+     * is imported by gotrue; call [completeSignupAfterCodeVerification] next
+     * to run the post-signup row upserts.
+     */
+    suspend fun verifySignupCode(email: String, code: String): RecoveryCodeResult =
+        verifyOtpCode(email, code, OtpType.Email.SIGNUP, "signup")
+
+    /**
+     * Shared email-OTP verification.
+     * supabase-kt 3.1.1: Auth.verifyEmailOtp(type: OtpType.Email,
+     * email: String, token: String, captchaToken: String? = null)
+     * - Auth.kt:256, impl AuthImpl.kt:322.
+     */
+    private suspend fun verifyOtpCode(
+        email: String,
+        code: String,
+        type: OtpType.Email,
+        logLabel: String
+    ): RecoveryCodeResult = withContext(Dispatchers.IO) {
+        val cleanEmail = email.trim().lowercase()
+        val digits = code.filter { it.isDigit() }
+        if (digits.length != 6) {
+            return@withContext RecoveryCodeResult.Error(
+                "Please enter the 6-digit code from your email."
+            )
+        }
+        try {
+            client.auth.verifyEmailOtp(
+                type = type,
+                email = cleanEmail,
+                token = digits
+            )
+            Log.i(TAG, "OTP code verified ($logLabel) for $cleanEmail")
+            RecoveryCodeResult.Verified
+        } catch (e: Exception) {
+            val raw = e.message ?: ""
+            Log.w(TAG, "verifyOtpCode ($logLabel) failed: $raw")
+            when {
+                raw.contains("expired", ignoreCase = true) ->
+                    RecoveryCodeResult.ExpiredCode
+                raw.contains("invalid", ignoreCase = true) ->
+                    RecoveryCodeResult.WrongCode
+                raw.contains("Unable to resolve host", ignoreCase = true) ||
+                        raw.contains("ConnectException", ignoreCase = true) ->
+                    RecoveryCodeResult.Error(
+                        "Network error. Please check your internet connection."
+                    )
+                else ->
+                    RecoveryCodeResult.Error("Could not verify the code. Please try again.")
+            }
+        }
+    }
+
+    /**
+     * v1.3.3 (ITEM 10 extension): resends the confirm-signup email (with a
+     * fresh 6-digit code). Throttled by the caller's 60s cooldown.
+     * supabase-kt 3.1.1: Auth.resendEmail(type: OtpType.Email, email: String,
+     * captchaToken: String? = null) - Auth.kt:216.
+     */
+    suspend fun resendSignupCode(email: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val cleanEmail = email.trim().lowercase()
+            if (!cleanEmail.contains("@")) {
+                return@withContext Result.failure(Exception("Please enter a valid email address."))
+            }
+            client.auth.resendEmail(OtpType.Email.SIGNUP, cleanEmail)
+            Log.i(TAG, "Signup confirmation email resent for $cleanEmail")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.w(TAG, "resendSignupCode failed: ${e.message}")
+            val raw = e.message ?: ""
+            val friendly = when {
+                raw.contains("Unable to resolve host", ignoreCase = true) || raw.contains("ConnectException", ignoreCase = true) ->
+                    "Network error. Please check your internet connection."
+                else -> "Could not resend the code. Please try again."
+            }
+            Result.failure(Exception(friendly))
+        }
+    }
+
     fun getCurrentUserId(): String? {
         return try {
             val uid = client.auth.currentUserOrNull()?.id
@@ -270,18 +379,89 @@ class SupabaseService {
         }
     }
 
-    suspend fun signUp(email: String, pinOrPass: String, fullName: String): Result<String> = withContext(Dispatchers.IO) {
-        try {
+    /**
+     * v1.3.3 (ITEM 10 extension): typed signup outcome. When email confirmation
+     * is required there is no session yet; the caller routes to the OTP code
+     * sheet instead of treating it as a failure.
+     */
+    suspend fun signUpWithConfirmation(email: String, pinOrPass: String, fullName: String): SignUpResult =
+        withContext(Dispatchers.IO) {
             val cleanEmail = email.trim().lowercase()
-            client.auth.signUpWith(Email, redirectUrl = "focivo://auth-callback") {
-                this.email = cleanEmail
-                this.password = pinOrPass
+            try {
+                client.auth.signUpWith(Email, redirectUrl = "focivo://auth-callback") {
+                    this.email = cleanEmail
+                    this.password = pinOrPass
+                }
+
+                val user = client.auth.currentUserOrNull()
+                val userId = user?.id
+                if (userId == null) {
+                    // Confirmation required: no session yet. The 6-digit code
+                    // from the confirmation email completes this via
+                    // [verifySignupCode] + [completeSignupAfterCodeVerification].
+                    Log.i(TAG, "signUp: confirmation required for $cleanEmail (no session yet)")
+                    return@withContext SignUpResult.ConfirmationRequired
+                }
+
+                insertSignupRows(userId, cleanEmail, fullName)
+                persistSessionNow()
+                SignUpResult.SignedIn(userId)
+            } catch (e: Exception) {
+                Log.w(TAG, "SignUp attempt failed: ${e.message}")
+                val rawMsg = e.message ?: ""
+                val userFriendlyMsg = when {
+                    rawMsg.contains("already registered", ignoreCase = true) || rawMsg.contains("already exists", ignoreCase = true) || rawMsg.contains("User already registered", ignoreCase = true) ->
+                        "An account with this email already exists. Please sign in instead."
+                    rawMsg.contains("Password should be at least", ignoreCase = true) ->
+                        "Password must be at least 6 characters long."
+                    rawMsg.contains("Unable to resolve host", ignoreCase = true) || rawMsg.contains("ConnectException", ignoreCase = true) ->
+                        "Network error. Please check your internet connection."
+                    else -> e.localizedMessage ?: "Sign up failed"
+                }
+                SignUpResult.Failed(userFriendlyMsg)
             }
+        }
 
-            val user = client.auth.currentUserOrNull()
-            val userId = user?.id ?: return@withContext Result.failure(Exception("Account registered! Please check your email inbox to confirm your address before logging in."))
+    /**
+     * Legacy Result-based signup; behavior unchanged. New callers that need to
+     * distinguish "confirmation required" should use [signUpWithConfirmation].
+     */
+    suspend fun signUp(email: String, pinOrPass: String, fullName: String): Result<String> =
+        withContext(Dispatchers.IO) {
+            when (val r = signUpWithConfirmation(email, pinOrPass, fullName)) {
+                is SignUpResult.SignedIn -> Result.success(r.uid)
+                is SignUpResult.ConfirmationRequired ->
+                    Result.failure(Exception("Account registered! Please check your email inbox to confirm your address before logging in."))
+                is SignUpResult.Failed -> Result.failure(Exception(r.message))
+            }
+        }
 
-            // 1. Insert matching row in public.users
+    /**
+     * v1.3.3 (ITEM 10 extension): runs the post-signup Supabase row upserts
+     * (users, user_preferences, study_leaderboard) after the signup OTP code
+     * was verified. Upserts stay best-effort; only a missing session fails.
+     */
+    suspend fun completeSignupAfterCodeVerification(email: String, fullName: String): Result<String> =
+        withContext(Dispatchers.IO) {
+            val cleanEmail = email.trim().lowercase()
+            val userId = client.auth.currentUserOrNull()?.id
+            if (userId.isNullOrBlank()) {
+                Log.w(TAG, "completeSignupAfterCodeVerification: no session after code verify")
+                return@withContext Result.failure(
+                    Exception("We couldn't finish creating your account. Please try signing in.")
+                )
+            }
+            try {
+                insertSignupRows(userId, cleanEmail, fullName)
+            } catch (e: Exception) {
+                Log.w(TAG, "completeSignupAfterCodeVerification upserts failed (best-effort): ${e.message}")
+            }
+            persistSessionNow()
+            Result.success(userId)
+        }
+
+    /** Shared post-signup row upserts; best-effort (failures are logged, not thrown). */
+    private suspend fun insertSignupRows(userId: String, cleanEmail: String, fullName: String) {
             try {
                 val userDto = SupabaseUserDto(
                     id = userId,
@@ -323,23 +503,6 @@ class SupabaseService {
             } catch (e: Exception) {
                 Log.w(TAG, "Error inserting into public.study_leaderboard: ${e.message}")
             }
-
-            persistSessionNow()
-            Result.success(userId)
-        } catch (e: Exception) {
-            Log.w(TAG, "SignUp attempt failed: ${e.message}")
-            val rawMsg = e.message ?: ""
-            val userFriendlyMsg = when {
-                rawMsg.contains("already registered", ignoreCase = true) || rawMsg.contains("already exists", ignoreCase = true) || rawMsg.contains("User already registered", ignoreCase = true) ->
-                    "An account with this email already exists. Please sign in instead."
-                rawMsg.contains("Password should be at least", ignoreCase = true) ->
-                    "Password must be at least 6 characters long."
-                rawMsg.contains("Unable to resolve host", ignoreCase = true) || rawMsg.contains("ConnectException", ignoreCase = true) ->
-                    "Network error. Please check your internet connection."
-                else -> e.localizedMessage ?: "Sign up failed"
-            }
-            Result.failure(Exception(userFriendlyMsg))
-        }
     }
 
     suspend fun signIn(email: String, pinOrPass: String): Result<String> = withContext(Dispatchers.IO) {
@@ -1804,3 +1967,139 @@ data class SupabaseAppDailyLimitDto(
     val is_enabled: Boolean = true
 )
 
+/**
+ * v1.3.3 (ITEM 10 extension): typed outcome of [SupabaseService.signUpWithConfirmation].
+ */
+sealed interface SignUpResult {
+    /** Session established immediately; post-signup upserts already ran. */
+    data class SignedIn(val uid: String) : SignUpResult
+
+    /** Email confirmation required; no session yet - route to the OTP code sheet. */
+    data object ConfirmationRequired : SignUpResult
+
+    /** Real failure; carries a friendly English message. */
+    data class Failed(val message: String) : SignUpResult
+}
+
+/**
+ * v1.3.3 (ITEM 10): outcome of verifying an email OTP code ([OtpType.Email.RECOVERY]
+ * or [OtpType.Email.SIGNUP]). Wrong and expired codes are DISTINCT outcomes so
+ * the UI can show distinct friendly English messages.
+ */
+sealed interface RecoveryCodeResult {
+    /** Code accepted; the recovery session is stored. Next: [SupabaseService.updatePassword]. */
+    data object Verified : RecoveryCodeResult
+
+    /** Code does not match; the user may retry without resending. */
+    data object WrongCode : RecoveryCodeResult
+
+    /** Code expired; a resend is offered. */
+    data object ExpiredCode : RecoveryCodeResult
+
+    /** Anything else; carries a friendly English message. */
+    data class Error(val message: String) : RecoveryCodeResult
+}
+
+/**
+ * v1.3.3 (ITEM 10 extension): auth deep-link classifiers. Pure functions
+ * (no client needed) so they are unit-testable without Android.
+ */
+fun linkTypeOf(uri: android.net.Uri): AuthLinkType {
+    return try {
+        val typeParam = uri.getQueryParameter("type")
+        val frag = uri.fragment ?: ""
+        val fragType = frag.split("&")
+            .firstOrNull { it.substringBefore("=").equals("type", ignoreCase = true) }
+            ?.substringAfter("=", "")
+        val t = typeParam ?: fragType.orEmpty()
+        when {
+            t.equals("recovery", ignoreCase = true) -> AuthLinkType.RECOVERY
+            t.equals("signup", ignoreCase = true) ||
+                    t.equals("magiclink", ignoreCase = true) -> AuthLinkType.SIGNUP
+            else -> AuthLinkType.UNKNOWN
+        }
+    } catch (_: Exception) {
+        AuthLinkType.UNKNOWN
+    }
+}
+
+/** True when a focivo://auth-callback deep link carries a signup-confirmation token. */
+fun isSignupDeeplink(uri: android.net.Uri): Boolean =
+    linkTypeOf(uri) == AuthLinkType.SIGNUP
+
+/** True when a focivo://auth-callback deep link carries a password-recovery token. */
+fun isRecoveryDeeplink(uri: android.net.Uri): Boolean {
+    return try {
+        val typeParam = uri.getQueryParameter("type")
+        val frag = uri.fragment ?: ""
+        typeParam.equals("recovery", ignoreCase = true) ||
+                frag.split("&").any { it.substringBefore("=").equals("type", ignoreCase = true) && it.substringAfter("=", "").equals("recovery", ignoreCase = true) }
+    } catch (_: Exception) {
+        false
+    }
+}
+
+/**
+ * v1.3.3 (ITEM 10 extension): resolves the user id from the freshly
+ * imported session with a bounded retry. Pure-ish and injectable for tests.
+ */
+internal suspend fun awaitUserSession(
+    maxAttempts: Int = 10,
+    delayMs: Long = 100L,
+    getUserId: () -> String?,
+    delayFn: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) }
+): String? {
+    repeat(maxAttempts) {
+        val uid = try { getUserId() } catch (_: Exception) { null }
+        if (!uid.isNullOrBlank()) return uid
+        delayFn(delayMs)
+    }
+    return try { getUserId().takeIf { !it.isNullOrBlank() } } catch (_: Exception) { null }
+}
+
+/**
+ * v1.3.3 (ITEM 10 extension): classifies link error params. "Expired" is
+ * claimed ONLY when the server actually said otp_expired/expired;
+ * anything else keeps the server's own description or the truthful
+ * generic message - never a made-up "expired".
+ */
+internal fun deeplinkErrorParamsMessage(
+    error: String?,
+    errorCode: String?,
+    errorDescription: String?
+): String {
+    val expired = errorCode == "otp_expired" ||
+            errorDescription?.contains("expired", ignoreCase = true) == true ||
+            error?.contains("expired", ignoreCase = true) == true
+    return if (expired) {
+        SupabaseService.DEEPLINK_EXPIRED_MESSAGE
+    } else {
+        errorDescription?.replace("+", " ")?.takeIf { it.isNotBlank() }
+            ?: SupabaseService.DEEPLINK_GENERIC_MESSAGE
+    }
+}
+
+/**
+ * v1.3.3 (ITEM 10 extension): classifies exchange exceptions. "Expired"
+ * only when the exchange itself threw an expired/invalid error; every
+ * other failure gets the truthful generic message.
+ */
+internal fun deeplinkExceptionMessage(raw: String?): String {
+    return if (raw?.contains("expired", ignoreCase = true) == true ||
+        raw?.contains("invalid", ignoreCase = true) == true
+    ) {
+        SupabaseService.DEEPLINK_EXPIRED_MESSAGE
+    } else {
+        SupabaseService.DEEPLINK_GENERIC_MESSAGE
+    }
+}
+
+
+/**
+ * v1.3.3 (ITEM 10 extension): the kind of auth deep link.
+ */
+enum class AuthLinkType {
+    RECOVERY,
+    SIGNUP,
+    UNKNOWN
+}

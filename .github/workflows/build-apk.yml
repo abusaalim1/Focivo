@@ -120,6 +120,22 @@ jobs:
           echo "Starting Gradle debug build..."
           gradle :app:assembleDebug --stacktrace --no-configuration-cache 2>&1 | tee gradle-build.log
 
+      - name: Audit merged manifest risk profile
+        run: |
+          MERGED_MANIFEST=$(find app/build/intermediates -name "AndroidManifest.xml" -path "*merged*" | head -n 1)
+          if [ -z "$MERGED_MANIFEST" ]; then
+            echo "Error: merged manifest not found under app/build/intermediates"
+            find app/build/intermediates -maxdepth 3 -type d | head -30 || true
+            exit 1
+          fi
+          echo "Auditing merged manifest: $MERGED_MANIFEST"
+          python3 tools/manifest_risk_check.py "$MERGED_MANIFEST" --variant debug
+
+      - name: Run manifest risk regression test
+        run: |
+          echo "Running ManifestPermissionAuditTest (Play Protect risk-profile gate)..."
+          gradle :app:testDebugUnitTest --tests "com.example.ManifestPermissionAuditTest" --tests "com.example.util.PermissionStatesTest" --tests "com.example.StrictTamperAlertTest" --tests "com.example.RecoveryCodeFlowTest" --tests "com.example.DeepLinkHonestyTest" --tests "com.example.RecoveryDeepLinkTest" --stacktrace --no-configuration-cache
+
       - name: Capture build failure details
         if: failure()
         run: |

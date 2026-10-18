@@ -22,6 +22,8 @@ class BlockedAppLockActivity : ComponentActivity() {
     private val reasonState = mutableStateOf<String?>(null)
     private val isPunishmentState = mutableStateOf(false)
     private val guardVariantState = mutableStateOf<String?>(null)
+    // v1.3.3 (item 8b): screen-time break variant budget label.
+    private val breakBudgetLabelState = mutableStateOf<String?>(null)
 
     companion object {
         const val EXTRA_BLOCKED_PACKAGE = "extra_blocked_package"
@@ -30,6 +32,7 @@ class BlockedAppLockActivity : ComponentActivity() {
         const val EXTRA_REASON = "extra_reason"
         const val EXTRA_IS_PUNISHMENT = "extra_is_punishment"
         const val EXTRA_GUARD_VARIANT = "extra_guard_variant"
+        const val EXTRA_BREAK_BUDGET_LABEL = "extra_break_budget_label"
         const val GUARD_VARIANT_WARNING = "warning"
 
         @Volatile
@@ -50,7 +53,8 @@ class BlockedAppLockActivity : ComponentActivity() {
             durationSec: Int = 0,
             reason: String? = null,
             isPunishment: Boolean = false,
-            guardVariant: String? = null
+            guardVariant: String? = null,
+            breakBudgetLabel: String? = null
         ): Intent {
             return Intent(context, BlockedAppLockActivity::class.java).apply {
                 putExtra(EXTRA_BLOCKED_PACKAGE, packageName)
@@ -59,6 +63,7 @@ class BlockedAppLockActivity : ComponentActivity() {
                 putExtra(EXTRA_REASON, reason)
                 putExtra(EXTRA_IS_PUNISHMENT, isPunishment)
                 putExtra(EXTRA_GUARD_VARIANT, guardVariant)
+                putExtra(EXTRA_BREAK_BUDGET_LABEL, breakBudgetLabel)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                         Intent.FLAG_ACTIVITY_CLEAR_TOP or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP or
@@ -92,6 +97,9 @@ class BlockedAppLockActivity : ComponentActivity() {
                     initialDurationSec = initialSecondsState.intValue,
                     reason = reasonState.value,
                     isPunishment = isPunishmentState.value,
+                    breakInfo = breakBudgetLabelState.value?.let {
+                        com.example.ui.components.BreakOverlayInfo(it)
+                    },
                     mascotRes = mascotRes,
                     onExitApp = {
                         exitToHomeScreen()
@@ -152,6 +160,7 @@ class BlockedAppLockActivity : ComponentActivity() {
         reasonState.value = rsn
         isPunishmentState.value = punishment
         guardVariantState.value = intent.getStringExtra(EXTRA_GUARD_VARIANT)
+        breakBudgetLabelState.value = intent.getStringExtra(EXTRA_BREAK_BUDGET_LABEL)
     }
 
     private fun exitToHomeScreen() {

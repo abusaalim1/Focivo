@@ -68,7 +68,23 @@ object StrictSessionStore {
                 .putLong(KEY_END_MS, 0L)
                 .apply()
         } catch (_: Exception) { }
+        // v1.3.3 (item 6b): a finished session auto-cancels the tamper
+        // alert notification — the alert is strictly session-scoped.
+        try {
+            com.example.service.FocivoNotifications.cancelStrictUninstallAlert(context)
+        } catch (_: Exception) { }
         applyUninstallBlockedIfOwner(context, blocked = false)
+    }
+
+    /**
+     * v1.3.3 (item 6b) — reads the armed session's real end time, 0L when
+     * no record is armed. Used for the uninstall-attempt alert body so the
+     * user sees exactly when protection lifts. Pure read.
+     */
+    fun getEndTimeMs(context: Context): Long {
+        return try {
+            prefs(context).getLong(KEY_END_MS, 0L)
+        } catch (_: Exception) { 0L }
     }
 
     /**
@@ -93,6 +109,11 @@ object StrictSessionStore {
                     .putBoolean(KEY_RUNNING, false)
                     .putLong(KEY_END_MS, 0L)
                     .apply()
+            } catch (_: Exception) { }
+            // v1.3.3 (item 6b): an expired-while-dead session must not leave
+            // a stale tamper alert in the shade.
+            try {
+                com.example.service.FocivoNotifications.cancelStrictUninstallAlert(context)
             } catch (_: Exception) { }
             applyUninstallBlockedIfOwner(context, blocked = false)
             try {
