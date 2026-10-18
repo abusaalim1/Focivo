@@ -1,0 +1,43 @@
+# TEMPORARY (v1.3.4 hotfix verification) — delete before any merge to main.
+name: v134 hotfix verify
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: v1.3.4 unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Set up Android SDK
+        run: |
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf "24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479edd01e217609cb32e753ac077a977\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-36" "build-tools;36.0.0" > /dev/null 2>&1 || true
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+      - name: Run v1.3.4 unit tests
+        run: |
+          gradle :app:testDebugUnitTest \
+            --tests "com.example.util.DailyUsagePipelineTest" \
+            --tests "com.example.util.AppUpdateNotifyPolicyTest" \
+            --no-configuration-cache 2>&1 | tee unit-tests.log
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v134-unit-tests
+          path: |
+            app/build/test-results/testDebugUnitTest/
+            unit-tests.log
