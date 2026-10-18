@@ -1,5 +1,7 @@
 package com.example.util
 
+import android.app.usage.UsageEvents
+import android.app.usage.UsageEventsQuery
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.util.Log
@@ -9,7 +11,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * v1.3.3 — the ONE source of truth for device usage stats.
+ * v1.1.1 — the ONE source of truth for device usage stats.
  *
  * Every surface that needs screen-time data (Study-top header, per-app
  * budgets, the global screen-time budget, the existing per-app daily-limit
@@ -24,9 +26,17 @@ import java.util.Locale
  *   it is false every read returns null/0 and callers must show the
  *   permission-gated UX instead of numbers.
  *
- * Pure, hermetic helpers ([aggregate], [dayKeyFor], [shouldRefresh]) are
- * unit-tested; the Android query path is injected via [UsageSampleProvider]
- * so tests can substitute a fake provider without a UsageStatsManager.
+ * Today's per-app numbers come from EVENT PAIRING ([sumForegroundTime]):
+ * ACTIVITY_RESUMED/ACTIVITY_PAUSED pairs clipped to [local midnight, now] —
+ * the same method Digital Wellbeing-style dashboards use, so the Study header
+ * tracks the system per-app minutes (YouTube, Muse, ...) and the summed
+ * total. The aggregate query survives only as a per-package FLOOR: on OEMs
+ * with sparse event logs it fills under-counted packages — never the reverse.
+ *
+ * Pure, hermetic helpers ([sumForegroundTime], [aggregate], [dayKeyFor],
+ * [shouldRefresh]) are unit-tested; the Android query path is injected via
+ * [UsageSampleProvider] so tests can substitute a fake provider without a
+ * UsageStatsManager.
  */
 object DailyUsagePipeline {
 
@@ -58,7 +68,7 @@ object DailyUsagePipeline {
         val queriedAtMs: Long
     )
 
-    /** Production provider: UsageStatsManager, aggregated per package. */
+    /** Production provider: event-paired per-package foreground time. */
     private val systemProvider = object : UsageSampleProvider {
         override fun queryTodaySamples(
             context: Context,
@@ -70,13 +80,67 @@ object DailyUsagePipeline {
                     ?: return emptyList()
             val merged = mutableMapOf<String, Long>()
 
-            // Primary: one aggregated call for the whole day.
+            // PRIMARY (v1.1.1): pair ACTIVITY_RESUMED/ACTIVITY_PAUSED events
+            // clipped to [dayStartMs, nowMs] — Digital Wellbeing fidelity.
+            var eventCount = 0
+            try {
+                // UsageEventsQuery.Builder is API 34+; the deprecated
+                // queryEvents(begin, end) covers API 21-33 (minSdk is 24).
+                val usageEvents = if (android.os.Build.VERSION.SDK_INT >=
+                    android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                ) {
+                    val query = UsageEventsQuery.Builder(dayStartMs, nowMs)
+                        .setEventTypes(
+                            UsageEvents.Event.ACTIVITY_RESUMED,
+                            UsageEvents.Event.ACTIVITY_PAUSED,
+                            UsageEvents.Event.DEVICE_SHUTDOWN,
+                            UsageEvents.Event.DEVICE_STARTUP
+                        )
+                        .build()
+                    usageStatsManager.queryEvents(query)
+                } else {
+                    @Suppress("DEPRECATION")
+                    usageStatsManager.queryEvents(dayStartMs, nowMs)
+                }
+                val events = mutableListOf<AppUsageEvent>()
+                if (usageEvents != null) {
+                    val ev = UsageEvents.Event()
+                    while (usageEvents.hasNextEvent()) {
+                        usageEvents.getNextEvent(ev)
+                        events.add(
+                            AppUsageEvent(
+                                ev.packageName ?: continue,
+                                when (ev.eventType) {
+                                    UsageEvents.Event.ACTIVITY_RESUMED -> AppEventType.RESUMED
+                                    UsageEvents.Event.ACTIVITY_PAUSED -> AppEventType.PAUSED
+                                    UsageEvents.Event.DEVICE_SHUTDOWN -> AppEventType.SHUTDOWN
+                                    UsageEvents.Event.DEVICE_STARTUP -> AppEventType.STARTUP
+                                    else -> continue
+                                },
+                                ev.timeStamp
+                            )
+                        )
+                        eventCount++
+                    }
+                }
+                if (events.isNotEmpty()) {
+                    merged.putAll(sumForegroundTime(events, dayStartMs, nowMs))
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "queryEvents pairing failed", e)
+            }
+
+            // FALLBACK/FLOOR: per-package aggregate — only RAISES a package's
+            // number, never lowers it (OEMs with sparse event logs can
+            // under-count the pairing). When the event list was empty this is
+            // the whole answer.
             try {
                 val aggregated = usageStatsManager.queryAndAggregateUsageStats(dayStartMs, nowMs)
                 if (!aggregated.isNullOrEmpty()) {
                     for ((pkg, stats) in aggregated) {
-                        if (stats.totalTimeInForeground > 0L) {
-                            merged[pkg] = stats.totalTimeInForeground
+                        val fg = stats.totalTimeInForeground
+                        if (fg > 0L) {
+                            merged[pkg] = maxOf(merged[pkg] ?: 0L, fg)
                         }
                     }
                 }
@@ -84,13 +148,9 @@ object DailyUsagePipeline {
                 Log.w(TAG, "queryAndAggregateUsageStats failed", e)
             }
 
-            // Fallback/supplement: daily-interval stats, keep the max per
-            // package (some OEMs under-report one of the two APIs).
-            // v1.3.4: anchor the fallback to today. queryUsageStats(INTERVAL_DAILY,
-            // dayStartMs, nowMs) returns EVERY daily bucket intersecting the range,
-            // including the PREVIOUS day's bucket (dayStartMs sits exactly on the
-            // bucket boundary). Merging those stale buckets was counting
-            // yesterday's usage into today's numbers (observed: ~2x inflation).
+            // Second fallback: daily-interval stats, anchored to today by
+            // mergeDailyIntervalStats (v1.3.4 fix — never merges buckets that
+            // started before local midnight).
             try {
                 val statsList = usageStatsManager.queryUsageStats(
                     UsageStatsManager.INTERVAL_DAILY,
@@ -111,6 +171,7 @@ object DailyUsagePipeline {
                 Log.w(TAG, "queryUsageStats fallback failed", e)
             }
 
+            Log.d(TAG, "queryTodaySamples: $eventCount events -> ${merged.size} pkgs, total=${merged.values.sum()}")
             return merged.map { (pkg, ms) -> UsageSample(pkg, ms) }
         }
     }
@@ -157,6 +218,67 @@ object DailyUsagePipeline {
         val totalTimeInForegroundMs: Long,
         val bucketStartMs: Long
     )
+
+    /** Kinds of usage events the pairing cares about (hermetic). */
+    internal enum class AppEventType { RESUMED, PAUSED, SHUTDOWN, STARTUP }
+
+    /** One hermetic usage event: package + kind + wall-clock time. */
+    internal data class AppUsageEvent(
+        val packageName: String,
+        val type: AppEventType,
+        val timeMs: Long
+    )
+
+    /**
+     * v1.1.1 — pure event pairing: foreground millis per package.
+     *
+     * Pairs ACTIVITY_RESUMED/ACTIVITY_PAUSED per package, clipping every
+     * interval to [dayStartMs, nowMs]. Rules:
+     * - RESUMED opens an interval (re-open is ignored while already open).
+     * - PAUSED closes it and banks the clipped duration.
+     * - DEVICE_SHUTDOWN closes ALL open intervals at the shutdown time (the
+     *   platform generates no matching PAUSED after a shutdown; events between
+     *   SHUTDOWN and STARTUP are ignored per the UsageEvents docs).
+     * - At the end of the stream, still-open intervals close at nowMs (the app
+     *   is still on screen).
+     * - Split-screen/PiP: two apps can be open at once; each banks its own
+     *   foreground time — the total is the sum of per-app minutes, exactly
+     *   like the system "Today" total.
+     * Unit-tested (split-screen overlap, midnight-spanning sessions,
+     * resume-without-pause, shutdown, per-app-sum-equals-total).
+     */
+    internal fun sumForegroundTime(
+        events: List<AppUsageEvent>,
+        dayStartMs: Long,
+        nowMs: Long
+    ): Map<String, Long> {
+        val totals = mutableMapOf<String, Long>()
+        val openStart = mutableMapOf<String, Long>()
+
+        fun close(pkg: String, endMs: Long) {
+            val start = openStart.remove(pkg) ?: return
+            val s = maxOf(start, dayStartMs)
+            val e = minOf(endMs, nowMs)
+            if (e > s) totals[pkg] = (totals[pkg] ?: 0L) + (e - s)
+        }
+
+        for (ev in events.sortedBy { it.timeMs }) {
+            val t = ev.timeMs.coerceIn(dayStartMs, nowMs)
+            when (ev.type) {
+                AppEventType.RESUMED ->
+                    if (!openStart.containsKey(ev.packageName)) openStart[ev.packageName] = t
+                AppEventType.PAUSED -> close(ev.packageName, t)
+                AppEventType.SHUTDOWN -> {
+                    val pkgs = openStart.keys.toList()
+                    for (pkg in pkgs) close(pkg, t)
+                }
+                AppEventType.STARTUP -> { /* already closed at SHUTDOWN; nothing to do */ }
+            }
+        }
+        // Still on screen at query time.
+        for (pkg in openStart.keys.toList()) close(pkg, nowMs)
+        return totals
+    }
 
     /**
      * v1.3.4 — pure merge of the daily-interval fallback stats.

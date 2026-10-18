@@ -3,7 +3,6 @@ package com.example.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.OndemandVideo
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -61,16 +61,16 @@ import com.example.util.StrictModeManager
 import com.example.util.YouTubeStudyGuardManager
 
 /**
- * v1.3.3 (ITEM 5 — owner UI order): the AI Guard control cluster on the
- * Study screen, placed LEFT of the START STUDY button.
+ * v1.1.1 (owner UI order): the old four-row guard cluster (Strict / AI Guard /
+ * YT Filter / Limits, whose 4th row was overlapped by the bottom nav bar) is
+ * REPLACED by a single compact "Block" entry left of the START STUDY button.
  *
- * Three icon toggles — Strict Mode, AI Guard, AI YouTube Filter — plus a
- * "screen-time limits" entry that routes to the budget settings
- * ([com.example.util.ScreenTimeBudgetStore.SCREEN_TIME_BUDGETS_ROUTE_ID]).
- *
- * Owner interaction rule, enforced exactly:
- * - Tapping the BUTTON (icon) toggles the feature on/off immediately.
- * - Tapping the TEXT/label next to a toggle opens a premium explainer sheet.
+ * - Tapping the entry opens [BlockHubSheet]: one premium sheet holding Strict
+ *   Mode, AI Guard, AI YouTube Filter (each with toggle + explainer) and the
+ *   Screen-time limits entry. Nothing from the old cluster was lost.
+ * - Inside the sheet the established interaction language holds: the SWITCH
+ *   toggles the feature immediately; tapping the row's LABEL opens the
+ *   premium explainer.
  *
  * State sources (SAME managers as the hubs — no parallel state):
  * - Strict Mode  -> StrictModeManager.isStrictModeState / setStrictModeEnabled
@@ -151,25 +151,113 @@ fun guardExplainerContent(key: GuardExplainerKey): GuardExplainerContent = when 
 /** Which feature still needs the accessibility opt-in dialog. */
 private enum class GuardOptInTarget { AI_GUARD, YT_FILTER }
 
+/**
+ * v1.1.1 — the single "Block" entry left of the START STUDY button.
+ *
+ * Compact row (same 46.dp icon language as the old cluster rows): shield
+ * icon + "Block" label + a caption summarising which guards are armed.
+ * Tapping opens [BlockHubSheet]. No bottom-nav overlap is possible anymore:
+ * this is ONE row, not a four-row column.
+ */
 @Composable
-fun GuardControlCluster(
-    onOpenScreenTimeBudgets: () -> Unit,
+fun BlockHubEntry(
     modifier: Modifier = Modifier,
-    /**
-     * Text color for the toggle labels, drawn directly on the Study
-     * screen's ambient timer-theme backdrop. Callers MUST pass the
-     * theme's backdrop content color (TimerTheme.backdropContent) —
-     * the raw design-token text color is unreadable on dark backdrops
-     * in light app mode (and vice versa). Defaults to the token text
-     * color for standalone (non-backdrop) renders.
-     */
     contentColor: Color = Color.Unspecified,
+    onOpen: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val T = focivoTokens()
-    // Resolved label color: backdrop-aware when the caller provides it.
     val labelColor = if (contentColor != Color.Unspecified) contentColor else T.text
+
+    val isStrictOn by StrictModeManager.isStrictModeState.collectAsState()
+    val isYtFilterOn by YouTubeStudyGuardManager.isFilterEnabledState.collectAsState()
+    var isAiGuardOn by remember { mutableStateOf(AiStudyGuardManager.isAiGuardEnabled(context)) }
+
+    // Re-read on resume so the caption reflects grants made in Settings.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isAiGuardOn = AiStudyGuardManager.isAiGuardEnabled(context)
+                YouTubeStudyGuardManager.init(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val armed = buildList {
+        if (isStrictOn) add("Strict")
+        if (isAiGuardOn) add("AI Guard")
+        if (isYtFilterOn) add("YT Filter")
+    }
+    val caption = if (armed.isEmpty()) "All off" else armed.joinToString(", ")
+    val anyOn = armed.isNotEmpty()
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen)
+            .testTag("block_hub_entry"),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(46.dp)
+                .clip(CircleShape)
+                .background(if (anyOn) T.accent else T.surface2)
+                .border(
+                    1.dp,
+                    if (anyOn) T.accent else T.chipBorder,
+                    CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Shield,
+                contentDescription = "Open Block settings",
+                tint = if (anyOn) T.onAccent else T.muted,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(9.dp))
+        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            Text(
+                text = "Block",
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.5.sp,
+                lineHeight = 15.sp,
+                color = labelColor
+            )
+            Text(
+                text = caption,
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.Medium,
+                fontSize = 10.sp,
+                lineHeight = 13.sp,
+                color = labelColor
+            )
+        }
+    }
+}
+
+/**
+ * v1.1.1 — the one premium "Block" sheet: Strict Mode, AI Guard and
+ * AI YouTube Filter each with an immediate switch plus a label that opens
+ * its premium explainer, and the Screen-time limits entry. Everything the
+ * old four-row cluster held, inside one sheet.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BlockHubSheet(
+    onOpenScreenTimeBudgets: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val T = focivoTokens()
 
     val isStrictOn by StrictModeManager.isStrictModeState.collectAsState()
     val isYtFilterOn by YouTubeStudyGuardManager.isFilterEnabledState.collectAsState()
@@ -178,13 +266,8 @@ fun GuardControlCluster(
     var hasAccessibility by remember { mutableStateOf(AiStudyGuardManager.isAccessibilityPermissionGranted(context)) }
     var explainerKey by remember { mutableStateOf<GuardExplainerKey?>(null) }
     var optInTarget by remember { mutableStateOf<GuardOptInTarget?>(null) }
-    // v1.3.3: mirrors the existing Strict opt-in flow (pre-session prompt +
-    // Deep Focus sheet) — enabling Strict without the device admin active
-    // offers the premium admin explainer instead of silently skipping it.
     var showAdminExplainer by remember { mutableStateOf(false) }
 
-    // Same refresh cadence as AiStudyGuardHubSheet: re-read on resume so a
-    // permission granted in Settings is reflected immediately.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -197,7 +280,7 @@ fun GuardControlCluster(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val onStrictIconTap = {
+    val toggleStrict = {
         if (isStrictOn) {
             StrictModeManager.setStrictModeEnabled(context, false)
         } else {
@@ -207,8 +290,7 @@ fun GuardControlCluster(
             }
         }
     }
-
-    val onGuardIconTap = {
+    val toggleGuard = {
         if (isAiGuardOn) {
             AiStudyGuardManager.setAiGuardEnabled(context, false)
             isAiGuardOn = false
@@ -219,8 +301,7 @@ fun GuardControlCluster(
             isAiGuardOn = true
         }
     }
-
-    val onYtFilterIconTap = {
+    val toggleYtFilter = {
         if (isYtFilterOn) {
             YouTubeStudyGuardManager.setFilterEnabled(context, false)
         } else if (!hasAccessibility) {
@@ -230,65 +311,161 @@ fun GuardControlCluster(
         }
     }
 
-    Column(
-        modifier = modifier.testTag("guard_control_cluster"),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = T.surface,
+        dragHandle = null,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        modifier = modifier.testTag("block_hub_sheet")
     ) {
-        GuardToggleRow(
-            icon = Icons.Default.Lock,
-            label = "Strict",
-            isOn = isStrictOn,
-            labelColor = labelColor,
-            onIconClick = onStrictIconTap,
-            onLabelClick = { explainerKey = GuardExplainerKey.STRICT },
-            iconTestTag = "guard_cluster_strict_icon",
-            labelTestTag = "guard_cluster_strict_label"
-        )
-        GuardToggleRow(
-            icon = Icons.Default.Shield,
-            label = "AI Guard",
-            isOn = isAiGuardOn,
-            labelColor = labelColor,
-            onIconClick = onGuardIconTap,
-            onLabelClick = { explainerKey = GuardExplainerKey.AI_GUARD },
-            iconTestTag = "guard_cluster_guard_icon",
-            labelTestTag = "guard_cluster_guard_label"
-        )
-        GuardToggleRow(
-            icon = Icons.Default.OndemandVideo,
-            label = "YT Filter",
-            isOn = isYtFilterOn,
-            labelColor = labelColor,
-            onIconClick = onYtFilterIconTap,
-            onLabelClick = { explainerKey = GuardExplainerKey.YT_FILTER },
-            iconTestTag = "guard_cluster_ytfilter_icon",
-            labelTestTag = "guard_cluster_ytfilter_label"
-        )
-        // Screen-time limits entry (icon + label both navigate; neutral style).
-        GuardToggleRow(
-            icon = Icons.Default.Timer,
-            label = "Limits",
-            stateCaption = "Budgets",
-            isOn = null,
-            labelColor = labelColor,
-            onIconClick = onOpenScreenTimeBudgets,
-            onLabelClick = onOpenScreenTimeBudgets,
-            iconTestTag = "guard_cluster_limits_icon",
-            labelTestTag = "guard_cluster_limits_label",
-            contentDescription = "Open screen-time budget settings"
-        )
-    }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 26.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            SheetDragHandle()
+            Spacer(modifier = Modifier.height(14.dp))
 
-    // Premium explainer sheets — label taps only.
-    explainerKey?.let { key ->
-        GuardExplainerSheet(
-            key = key,
-            onDismiss = { explainerKey = null }
-        )
+            if (explainerKey == null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(T.accent.copy(alpha = 0.16f))
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(T.accent)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "BLOCK", style = focivoEyebrow())
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Your study-time guards.",
+                    fontFamily = SerifItalicFontFamily,
+                    fontStyle = FontStyle.Italic,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 26.sp,
+                    lineHeight = 32.sp,
+                    textAlign = TextAlign.Center,
+                    color = T.text
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Flip a switch to arm a guard. Tap a name to learn what it does.",
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    textAlign = TextAlign.Center,
+                    color = T.muted
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                BlockGuardRow(
+                    icon = Icons.Default.Lock,
+                    label = "Strict Mode",
+                    caption = if (isStrictOn) "On" else "Off",
+                    isOn = isStrictOn,
+                    onToggle = toggleStrict,
+                    onLabelClick = { explainerKey = GuardExplainerKey.STRICT },
+                    rowTestTag = "block_hub_strict_row"
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                BlockGuardRow(
+                    icon = Icons.Default.Shield,
+                    label = "AI Guard",
+                    caption = if (isAiGuardOn) "On" else "Off",
+                    isOn = isAiGuardOn,
+                    onToggle = toggleGuard,
+                    onLabelClick = { explainerKey = GuardExplainerKey.AI_GUARD },
+                    rowTestTag = "block_hub_guard_row"
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                BlockGuardRow(
+                    icon = Icons.Default.OndemandVideo,
+                    label = "AI YouTube Filter",
+                    caption = if (isYtFilterOn) "On" else "Off",
+                    isOn = isYtFilterOn,
+                    onToggle = toggleYtFilter,
+                    onLabelClick = { explainerKey = GuardExplainerKey.YT_FILTER },
+                    rowTestTag = "block_hub_ytfilter_row"
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Screen-time limits entry (whole row navigates; neutral style).
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(T.surface2)
+                        .border(1.dp, T.line, RoundedCornerShape(16.dp))
+                        .clickable {
+                            onDismiss()
+                            onOpenScreenTimeBudgets()
+                        }
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                        .testTag("block_hub_limits_row"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(T.accent.copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = null,
+                            tint = T.accentText,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Screen-time limits",
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                            color = T.text
+                        )
+                        Text(
+                            text = "Per-app and daily budgets",
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 12.sp,
+                            color = T.muted
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Open",
+                        tint = T.muted,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(18.dp))
+            } else {
+                // Explainer detail inside the sheet — the "Got it" button
+                // returns to the guard list.
+                GuardExplainerContent(
+                    content = guardExplainerContent(explainerKey!!),
+                    onDismiss = { explainerKey = null }
+                )
+            }
+        }
     }
 
     // Accessibility opt-in for AI Guard / YT Filter (same dialog as the hub).
-    optInTarget?.let { target ->
+    optInTarget?.let {
         AiStudyAccessibilityOptInDialog(
             onConfirmOptIn = {
                 optInTarget = null
@@ -316,95 +493,79 @@ fun GuardControlCluster(
 }
 
 /**
- * One cluster row: icon button (tap = immediate toggle) + label (tap =
- * explainer). The button itself carries icon + on/off state only — no text
- * clutter. isOn = null renders the neutral (non-toggle) style.
+ * One Block-sheet row: icon + label (tap = explainer) + immediate switch.
+ * Matches the premium sheet language of the rest of the app.
  */
 @Composable
-private fun GuardToggleRow(
+private fun BlockGuardRow(
     icon: ImageVector,
     label: String,
-    isOn: Boolean?,
-    labelColor: Color,
-    onIconClick: () -> Unit,
+    caption: String,
+    isOn: Boolean,
+    onToggle: () -> Unit,
     onLabelClick: () -> Unit,
-    iconTestTag: String,
-    labelTestTag: String,
-    stateCaption: String? = null,
-    contentDescription: String? = null,
+    rowTestTag: String,
     modifier: Modifier = Modifier
 ) {
     val T = focivoTokens()
-    val on = isOn == true
-    val caption = stateCaption ?: if (on) "On" else "Off"
-
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(T.surface2)
+            .border(1.dp, T.line, RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .testTag(rowTestTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(46.dp)
+                .size(40.dp)
                 .clip(CircleShape)
-                .background(
-                    when {
-                        isOn == null -> T.surface2
-                        on -> T.accent
-                        else -> T.surface2
-                    }
-                )
-                .border(
-                    1.dp,
-                    when {
-                        isOn == null -> T.line
-                        on -> T.accent
-                        else -> T.chipBorder
-                    },
-                    CircleShape
-                )
-                .clickable(onClick = onIconClick)
-                .testTag(iconTestTag),
+                .background(if (isOn) T.accent else T.surface)
+                .border(1.dp, if (isOn) T.accent else T.chipBorder, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = contentDescription ?: "$label toggle",
-                tint = when {
-                    isOn == null -> T.muted
-                    on -> T.onAccent
-                    else -> T.muted
-                },
-                modifier = Modifier.size(22.dp)
+                contentDescription = null,
+                tint = if (isOn) T.onAccent else T.muted,
+                modifier = Modifier.size(20.dp)
             )
         }
-        Spacer(modifier = Modifier.width(9.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         Column(
             modifier = Modifier
+                .weight(1f)
                 .clickable(onClick = onLabelClick)
-                .testTag(labelTestTag)
                 .padding(vertical = 4.dp)
         ) {
             Text(
                 text = label,
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 12.5.sp,
-                lineHeight = 15.sp,
-                // Full-alpha backdrop content color in every state: the
-                // on/off state lives on the icon button (lime vs dim).
-                // Dimming the label here would drop it below the contrast
-                // floor on theme backdrops (v1.3.3 item 9 rule).
-                color = labelColor
+                fontSize = 15.sp,
+                color = T.text
             )
             Text(
                 text = caption,
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Medium,
-                fontSize = 10.sp,
-                lineHeight = 13.sp,
-                color = labelColor
+                fontSize = 12.sp,
+                color = T.muted
             )
         }
+        androidx.compose.material3.Switch(
+            checked = isOn,
+            onCheckedChange = { onToggle() },
+            colors = androidx.compose.material3.SwitchDefaults.colors(
+                checkedThumbColor = T.onAccent,
+                checkedTrackColor = T.accent,
+                uncheckedThumbColor = T.muted,
+                uncheckedTrackColor = T.surface
+            ),
+            modifier = Modifier.testTag("${rowTestTag}_switch")
+        )
     }
 }
 

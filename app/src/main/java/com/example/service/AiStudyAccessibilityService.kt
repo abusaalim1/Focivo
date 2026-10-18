@@ -1943,6 +1943,32 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                 val browserLabel = guardMonitoredLabel(pkg) ?: "Browser"
                                 val urlOrTitle = extraction.urlOrContext ?: extraction.screenTitle ?: ""
 
+                                // v1.1.1: deterministic website-block check FIRST.
+                                // WebsiteBlockManager holds the user's blocked-domain
+                                // list (defaults + custom, allowlisted study sites
+                                // exempt). A known distraction domain needs no AI
+                                // verdict — treat it as non-study immediately.
+                                if (com.example.util.WebsiteBlockManager.isBlockedDomain(
+                                        applicationContext, urlOrTitle
+                                    )
+                                ) {
+                                    val blockedDomain = com.example.util.WebsiteBlockManager
+                                        .extractDomain(urlOrTitle) ?: "a blocked site"
+                                    Log.w(TAG, "[Browser AI Guard] Blocked domain $blockedDomain in $browserLabel")
+                                    AiStudyGuardManager.logGuardActivity(
+                                        applicationContext, browserLabel, "website-block", "NON_STUDY",
+                                        "blocked domain $blockedDomain", urlOrTitle
+                                    )
+                                    AiStudyGuardManager.onNonStudyDetected(
+                                        context = applicationContext,
+                                        packageName = pkg,
+                                        messageText = urlOrTitle.ifBlank { extraction.textSnippets.firstOrNull() ?: "" },
+                                        reason = "Blocked website ($blockedDomain) during study"
+                                    )
+                                    try { rootNode.recycle() } catch (_: Exception) {}
+                                    return
+                                }
+
                                 // Check for web-based AI chats (ChatGPT web, Claude web, Perplexity web) in browser
                                 val lowerUrlOrTitle = urlOrTitle.lowercase(Locale.ROOT)
                                 val isWebAiChat = lowerUrlOrTitle.contains("chatgpt.com") ||

@@ -95,6 +95,7 @@ import com.example.data.SupabaseScheduledBlockDto
 import com.example.service.ScheduledBlockScheduler
 import com.example.service.StrictLockInManager
 import com.example.ui.screens.StudyChannelsScreen
+import com.example.ui.screens.WebsiteBlockerScreen
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.focivoTokens
@@ -429,6 +430,9 @@ fun FocusShieldHubSheet(
     var selectedDurationMinutes by remember { mutableIntStateOf(25) }
     var showPermissionSheet by remember { mutableStateOf(false) }
     var showStudyChannels by remember { mutableStateOf(false) }
+    // v1.1.1: WebsiteBlockManager existed with zero call sites — this state
+    // opens its management screen (same pattern as showStudyChannels).
+    var showWebsiteBlocker by remember { mutableStateOf(false) }
     // v1.2.3 (Task 13.1): strict lock-in — a locked schedule's toggle tap
     // shows this reason instead of toggling.
     var lockReasonText by remember { mutableStateOf<String?>(null) }
@@ -1156,6 +1160,34 @@ fun FocusShieldHubSheet(
                                 modifier = Modifier.size(18.dp)
                             )
                         }
+
+                        // v1.1.1: the WebsiteBlockManager engine had zero call
+                        // sites and no UI — this row gives it a face. Tapping
+                        // opens the management screen; blocked domains are
+                        // enforced in browsers during study sessions.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showWebsiteBlocker = true }
+                                .padding(vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = "Website blocker", style = shieldBody(14, FontWeight.SemiBold))
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Blocked sites in browsers during study",
+                                    style = shieldBody(12, FontWeight.Normal, focivoTokens().muted).copy(lineHeight = 17.4.sp)
+                                )
+                            }
+                            androidx.compose.material3.Icon(
+                                imageVector = Icons.Filled.ChevronRight,
+                                contentDescription = "Open",
+                                tint = focivoTokens().muted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -1651,6 +1683,13 @@ fun FocusShieldHubSheet(
         if (showStudyChannels) {
             Box(modifier = Modifier.fillMaxSize().background(focivoTokens().bg)) {
                 StudyChannelsScreen(onBack = { showStudyChannels = false })
+            }
+        }
+
+        // v1.1.1: nested website-blocker management overlay.
+        if (showWebsiteBlocker) {
+            Box(modifier = Modifier.fillMaxSize().background(focivoTokens().bg)) {
+                WebsiteBlockerScreen(onBack = { showWebsiteBlocker = false })
             }
         }
 
