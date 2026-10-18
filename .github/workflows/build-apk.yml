@@ -134,7 +134,7 @@ jobs:
       - name: Run manifest risk regression test
         run: |
           echo "Running ManifestPermissionAuditTest (Play Protect risk-profile gate)..."
-          gradle :app:testDebugUnitTest --tests "com.example.ManifestPermissionAuditTest" --tests "com.example.util.PermissionStatesTest" --tests "com.example.StrictTamperAlertTest" --stacktrace --no-configuration-cache
+          gradle :app:testDebugUnitTest --tests "com.example.ManifestPermissionAuditTest" --tests "com.example.util.PermissionStatesTest" --tests "com.example.StrictTamperAlertTest" --tests "com.example.RecoveryCodeFlowTest" --tests "com.example.DeepLinkHonestyTest" --tests "com.example.RecoveryDeepLinkTest" --stacktrace --no-configuration-cache
 
       - name: Capture build failure details
         if: failure()
