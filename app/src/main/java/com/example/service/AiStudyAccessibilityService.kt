@@ -315,9 +315,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
         windowBounds: android.graphics.Rect? = null,
         // v1.3.0: "floating" | "split" — the compact small-window message
         // for split-pane / freeform interceptions. Null = fullscreen copy.
-        windowedMode: String? = null,
-        // v1.3.3 (item 8b): screen-time break variant payload.
-        breakInfo: com.example.ui.components.BreakOverlayInfo? = null
+        windowedMode: String? = null
     ): Boolean {
         if (a11yBlockView != null) {
             a11yBlockedPackage.value = blockedPackage
@@ -326,7 +324,6 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yReason.value = reason
             a11yPunishment.value = isPunishment
             a11yWindowedMode.value = windowedMode
-            a11yBreakInfo.value = breakInfo
             // Reposition to the offending window when a (different) bound
             // is supplied — e.g. fullscreen overlay followed by a
             // small-window intercept of the same package.
@@ -1465,13 +1462,13 @@ class AiStudyAccessibilityService : AccessibilityService() {
                     Log.w(TAG, "[Screen-Time Break] Global budget exceeded; blocking $pkg")
                     val friendlyName = FocusShieldService.friendlyAppName(applicationContext, pkg)
                     val budgetMins = com.example.util.ScreenTimeBudgetManager.getGlobalBudgetMinutes(applicationContext)
-                    BlockOverlayManager.intercept(
+                    BlockOverlayManager.interceptScreenTimeBreak(
                         context = applicationContext,
                         blockedPackage = pkg,
                         appName = friendlyName,
-                        durationSec = (breakDecision.remainingMs / 1000L).toInt().coerceAtLeast(1),
-                        reason = com.example.util.ScreenTimeBudgetManager.breakReason(applicationContext, budgetMins),
-                        isPunishment = false
+                        remainingSec = (breakDecision.remainingMs / 1000L).toInt(),
+                        budgetLabel = com.example.util.ScreenTimeBudgetManager.budgetLabel(budgetMins),
+                        reason = com.example.util.ScreenTimeBudgetManager.breakReason(applicationContext, budgetMins)
                     )
                     return
                 }

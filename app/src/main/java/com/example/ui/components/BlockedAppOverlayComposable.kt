@@ -95,6 +95,15 @@ import java.util.Locale
  * in a small window — you've locked this app. Unlock it from Focivo to use
  * it."). English only, no emojis. Null = the existing fullscreen layout.
  */
+/**
+ * v1.3.3 (item 8b) — payload for the screen-time break variant of
+ * [BlockedAppOverlay]. Carries the budget label ("4h") used in the break
+ * explanation copy.
+ */
+data class BreakOverlayInfo(
+    val budgetLabel: String
+)
+
 @Composable
 fun BlockedAppOverlay(
     appName: String,
@@ -103,6 +112,12 @@ fun BlockedAppOverlay(
     reason: String? = null,
     isPunishment: Boolean = false,
     mascotRes: Int = R.drawable.mascot_blocked,
+    /**
+     * v1.3.3 (item 8b): when non-null the overlay renders the screen-time
+     * break variant — "Screen-time break" headline + the break explanation
+     * with the live remaining countdown. Null keeps the classic block copy.
+     */
+    breakInfo: BreakOverlayInfo? = null,
     /**
      * Tri-state next priority:
      *  - null  -> resolve automatically from FocuslyRepository top priorities
@@ -207,11 +222,10 @@ fun BlockedAppOverlay(
 
             // 2 — Headline
             Text(
-                text = when (windowedMode) {
-                    // v1.3.0: the window-specific message (owner order
-                    // 2026-10-17). English only, no emojis.
-                    "split" -> "You can't open $appName in split-screen"
-                    "floating" -> "You can't open $appName in a small window"
+                text = when {
+                    breakInfo != null -> "Screen-time break"
+                    windowedMode == "split" -> "You can't open $appName in split-screen"
+                    windowedMode == "floating" -> "You can't open $appName in a small window"
                     else -> "$appName is blocked during focus"
                 },
                 style = MaterialTheme.typography.headlineMedium.copy(
@@ -249,6 +263,23 @@ fun BlockedAppOverlay(
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center
             )
+
+            // v1.3.3 (item 8b): break explanation — what happened, how long
+            // the lock lasts, and which apps stay available.
+            if (breakInfo != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Daily screen-time limit reached (${breakInfo.budgetLabel}). " +
+                        "Non-essential apps stay locked for 3 hours. " +
+                        "Phone, Camera, Maps, YouTube and Chrome stay available.",
+                    color = Color(0xFFB9B9BE),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 21.sp,
+                    modifier = Modifier.testTag("break_explanation_text")
+                )
+            }
 
             Spacer(modifier = Modifier.height(if (windowed) 14.dp else 26.dp))
 
@@ -311,7 +342,7 @@ fun BlockedAppOverlay(
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
             ) {
                 Text(
-                    text = "Stay in Focus",
+                    text = if (breakInfo != null) "Take a Break" else "Stay in Focus",
                     fontWeight = FontWeight.Bold,
                     fontSize = if (windowed) 15.sp else 16.sp,
                     color = NearBlack,

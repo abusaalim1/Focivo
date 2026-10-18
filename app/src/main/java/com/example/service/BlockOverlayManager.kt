@@ -91,6 +91,9 @@ object BlockOverlayManager {
     private val durationState = mutableStateOf(0)
     private val reasonState = mutableStateOf<String?>(null)
     private val punishmentState = mutableStateOf(false)
+    // v1.3.3 (item 8b): break-mode payload for the screen-time break overlay.
+    private val breakInfoState =
+        mutableStateOf<com.example.ui.components.BreakOverlayInfo?>(null)
 
     // v1.2.2 (C): dedicated Shorts & Reels surface overlay — separate from the
     // main block overlay so a surface lock never disturbs an active block UI.
@@ -124,19 +127,21 @@ object BlockOverlayManager {
         windowBounds: android.graphics.Rect? = null,
         // v1.3.0: "floating" | "split" — the compact small-window message
         // for split-pane / freeform interceptions. Null = fullscreen copy.
-        windowedMode: String? = null
+        windowedMode: String? = null,
+        // v1.3.3 (item 8b): screen-time break variant payload.
+        breakInfo: com.example.ui.components.BreakOverlayInfo? = null
     ): Boolean {
         val svc = AiStudyAccessibilityService.connectedInstance ?: return false
         if (svc.isA11yBlockOverlayShowing()) return true
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            return svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant, windowBounds, windowedMode)
+            return svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant, windowBounds, windowedMode, breakInfo)
         }
         val result = java.util.concurrent.atomic.AtomicBoolean(false)
         val latch = java.util.concurrent.CountDownLatch(1)
         mainHandler.post {
             try {
                 result.set(
-                    svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant, windowBounds, windowedMode)
+                    svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant, windowBounds, windowedMode, breakInfo)
                 )
             } finally {
                 latch.countDown()
@@ -183,7 +188,9 @@ object BlockOverlayManager {
         durationSec: Int = 0,
         reason: String? = null,
         isPunishment: Boolean = false,
-        warningVariant: Boolean = false
+        warningVariant: Boolean = false,
+        // v1.3.3 (item 8b): screen-time break variant payload.
+        breakInfo: com.example.ui.components.BreakOverlayInfo? = null
     ): Boolean {
         if (isShowing()) {
             // Refresh the payload on the already-visible overlay.
@@ -192,10 +199,11 @@ object BlockOverlayManager {
             durationState.value = durationSec
             reasonState.value = reason
             punishmentState.value = isPunishment
+            breakInfoState.value = breakInfo
             return true
         }
         if (!Settings.canDrawOverlays(context)) return false
-        show(context.applicationContext, blockedPackage, appName, durationSec, reason, isPunishment, warningVariant)
+        show(context.applicationContext, blockedPackage, appName, durationSec, reason, isPunishment, warningVariant, breakInfo)
         return isShowing()
     }
 
@@ -206,7 +214,8 @@ object BlockOverlayManager {
         durationSec: Int,
         reason: String?,
         isPunishment: Boolean,
-        warningVariant: Boolean = false
+        warningVariant: Boolean = false,
+        breakInfo: com.example.ui.components.BreakOverlayInfo? = null
     ) {
         runOnMain {
             if (overlayView != null) return@runOnMain
@@ -217,6 +226,7 @@ object BlockOverlayManager {
                 durationState.value = durationSec
                 reasonState.value = reason
                 punishmentState.value = isPunishment
+                breakInfoState.value = breakInfo
 
                 val wm = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
                 val view = ComposeView(appContext).apply {
@@ -229,6 +239,7 @@ object BlockOverlayManager {
                                 initialDurationSec = durationState.value,
                                 reason = reasonState.value,
                                 isPunishment = punishmentState.value,
+                                breakInfo = breakInfoState.value,
                                 mascotRes = if (warningVariant) R.drawable.mascot_warning_transparent
                                 else R.drawable.mascot_blocked,
                                 onExitApp = { exitToHome(appContext) },
@@ -337,7 +348,9 @@ object BlockOverlayManager {
         multiWindowMode: String? = null,
         // v1.2.4: offending window bounds (screen coords) for split-pane /
         // freeform interceptions — the block UI covers ONLY that window.
-        windowBounds: android.graphics.Rect? = null
+        windowBounds: android.graphics.Rect? = null,
+        // v1.3.3 (item 8b): screen-time break variant payload.
+        breakInfo: com.example.ui.components.BreakOverlayInfo? = null
     ) {
         // v1.1.3: Guard Hub diagnostics — every intercept is recorded with
         // the concrete reason so device tests are evidence-based.
@@ -353,8 +366,8 @@ object BlockOverlayManager {
             (multiWindowMode == "floating" || multiWindowMode == "split")
         ) multiWindowMode else null
         val shown = when (path) {
-            OverlayPath.A11Y -> showViaA11y(blockedPackage, appName, durationSec, reason, isPunishment, windowBounds = windowBounds, windowedMode = windowedMode)
-            OverlayPath.APP -> showIfPermitted(context, blockedPackage, appName, durationSec, reason, isPunishment)
+            OverlayPath.A11Y -> showViaA11y(blockedPackage, appName, durationSec, reason, isPunishment, windowBounds = windowBounds, windowedMode = windowedMode, breakInfo = breakInfo)
+            OverlayPath.APP -> showIfPermitted(context, blockedPackage, appName, durationSec, reason, isPunishment, breakInfo = breakInfo)
             OverlayPath.ACTIVITY -> false
         }
         // v1.2.3: braces — a second, guaranteed-top layer for multi-window.
@@ -366,7 +379,8 @@ object BlockOverlayManager {
         if (shown && !alreadyShowing) {
             if (multiWindowMode == "floating" && windowBounds == null) {
                 bracesLaunched = launchBracesActivity(
-                    context, blockedPackage, appName, durationSec, reason, isPunishment, "floating"
+                    context, blockedPackage, appName, durationSec, reason, isPunishment, "floating",
+                    breakInfo = breakInfo
                 )
             } else if (path == OverlayPath.A11Y) {
                 // No-draw watchdog: addView succeeding doesn't prove the frame
@@ -379,7 +393,8 @@ object BlockOverlayManager {
                         if (isBlockUiShowing() && svc?.isA11yBlockOverlayDrawn() != true) {
                             launchBracesActivity(
                                 context, blockedPackage, appName, durationSec,
-                                reason, isPunishment, "no-draw-800ms"
+                                reason, isPunishment, "no-draw-800ms",
+                                breakInfo = breakInfo
                             )
                         }
                     } catch (_: Exception) { }
@@ -414,12 +429,37 @@ object BlockOverlayManager {
                 appName = appName,
                 durationSec = durationSec,
                 reason = reason,
-                isPunishment = isPunishment
+                isPunishment = isPunishment,
+                breakBudgetLabel = breakInfo?.budgetLabel
             )
             context.startActivity(intent)
         } catch (e: Exception) {
             Log.e(TAG, "Fallback block Activity failed: ${e.message}")
         }
+    }
+
+    /**
+     * v1.3.3 (item 8b) — convenience for the global screen-time break:
+     * intercepts with the break overlay variant (break explanation + live
+     * remaining countdown) on every render path.
+     */
+    fun interceptScreenTimeBreak(
+        context: Context,
+        blockedPackage: String,
+        appName: String,
+        remainingSec: Int,
+        budgetLabel: String,
+        reason: String? = null
+    ) {
+        intercept(
+            context = context,
+            blockedPackage = blockedPackage,
+            appName = appName,
+            durationSec = remainingSec.coerceAtLeast(1),
+            reason = reason,
+            isPunishment = false,
+            breakInfo = com.example.ui.components.BreakOverlayInfo(budgetLabel)
+        )
     }
 
     // v1.2.3 — braces Activity bookkeeping.
@@ -439,7 +479,8 @@ object BlockOverlayManager {
         durationSec: Int,
         reason: String?,
         isPunishment: Boolean,
-        why: String
+        why: String,
+        breakInfo: com.example.ui.components.BreakOverlayInfo? = null
     ): Boolean {
         val now = System.currentTimeMillis()
         if (com.example.ui.screens.BlockedAppLockActivity.isCurrentlyShowing) return true
@@ -453,7 +494,8 @@ object BlockOverlayManager {
                 appName = appName,
                 durationSec = durationSec,
                 reason = reason,
-                isPunishment = isPunishment
+                isPunishment = isPunishment,
+                breakBudgetLabel = breakInfo?.budgetLabel
             )
             context.startActivity(intent)
             try {
