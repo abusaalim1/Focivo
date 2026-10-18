@@ -156,7 +156,6 @@ fun GuardControlCluster(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val T = focivoTokens()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val isStrictOn by StrictModeManager.isStrictModeState.collectAsState()
