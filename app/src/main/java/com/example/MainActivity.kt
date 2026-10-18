@@ -50,6 +50,7 @@ import com.example.ui.components.AiStudyWarningDialog
 import com.example.ui.components.AiStudyBlockedDialog
 import com.example.ui.components.AiStudyResolvedDialog
 import com.example.ui.components.AppUpdateDialog
+import com.example.util.AppUpdateManager
 import com.example.ui.components.HomeNoticeOverlay
 import com.example.ui.components.HomeUpdateOverlay
 import com.example.ui.screens.AutoStudyScheduleScreen
@@ -1293,6 +1294,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                             updateInfo = updateInfo,
                             onDownloadClick = { downloadUrl ->
                                 viewModel.downloadAndInstallUpdate(context, downloadUrl)
+                            },
+                            onOpenInBrowser = { downloadUrl ->
+                                AppUpdateManager.openUpdateUrlInBrowser(context, downloadUrl)
                             },
                             onDismiss = {
                                 viewModel.dismissAppUpdate(context)

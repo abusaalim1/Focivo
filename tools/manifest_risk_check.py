@@ -23,9 +23,14 @@ ANDROID_NS = "http://schemas.android.com/apk/res/android"
 # chance of a Google Play Protect block on sideloaded installs.
 # NOTE (owner constraint 2026-10-18): QUERY_ALL_PACKAGES is deliberately NOT
 # banned — the blocked-apps picker is a feature and stays as-declared.
+# NOTE (v1.3.5 correction): REQUEST_INSTALL_PACKAGES was REMOVED in v1.3.3 as
+# "unused", but the in-app updater CALLS PackageManager.canRequestPackageInstalls(),
+# which THROWS SecurityException (crashing the Update button — owner crash
+# report 2026-10-18) when the permission is undeclared. It is legitimately
+# required by the self-update feature and lives on the WATCHLIST (justified
+# but sensitive), not the ban list.
 BANNED_PERMISSIONS = {
     "android.permission.KILL_BACKGROUND_PROCESSES", # removed v1.3.3 (unused, grep-verified)
-    "android.permission.REQUEST_INSTALL_PACKAGES",  # removed v1.3.3 (system installer flow)
     "android.permission.REQUEST_DELETE_PACKAGES",
     "android.permission.CALL_PHONE",
     "android.permission.SEND_SMS",
@@ -61,6 +66,9 @@ WATCHLIST_PERMISSIONS = {
     "android.permission.POST_NOTIFICATIONS",
     "android.permission.ACCESS_NOTIFICATION_POLICY",
     "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+    # v1.3.5: restored — required by the in-app updater
+    # (canRequestPackageInstalls); crash evidence 2026-10-18.
+    "android.permission.REQUEST_INSTALL_PACKAGES",
 }
 
 

@@ -473,6 +473,26 @@ object AppUpdateManager {
     }
 
     /**
+     * v1.3.5: canRequestPackageInstalls() THROWS SecurityException (instead of
+     * returning false) when REQUEST_INSTALL_PACKAGES is not declared — that's
+     * what crashed the Update button on live 1.3.3/1.3.4. Never let this throw:
+     * treat any failure as "not permitted" and continue to the settings or
+     * browser fallbacks.
+     */
+    private fun canInstallUnknownApps(appContext: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        return try {
+            appContext.packageManager.canRequestPackageInstalls()
+        } catch (e: SecurityException) {
+            Log.w(TAG, "canRequestPackageInstalls threw (permission undeclared?) — treating as not permitted", e)
+            false
+        } catch (e: Exception) {
+            Log.w(TAG, "canRequestPackageInstalls failed — treating as not permitted", e)
+            false
+        }
+    }
+
+    /**
      * v1.2: replaces the old browser-only behavior. Existing call sites
      * (AppUpdateDialog.onDownloadClick, HomeUpdateOverlay.onUpdateNow via
      * FocuslyViewModel.downloadAndInstallUpdate) keep working unchanged —
@@ -486,7 +506,7 @@ object AppUpdateManager {
         // "install unknown apps" grant for our own package. Route the user to
         // that settings page first; they tap Update again afterwards.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            !appContext.packageManager.canRequestPackageInstalls()
+            !canInstallUnknownApps(appContext)
         ) {
             Log.i(TAG, "Install-unknown-apps not granted; routing to settings")
             try {
@@ -584,6 +604,12 @@ object AppUpdateManager {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
         context.startActivity(installIntent)
+    }
+
+    /** v1.3.5: public escape hatch — open the update URL in the browser.
+     * The update dialog offers this after any failed download/install attempt. */
+    fun openUpdateUrlInBrowser(context: Context, downloadUrl: String) {
+        openInBrowser(context, downloadUrl)
     }
 
     /** Last-resort fallback: open the download URL in the browser. */
