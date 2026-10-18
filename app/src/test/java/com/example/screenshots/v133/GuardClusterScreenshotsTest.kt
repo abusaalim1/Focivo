@@ -13,7 +13,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.model.UserPreferencesEntity
-import com.example.ui.components.GuardControlCluster
+import com.example.ui.components.BlockHubEntry
+import com.example.ui.theme.isAppInDarkTheme
 import com.example.ui.components.GuardExplainerContent
 import com.example.ui.components.GuardExplainerKey
 import com.example.ui.components.ThemedScreenBackground
@@ -112,9 +113,9 @@ class GuardClusterScreenshotsTest {
                 .fillMaxWidth()
                 .padding(24.dp)
         ) {
-            GuardControlCluster(
-                onOpenScreenTimeBudgets = {},
-                contentColor = theme.backdropContent(dark)
+            BlockHubEntry(
+                contentColor = theme.backdropContent(dark),
+                onOpen = {}
             )
         }
     }
