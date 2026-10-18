@@ -6,10 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,9 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -36,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -311,67 +309,23 @@ fun PresetChooserContent(
                 textAlign = TextAlign.Center,
             )
         } else {
-            LazyVerticalGrid(
-                // v1.1.1: nested inside the sheet's scroll — size to content,
-                // never scroll independently.
-                userScrollEnabled = false,
-                columns = GridCells.Fixed(3),
-                contentPadding = PaddingValues(2.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                // v1.1.1: no height cap — sizes to content inside the sheet's
-                // scroll (a cap + disabled inner scroll would truncate tiles).
-                modifier = Modifier,
-            ) {
-                items(ids, key = { it }) { id ->
-                    val ref = refFor(id)
-                    val selected = ref == selectedRef
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(tokens.surface2)
-                            .border(
-                                width = if (selected) 2.5.dp else 1.dp,
-                                color = if (selected) RegainLimePrimary else tokens.line,
-                                shape = RoundedCornerShape(20.dp),
-                            )
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { onSelectionChange(ref) },
-                            )
-                            .testTag("preset_tile_$id"),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        PresetImage(
-                            ref = ref,
-                            contentDescription = "Preset $id",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(96.dp)
-                                .clip(RoundedCornerShape(20.dp)),
-                            contentScale = ContentScale.Crop,
-                        )
-                        if (selected) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(6.dp)
-                                    .size(22.dp)
-                                    .clip(CircleShape)
-                                    .background(RegainLimePrimary),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = Color(0xFF0D1B05),
-                                    modifier = Modifier.size(14.dp),
-                                )
-                            }
-                        }
-                    }
-                }
+            // v1.1.1: plain chunked rows (NOT a LazyVerticalGrid) — lazy
+            // grids refuse infinity max-height inside the sheet's vertical
+            // scroll even with userScrollEnabled=false.
+            ChunkedPresetGrid(
+                items = ids,
+                key = { it },
+            ) { id, tileModifier ->
+                val ref = refFor(id)
+                PresetTile(
+                    modifier = tileModifier,
+                    ref = ref,
+                    contentDescription = "Preset $id",
+                    selected = ref == selectedRef,
+                    enabled = true,
+                    onClick = { onSelectionChange(ref) },
+                    testTag = "preset_tile_$id",
+                )
             }
         }
 
@@ -401,6 +355,108 @@ fun PresetChooserContent(
                     fontSize = 15.sp,
                 ),
             )
+        }
+    }
+}
+
+/**
+ * v1.1.1: one preset tile. Shared by both chooser modes so the tile look
+ * (selected lime ring, optional lock overlay) stays identical.
+ */
+@Composable
+private fun PresetTile(
+    ref: String,
+    contentDescription: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    testTag: String,
+    modifier: Modifier = Modifier,
+    overlay: (@Composable BoxScope.() -> Unit)? = null,
+) {
+    val tokens = focivoTokens()
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(tokens.surface2)
+            .border(
+                width = if (selected) 2.5.dp else 1.dp,
+                color = if (selected) RegainLimePrimary else tokens.line,
+                shape = RoundedCornerShape(20.dp),
+            )
+            .then(
+                if (enabled) Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick,
+                ) else Modifier
+            )
+            .testTag(testTag),
+        contentAlignment = Alignment.Center,
+    ) {
+        PresetImage(
+            ref = ref,
+            contentDescription = contentDescription,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(96.dp)
+                .clip(RoundedCornerShape(20.dp)),
+            contentScale = ContentScale.Crop,
+        )
+        if (selected && enabled) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(RegainLimePrimary),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF0D1B05),
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+        overlay?.let { this.it() }
+    }
+}
+
+/**
+ * v1.1.1: a fixed 3-column grid rendered as plain (non-lazy) chunked rows.
+ * LazyVerticalGrid cannot live inside the sheet's vertical scroll — it
+ * throws on infinity max-height even with userScrollEnabled=false — and
+ * these lists are tiny (<= 25 items), so lazy layout buys nothing.
+ */
+@Composable
+private fun <T> ChunkedPresetGrid(
+    items: List<T>,
+    key: (T) -> Any,
+    columns: Int = 3,
+    tile: @Composable (item: T, modifier: Modifier) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items.chunked(columns).forEach { rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                rowItems.forEach { item ->
+                    key(key(item)) {
+                        tile(item, Modifier.weight(1f))
+                    }
+                }
+                // Keep tile widths equal on a short last row.
+                repeat(columns - rowItems.size) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
         }
     }
 }
@@ -490,48 +546,24 @@ private fun AvatarSectionsGrid(
                     ),
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
-                LazyVerticalGrid(
-                    // v1.1.1: nested inside the sheet's scroll — size to content,
-                    // never scroll independently.
-                    userScrollEnabled = false,
-                    columns = GridCells.Fixed(3),
-                    contentPadding = PaddingValues(2.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier,
-                ) {
-                    items(sectionPresets, key = { it.id }) { preset ->
-                        val unlocked = preset.isUnlocked(focusPoints, isAdmin)
-                        val selected = preset.ref == selectedRef
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(tokens.surface2)
-                                .border(
-                                    width = if (selected) 2.5.dp else 1.dp,
-                                    color = if (selected) RegainLimePrimary else tokens.line,
-                                    shape = RoundedCornerShape(20.dp),
-                                )
-                                .then(
-                                    if (unlocked) Modifier.clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = { onSelectionChange(preset.ref) },
-                                    ) else Modifier
-                                )
-                                .testTag("preset_tile_${preset.id}"),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            PresetImage(
-                                ref = preset.ref,
-                                contentDescription = "Avatar ${preset.id}",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(96.dp)
-                                    .clip(RoundedCornerShape(20.dp)),
-                                contentScale = ContentScale.Crop,
-                            )
-                            if (!unlocked) {
+                // v1.1.1: plain chunked rows (NOT a LazyVerticalGrid) — lazy
+                // grids refuse infinity max-height inside the sheet's
+                // vertical scroll even with userScrollEnabled=false.
+                ChunkedPresetGrid(
+                    items = sectionPresets,
+                    key = { it.id },
+                ) { preset, tileModifier ->
+                    val unlocked = preset.isUnlocked(focusPoints, isAdmin)
+                    PresetTile(
+                        modifier = tileModifier,
+                        ref = preset.ref,
+                        contentDescription = "Avatar ${preset.id}",
+                        selected = preset.ref == selectedRef,
+                        enabled = unlocked,
+                        onClick = { onSelectionChange(preset.ref) },
+                        testTag = "preset_tile_${preset.id}",
+                        overlay = if (!unlocked) {
+                            {
                                 // Locked overlay: dim + lock + price
                                 Box(
                                     modifier = Modifier
@@ -558,26 +590,9 @@ private fun AvatarSectionsGrid(
                                         )
                                     }
                                 }
-                            } else if (selected) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(6.dp)
-                                        .size(22.dp)
-                                        .clip(CircleShape)
-                                        .background(RegainLimePrimary),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = Color(0xFF0D1B05),
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                }
                             }
-                        }
-                    }
+                        } else null,
+                    )
                 }
                 Spacer(Modifier.height(8.dp))
             }
