@@ -56,7 +56,10 @@ class RecoveryDeepLinkTest {
 
     @Test
     fun `handleAuthDeeplink fallback path still present`() {
-        val m = SupabaseService::class.java.getMethod("handleAuthDeeplink", Uri::class.java)
-        assertNotNull(m)
+        // Note: suspend functions carry a synthetic Continuation parameter on
+        // the JVM, so match by name instead of exact signature.
+        val methods = SupabaseService::class.java.declaredMethods
+            .filter { it.name == "handleAuthDeeplink" }
+        assertTrue(methods.isNotEmpty())
     }
 }

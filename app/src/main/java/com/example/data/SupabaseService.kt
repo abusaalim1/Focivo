@@ -215,84 +215,6 @@ class SupabaseService {
         }
     }
 
-    /**
-     * v1.3.3 (ITEM 10 extension): resolves the user id from the freshly
-     * imported session with a bounded retry. Pure-ish and injectable for tests.
-     */
-    internal suspend fun awaitUserSession(
-        maxAttempts: Int = 10,
-        delayMs: Long = 100L,
-        getUserId: () -> String?,
-        delayFn: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) }
-    ): String? {
-        repeat(maxAttempts) {
-            val uid = try { getUserId() } catch (_: Exception) { null }
-            if (!uid.isNullOrBlank()) return uid
-            delayFn(delayMs)
-        }
-        return try { getUserId().takeIf { !it.isNullOrBlank() } } catch (_: Exception) { null }
-    }
-
-    /**
-     * v1.3.3 (ITEM 10 extension): classifies link error params. "Expired" is
-     * claimed ONLY when the server actually said otp_expired/expired;
-     * anything else keeps the server's own description or the truthful
-     * generic message - never a made-up "expired".
-     */
-    internal fun deeplinkErrorParamsMessage(
-        error: String?,
-        errorCode: String?,
-        errorDescription: String?
-    ): String {
-        val expired = errorCode == "otp_expired" ||
-                errorDescription?.contains("expired", ignoreCase = true) == true ||
-                error?.contains("expired", ignoreCase = true) == true
-        return if (expired) {
-            DEEPLINK_EXPIRED_MESSAGE
-        } else {
-            errorDescription?.replace("+", " ")?.takeIf { it.isNotBlank() }
-                ?: DEEPLINK_GENERIC_MESSAGE
-        }
-    }
-
-    /**
-     * v1.3.3 (ITEM 10 extension): classifies exchange exceptions. "Expired"
-     * only when the exchange itself threw an expired/invalid error; every
-     * other failure gets the truthful generic message.
-     */
-    internal fun deeplinkExceptionMessage(raw: String?): String {
-        return if (raw?.contains("expired", ignoreCase = true) == true ||
-            raw?.contains("invalid", ignoreCase = true) == true
-        ) {
-            DEEPLINK_EXPIRED_MESSAGE
-        } else {
-            DEEPLINK_GENERIC_MESSAGE
-        }
-    }
-
-    /** v1.3.3 (ITEM 10 extension): what kind of auth link a deep link is. */
-    fun linkTypeOf(uri: android.net.Uri): AuthLinkType {
-        return try {
-            val typeParam = uri.getQueryParameter("type")
-            val frag = uri.fragment ?: ""
-            val fragType = frag.split("&")
-                .firstOrNull { it.substringBefore("=").equals("type", ignoreCase = true) }
-                ?.substringAfter("=", "")
-            val t = typeParam ?: fragType.orEmpty()
-            when {
-                t.equals("recovery", ignoreCase = true) -> AuthLinkType.RECOVERY
-                t.equals("signup", ignoreCase = true) ||
-                        t.equals("magiclink", ignoreCase = true) -> AuthLinkType.SIGNUP
-                else -> AuthLinkType.UNKNOWN
-            }
-        } catch (_: Exception) {
-            AuthLinkType.UNKNOWN
-        }
-    }
-
-    /** True when a focivo://auth-callback deep link carries a signup-confirmation token. */
-    fun isSignupDeeplink(uri: android.net.Uri): Boolean =
-        linkTypeOf(uri) == AuthLinkType.SIGNUP
 
     /**
      * v1.4.0-round2: password recovery. Sends the Supabase recovery email;
@@ -319,6 +241,30 @@ class SupabaseService {
             Result.failure(Exception(friendly))
         }
     }
+
+    /** v1.3.3 (ITEM 10 extension): what kind of auth link a deep link is. */
+    fun linkTypeOf(uri: android.net.Uri): AuthLinkType {
+        return try {
+            val typeParam = uri.getQueryParameter("type")
+            val frag = uri.fragment ?: ""
+            val fragType = frag.split("&")
+                .firstOrNull { it.substringBefore("=").equals("type", ignoreCase = true) }
+                ?.substringAfter("=", "")
+            val t = typeParam ?: fragType.orEmpty()
+            when {
+                t.equals("recovery", ignoreCase = true) -> AuthLinkType.RECOVERY
+                t.equals("signup", ignoreCase = true) ||
+                        t.equals("magiclink", ignoreCase = true) -> AuthLinkType.SIGNUP
+                else -> AuthLinkType.UNKNOWN
+            }
+        } catch (_: Exception) {
+            AuthLinkType.UNKNOWN
+        }
+    }
+
+    /** True when a focivo://auth-callback deep link carries a signup-confirmation token. */
+    fun isSignupDeeplink(uri: android.net.Uri): Boolean =
+        linkTypeOf(uri) == AuthLinkType.SIGNUP
 
     /** True when a focivo://auth-callback deep link carries a password-recovery token. */
     fun isRecoveryDeeplink(uri: android.net.Uri): Boolean {
@@ -2088,6 +2034,62 @@ sealed interface RecoveryCodeResult {
     /** Anything else; carries a friendly English message. */
     data class Error(val message: String) : RecoveryCodeResult
 }
+
+/**
+ * v1.3.3 (ITEM 10 extension): resolves the user id from the freshly
+ * imported session with a bounded retry. Pure-ish and injectable for tests.
+ */
+internal suspend fun awaitUserSession(
+    maxAttempts: Int = 10,
+    delayMs: Long = 100L,
+    getUserId: () -> String?,
+    delayFn: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) }
+): String? {
+    repeat(maxAttempts) {
+        val uid = try { getUserId() } catch (_: Exception) { null }
+        if (!uid.isNullOrBlank()) return uid
+        delayFn(delayMs)
+    }
+    return try { getUserId().takeIf { !it.isNullOrBlank() } } catch (_: Exception) { null }
+}
+
+/**
+ * v1.3.3 (ITEM 10 extension): classifies link error params. "Expired" is
+ * claimed ONLY when the server actually said otp_expired/expired;
+ * anything else keeps the server's own description or the truthful
+ * generic message - never a made-up "expired".
+ */
+internal fun deeplinkErrorParamsMessage(
+    error: String?,
+    errorCode: String?,
+    errorDescription: String?
+): String {
+    val expired = errorCode == "otp_expired" ||
+            errorDescription?.contains("expired", ignoreCase = true) == true ||
+            error?.contains("expired", ignoreCase = true) == true
+    return if (expired) {
+        SupabaseService.DEEPLINK_EXPIRED_MESSAGE
+    } else {
+        errorDescription?.replace("+", " ")?.takeIf { it.isNotBlank() }
+            ?: SupabaseService.DEEPLINK_GENERIC_MESSAGE
+    }
+}
+
+/**
+ * v1.3.3 (ITEM 10 extension): classifies exchange exceptions. "Expired"
+ * only when the exchange itself threw an expired/invalid error; every
+ * other failure gets the truthful generic message.
+ */
+internal fun deeplinkExceptionMessage(raw: String?): String {
+    return if (raw?.contains("expired", ignoreCase = true) == true ||
+        raw?.contains("invalid", ignoreCase = true) == true
+    ) {
+        SupabaseService.DEEPLINK_EXPIRED_MESSAGE
+    } else {
+        SupabaseService.DEEPLINK_GENERIC_MESSAGE
+    }
+}
+
 
 /**
  * v1.3.3 (ITEM 10 extension): the kind of auth deep link.
