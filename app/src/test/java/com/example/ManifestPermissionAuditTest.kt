@@ -16,12 +16,16 @@ import org.w3c.dom.Element
  * permissions merged in from library dependencies are caught too.
  *
  * Before/after (v1.3.3):
- *   REMOVED  QUERY_ALL_PACKAGES      — blocked-apps picker only lists LAUNCHER
- *                                      apps, covered by <queries> launcher intent
- *   REMOVED  KILL_BACKGROUND_PROCESSES — never used by any code
- *   REMOVED  REQUEST_INSTALL_PACKAGES  — updater hands the APK to the system
- *                                      installer via ACTION_VIEW + FileProvider
- *   ADDED    canPerformGestures (a11y) — guard genuinely performs
+ *   REMOVED  KILL_BACKGROUND_PROCESSES     — never used by any code (grep:
+ *                                      zero references in Kotlin/resources)
+ *   REMOVED  REQUEST_INSTALL_PACKAGES      — updater hands the APK to the system
+ *                                      installer via ACTION_VIEW + FileProvider;
+ *                                      no PackageInstaller session API is used
+ *   KEPT     QUERY_ALL_PACKAGES            — owner constraint 2026-10-18: the
+ *                                      blocked-apps picker is a feature and may
+ *                                      not be narrowed without proof-tested
+ *                                      parity, so it stays as-declared
+ *   ADDED    canPerformGestures (a11y)     — guard genuinely performs
  *                                      GLOBAL_ACTION_BACK / HOME
  */
 class ManifestPermissionAuditTest {
@@ -30,8 +34,7 @@ class ManifestPermissionAuditTest {
 
   /** Permissions that must NEVER be in Focivo's manifest. */
   private val bannedPermissions = setOf(
-    // Removed in v1.3.3 — replaceable or unused (Play Protect red flags)
-    "android.permission.QUERY_ALL_PACKAGES",
+    // Removed in v1.3.3 — genuinely unused, with grep evidence (Play Protect red flags)
     "android.permission.KILL_BACKGROUND_PROCESSES",
     "android.permission.REQUEST_INSTALL_PACKAGES",
     // Never existed — Focivo has no calling/SMS/contacts/phone features
@@ -101,12 +104,16 @@ class ManifestPermissionAuditTest {
   }
 
   @Test
-  fun blockedAppsPickerDoesNotNeedQueryAllPackages() {
-    // The blocked-apps picker lists launchable apps only; on API 30+ this
-    // requires a <queries> launcher-intent entry (QUERY_ALL_PACKAGES was
-    // removed in v1.3.3). If this query entry goes missing, the picker
-    // silently breaks — hence the regression gate.
+  fun blockedAppsPickerHasPackageVisibility() {
+    // Owner constraint 2026-10-18: the blocked-apps picker is a feature and
+    // QUERY_ALL_PACKAGES stays as-declared (no narrowing without proof-tested
+    // parity). This gate accepts either the declared permission or, if it is
+    // ever removed in future, a <queries> block that provably covers the
+    // picker's launcher + home lookups.
     val doc = manifestDoc()
+    val declared = declaredPermissions(doc)
+    if ("android.permission.QUERY_ALL_PACKAGES" in declared) return
+
     val queries = doc.getElementsByTagName("queries")
     assertTrue("manifest must declare a <queries> block", queries.length > 0)
     val intents = (queries.item(0) as Element).getElementsByTagName("intent")
@@ -128,12 +135,12 @@ class ManifestPermissionAuditTest {
     }
 
     assertTrue(
-      "queries block must keep ACTION_MAIN/CATEGORY_LAUNCHER intent " +
+      "without QUERY_ALL_PACKAGES, queries must keep ACTION_MAIN/CATEGORY_LAUNCHER " +
         "(blocked-apps picker listing)",
       hasIntent("android.intent.action.MAIN", "android.intent.category.LAUNCHER")
     )
     assertTrue(
-      "queries block must keep ACTION_MAIN/CATEGORY_HOME intent " +
+      "without QUERY_ALL_PACKAGES, queries must keep ACTION_MAIN/CATEGORY_HOME " +
         "(EssentialAppsGuard home-launcher check)",
       hasIntent("android.intent.action.MAIN", "android.intent.category.HOME")
     )

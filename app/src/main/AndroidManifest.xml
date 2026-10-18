@@ -18,6 +18,10 @@
     <!-- v1.3.0: share-card download on Android 9 and below (scoped storage needs no permission on 10+) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- v1.3.3: KEEP — the blocked-apps picker lists installed launchable apps
+         (InstalledAppsManager). Owner constraint 2026-10-18: no feature may be
+         removed or narrowed; the picker stays on QUERY_ALL_PACKAGES. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
     <!-- v1.3.3: in-app updater downloads the APK and hands it to the SYSTEM
          package installer via ACTION_VIEW + FileProvider (AppUpdateManager),
          which needs no install permission — REQUEST_INSTALL_PACKAGES was

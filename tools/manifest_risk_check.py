@@ -21,9 +21,10 @@ ANDROID_NS = "http://schemas.android.com/apk/res/android"
 # High-risk permissions that must never ship in Focivo. Removing any of these
 # from this list requires the owner's explicit sign-off — each one raises the
 # chance of a Google Play Protect block on sideloaded installs.
+# NOTE (owner constraint 2026-10-18): QUERY_ALL_PACKAGES is deliberately NOT
+# banned — the blocked-apps picker is a feature and stays as-declared.
 BANNED_PERMISSIONS = {
-    "android.permission.QUERY_ALL_PACKAGES",       # removed v1.3.3 (queries cover picker)
-    "android.permission.KILL_BACKGROUND_PROCESSES", # removed v1.3.3 (unused)
+    "android.permission.KILL_BACKGROUND_PROCESSES", # removed v1.3.3 (unused, grep-verified)
     "android.permission.REQUEST_INSTALL_PACKAGES",  # removed v1.3.3 (system installer flow)
     "android.permission.REQUEST_DELETE_PACKAGES",
     "android.permission.CALL_PHONE",
