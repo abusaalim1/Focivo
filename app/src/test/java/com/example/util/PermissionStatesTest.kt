@@ -89,12 +89,20 @@ class PermissionStatesTest {
     fun `isUsageAccessGranted reflects the live AppOps mode`() {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
         val shadowAppOps: ShadowAppOpsManager = shadowOf(appOps)
-        val op = AppOpsManager.OP_GET_USAGE_STATS
-
-        shadowAppOps.setMode(op, Process.myUid(), context.packageName, AppOpsManager.MODE_IGNORED)
+        shadowAppOps.setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_IGNORED
+        )
         assertFalse(PermissionStates.isUsageAccessGranted(context))
 
-        shadowAppOps.setMode(op, Process.myUid(), context.packageName, AppOpsManager.MODE_ALLOWED)
+        shadowAppOps.setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
         assertTrue(PermissionStates.isUsageAccessGranted(context))
     }
 
