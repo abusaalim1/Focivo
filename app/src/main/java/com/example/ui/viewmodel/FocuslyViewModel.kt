@@ -188,9 +188,12 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     // of tapping the fragile link. Uses the same RecoveryCodeFlow state
     // machine as recovery, wired to OtpType.Email.SIGNUP.
     // ------------------------------------------------------------------
-    val signupCodeFlow = RecoveryCodeFlow(viewModelScope) { email, code ->
-        SupabaseService.getInstance().verifySignupCode(email, code)
-    }
+    val signupCodeFlow = RecoveryCodeFlow(
+        scope = viewModelScope,
+        verifier = { email, code ->
+            SupabaseService.getInstance().verifySignupCode(email, code)
+        }
+    )
 
     /** Email awaiting signup confirmation; non-null while the signup code sheet is shown. */
     private val _signupCodeEmail = MutableStateFlow<String?>(null)
