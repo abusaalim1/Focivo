@@ -4,6 +4,7 @@ import android.util.Log
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
@@ -257,6 +258,52 @@ class SupabaseService {
             Result.failure(Exception(friendly))
         }
     }
+
+    /**
+     * v1.3.3 (ITEM 10): OTP-code password recovery. Verifies the 6-digit code
+     * from the recovery email via [OtpType.Email.RECOVERY]. On success the
+     * gotrue client imports the recovery session automatically, so the flow
+     * no longer depends on the email link / deep-link scheme at all.
+     * The deep-link path ([handleAuthDeeplink]) is kept as a fallback.
+     */
+    suspend fun verifyRecoveryCode(email: String, code: String): RecoveryCodeResult =
+        withContext(Dispatchers.IO) {
+            val cleanEmail = email.trim().lowercase()
+            val digits = code.filter { it.isDigit() }
+            if (digits.length != 6) {
+                return@withContext RecoveryCodeResult.Error(
+                    "Please enter the 6-digit code from your email."
+                )
+            }
+            try {
+                // supabase-kt 3.1.1: Auth.verifyEmailOtp(type: OtpType.Email,
+                // email: String, token: String, captchaToken: String? = null)
+                // - Auth.kt:256, impl AuthImpl.kt:322.
+                client.auth.verifyEmailOtp(
+                    type = OtpType.Email.RECOVERY,
+                    email = cleanEmail,
+                    token = digits
+                )
+                Log.i(TAG, "Recovery code verified for $cleanEmail")
+                RecoveryCodeResult.Verified
+            } catch (e: Exception) {
+                val raw = e.message ?: ""
+                Log.w(TAG, "verifyRecoveryCode failed: $raw")
+                when {
+                    raw.contains("expired", ignoreCase = true) ->
+                        RecoveryCodeResult.ExpiredCode
+                    raw.contains("invalid", ignoreCase = true) ->
+                        RecoveryCodeResult.WrongCode
+                    raw.contains("Unable to resolve host", ignoreCase = true) ||
+                            raw.contains("ConnectException", ignoreCase = true) ->
+                        RecoveryCodeResult.Error(
+                            "Network error. Please check your internet connection."
+                        )
+                    else ->
+                        RecoveryCodeResult.Error("Could not verify the code. Please try again.")
+                }
+            }
+        }
 
     fun getCurrentUserId(): String? {
         return try {
@@ -1804,3 +1851,21 @@ data class SupabaseAppDailyLimitDto(
     val is_enabled: Boolean = true
 )
 
+/**
+ * v1.3.3 (ITEM 10): outcome of verifying the recovery OTP code. Wrong and
+ * expired codes are DISTINCT outcomes so the UI can show distinct friendly
+ * English messages.
+ */
+sealed interface RecoveryCodeResult {
+    /** Code accepted; the recovery session is stored. Next: [SupabaseService.updatePassword]. */
+    data object Verified : RecoveryCodeResult
+
+    /** Code does not match; the user may retry without resending. */
+    data object WrongCode : RecoveryCodeResult
+
+    /** Code expired; a resend is offered. */
+    data object ExpiredCode : RecoveryCodeResult
+
+    /** Anything else; carries a friendly English message. */
+    data class Error(val message: String) : RecoveryCodeResult
+}
