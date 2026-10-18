@@ -21,10 +21,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Info
@@ -138,6 +140,9 @@ fun SettingsScreen(
     onCheckForUpdates: () -> Unit = {},
     isCheckingForUpdates: Boolean = false,
     manualUpdateMessage: String? = null,
+    // v1.3.3 (item 8b): global daily screen-time budget (0 = off).
+    screenTimeBudgetMinutes: Int = 0,
+    onUpdateScreenTimeBudget: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isDark = isAppInDarkTheme()
@@ -157,6 +162,11 @@ fun SettingsScreen(
     var hasDndPermission by remember { mutableStateOf(StudyNotificationBlockerManager.hasDndPermission(context)) }
     var showAiGuardDisclosureDialog by remember { mutableStateOf(false) }
     var showPrivacyPolicySheet by remember { mutableStateOf(false) }
+    // v1.3.3 (item 8b): global screen-time budget sheet.
+    var showScreenTimeBudgetSheet by remember { mutableStateOf(false) }
+    var liveBudgetMinutes by remember(screenTimeBudgetMinutes) {
+        mutableStateOf(screenTimeBudgetMinutes)
+    }
 
     // Refresh permission states when returning from system settings
     val settingsLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -343,6 +353,100 @@ fun SettingsScreen(
                                     )
                                 )
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // v1.3.3 (item 8b): Daily Screen Time — the global budget entry.
+        // Past the budget, non-essential apps lock for a 3-hour break.
+        item {
+            GlassCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings_screen_time_budget_card"),
+                shape = RoundedCornerShape(22.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.HourglassEmpty,
+                            contentDescription = null,
+                            tint = SettingsT.Lime,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "DAILY SCREEN TIME",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontFamily = PoppinsFontFamily,
+                                color = textSecondary,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.76.sp,
+                                fontSize = 11.sp
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { showScreenTimeBudgetSheet = true }
+                            .padding(vertical = 4.dp)
+                            .testTag("settings_screen_time_budget_row"),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Daily screen-time limit",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = textPrimary,
+                                    fontFamily = PoppinsFontFamily
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (liveBudgetMinutes > 0)
+                                    "Lock non-essentials past ${com.example.util.ScreenTimeBudgetManager.budgetLabel(liveBudgetMinutes)} / day"
+                                else "Off — set a limit to enable 3h breaks",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontSize = 12.sp,
+                                    color = textSecondary,
+                                    fontFamily = PoppinsFontFamily
+                                )
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (liveBudgetMinutes > 0) {
+                                Text(
+                                    text = com.example.util.ScreenTimeBudgetManager.budgetLabel(liveBudgetMinutes),
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        color = SettingsT.Lime,
+                                        fontSize = 15.sp
+                                    ),
+                                    modifier = Modifier.testTag("settings_screen_time_budget_value")
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = textSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
                         }
                     }
                 }
@@ -995,6 +1099,18 @@ fun SettingsScreen(
             onDismiss = {
                 showAiGuardDisclosureDialog = false
             }
+        )
+    }
+
+    // v1.3.3 (item 8b): global screen-time budget sheet.
+    if (showScreenTimeBudgetSheet) {
+        com.example.ui.components.ScreenTimeBudgetSheet(
+            currentBudgetMinutes = liveBudgetMinutes,
+            onBudgetSelected = { minutes ->
+                liveBudgetMinutes = minutes
+                onUpdateScreenTimeBudget(minutes)
+            },
+            onDismiss = { showScreenTimeBudgetSheet = false }
         )
     }
 }

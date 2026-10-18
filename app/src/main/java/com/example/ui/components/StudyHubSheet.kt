@@ -107,6 +107,10 @@ fun StudyHubSheet(
     var expandedSection by remember { mutableStateOf(initialExpandedSection) }
     var showDistractionDialog by remember { mutableStateOf(false) }
     var hubLockedTheme by remember { mutableStateOf<TimerTheme?>(null) }
+    // v1.3.3 (item 8b): global screen-time budget sheet from the hub's
+    // Protection section (the Study guard area entry).
+    var showBudgetSheet by remember { mutableStateOf(false) }
+    var hubBudgetMinutes by remember { mutableStateOf(0) }
 
     val selectedTheme by TimerThemeManager.selectedTheme.collectAsState()
     val prefsFlow = remember(context) { FocuslyRepository.getInstance(context).userPreferences }
@@ -354,6 +358,27 @@ fun StudyHubSheet(
                     )
                 }
                 item {
+                    // v1.3.3 (item 8b): global screen-time budget entry from
+                    // the Study guard area.
+                    val budgetMins = com.example.util.ScreenTimeBudgetManager.getGlobalBudgetMinutes(context)
+                    HubActionRow(
+                        icon3dRes = R.drawable.ic3d_timer,
+                        title = "Daily screen-time limit",
+                        subtitle = if (budgetMins > 0)
+                            "Limit ${com.example.util.ScreenTimeBudgetManager.budgetLabel(budgetMins)} / day · 3h breaks past it"
+                        else "Lock non-essential apps past a daily limit",
+                        onClick = {
+                            hubBudgetMinutes = budgetMins
+                            showBudgetSheet = true
+                        },
+                        textPrimary = textPrimary,
+                        textSecondary = textSecondary,
+                        rowBg = rowBg,
+                        rowBorder = rowBorder,
+                        testTag = "hub_screen_time_budget_row"
+                    )
+                }
+                item {
                     HubActionRow(
                         iconCustom = {
                             Image(
@@ -396,6 +421,18 @@ fun StudyHubSheet(
                 item { Spacer(modifier = Modifier.height(28.dp)) }
             }
         }
+    }
+
+    // v1.3.3 (item 8b): global screen-time budget sheet.
+    if (showBudgetSheet) {
+        ScreenTimeBudgetSheet(
+            currentBudgetMinutes = hubBudgetMinutes,
+            onBudgetSelected = { minutes ->
+                com.example.util.ScreenTimeBudgetManager.setGlobalBudgetMinutes(context, minutes)
+                hubBudgetMinutes = minutes
+            },
+            onDismiss = { showBudgetSheet = false }
+        )
     }
 }
 

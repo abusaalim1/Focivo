@@ -90,7 +90,7 @@ import com.example.ui.components.GlassCard
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SerifItalicFontFamily
 import com.example.ui.theme.focivoTokens
-import com.example.util.AppDailyLimitsManager
+import com.example.util.DailyUsagePipeline
 import com.example.util.AppIconView
 import com.example.util.DeviceAppInfo
 import com.example.util.EssentialAppsGuard
@@ -183,11 +183,16 @@ fun AppLimitsScreen(
         }
     }
 
-    // Refresh usage statistics whenever permission is available or resumed
+    // Refresh usage statistics whenever permission is available or resumed.
+    // v1.3.3: reads from DailyUsagePipeline — the same source as the
+    // Study-top header and the global budget.
     LaunchedEffect(hasUsagePermission) {
         if (hasUsagePermission) {
             withContext(Dispatchers.IO) {
-                val usage = AppDailyLimitsManager.queryAllAppsUsageMinutesToday(context)
+                val snapshot = DailyUsagePipeline.getSnapshot(context, forceRefresh = true)
+                val usage = snapshot?.perAppMillis
+                    ?.mapValues { (_, ms) -> (ms / (1000 * 60)).toInt() }
+                    ?: emptyMap()
                 withContext(Dispatchers.Main) {
                     appUsageMap = usage
                 }
