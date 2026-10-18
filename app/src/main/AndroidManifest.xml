@@ -18,16 +18,19 @@
     <!-- v1.3.0: share-card download on Android 9 and below (scoped storage needs no permission on 10+) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
-    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
-    <!-- v1.2: real in-app update — download APK to cache and launch the package
-         installer via FileProvider (AppUpdateManager). -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- v1.3.3: in-app updater downloads the APK and hands it to the SYSTEM
+         package installer via ACTION_VIEW + FileProvider (AppUpdateManager),
+         which needs no install permission — REQUEST_INSTALL_PACKAGES was
+         dropped to keep the risk profile minimal. -->
 
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
         </intent>
         <package android:name="com.openai.chatgpt" />
         <package android:name="com.anthropic.claude" />
