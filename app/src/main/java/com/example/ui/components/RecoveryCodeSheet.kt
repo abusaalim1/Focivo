@@ -95,19 +95,6 @@ fun RecoveryCodeSheet(
         }
     }
 
-    // Clear the boxes and refocus on wrong/expired/other errors.
-    LaunchedEffect(codeState) {
-        if (codeState is RecoveryCodeFlow.CodeState.WrongCode ||
-            codeState is RecoveryCodeFlow.CodeState.ExpiredCode ||
-            codeState is RecoveryCodeFlow.CodeState.Error
-        ) {
-            digits = ""
-            submittedFor = null
-            focusRequester.requestFocus()
-        }
-    }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-
     val errorText: String? = when (codeState) {
         is RecoveryCodeFlow.CodeState.WrongCode ->
             "That code isn't right \u2014 check and try again."
@@ -134,6 +121,21 @@ fun RecoveryCodeSheet(
         },
         modifier = Modifier.testTag("recovery_code_sheet")
     ) {
+        // Focus effects live inside the sheet content: the FocusRequester is
+        // attached by the field below in THIS composition, so requesting
+        // focus here can never hit "FocusRequester is not initialized".
+        LaunchedEffect(codeState) {
+            if (codeState is RecoveryCodeFlow.CodeState.WrongCode ||
+                codeState is RecoveryCodeFlow.CodeState.ExpiredCode ||
+                codeState is RecoveryCodeFlow.CodeState.Error
+            ) {
+                digits = ""
+                submittedFor = null
+                focusRequester.requestFocus()
+            }
+        }
+        LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
