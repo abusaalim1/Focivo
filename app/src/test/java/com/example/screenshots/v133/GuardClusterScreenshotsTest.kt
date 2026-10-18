@@ -102,6 +102,7 @@ class GuardClusterScreenshotsTest {
      * Renders the cluster exactly as FocusScreen does: labels in the
      * timer theme's backdrop content color (v1.3.3 item 9 rule).
      */
+    @Composable
     private fun clusterShot(dark: Boolean) {
         val theme = TimerThemeManager.selectedTheme.value
         Box(
