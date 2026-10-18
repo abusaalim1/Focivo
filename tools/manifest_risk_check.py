@@ -21,17 +21,25 @@ ANDROID_NS = "http://schemas.android.com/apk/res/android"
 # High-risk permissions that must never ship in Focivo. Removing any of these
 # from this list requires the owner's explicit sign-off — each one raises the
 # chance of a Google Play Protect block on sideloaded installs.
-# NOTE (owner constraint 2026-10-18): QUERY_ALL_PACKAGES is deliberately NOT
-# banned — the blocked-apps picker is a feature and stays as-declared.
-# NOTE (v1.3.5 correction): REQUEST_INSTALL_PACKAGES was REMOVED in v1.3.3 as
-# "unused", but the in-app updater CALLS PackageManager.canRequestPackageInstalls(),
-# which THROWS SecurityException (crashing the Update button — owner crash
-# report 2026-10-18) when the permission is undeclared. It is legitimately
-# required by the self-update feature and lives on the WATCHLIST (justified
-# but sensitive), not the ban list.
+#
+# v1.1.2: REQUEST_INSTALL_PACKAGES and QUERY_ALL_PACKAGES are BANNED again —
+# not because the features went away, but because both were REMOVED without
+# feature loss:
+#   - REQUEST_INSTALL_PACKAGES: the in-app updater never used PackageInstaller
+#     session APIs; it hands the APK to the SYSTEM installer via an ACTION_VIEW
+#     FileProvider intent (AppUpdateManager.installApk). The old
+#     canRequestPackageInstalls() pre-check was removed in the SAME change —
+#     one without the other is what caused the 1.3.3/1.3.4 crash. A re-add of
+#     the permission WITHOUT the API call, or vice versa, fails this gate.
+#   - QUERY_ALL_PACKAGES: the blocked-apps picker only calls
+#     queryIntentActivities(MAIN/LAUNCHER) and the home check only MAIN/HOME;
+#     both are declared in the <queries> block, provably identical output
+#     (ManifestPermissionAuditTest.blockedAppsPickerHasPackageVisibility).
 BANNED_PERMISSIONS = {
     "android.permission.KILL_BACKGROUND_PROCESSES", # removed v1.3.3 (unused, grep-verified)
     "android.permission.REQUEST_DELETE_PACKAGES",
+    "android.permission.REQUEST_INSTALL_PACKAGES",  # v1.1.2: removed — updater now uses the system installer handoff
+    "android.permission.QUERY_ALL_PACKAGES",        # v1.1.2: removed — <queries> block gives identical picker output
     "android.permission.CALL_PHONE",
     "android.permission.SEND_SMS",
     "android.permission.READ_SMS",
@@ -66,9 +74,9 @@ WATCHLIST_PERMISSIONS = {
     "android.permission.POST_NOTIFICATIONS",
     "android.permission.ACCESS_NOTIFICATION_POLICY",
     "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
-    # v1.3.5: restored — required by the in-app updater
-    # (canRequestPackageInstalls); crash evidence 2026-10-18.
-    "android.permission.REQUEST_INSTALL_PACKAGES",
+    # v1.1.2: REQUEST_INSTALL_PACKAGES removed from the watchlist — it is no
+    # longer declared at all (updater hands off to the system installer; see
+    # the BANNED_PERMISSIONS note above).
 }
 
 
