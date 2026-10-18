@@ -25,6 +25,7 @@ import com.example.ui.theme.LocalAppAccent
 import com.example.util.AiStudyGuardManager
 import com.example.util.ScreenTimeBudgetStore
 import com.example.util.StrictModeManager
+import com.example.setAiStudyServiceConnectedForTest
 import com.example.util.TimerThemeManager
 import com.example.util.YouTubeStudyGuardManager
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
@@ -80,19 +81,21 @@ class GuardClusterScreenshotsTest {
     )
 
     /**
-     * Sets the toggles' real manager state before composition. Strict Mode
-     * is permission-free so both its states render; AI Guard / YT Filter
-     * need the real accessibility permission, so they render OFF in the
-     * sandbox (their ON states are exercised in production via the hubs).
+     * Sets the three toggles' real manager state before composition so the
+     * cluster renders the intended on/off mix. Same state sources as prod;
+     * the accessibility permission is simulated via Settings.Secure (the
+     * path the managers fall through to when the live service is absent).
      */
-    private fun setToggleStates(strict: Boolean) {
+    private fun setToggleStates(strict: Boolean, guard: Boolean, ytFilter: Boolean) {
         StrictModeManager.setStrictModeEnabled(context, strict)
-        AiStudyGuardManager.setAiGuardEnabled(context, false)
-        YouTubeStudyGuardManager.setFilterEnabled(context, false)
+        setAiStudyServiceConnectedForTest(guard)
+        AiStudyGuardManager.setAiGuardEnabled(context, guard)
+        YouTubeStudyGuardManager.setFilterEnabled(context, ytFilter)
     }
 
     private fun resetToggleStates() {
-        setToggleStates(strict = true)
+        setToggleStates(strict = true, guard = false, ytFilter = false)
+        setAiStudyServiceConnectedForTest(false)
     }
 
     // -- Cluster alone ------------------------------------------------------
@@ -120,7 +123,7 @@ class GuardClusterScreenshotsTest {
     fun cluster_dark_mixedStates() {
         TimerThemeManager.init(context)
         TimerThemeManager.selectTheme(context, "midnight")
-        setToggleStates(strict = true)
+        setToggleStates(strict = true, guard = true, ytFilter = true)
         themed(dark = true) {
             clusterShot(dark = true)
         }
@@ -132,7 +135,7 @@ class GuardClusterScreenshotsTest {
     fun cluster_light_allOff() {
         TimerThemeManager.init(context)
         TimerThemeManager.selectTheme(context, "aurora")
-        setToggleStates(strict = false)
+        setToggleStates(strict = false, guard = false, ytFilter = false)
         themed(dark = false) {
             clusterShot(dark = false)
         }
