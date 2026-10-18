@@ -1452,6 +1452,31 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 return
             }
 
+            // 6b. v1.3.3 (item 8b): global screen-time budget — when total
+            // device usage today exceeds the budget, ALL non-essential apps
+            // are blocked for a 3-hour break. Essentials (phone, camera,
+            // maps, YouTube, Chrome, ...) short-circuit inside the manager.
+            if (isWindowStateChanged) {
+                val breakDecision = com.example.util.ScreenTimeBudgetManager.checkOnAppOpen(applicationContext, pkg)
+                if (breakDecision is com.example.util.ScreenTimeBudgetManager.BreakDecision.Block) {
+                    Log.w(TAG, "[Screen-Time Break] Global budget exceeded; blocking $pkg")
+                    val friendlyName = FocusShieldService.friendlyAppName(applicationContext, pkg)
+                    val budgetMins = com.example.util.ScreenTimeBudgetManager.getGlobalBudgetMinutes(applicationContext)
+                    BlockOverlayManager.intercept(
+                        context = applicationContext,
+                        blockedPackage = pkg,
+                        appName = friendlyName,
+                        durationSec = (breakDecision.remainingMs / 1000L).toInt().coerceAtLeast(1),
+                        reason = com.example.util.ScreenTimeBudgetManager.breakReason(applicationContext, budgetMins),
+                        isPunishment = false
+                    )
+                    return
+                }
+            }
+                )
+                return
+            }
+
             // 7. YouTube Shorts & AI Study Filter (Active ONLY during scheduled study time or active timer)
             val isYouTube = pkg == "com.google.android.youtube" || pkg.contains("youtube", ignoreCase = true)
             if (isYouTube) {
