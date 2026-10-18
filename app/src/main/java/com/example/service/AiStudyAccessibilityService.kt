@@ -52,7 +52,6 @@ class AiStudyAccessibilityService : AccessibilityService() {
 
         @Volatile
         var isServiceConnected: Boolean = false
-            private set
 
         /**
          * v1.2.3 — live service instance for the window-proof block overlay.

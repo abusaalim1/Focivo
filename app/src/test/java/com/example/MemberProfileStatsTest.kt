@@ -64,7 +64,7 @@ class MemberProfileStatsTest {
         assertEquals("Top 34%", MemberProfileStats.formatTopPercent(10, 30)) // 33.33 -> 34
     }
 
-    @Test fun `top percent clamps to 1..100`() {
+    @Test fun `top percent clamps to 1 to 100`() {
         assertEquals("Top 100%", MemberProfileStats.formatTopPercent(5, 5))
         assertEquals("Top 1%", MemberProfileStats.formatTopPercent(1, 200))
     }
