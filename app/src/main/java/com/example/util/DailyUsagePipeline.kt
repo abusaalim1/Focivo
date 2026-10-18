@@ -86,6 +86,11 @@ object DailyUsagePipeline {
 
             // Fallback/supplement: daily-interval stats, keep the max per
             // package (some OEMs under-report one of the two APIs).
+            // v1.3.4: anchor the fallback to today. queryUsageStats(INTERVAL_DAILY,
+            // dayStartMs, nowMs) returns EVERY daily bucket intersecting the range,
+            // including the PREVIOUS day's bucket (dayStartMs sits exactly on the
+            // bucket boundary). Merging those stale buckets was counting
+            // yesterday's usage into today's numbers (observed: ~2x inflation).
             try {
                 val statsList = usageStatsManager.queryUsageStats(
                     UsageStatsManager.INTERVAL_DAILY,
@@ -93,13 +98,14 @@ object DailyUsagePipeline {
                     nowMs
                 )
                 if (!statsList.isNullOrEmpty()) {
-                    for (stats in statsList) {
-                        if (stats.totalTimeInForeground > 0L) {
-                            val current = merged[stats.packageName] ?: 0L
-                            merged[stats.packageName] =
-                                maxOf(current, stats.totalTimeInForeground)
-                        }
+                    val samples = statsList.map { stats ->
+                        DailyBucketSample(
+                            stats.packageName,
+                            stats.totalTimeInForeground,
+                            stats.firstTimeStamp
+                        )
                     }
+                    mergeDailyIntervalStats(merged, samples, dayStartMs)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "queryUsageStats fallback failed", e)
@@ -139,6 +145,41 @@ object DailyUsagePipeline {
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
+    }
+
+    /**
+     * One daily-interval bucket from UsageStatsManager (hermetic view of
+     * [android.app.usage.UsageStats]: package, foreground millis, and the
+     * bucket's start — see [android.app.usage.UsageStats.getFirstTimeStamp]).
+     */
+    internal data class DailyBucketSample(
+        val packageName: String,
+        val totalTimeInForegroundMs: Long,
+        val bucketStartMs: Long
+    )
+
+    /**
+     * v1.3.4 — pure merge of the daily-interval fallback stats.
+     *
+     * Keeps the max per package (some OEMs under-report one of the two
+     * UsageStats APIs), but SKIPS buckets whose interval started before
+     * [dayStartMs]: queryUsageStats(INTERVAL_DAILY) returns every bucket
+     * intersecting the query range, including the previous day's bucket,
+     * which otherwise leaks yesterday's minutes into today's totals.
+     * Unit-tested (incl. an Asia/Kolkata midnight-boundary case).
+     */
+    internal fun mergeDailyIntervalStats(
+        merged: MutableMap<String, Long>,
+        stats: List<DailyBucketSample>,
+        dayStartMs: Long
+    ): MutableMap<String, Long> {
+        for (s in stats) {
+            if (s.totalTimeInForegroundMs <= 0L) continue
+            if (s.bucketStartMs < dayStartMs) continue
+            val current = merged[s.packageName] ?: 0L
+            merged[s.packageName] = maxOf(current, s.totalTimeInForegroundMs)
+        }
+        return merged
     }
 
     /**

@@ -425,8 +425,9 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
         }
     }
 
-    // v1.1.3: automatic update check on cold start (once per 24h, non-blocking) —
-    // runs for guests too, not just logged-in users.
+    // v1.1.3 (v1.3.4: now at most once per 60 minutes): automatic update
+    // check on cold start, non-blocking — runs for guests too, not just
+    // logged-in users.
     LaunchedEffect(Unit) {
         viewModel.checkForAppUpdates(context, isManual = false)
         // v1.4.2: backend announcement notice (silent on any failure).

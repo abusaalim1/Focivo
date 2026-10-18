@@ -3914,7 +3914,10 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                     // overlay dismissal). Silent on any failure.
                     try {
                         com.example.service.FocivoNotifications.postUpdateAvailable(
-                            context, updateInfo.latestVersionName, updateInfo.latestVersionCode
+                            context,
+                            updateInfo.latestVersionName,
+                            updateInfo.latestVersionCode,
+                            updateInfo.isForceUpdate
                         )
                     } catch (_: Exception) { }
                     if (isManual) {

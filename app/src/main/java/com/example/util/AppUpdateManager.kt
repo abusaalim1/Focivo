@@ -63,11 +63,24 @@ object AppUpdateManager {
     // notification across every check path (app-open + scheduled). A
     // genuinely newer versionCode notifies once.
     private const val KEY_LAST_NOTIFIED_VERSION = "last_notified_version_code"
+    // v1.3.4: FORCE-update re-notify tracking. When the first notification
+    // for a force version is posted, we stamp the version + time here; the
+    // re-notify gate re-posts at most once per 24h until the user updates or
+    // a newer version replaces this one.
+    internal const val KEY_FORCE_NOTIFIED_VERSION = "force_notified_version_code"
+    internal const val KEY_FORCE_NOTIFIED_AT = "force_notified_at_ms"
     // v1.1.3: dismissal only suppresses the auto dialog for 24h so it re-shows
     // on next launch/day instead of being hidden forever.
     private const val KEY_DISMISSED_AT = "dismissed_version_at"
-    private const val CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
+    // v1.3.4: non-manual checks run at most once per 60 minutes (was 24h —
+    // that plus the once-ever notification cap is why old installs went
+    // silently stale). Manual Settings checks always hit the network.
+    private const val CHECK_INTERVAL_MS = 60 * 60 * 1000L
     private const val DISMISS_SUPPRESS_MS = 24 * 60 * 60 * 1000L
+    // v1.3.4: minimum gap between repeat notifications for the same FORCE
+    // version (first notification is still exactly-once per versionCode via
+    // KEY_LAST_NOTIFIED_VERSION; non-force versions never re-notify).
+    internal const val FORCE_RENOTIFY_MS = 24 * 60 * 60 * 1000L
 
     // v1.1.6: the app's main Supabase project (SupabaseManager) is the app-data backend
     // and does NOT host the app_updates table. Update metadata lives on the website
@@ -98,15 +111,59 @@ object AppUpdateManager {
         }
     }
 
+    /**
+     * v1.3.4 — pure check-throttle decision (unit-tested).
+     * Manual checks always hit the network; automatic checks at most once
+     * per [intervalMs] (60 minutes since 1.3.4).
+     */
+    internal fun shouldPerformCheck(
+        nowMs: Long,
+        lastCheckMs: Long,
+        isManualCheck: Boolean,
+        intervalMs: Long = CHECK_INTERVAL_MS
+    ): Boolean {
+        if (isManualCheck) return true
+        return nowMs - lastCheckMs >= intervalMs
+    }
+
+    /**
+     * v1.3.4 — pure first-notification decision (unit-tested). A version gets
+     * its one notification only if it was never notified before.
+     */
+    internal fun initialNotifyDecision(lastNotifiedVersion: Int, versionCode: Int): Boolean {
+        return versionCode > lastNotifiedVersion
+    }
+
+    /**
+     * v1.3.4 — pure FORCE re-notify decision (unit-tested). True when this
+     * force version was already notified once ([forceNotifiedAtMs] > 0) and
+     * at least [FORCE_RENOTIFY_MS] has passed since the last force
+     * notification for the SAME versionCode. A newer versionCode resets the
+     * gate; an already-updated user never reaches this path because the
+     * update is no longer "available".
+     */
+    internal fun forceRenotifyDue(
+        nowMs: Long,
+        versionCode: Int,
+        forceNotifiedVersion: Int,
+        forceNotifiedAtMs: Long
+    ): Boolean {
+        return forceNotifiedVersion == versionCode &&
+            forceNotifiedAtMs > 0L &&
+            nowMs - forceNotifiedAtMs >= FORCE_RENOTIFY_MS
+    }
+
     suspend fun checkForUpdates(context: Context, isManualCheck: Boolean = false): AppUpdateInfo? = withContext(Dispatchers.IO) {
         val (currentCode, currentName) = getCurrentVersionInfo(context)
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        if (!isManualCheck) {
-            val lastCheck = prefs.getLong(KEY_LAST_CHECK_TIMESTAMP, 0L)
-            if (System.currentTimeMillis() - lastCheck < CHECK_INTERVAL_MS) {
-                return@withContext null
-            }
+        if (!shouldPerformCheck(
+                System.currentTimeMillis(),
+                prefs.getLong(KEY_LAST_CHECK_TIMESTAMP, 0L),
+                isManualCheck
+            )
+        ) {
+            return@withContext null
         }
 
         prefs.edit().putLong(KEY_LAST_CHECK_TIMESTAMP, System.currentTimeMillis()).apply()
@@ -271,11 +328,50 @@ object AppUpdateManager {
     fun claimNotifyForVersion(context: Context, versionCode: Int): Boolean {
         return try {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            if (prefs.getInt(KEY_LAST_NOTIFIED_VERSION, 0) >= versionCode) return false
+            if (!initialNotifyDecision(prefs.getInt(KEY_LAST_NOTIFIED_VERSION, 0), versionCode)) {
+                return false
+            }
             prefs.edit().putInt(KEY_LAST_NOTIFIED_VERSION, versionCode).apply()
             true
         } catch (_: Exception) {
             false // fail closed: never spam when storage is unavailable
+        }
+    }
+
+    /**
+     * v1.3.4: call this right after a FORCE version's FIRST notification is
+     * posted, so the 24h re-notify gate can arm. (Non-force versions never
+     * call it — they keep the once-per-version behaviour exactly.)
+     */
+    fun recordForceUpdateNotified(context: Context, versionCode: Int) {
+        try {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putInt(KEY_FORCE_NOTIFIED_VERSION, versionCode)
+                .putLong(KEY_FORCE_NOTIFIED_AT, System.currentTimeMillis())
+                .apply()
+        } catch (_: Exception) { }
+    }
+
+    /**
+     * v1.3.4: FORCE-update re-notify gate. Returns true at most once per 24h
+     * for the SAME versionCode, only after its first notification was
+     * already posted (see [recordForceUpdateNotified]). A newer versionCode
+     * re-arms via its own first notification. Fail closed: never spam when
+     * storage is unavailable.
+     */
+    fun claimForceRenotify(context: Context, versionCode: Int): Boolean {
+        return try {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val forceVersion = prefs.getInt(KEY_FORCE_NOTIFIED_VERSION, 0)
+            val forceAt = prefs.getLong(KEY_FORCE_NOTIFIED_AT, 0L)
+            if (!forceRenotifyDue(System.currentTimeMillis(), versionCode, forceVersion, forceAt)) {
+                return false
+            }
+            prefs.edit().putLong(KEY_FORCE_NOTIFIED_AT, System.currentTimeMillis()).apply()
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 
