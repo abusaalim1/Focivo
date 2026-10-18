@@ -38,8 +38,10 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import com.example.ui.components.CodeSheetMode
 import com.example.ui.components.PrivacyPolicySheet
 import com.example.ui.components.PremiumButton
+import com.example.ui.components.RecoveryCodeSheet
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -137,6 +139,19 @@ fun AuthScreen(
     onForgotPassword: (email: String) -> Unit = {},
     onClearPasswordReset: () -> Unit = {},
     onSetNewPassword: (password: String) -> Unit = {},
+    // v1.3.3 (ITEM 10): OTP code sheets
+    resetEmail: String = "",
+    resendCooldownSeconds: Long = 0L,
+    onVerifyRecoveryCode: (code: String) -> Unit = {},
+    onResendRecoveryCode: () -> Unit = {},
+    // v1.3.3 (ITEM 10 ext): signup confirmation code sheet
+    signupCodeEmail: String? = null,
+    signupCodeState: com.example.ui.viewmodel.RecoveryCodeFlow.CodeState =
+        com.example.ui.viewmodel.RecoveryCodeFlow.CodeState.Entry,
+    signupResendSeconds: Long = 0L,
+    onVerifySignupCode: (code: String) -> Unit = {},
+    onResendSignupCode: () -> Unit = {},
+    onDismissSignupCode: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -1043,8 +1058,14 @@ fun AuthScreen(
             )
         }
 
-        // v1.4.0-round2: Forgot password dialog
-        if (showForgotPasswordDialog) {
+        // v1.4.0-round2: Forgot password dialog (email entry only; once the
+        // code is sent the OTP sheet below takes over).
+        val showRecoveryCodeSheet = (passwordResetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Sent ||
+                passwordResetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.VerifyingCode ||
+                passwordResetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.CodeWrong ||
+                passwordResetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.CodeExpired) &&
+                !pendingPasswordRecovery
+        if (showForgotPasswordDialog && !showRecoveryCodeSheet) {
             ForgotPasswordDialog(
                 initialEmail = emailInput,
                 resetState = passwordResetState,
@@ -1053,6 +1074,46 @@ fun AuthScreen(
                     onClearPasswordReset()
                 },
                 onSend = { email -> onForgotPassword(email) }
+            )
+        }
+
+        // v1.3.3 (ITEM 10): OTP code sheet - password recovery.
+        if (showRecoveryCodeSheet) {
+            val recoveryCodeState: com.example.ui.viewmodel.RecoveryCodeFlow.CodeState = when (passwordResetState) {
+                is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.VerifyingCode ->
+                    com.example.ui.viewmodel.RecoveryCodeFlow.CodeState.Verifying
+                is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.CodeWrong ->
+                    com.example.ui.viewmodel.RecoveryCodeFlow.CodeState.WrongCode(0)
+                is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.CodeExpired ->
+                    com.example.ui.viewmodel.RecoveryCodeFlow.CodeState.ExpiredCode
+                is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Error ->
+                    com.example.ui.viewmodel.RecoveryCodeFlow.CodeState.Error(passwordResetState.message)
+                else -> com.example.ui.viewmodel.RecoveryCodeFlow.CodeState.Entry
+            }
+            RecoveryCodeSheet(
+                email = resetEmail,
+                mode = CodeSheetMode.RECOVERY,
+                codeState = recoveryCodeState,
+                resendCooldownSeconds = resendCooldownSeconds,
+                onSubmitCode = onVerifyRecoveryCode,
+                onResend = onResendRecoveryCode,
+                onDismiss = {
+                    showForgotPasswordDialog = false
+                    onClearPasswordReset()
+                }
+            )
+        }
+
+        // v1.3.3 (ITEM 10 ext): OTP code sheet - signup confirmation.
+        if (signupCodeEmail != null) {
+            RecoveryCodeSheet(
+                email = signupCodeEmail,
+                mode = CodeSheetMode.SIGNUP,
+                codeState = signupCodeState,
+                resendCooldownSeconds = signupResendSeconds,
+                onSubmitCode = onVerifySignupCode,
+                onResend = onResendSignupCode,
+                onDismiss = onDismissSignupCode
             )
         }
 
@@ -1318,7 +1379,7 @@ private fun ForgotPasswordDialog(
                     }
                     else -> {
                         Text(
-                            text = "Enter your account email. We will send you a link to reset your password.",
+                            text = "Enter your account email. We'll send you a 6-digit code to reset your password.",
                             fontFamily = PoppinsFontFamily,
                             fontSize = 14.sp,
                             color = textSecondary
@@ -1349,7 +1410,7 @@ private fun ForgotPasswordDialog(
             val sent = resetState is com.example.ui.viewmodel.FocuslyViewModel.PasswordResetState.Sent
             if (!sent) {
                 PremiumButton(
-                    text = if (sending) "Sending..." else "Send link",
+                    text = if (sending) "Sending..." else "Send code",
                     onClick = { onSend(email.trim()) },
                     enabled = !sending && email.contains("@"),
                     compact = true,

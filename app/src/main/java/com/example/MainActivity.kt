@@ -577,7 +577,19 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                 pendingPasswordRecovery = viewModel.pendingPasswordRecovery.collectAsState().value,
                 onForgotPassword = { email -> viewModel.requestPasswordReset(email) },
                 onClearPasswordReset = { viewModel.clearPasswordReset() },
-                onSetNewPassword = { password -> viewModel.completePasswordRecovery(password) }
+                onSetNewPassword = { password -> viewModel.completePasswordRecovery(password) },
+                // v1.3.3 (ITEM 10): OTP code sheets
+                resetEmail = viewModel.getRecoveryEmail(),
+                resendCooldownSeconds = viewModel.recoveryCodeFlow.resendCooldownSeconds.collectAsState().value,
+                onVerifyRecoveryCode = { code -> viewModel.verifyRecoveryCode(code) },
+                onResendRecoveryCode = { viewModel.resendRecoveryCode() },
+                // v1.3.3 (ITEM 10 ext): signup confirmation code sheet
+                signupCodeEmail = viewModel.signupCodeEmail.collectAsState().value,
+                signupCodeState = viewModel.signupCodeFlow.codeState.collectAsState().value,
+                signupResendSeconds = viewModel.signupCodeFlow.resendCooldownSeconds.collectAsState().value,
+                onVerifySignupCode = { code -> viewModel.verifySignupCode(code) },
+                onResendSignupCode = { viewModel.resendSignupCode() },
+                onDismissSignupCode = { viewModel.dismissSignupCode() }
             )
         // v1.4.0: first-launch onboarding ran for guests too — v1.2 REVERSED
         // this (owner-ordered): guest sessions skip onboarding entirely and
