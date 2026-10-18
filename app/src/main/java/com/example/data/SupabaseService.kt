@@ -242,41 +242,6 @@ class SupabaseService {
         }
     }
 
-    /** v1.3.3 (ITEM 10 extension): what kind of auth link a deep link is. */
-    fun linkTypeOf(uri: android.net.Uri): AuthLinkType {
-        return try {
-            val typeParam = uri.getQueryParameter("type")
-            val frag = uri.fragment ?: ""
-            val fragType = frag.split("&")
-                .firstOrNull { it.substringBefore("=").equals("type", ignoreCase = true) }
-                ?.substringAfter("=", "")
-            val t = typeParam ?: fragType.orEmpty()
-            when {
-                t.equals("recovery", ignoreCase = true) -> AuthLinkType.RECOVERY
-                t.equals("signup", ignoreCase = true) ||
-                        t.equals("magiclink", ignoreCase = true) -> AuthLinkType.SIGNUP
-                else -> AuthLinkType.UNKNOWN
-            }
-        } catch (_: Exception) {
-            AuthLinkType.UNKNOWN
-        }
-    }
-
-    /** True when a focivo://auth-callback deep link carries a signup-confirmation token. */
-    fun isSignupDeeplink(uri: android.net.Uri): Boolean =
-        linkTypeOf(uri) == AuthLinkType.SIGNUP
-
-    /** True when a focivo://auth-callback deep link carries a password-recovery token. */
-    fun isRecoveryDeeplink(uri: android.net.Uri): Boolean {
-        return try {
-            val typeParam = uri.getQueryParameter("type")
-            val frag = uri.fragment ?: ""
-            typeParam.equals("recovery", ignoreCase = true) ||
-                    frag.split("&").any { it.substringBefore("=").equals("type", ignoreCase = true) && it.substringAfter("=", "").equals("recovery", ignoreCase = true) }
-        } catch (_: Exception) {
-            false
-        }
-    }
 
     /** Sets the new password for the user holding the recovery session. */
     suspend fun updatePassword(newPassword: String): Result<Unit> = withContext(Dispatchers.IO) {
@@ -2033,6 +1998,45 @@ sealed interface RecoveryCodeResult {
 
     /** Anything else; carries a friendly English message. */
     data class Error(val message: String) : RecoveryCodeResult
+}
+
+/**
+ * v1.3.3 (ITEM 10 extension): auth deep-link classifiers. Pure functions
+ * (no client needed) so they are unit-testable without Android.
+ */
+fun linkTypeOf(uri: android.net.Uri): AuthLinkType {
+    return try {
+        val typeParam = uri.getQueryParameter("type")
+        val frag = uri.fragment ?: ""
+        val fragType = frag.split("&")
+            .firstOrNull { it.substringBefore("=").equals("type", ignoreCase = true) }
+            ?.substringAfter("=", "")
+        val t = typeParam ?: fragType.orEmpty()
+        when {
+            t.equals("recovery", ignoreCase = true) -> AuthLinkType.RECOVERY
+            t.equals("signup", ignoreCase = true) ||
+                    t.equals("magiclink", ignoreCase = true) -> AuthLinkType.SIGNUP
+            else -> AuthLinkType.UNKNOWN
+        }
+    } catch (_: Exception) {
+        AuthLinkType.UNKNOWN
+    }
+}
+
+/** True when a focivo://auth-callback deep link carries a signup-confirmation token. */
+fun isSignupDeeplink(uri: android.net.Uri): Boolean =
+    linkTypeOf(uri) == AuthLinkType.SIGNUP
+
+/** True when a focivo://auth-callback deep link carries a password-recovery token. */
+fun isRecoveryDeeplink(uri: android.net.Uri): Boolean {
+    return try {
+        val typeParam = uri.getQueryParameter("type")
+        val frag = uri.fragment ?: ""
+        typeParam.equals("recovery", ignoreCase = true) ||
+                frag.split("&").any { it.substringBefore("=").equals("type", ignoreCase = true) && it.substringAfter("=", "").equals("recovery", ignoreCase = true) }
+    } catch (_: Exception) {
+        false
+    }
 }
 
 /**

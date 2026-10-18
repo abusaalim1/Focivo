@@ -15,6 +15,8 @@ import com.example.data.FirebaseAuthManager
 import com.example.data.FocuslyRepository
 import com.example.data.FirebaseSyncManager
 import com.example.data.AuthLinkType
+import com.example.data.isRecoveryDeeplink
+import com.example.data.linkTypeOf
 import com.example.data.SignUpResult
 import com.example.data.SupabaseService
 import com.example.data.LeaderboardUser
@@ -1124,7 +1126,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             _authError.value = null
             // v1.4.0-round2: password-recovery links land here too. Establish the
             // recovery session, then ask the user for the new password in-app.
-            if (SupabaseService.getInstance().isRecoveryDeeplink(uri)) {
+            if (isRecoveryDeeplink(uri)) {
                 val result = SupabaseService.getInstance().handleAuthDeeplink(uri)
                 result.onSuccess {
                     _pendingPasswordRecovery.value = true
@@ -1157,7 +1159,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 // v1.3.3 (ITEM 10 ext): offer the signup OTP code sheet as the
                 // next step when this session knows the pending signup email.
                 val signupEmail = pendingSignupEmail
-                if (SupabaseService.getInstance().linkTypeOf(uri) == AuthLinkType.SIGNUP &&
+                if (linkTypeOf(uri) == AuthLinkType.SIGNUP &&
                     signupEmail != null
                 ) {
                     _signupCodeEmail.value = signupEmail
