@@ -130,6 +130,45 @@ class FirebaseAuthManager private constructor(private val context: Context) {
         )
     }
 
+    /**
+     * v1.3.3 (ITEM 10 extension): typed signup that distinguishes "session
+     * established" from "email confirmation required" (no session yet - the
+     * OTP code sheet completes it) from real failures. [signUpWithEmail] keeps
+     * its legacy Result<AuthUserData> behavior on top of this.
+     */
+    suspend fun signUpWithEmailResult(
+        email: String,
+        pinOrPass: String,
+        displayName: String
+    ): Result<SignUpResult> {
+        _isAuthLoading.value = true
+        _authError.value = null
+        val cleanEmail = email.trim().lowercase()
+
+        return when (val outcome = SupabaseService.getInstance().signUpWithConfirmation(cleanEmail, pinOrPass, displayName)) {
+            is SignUpResult.SignedIn -> {
+                val user = FirebaseUser(
+                    uid = outcome.uid,
+                    email = cleanEmail,
+                    displayName = displayName,
+                    photoUrl = null
+                )
+                _currentUser.value = user
+                _isAuthLoading.value = false
+                Result.success(outcome)
+            }
+            is SignUpResult.ConfirmationRequired -> {
+                _isAuthLoading.value = false
+                Result.success(outcome)
+            }
+            is SignUpResult.Failed -> {
+                _isAuthLoading.value = false
+                _authError.value = outcome.message
+                Result.failure(Exception(outcome.message))
+            }
+        }
+    }
+
     suspend fun signUpWithEmail(email: String, pinOrPass: String, displayName: String): Result<AuthUserData> {
         _isAuthLoading.value = true
         _authError.value = null
