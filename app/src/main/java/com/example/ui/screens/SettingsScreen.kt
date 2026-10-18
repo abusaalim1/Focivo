@@ -723,7 +723,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (isShieldEnabled) "Armed · Distractions Blocked During Study" else if (!hasShieldPerms) "Permissions Needed · Tap to setup shield" else "Configured · Tap to manage apps & timer",
+                                text = if (isShieldEnabled) "Armed · Distractions Blocked During Study" else if (!shieldPermissionsOk) "Permissions Needed · Tap to setup shield" else "Configured · Tap to manage apps & timer",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = textSecondary,
                                     fontSize = 12.sp
