@@ -3,6 +3,7 @@ package com.example.screenshots.v133
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.material3.ExperimentalMaterial3Api
 import com.example.ui.components.CodeSheetMode
 import com.example.ui.components.RecoveryCodeSheet
 import com.example.ui.theme.FocuslyTheme
@@ -24,6 +25,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = RobolectricDeviceQualifiers.Pixel8, sdk = [36])
+@OptIn(ExperimentalMaterial3Api::class)
 class V133RecoveryCodeSheetScreenshotsTest {
 
     @get:Rule
