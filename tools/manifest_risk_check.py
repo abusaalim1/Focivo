@@ -7,7 +7,7 @@ if any high-risk permission from the banned list is present — including
 permissions merged in silently from library dependencies.
 
 Usage:
-    python3 tools/manifest_risk_check.py <merged-manifest-path>
+    python3 tools/manifest_risk_check.py <merged-manifest-path> [--variant debug|release]
 
 This is the CI companion of ManifestPermissionAuditTest.kt (unit test that
 checks the SOURCE manifest). Both must agree.
@@ -64,10 +64,14 @@ WATCHLIST_PERMISSIONS = {
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: manifest_risk_check.py <merged-manifest-path>", file=sys.stderr)
+    if len(sys.argv) < 2 or len(sys.argv) > 4:
+        print("usage: manifest_risk_check.py <merged-manifest-path> [--variant debug|release]",
+              file=sys.stderr)
         return 2
     path = sys.argv[1]
+    variant = "release"
+    if "--variant" in sys.argv:
+        variant = sys.argv[sys.argv.index("--variant") + 1]
     try:
         root = ET.parse(path).getroot()
     except Exception as e:  # noqa: BLE001
@@ -98,11 +102,14 @@ def main() -> int:
         )
         return 1
 
-    # Sanity: no debuggable in release-type merged manifests.
-    app = root.find("application")
-    if app is not None and app.get(f"{{{ANDROID_NS}}}debuggable") == "true":
-        print("\nFAIL: android:debuggable=\"true\" in merged manifest.", file=sys.stderr)
-        return 1
+    # Sanity: release-type merged manifests must never be debuggable.
+    # (Debug builds legitimately set android:debuggable="true".)
+    if variant == "release":
+        app = root.find("application")
+        if app is not None and app.get(f"{{{ANDROID_NS}}}debuggable") == "true":
+            print("\nFAIL: android:debuggable=\"true\" in RELEASE merged manifest.",
+                  file=sys.stderr)
+            return 1
 
     print("\nPASS: no high-risk permissions in merged manifest.")
     return 0

@@ -129,7 +129,7 @@ jobs:
             exit 1
           fi
           echo "Auditing merged manifest: $MERGED_MANIFEST"
-          python3 tools/manifest_risk_check.py "$MERGED_MANIFEST"
+          python3 tools/manifest_risk_check.py "$MERGED_MANIFEST" --variant debug
 
       - name: Run manifest risk regression test
         run: |
