@@ -1150,6 +1150,24 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             _verificationMessage.value = "Verifying email confirmation link..."
             val result = SupabaseService.getInstance().handleAuthDeeplink(uri)
             result.onSuccess { uid ->
+                // v1.1.1: the confirmation email's BUTTON was used instead of
+                // the 6-digit code. If the signup code sheet was showing, it
+                // must never survive with a dead code — dismiss it and run the
+                // SAME post-signup upserts as the code path (a fresh deeplink
+                // signup has no users-row yet; restoreUserAccount alone would
+                // leave the account half-created).
+                val wasSignupLink = linkTypeOf(uri) == AuthLinkType.SIGNUP
+                val codeSheetEmail = pendingSignupEmail
+                val codeSheetName = pendingSignupName
+                _signupCodeEmail.value = null
+                signupCodeFlow.resetToEntry()
+                pendingSignupEmail = null
+                pendingSignupName = null
+                pendingSignupPin = null
+                if (wasSignupLink && !codeSheetEmail.isNullOrBlank()) {
+                    SupabaseService.getInstance()
+                        .completeSignupAfterCodeVerification(codeSheetEmail, codeSheetName.orEmpty())
+                }
                 _verificationMessage.value = "Email verified successfully! Welcome to Focivo."
                 restoreUserAccount(uid)
                 _showQuestionnaire.value = false

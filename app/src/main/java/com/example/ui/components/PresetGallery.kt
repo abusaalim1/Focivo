@@ -7,12 +7,13 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -231,6 +232,15 @@ fun PresetChooserContent(
         )
         Spacer(Modifier.height(16.dp))
 
+        // v1.1.1: the grids below can exceed the screen height (Boys + Girls
+        // sections), which used to push the "Use this design" button below
+        // the visible sheet — the owner reported no save option was visible.
+        // The middle scrolls; the header and the confirm button stay pinned.
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+        ) {
         // ——— Upload photo (GROUP mode only; AVATAR is presets-only) ————
         if (mode == PresetChooserMode.GROUP) {
             PresetChooserOptionRow(
@@ -302,11 +312,16 @@ fun PresetChooserContent(
             )
         } else {
             LazyVerticalGrid(
+                // v1.1.1: nested inside the sheet's scroll — size to content,
+                // never scroll independently.
+                userScrollEnabled = false,
                 columns = GridCells.Fixed(3),
                 contentPadding = PaddingValues(2.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.heightIn(max = 336.dp),
+                // v1.1.1: no height cap — sizes to content inside the sheet's
+                // scroll (a cap + disabled inner scroll would truncate tiles).
+                modifier = Modifier,
             ) {
                 items(ids, key = { it }) { id ->
                     val ref = refFor(id)
@@ -359,6 +374,8 @@ fun PresetChooserContent(
                 }
             }
         }
+
+        } // end scrollable middle
 
         Spacer(Modifier.height(18.dp))
         Button(
@@ -474,11 +491,14 @@ private fun AvatarSectionsGrid(
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
                 LazyVerticalGrid(
+                    // v1.1.1: nested inside the sheet's scroll — size to content,
+                    // never scroll independently.
+                    userScrollEnabled = false,
                     columns = GridCells.Fixed(3),
                     contentPadding = PaddingValues(2.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.heightIn(max = 336.dp),
+                    modifier = Modifier,
                 ) {
                     items(sectionPresets, key = { it.id }) { preset ->
                         val unlocked = preset.isUnlocked(focusPoints, isAdmin)

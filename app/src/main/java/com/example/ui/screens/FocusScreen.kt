@@ -60,7 +60,8 @@ import com.example.ui.components.BuddyMascot
 import com.example.ui.components.CustomizeTimerSheet
 import com.example.ui.components.DeepFocusActiveBanner
 import com.example.ui.components.DeepFocusSettingsSheet
-import com.example.ui.components.GuardControlCluster
+import com.example.ui.components.BlockHubEntry
+import com.example.ui.components.BlockHubSheet
 import com.example.ui.components.FocusShieldPermissionSheet
 import com.example.ui.components.StrictAdminExplainerSheet
 import com.example.ui.components.DistractionDialog
@@ -584,23 +585,24 @@ fun FocusScreen(
                     }
                 }
 
-                // 3. The primary action — Start / Pause. v1.3.3 (ITEM 5):
-                // the guard control cluster sits LEFT of the button (icon
-                // toggles + explainer labels + screen-time limits entry).
+                // 3. The primary action — Start / Pause. v1.1.1: ONE compact
+                // "Block" entry sits LEFT of the button (the old four-row
+                // guard cluster was overlapped by the nav bar — gone now).
                 item {
+                    var showBlockHub by remember { mutableStateOf(false) }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        GuardControlCluster(
-                            onOpenScreenTimeBudgets = onOpenScreenTimeBudgets,
-                            // v1.3.3 (ITEM 5): the labels sit directly on the
-                            // ambient timer-theme backdrop — they must use
-                            // the backdrop content color, never the raw
-                            // design token (unreadable on dark backdrops in
-                            // light app mode, and vice versa).
+                        BlockHubEntry(
+                            // The label sits directly on the ambient
+                            // timer-theme backdrop — it must use the backdrop
+                            // content color, never the raw design token
+                            // (unreadable on dark backdrops in light app
+                            // mode, and vice versa).
                             contentColor = selectedTheme.backdropContent(isDark),
-                            modifier = Modifier.weight(0.44f)
+                            modifier = Modifier.weight(0.44f),
+                            onOpen = { showBlockHub = true }
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Box(
@@ -650,7 +652,15 @@ fun FocusScreen(
                             )
                         }
                         } // end Start/Pause pill
-                    } // end cluster + button Row
+                    } // end Block entry + button Row
+                    // v1.1.1: the one premium Block sheet (Strict, AI Guard,
+                    // AI YouTube Filter, Screen-time limits).
+                    if (showBlockHub) {
+                        BlockHubSheet(
+                            onOpenScreenTimeBudgets = onOpenScreenTimeBudgets,
+                            onDismiss = { showBlockHub = false }
+                        )
+                    }
                     // Breathing room under the action; the hub hint sits quiet.
                     if (!isRunning) {
                         Spacer(modifier = Modifier.height(6.dp))

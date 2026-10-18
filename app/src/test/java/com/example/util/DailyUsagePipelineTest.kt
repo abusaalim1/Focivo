@@ -345,6 +345,121 @@ class DailyUsagePipelineTest {
         }
     }
 
+    // ---------- v1.1.1: event-pair foreground pairing ----------
+
+    private fun resumed(pkg: String, t: Long) =
+        DailyUsagePipeline.AppUsageEvent(pkg, DailyUsagePipeline.AppEventType.RESUMED, t)
+
+    private fun paused(pkg: String, t: Long) =
+        DailyUsagePipeline.AppUsageEvent(pkg, DailyUsagePipeline.AppEventType.PAUSED, t)
+
+    private fun shutdown(t: Long) =
+        DailyUsagePipeline.AppUsageEvent("", DailyUsagePipeline.AppEventType.SHUTDOWN, t)
+
+    @Test
+    fun `sumForegroundTime pairs resumed and paused per app`() {
+        val defaultTz = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"))
+            val dayStart = istDayStart()
+            val now = dayStart + 12 * 60 * MIN
+            val totals = DailyUsagePipeline.sumForegroundTime(
+                listOf(
+                    resumed("com.youtube", dayStart + 60 * MIN),
+                    paused("com.youtube", dayStart + 128 * MIN), // 1h08m — owner's YouTube
+                    resumed("com.muse", dayStart + 130 * MIN),
+                    paused("com.muse", dayStart + 190 * MIN) // 1h00m
+                ),
+                dayStart, now
+            )
+            assertEquals(68 * MIN, totals["com.youtube"])
+            assertEquals(60 * MIN, totals["com.muse"])
+            assertEquals(128 * MIN, totals.values.sum())
+        } finally {
+            TimeZone.setDefault(defaultTz)
+        }
+    }
+
+    @Test
+    fun `sumForegroundTime counts both apps in split-screen`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val now = dayStart + 2 * 60 * MIN
+        val totals = DailyUsagePipeline.sumForegroundTime(
+            listOf(
+                resumed("com.a", dayStart + 10 * MIN),
+                resumed("com.b", dayStart + 20 * MIN), // split-screen: both on screen
+                paused("com.a", dayStart + 50 * MIN),
+                paused("com.b", dayStart + 60 * MIN)
+            ),
+            dayStart, now
+        )
+        assertEquals(40 * MIN, totals["com.a"])
+        assertEquals(40 * MIN, totals["com.b"])
+        assertEquals(80 * MIN, totals.values.sum()) // sum of per-app, like the system total
+    }
+
+    @Test
+    fun `sumForegroundTime clips sessions spanning midnight`() {
+        val defaultTz = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"))
+            val dayStart = istDayStart()
+            val now = dayStart + 3 * 60 * MIN
+            val totals = DailyUsagePipeline.sumForegroundTime(
+                listOf(
+                    resumed("com.a", dayStart - 30 * MIN), // opened yesterday
+                    paused("com.a", dayStart + 10 * MIN)
+                ),
+                dayStart, now
+            )
+            assertEquals(10 * MIN, totals["com.a"]) // only today's part
+        } finally {
+            TimeZone.setDefault(defaultTz)
+        }
+    }
+
+    @Test
+    fun `sumForegroundTime closes still-open apps at now`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val now = dayStart + 5 * 60 * MIN
+        val totals = DailyUsagePipeline.sumForegroundTime(
+            listOf(resumed("com.a", dayStart + 4 * 60 * MIN)), // never paused — on screen now
+            dayStart, now
+        )
+        assertEquals(60 * MIN, totals["com.a"])
+    }
+
+    @Test
+    fun `sumForegroundTime treats shutdown as closing all apps`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val now = dayStart + 8 * 60 * MIN
+        val totals = DailyUsagePipeline.sumForegroundTime(
+            listOf(
+                resumed("com.a", dayStart + 1 * 60 * MIN),
+                shutdown(dayStart + 2 * 60 * MIN),
+                resumed("com.a", dayStart + 5 * 60 * MIN),
+                paused("com.a", dayStart + 6 * 60 * MIN)
+            ),
+            dayStart, now
+        )
+        assertEquals(2 * 60 * MIN, totals["com.a"]) // 1h before shutdown + 1h after
+    }
+
+    @Test
+    fun `sumForegroundTime ignores duplicate resumes while open`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val now = dayStart + 3 * 60 * MIN
+        val totals = DailyUsagePipeline.sumForegroundTime(
+            listOf(
+                resumed("com.a", dayStart + 10 * MIN),
+                resumed("com.a", dayStart + 20 * MIN), // activity flip; still one interval
+                paused("com.a", dayStart + 70 * MIN)
+            ),
+            dayStart, now
+        )
+        assertEquals(60 * MIN, totals["com.a"])
+    }
+
     @Test
     fun `usageMillisForPackage and deviceTotalMillis read the snapshot`() {
         fakeSamples = listOf(
