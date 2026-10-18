@@ -1,15 +1,10 @@
 package com.example.util
 
-import android.Manifest
-import android.app.AlarmManager
-import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.core.content.ContextCompat
 
 object PermissionUtils {
 
@@ -84,11 +79,8 @@ object PermissionUtils {
         "overlay" -> hasOverlayPermission(context)
         "battery" -> isBatteryOptimizationDisabled(context)
         "exact_alarm" -> hasExactAlarmPermission(context)
-        "accessibility" -> AiStudyGuardManager.isAccessibilityPermissionGranted(context)
-        "device_admin" -> {
-            val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? android.app.admin.DevicePolicyManager
-            dpm?.isAdminActive(com.example.service.FocivoDeviceAdminReceiver.getComponentName(context)) == true
-        }
+        "accessibility" -> PermissionStates.isAccessibilityEnabled(context)
+        "device_admin" -> PermissionStates.isDeviceAdminActive(context)
         else -> false
     }
 
@@ -134,39 +126,13 @@ object PermissionUtils {
         }
     }
 
-    fun hasNotificationPermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            val notificationManager = ContextCompat.getSystemService(
-                context,
-                NotificationManager::class.java
-            )
-            notificationManager?.areNotificationsEnabled() ?: false
-        }
-    }
+    // v1.3.3 — delegates to PermissionStates (single live-query source of
+    // truth). Signatures kept so all existing callers keep working.
+    fun hasNotificationPermission(context: Context): Boolean =
+        PermissionStates.isNotificationGranted(context)
 
-    fun hasUsageStatsPermission(context: Context): Boolean {
-        val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? android.app.AppOpsManager ?: return false
-        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            appOps.unsafeCheckOpNoThrow(
-                android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
-                android.os.Process.myUid(),
-                context.packageName
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            appOps.checkOpNoThrow(
-                android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
-                android.os.Process.myUid(),
-                context.packageName
-            )
-        }
-        return mode == android.app.AppOpsManager.MODE_ALLOWED
-    }
+    fun hasUsageStatsPermission(context: Context): Boolean =
+        PermissionStates.isUsageAccessGranted(context)
 
     fun openUsageStatsSettings(context: Context) {
         try {
@@ -179,11 +145,9 @@ object PermissionUtils {
         }
     }
 
-    fun hasOverlayPermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(context)
-        } else true
-    }
+    // v1.3.3 — delegates to PermissionStates. Signatures kept for callers.
+    fun hasOverlayPermission(context: Context): Boolean =
+        PermissionStates.canDrawOverlays(context)
 
     fun openOverlaySettings(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -199,12 +163,9 @@ object PermissionUtils {
         }
     }
 
-    fun isBatteryOptimizationDisabled(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val pm = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
-            pm?.isIgnoringBatteryOptimizations(context.packageName) ?: false
-        } else false
-    }
+    // v1.3.3 — delegates to PermissionStates. Signature kept for callers.
+    fun isBatteryOptimizationDisabled(context: Context): Boolean =
+        PermissionStates.isBatteryOptimizationDisabled(context)
 
     fun openBatteryOptimizationSettings(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -227,17 +188,9 @@ object PermissionUtils {
         }
     }
 
-    fun hasExactAlarmPermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val alarmManager = ContextCompat.getSystemService(
-                context,
-                AlarmManager::class.java
-            )
-            alarmManager?.canScheduleExactAlarms() ?: true
-        } else {
-            true
-        }
-    }
+    // v1.3.3 — delegates to PermissionStates. Signature kept for callers.
+    fun hasExactAlarmPermission(context: Context): Boolean =
+        PermissionStates.canScheduleExactAlarms(context)
 
     fun openExactAlarmSettings(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

@@ -852,42 +852,13 @@ object AiStudyGuardManager {
         }
     }
 
-    fun isAccessibilityPermissionGranted(context: Context): Boolean {
-        if (com.example.service.AiStudyAccessibilityService.isServiceConnected) {
-            return true
-        }
-        return try {
-            val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? android.view.accessibility.AccessibilityManager
-            val enabledList = am?.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-            if (enabledList != null) {
-                for (service in enabledList) {
-                    val id = service.id ?: continue
-                    if (id.contains("AiStudyAccessibilityService", ignoreCase = true)) {
-                        return true
-                    }
-                }
-            }
-            val expectedServiceName = "${context.packageName}/com.example.service.AiStudyAccessibilityService"
-            val enabledServices = android.provider.Settings.Secure.getString(
-                context.contentResolver,
-                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-            ) ?: return false
-            val colonSplitter = android.text.TextUtils.SimpleStringSplitter(':')
-            colonSplitter.setString(enabledServices)
-            while (colonSplitter.hasNext()) {
-                val componentName = colonSplitter.next()
-                if (componentName.equals(expectedServiceName, ignoreCase = true) ||
-                    componentName.endsWith("AiStudyAccessibilityService", ignoreCase = true) ||
-                    componentName.contains("AiStudyAccessibilityService", ignoreCase = true)
-                ) {
-                    return true
-                }
-            }
-            false
-        } catch (_: Exception) {
-            false
-        }
-    }
+    // v1.3.3 — delegates to PermissionStates.isAccessibilityEnabled: detects
+    // the service actually RUNNING for our package (in-process liveness flag,
+    // then exact component match in the enabled-service list), with the
+    // secure-settings flag only as an exact-match fallback. Signature kept
+    // for all existing callers.
+    fun isAccessibilityPermissionGranted(context: Context): Boolean =
+        PermissionStates.isAccessibilityEnabled(context)
 
     /**
      * v1.1.6: Liveness signal. The accessibility service writes a heartbeat timestamp

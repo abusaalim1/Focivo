@@ -6,12 +6,10 @@ package com.example.ui.components
 // body + Instrument Serif italic for the page headline. Every control is wired
 // to the same real setting/feature as before — visual rebuild only.
 
-import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.os.Process
 import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
@@ -105,40 +103,17 @@ import com.example.util.AppIconView
 import com.example.util.DeviceAppInfo
 
 object FocusShieldPermissions {
-    fun hasUsageStatsPermission(context: Context): Boolean {
-        return try {
-            val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager ?: return false
-            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                appOps.unsafeCheckOpNoThrow(
-                    AppOpsManager.OPSTR_GET_USAGE_STATS,
-                    Process.myUid(),
-                    context.packageName
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                appOps.checkOpNoThrow(
-                    AppOpsManager.OPSTR_GET_USAGE_STATS,
-                    Process.myUid(),
-                    context.packageName
-                )
-            }
-            mode == AppOpsManager.MODE_ALLOWED
-        } catch (_: Exception) {
-            false
-        }
-    }
+    // v1.3.3 — single live-query source of truth is PermissionStates; these
+    // signatures are kept so MainActivity / FocuslyViewModel / AppLimitsScreen
+    // keep compiling unchanged.
+    fun hasUsageStatsPermission(context: Context): Boolean =
+        com.example.util.PermissionStates.isUsageAccessGranted(context)
 
-    fun hasOverlayPermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(context)
-        } else {
-            true
-        }
-    }
+    fun hasOverlayPermission(context: Context): Boolean =
+        com.example.util.PermissionStates.canDrawOverlays(context)
 
-    fun hasAccessibilityPermission(context: Context): Boolean {
-        return AiStudyGuardManager.isAccessibilityPermissionGranted(context)
-    }
+    fun hasAccessibilityPermission(context: Context): Boolean =
+        com.example.util.PermissionStates.isAccessibilityEnabled(context)
 
     fun openAccessibilitySettings(context: Context) {
         try {
