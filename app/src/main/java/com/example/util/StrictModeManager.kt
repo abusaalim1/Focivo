@@ -64,6 +64,14 @@ object StrictModeManager {
     fun setStrictModeEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_STRICT_MODE_ENABLED, enabled).apply()
         _isStrictModeState.value = enabled
+        // v1.1.3 FIX 1: turning Strict Mode OFF deterministically clears any
+        // armed protected-session record. Re-enabling Strict later must never
+        // resurrect friction without a genuinely running session.
+        if (!enabled) {
+            try {
+                StrictSessionStore.disarm(context)
+            } catch (_: Exception) { }
+        }
     }
 
     fun setSessionActive(context: Context, active: Boolean) {
@@ -103,6 +111,14 @@ object StrictModeManager {
     fun setUninstallProtectionEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_UNINSTALL_PROTECTION, enabled).apply()
         _uninstallProtectionState.value = enabled
+        // v1.1.3 FIX 1: opting out of uninstall protection also clears the
+        // armed record — the next opt-in starts from a clean slate and can
+        // never inherit a stale protected window.
+        if (!enabled) {
+            try {
+                StrictSessionStore.disarm(context)
+            } catch (_: Exception) { }
+        }
     }
 
     /**

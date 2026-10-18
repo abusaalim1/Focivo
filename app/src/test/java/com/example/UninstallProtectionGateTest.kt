@@ -102,4 +102,36 @@ class UninstallProtectionGateTest {
             )
         )
     }
+
+    // v1.1.3 FIX 1 — regression: strict off + no session + admin STILL
+    // ACTIVE must report STRICT_OFF (ordinary Android uninstall). The admin
+    // being present can never resurrect friction on its own.
+    @Test
+    fun `strict off with admin active and no session is ordinary uninstall`() {
+        assertEquals(
+            STRICT_OFF,
+            UninstallProtectionGate.decide(
+                strictEnabled = false,
+                protectionEnabled = true,
+                sessionActive = false,
+                adminActive = true
+            )
+        )
+    }
+
+    // v1.1.3 FIX 1 — regression: a session that ended (paused, discarded,
+    // completed) is sessionActive=false -> NO_SESSION even though the
+    // admin is still active. Uninstall returns to normal immediately.
+    @Test
+    fun `ended session with admin active is ordinary uninstall`() {
+        assertEquals(
+            NO_SESSION,
+            UninstallProtectionGate.decide(
+                strictEnabled = true,
+                protectionEnabled = true,
+                sessionActive = false,
+                adminActive = true
+            )
+        )
+    }
 }

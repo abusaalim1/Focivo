@@ -189,6 +189,7 @@ fun DeepFocusSettingsSheet(
     }
     if (showAdminDisableSheet) {
         StrictAdminDisableSheet(
+            isCurrentlyBlocking = protectionState == UninstallProtectionGate.State.PROTECTED,
             onOpenSettings = {
                 showAdminDisableSheet = false
                 DeviceAdminGuard.openDeactivateScreen(context)
@@ -364,7 +365,12 @@ fun DeepFocusSettingsSheet(
                     UninstallProtectionStatusRow(
                         state = protectionState,
                         onClick = {
-                            if (protectionState == UninstallProtectionGate.State.PROTECTED) {
+                            // v1.1.3 FIX 1: whenever the device admin is
+                            // present — protected or not — the row offers the
+                            // working "Turn off uninstall protection" path
+                            // (the system deactivation screen). Only when the
+                            // admin is absent does the tap offer activation.
+                            if (adminActive) {
                                 showAdminDisableSheet = true
                             } else if (isStrictModeEnabled) {
                                 showAdminExplainer = true

@@ -207,14 +207,19 @@ fun StrictAdminExplainerSheet(
 }
 
 /**
- * Shown from the "Uninstall protection" row while protection is PROTECTED.
- * The disable path is the SYSTEM settings screen — Android gives apps no API
- * to deactivate their own admin, and we say so plainly. That is the user's
- * guarantee against trapping.
+ * Shown from the "Uninstall protection" row whenever the device admin is
+ * present. The disable path is the SYSTEM settings screen — Android gives
+ * apps no API to deactivate their own admin, and we say so plainly. That is
+ * the user's guarantee against trapping.
+ *
+ * v1.1.3 FIX 1: [isCurrentlyBlocking] keeps the copy honest — the sheet is
+ * now also reachable when the admin is on but no strict session is running,
+ * in which case uninstall is already one standard step away.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StrictAdminDisableSheet(
+    isCurrentlyBlocking: Boolean,
     onOpenSettings: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -236,7 +241,7 @@ fun StrictAdminDisableSheet(
         ) {
             SheetDragHandle()
             Spacer(modifier = Modifier.height(14.dp))
-            AdminEyebrow("PROTECTION ACTIVE")
+            AdminEyebrow(if (isCurrentlyBlocking) "PROTECTION ACTIVE" else "DEVICE ADMIN ON")
             Spacer(modifier = Modifier.height(14.dp))
 
             BuddyMascot(
@@ -247,7 +252,8 @@ fun StrictAdminDisableSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Your focus is guarded.",
+                text = if (isCurrentlyBlocking) "Your focus is guarded."
+                else "Protection is standing by.",
                 fontFamily = SerifItalicFontFamily,
                 fontStyle = FontStyle.Italic,
                 fontWeight = FontWeight.Normal,
@@ -258,10 +264,18 @@ fun StrictAdminDisableSheet(
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                text = "Android is blocking Focivo's uninstall right now. " +
-                    "To remove this, deactivate Focivo in your phone's " +
-                    "device-admin list — Focivo can't do it itself, and " +
-                    "that's your guarantee we can never trap you.",
+                text = if (isCurrentlyBlocking) {
+                    "Android is blocking Focivo's uninstall right now. " +
+                        "To remove this, deactivate Focivo in your phone's " +
+                        "device-admin list — Focivo can't do it itself, and " +
+                        "that's your guarantee we can never trap you."
+                } else {
+                    "No strict session is running, so uninstall is already " +
+                        "one standard step away. To make it fully normal, " +
+                        "deactivate Focivo in your phone's device-admin " +
+                        "list — Focivo can't do it itself, and that's your " +
+                        "guarantee we can never trap you."
+                },
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Normal,
                 fontSize = 13.5.sp,

@@ -91,14 +91,14 @@ class StrictAdminSheetScreenshotsTest {
     @Test
     fun disable_dark() {
         shot(true, "admin_disable_dark") {
-            StrictAdminDisableSheet(onOpenSettings = {}, onDismiss = {})
+            StrictAdminDisableSheet(isCurrentlyBlocking = true, onOpenSettings = {}, onDismiss = {})
         }
     }
 
     @Test
     fun disable_light() {
         shot(false, "admin_disable_light") {
-            StrictAdminDisableSheet(onOpenSettings = {}, onDismiss = {})
+            StrictAdminDisableSheet(isCurrentlyBlocking = true, onOpenSettings = {}, onDismiss = {})
         }
     }
 

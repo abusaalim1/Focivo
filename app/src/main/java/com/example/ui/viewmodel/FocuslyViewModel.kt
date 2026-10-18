@@ -3035,6 +3035,15 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 .apply()
             com.example.util.StrictModeManager.setSessionActive(app, false)
             com.example.util.DeepFocusManager.setDeepFocusSessionActive(app, false)
+            // v1.1.3 FIX 1: pauseTimer() is the choke point for every
+            // deliberate end path (pause, discard, skip, completion). The
+            // durable strict-session record must die here too — otherwise it
+            // stays armed until its end time and the uninstall tamper guard
+            // keeps firing with NO session running. Resume/start re-arms via
+            // FocusTimerService; disarm is idempotent.
+            try {
+                com.example.util.StrictSessionStore.disarm(app)
+            } catch (_: Exception) { }
 
             val tPrefs = app.getSharedPreferences("focusly_timer_state", Context.MODE_PRIVATE)
             tPrefs.edit()
