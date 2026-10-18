@@ -16,7 +16,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import org.robolectric.shadows.ShadowSystemClock
+import android.os.SystemClock
+import org.robolectric.shadows.ShadowLegacySystemClock
 
 /**
  * v1.3.2 (owner order 2026-10-17, items 10+11) — timer notification fixes.
@@ -153,8 +154,8 @@ class TimerRemainingTimeStoreTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
-        ShadowSystemClock.setCurrentTimeMillis(wallStart)
-        ShadowSystemClock.setElapsedRealtime(elapsedStart)
+        ShadowLegacySystemClock.setNanoTime(wallStart * 1_000_000L)
+        SystemClock.setCurrentTimeMillis(elapsedStart)
         // Clean slate: no stale timer flags or anchors leak between tests.
         context.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
             .edit().clear().apply()
@@ -180,8 +181,8 @@ class TimerRemainingTimeStoreTest {
         assertEquals(sessionSecs, before)
 
         // 10 minutes pass with no ticks (Doze / screen locked).
-        ShadowSystemClock.setCurrentTimeMillis(wallStart + 10 * 60_000L)
-        ShadowSystemClock.setElapsedRealtime(elapsedStart + 10 * 60_000L)
+        ShadowLegacySystemClock.setNanoTime((wallStart + 10 * 60_000L) * 1_000_000L)
+        SystemClock.setCurrentTimeMillis(elapsedStart + 10 * 60_000L)
 
         val after = TimerAnchorStore.getRemainingSeconds(context)
         assertEquals(sessionSecs - 600, after)
