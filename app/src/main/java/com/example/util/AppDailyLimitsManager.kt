@@ -129,7 +129,16 @@ object AppDailyLimitsManager {
         val limit = limits.find { it.appPackage.equals(packageName, ignoreCase = true) && it.isEnabled } ?: return false
         val checked = limit.checkAndResetDailyUsage()
         val realMinutes = queryRealAppUsageMinutesToday(context, packageName)
-        val effectiveMins = if (realMinutes > 0) realMinutes else checked.minutesUsedToday
+        // v1.1.4b (item B, clause 11): after a revocation the pipeline
+        // returns 0 — the stored minutes are stale leftovers and must NOT
+        // keep enforcing limits. Without the grant, nothing is exceeded.
+        val effectiveMins = if (!DailyUsagePipeline.hasUsagePermission(context)) {
+            0
+        } else if (realMinutes > 0) {
+            realMinutes
+        } else {
+            checked.minutesUsedToday
+        }
         return PerAppBudgetEvaluator.isExceeded(
             usageMinutesToday = effectiveMins,
             dailyLimitMinutes = checked.dailyLimitMinutes,
@@ -160,7 +169,15 @@ object AppDailyLimitsManager {
 
         // Query REAL screen time from UsageStatsManager
         val realMinutes = queryRealAppUsageMinutesToday(context, checkedLimit.appPackage)
-        val effectiveMinutes = if (realMinutes > 0) realMinutes else checkedLimit.minutesUsedToday
+        // v1.1.4b (item B, clause 11): same revocation rule as
+        // isDailyLimitExceeded — stale stored minutes never enforce.
+        val effectiveMinutes = if (!DailyUsagePipeline.hasUsagePermission(context)) {
+            0
+        } else if (realMinutes > 0) {
+            realMinutes
+        } else {
+            checkedLimit.minutesUsedToday
+        }
 
         var updatedLimit = checkedLimit.copy(minutesUsedToday = effectiveMinutes)
 

@@ -211,7 +211,12 @@ fun AppLimitsScreen(
         val itemsList = nonEssentialApps.map { app ->
             val limit = limitMap[app.packageName.lowercase()]
             val realUsage = appUsageMap[app.packageName] ?: 0
-            val effectiveUsage = maxOf(limit?.minutesUsedToday ?: 0, realUsage)
+            // v1.1.4b (item B, clauses 10-11): without the usage grant there
+            // are no real minutes — and stored limit minutes are stale
+            // leftovers from a previous granted session (or revocation).
+            // Never surface them as today's usage.
+            val effectiveUsage =
+                if (hasUsagePermission) maxOf(limit?.minutesUsedToday ?: 0, realUsage) else 0
             AppUsageRankItem(
                 appInfo = app,
                 usageMinutesToday = effectiveUsage,
@@ -585,6 +590,7 @@ fun AppLimitsScreen(
                     items(filteredItems, key = { it.appInfo.packageName }) { item ->
                         AppRankAndLimitCard(
                             item = item,
+                            hasUsagePermission = hasUsagePermission,
                             onSetLimit = {
                                 selectedLimitForEdit = null
                                 preselectedAppForAdd = item.appInfo
@@ -637,6 +643,9 @@ fun AppLimitsScreen(
 @Composable
 fun AppRankAndLimitCard(
     item: AppUsageRankItem,
+    // v1.1.4b (item B, clause 10): the no-grant state renders "--" for the
+    // spent time instead of "0m" dressed as data.
+    hasUsagePermission: Boolean = true,
     onSetLimit: () -> Unit,
     onEditLimit: (AppDailyLimitEntity) -> Unit,
     onDeleteLimit: (String) -> Unit,
@@ -649,7 +658,9 @@ fun AppRankAndLimitCard(
 
     val hrs = usedMins / 60
     val mins = usedMins % 60
+    // v1.1.4b (item B, clause 10): no grant -> "--", never "0m".
     val formattedSpentToday = when {
+        !hasUsagePermission -> "--"
         hrs > 0 && mins > 0 -> "${hrs}h ${mins}m"
         hrs > 0 -> "${hrs}h"
         mins > 0 -> "${mins}m"
@@ -663,7 +674,10 @@ fun AppRankAndLimitCard(
     val limitMins = (limit?.dailyLimitMinutes ?: 0) % 60
     val limitText = if (limitHrs > 0) "${limitHrs}h ${limitMins}m" else "${limitMins}m"
 
-    val progressFraction = if (hasLimit && limit!!.dailyLimitMinutes > 0) {
+    // v1.1.4b (item B, clause 10): no grant -> neutral empty bar.
+    val progressFraction = if (!hasUsagePermission) {
+        0f
+    } else if (hasLimit && limit!!.dailyLimitMinutes > 0) {
         (usedMins.toFloat() / limit.dailyLimitMinutes.toFloat()).coerceIn(0f, 1f)
     } else 0f
 

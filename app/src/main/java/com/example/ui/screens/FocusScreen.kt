@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -63,6 +64,7 @@ import com.example.ui.components.DeepFocusSettingsSheet
 import com.example.ui.components.BlockHubEntry
 import com.example.ui.components.BlockHubSheet
 import com.example.ui.components.FocusShieldPermissionSheet
+import com.example.ui.components.FeatureIcon
 import com.example.ui.components.StrictAdminExplainerSheet
 import com.example.ui.components.DistractionDialog
 import com.example.ui.components.MascotPose
@@ -78,6 +80,7 @@ import com.example.ui.theme.BottomNavClearance
 import com.example.ui.theme.MutedBorderLight
 import com.example.ui.theme.NearBlack
 import com.example.ui.theme.PoppinsFontFamily
+import com.example.ui.theme.SecondaryTextLight
 import com.example.ui.theme.backdropTitleShadow
 import com.example.ui.theme.isAppInDarkTheme
 import com.example.ui.theme.themedCardBackground
@@ -201,6 +204,11 @@ fun FocusScreen(
         mutableStateOf(com.example.util.DailyUsagePipeline.hasUsagePermission(context))
     }
     var showUsagePermissionSheet by remember { mutableStateOf(false) }
+    // v1.1.4b (item B, clause 9): dismiss flag for the in-context usage-access
+    // ask. Signed-in users who never granted (or revoked) must be actively
+    // asked too — not just guests. Dismissible, but reset on every resume so
+    // the ask is re-presented on this surface until the grant exists.
+    var usageAskDismissed by remember { mutableStateOf(false) }
 
     suspend fun refreshStudyHeaderUsage(force: Boolean) {
         val granted = withContext(Dispatchers.IO) {
@@ -223,6 +231,8 @@ fun FocusScreen(
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                    // Re-present the in-context ask until the grant exists.
+                    usageAskDismissed = false
                     refreshStudyHeaderUsage(force = true)
                 }
             }
@@ -304,6 +314,25 @@ fun FocusScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
+                // v1.1.4b (item B, clause 9): in-context usage-access ask for
+                // signed-in users too. Shows whenever PACKAGE_USAGE_STATS is
+                // missing (never granted, or revoked) until the grant exists.
+                // Dismissible per resume; the tap target opens the premium
+                // permission sheet (same flow as the usage-card tap).
+                if (!hasUsagePermission && !usageAskDismissed) {
+                    item {
+                        UsageAccessAskCard(
+                            onGrant = { showUsagePermissionSheet = true },
+                            onDismiss = { usageAskDismissed = true },
+                            cardBg = cardBg,
+                            cardBorder = cardBorder,
+                            accent = hubAccent,
+                            textPrimary = if (isDark) Color(0xFFF4F4F5) else Color(0xFF141416),
+                            textSecondary = if (isDark) Color(0xFF8E8E93) else SecondaryTextLight
+                        )
+                    }
+                }
+
                 // v1.3.3 (item 1): Study-top header — Usage Time (device total
                 // from DailyUsagePipeline) + Focus Time (today's completed
                 // focus minutes from the session log).
@@ -879,4 +908,98 @@ private fun buildPomodoroUiState(
         nextPhase = nextPhase,
         nextMinutes = next?.phaseMinutes() ?: pomo.config.shortBreakMinutes
     )
+}
+
+/**
+ * v1.1.4b (item B, clause 9) — slim in-context usage-access ask for the Study
+ * screen. Rendered whenever PACKAGE_USAGE_STATS is missing (never granted,
+ * or revoked after granting) so signed-in users are actively asked too —
+ * not only guests on the onboarding path. Dismissible; the parent resets
+ * the dismissal on every resume so the ask returns until the grant exists.
+ * Tapping Grant opens the premium permission sheet (same flow as tapping
+ * the Usage Time card). English only, no emoji, design-system tokens.
+ */
+@Composable
+private fun UsageAccessAskCard(
+    onGrant: () -> Unit,
+    onDismiss: () -> Unit,
+    cardBg: Color,
+    cardBorder: Color,
+    accent: Color,
+    textPrimary: Color,
+    textSecondary: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(cardBg)
+            .border(1.dp, cardBorder, RoundedCornerShape(18.dp))
+            .padding(14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FeatureIcon(
+                drawableRes = R.drawable.ic3d_chart,
+                contentDescription = null,
+                size = 46.dp
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "See your screen time",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = textPrimary
+                    )
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = "Grant Usage Access to show today's screen time here.",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Normal,
+                        fontSize = 11.5.sp,
+                        color = textSecondary
+                    )
+                )
+                Spacer(modifier = Modifier.height(9.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(accent)
+                        .clickable { onGrant() }
+                        .padding(horizontal = 18.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Grant Access",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = Color(0xFF0D110E)
+                        )
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .clickable { onDismiss() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Dismiss",
+                    tint = textSecondary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
 }
