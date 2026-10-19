@@ -213,8 +213,7 @@ class TimerRemainingTimeStoreTest {
     }
 
     @Test
-    fun `guard status notification is suppressed while a timer session runs`() {
-        // Guard enabled: register the accessibility service as enabled in
+    fun `guard status notification is suppressed while a timer session runs`() {        // Guard enabled: register the accessibility service as enabled in
         // Settings.Secure (the path isAccessibilityPermissionGranted falls
         // through to when the live service is not connected in tests).
         Settings.Secure.putString(
@@ -240,6 +239,76 @@ class TimerRemainingTimeStoreTest {
             "guard status notification (id $guardId) must not be posted while the " +
                     "timer notification is the single running notification",
             shadowOf(nm).getNotification(guardId) == null
+        )
+    }
+
+    /**
+     * v1.1.4-item5: liveness is decided by the elapsed-realtime anchor, not
+     * the wall clock. A wall-clock jump FORWARD past the wall end must not
+     * kill a live session early — the session continues on the monotonic
+     * anchor (the old wall-only check reported not-running here).
+     */
+    @Test
+    fun `session survives a wall-clock jump forward via the elapsed anchor`() {
+        armTimerSession()
+
+        // Wall clock jumps 30 min forward (past the 25-min wall end); only
+        // 5 real minutes elapsed on the monotonic clock.
+        ShadowLegacySystemClock.setNanoTime((wallStart + 30 * 60_000L) * 1_000_000L)
+        RuntimeEnvironment.getMasterScheduler().advanceTo(elapsedStart + 5 * 60_000L)
+
+        assertTrue(
+            "elapsed anchor still has 20 min left; the session must stay live",
+            TimerAnchorStore.isManualTimerRunning(context)
+        )
+        assertEquals(20 * 60, TimerAnchorStore.getRemainingSeconds(context))
+    }
+
+    /**
+     * v1.1.4-item5: a wall-clock jump BACKWARD must not extend a session
+     * whose elapsed anchor has expired — the session ends on time and can
+     * never be resurrected by moving the clock.
+     */
+    @Test
+    fun `session expires on the elapsed anchor despite a wall-clock rollback`() {
+        armTimerSession()
+
+        // 30 real minutes elapsed (past the 25-min session); wall clock
+        // rolled 30 min backward so the wall end still looks "future".
+        RuntimeEnvironment.getMasterScheduler().advanceTo(elapsedStart + 30 * 60_000L)
+        ShadowLegacySystemClock.setNanoTime((wallStart - 30 * 60_000L) * 1_000_000L)
+
+        assertFalse(
+            "elapsed anchor expired; a clock rollback must not keep the session alive",
+            TimerAnchorStore.isManualTimerRunning(context)
+        )
+        assertEquals(0, TimerAnchorStore.getRemainingSeconds(context))
+    }
+
+    /**
+     * v1.1.4-item5: boot validation only reports (live/expired/none) and
+     * logs to Guard Hub — it never clears the timer flags, so the normal
+     * app-open restore can still complete an expired session exactly once.
+     */
+    @Test
+    fun `validateOnBoot reports state without touching the persisted flags`() {
+        assertEquals("none", TimerAnchorStore.validateOnBoot(context))
+
+        armTimerSession()
+        assertEquals("live", TimerAnchorStore.validateOnBoot(context))
+
+        RuntimeEnvironment.getMasterScheduler().advanceTo(elapsedStart + 30 * 60_000L)
+        ShadowLegacySystemClock.setNanoTime((wallStart + 30 * 60_000L) * 1_000_000L)
+        assertEquals("expired", TimerAnchorStore.validateOnBoot(context))
+
+        val prefs = context.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
+        assertTrue(
+            "expired-session flags must survive boot validation for the restore path",
+            prefs.getBoolean("is_manual_timer_running", false)
+        )
+        assertTrue(
+            "expired-session end time must survive boot validation for the restore path",
+            prefs.getLong("manual_timer_end_time_ms", 0L) > 0L
         )
     }
 }

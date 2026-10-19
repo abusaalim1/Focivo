@@ -81,8 +81,17 @@ object TimerAnchorStore {
 
     /**
      * True when the persisted flags describe a genuinely running manual
-     * timer (flag set AND wall-clock end time still in the future). Mirrors
-     * FocusTimerService's own restart-recovery check.
+     * timer: the running flag is set AND the single persisted anchor pair
+     * still has time left.
+     *
+     * v1.1.4-item5: the liveness decision now goes through the same anchor
+     * math as [getRemainingSeconds] instead of the raw wall-clock end time.
+     * The elapsed-realtime anchor decides whenever the device has not
+     * rebooted since arming, so a wall-clock jump can neither resurrect an
+     * expired session (clock set back) nor kill a live one early (clock set
+     * forward). After a reboot (elapsedRealtime reset) or for legacy
+     * sessions without anchors, the wall-clock end time decides, exactly
+     * like before.
      */
     fun isManualTimerRunning(context: Context): Boolean {
         return try {
@@ -90,10 +99,64 @@ object TimerAnchorStore {
             val tPrefs = context.getSharedPreferences(PREFS_TIMER_STATE, Context.MODE_PRIVATE)
             val flagged = prefs.getBoolean(KEY_MANUAL_RUNNING, false) ||
                     tPrefs.getBoolean(KEY_TIMER_STATE_RUNNING, false)
-            flagged && prefs.getLong(KEY_MANUAL_END_WALL, 0L) > System.currentTimeMillis()
+            if (!flagged) return false
+            val endWall = prefs.getLong(KEY_MANUAL_END_WALL, 0L)
+            val endElapsed = prefs.getLong(KEY_MANUAL_END_ELAPSED, 0L)
+            val elapsedAtWrite = prefs.getLong(KEY_ANCHOR_ELAPSED_AT_WRITE, 0L)
+            computeRemainingSeconds(
+                endElapsed, elapsedAtWrite, endWall,
+                SystemClock.elapsedRealtime(), System.currentTimeMillis()
+            ) > 0
         } catch (_: Exception) {
             false
         }
+    }
+
+    /**
+     * v1.1.4-item5: the persisted wall-clock session end, 0L when none is
+     * armed. Restore paths use this (together with the elapsed anchor) so
+     * every one of them re-arms the SAME session end — a restore can never
+     * invent a new full-duration end time.
+     */
+    fun getEndWallMs(context: Context): Long {
+        return try {
+            context.getSharedPreferences(PREFS_LOCAL, Context.MODE_PRIVATE)
+                .getLong(KEY_MANUAL_END_WALL, 0L)
+        } catch (_: Exception) {
+            0L
+        }
+    }
+
+    /**
+     * v1.1.4-item5: call from the BOOT_COMPLETED receiver. Reports the
+     * persisted timer state after a reboot and logs it to Guard Hub so a
+     * post-reboot anomaly is traceable. Never completes, records, or
+     * re-arms anything: an expired session's flags are left intact so the
+     * normal app-open restore path can still complete it properly (record
+     * the session once); a live session keeps its wall-clock end so the
+     * same restore path continues it. Returns "live", "expired", or "none".
+     */
+    fun validateOnBoot(context: Context): String {
+        val state = try {
+            val prefs = context.getSharedPreferences(PREFS_LOCAL, Context.MODE_PRIVATE)
+            val flagged = prefs.getBoolean(KEY_MANUAL_RUNNING, false)
+            if (!flagged) {
+                "none"
+            } else if (isManualTimerRunning(context)) {
+                "live"
+            } else {
+                "expired"
+            }
+        } catch (_: Exception) {
+            "none"
+        }
+        try {
+            AiStudyGuardManager.logGuardActivity(
+                context, "Focus Timer", "boot-validate", state,
+                "reboot seen; restore continues the same session on next app open"
+            )
+        } catch (_: Exception) { }
+        return state
     }
 
     /**

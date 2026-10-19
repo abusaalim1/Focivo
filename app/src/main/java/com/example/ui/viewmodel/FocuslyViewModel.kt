@@ -569,8 +569,24 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             setCurrentTaskTitle(taskTitle)
         }
         if (quickMins != null && quickMins > 0) {
-            val modeName = if (quickMins >= 50) "Deep Work" else if (quickMins <= 15) "Sprint" else "Classic"
-            setMode(modeName, quickMins)
+            // v1.1.4-item5: a widget quick-start tap must never re-anchor or
+            // reset the display while a session is already running (that was
+            // a "jumps back to 25" vector: setMode() reset the UI counter to
+            // full while the service kept the original end). The setMode()
+            // guard below is the backstop; this branch keeps the provenance
+            // explicit in Guard Hub.
+            if (_isTimerRunning.value) {
+                try {
+                    com.example.util.AiStudyGuardManager.logGuardSkip(
+                        getApplication(), "Focus Timer", "session-start",
+                        "widget-quickmins-ignored-running"
+                    )
+                } catch (_: Exception) { }
+                Log.i(TAG, "Widget quick-start ignored: a session is already running")
+            } else {
+                val modeName = if (quickMins >= 50) "Deep Work" else if (quickMins <= 15) "Sprint" else "Classic"
+                setMode(modeName, quickMins)
+            }
             _shouldNavigateToStudyTab.value = true
             if (!_isTimerRunning.value) {
                 startTimer(source = "WIDGET")
@@ -2324,6 +2340,22 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun setMode(mode: String, durationMinutes: Int) {
+        // v1.1.4-item5: a mode/duration change mid-session used to reset the
+        // UI countdown to the full duration while the service kept the
+        // original end anchor — the "timer jumps back to 25" corruption (the
+        // Home quick start, the widget quick buttons, and the duration picker
+        // all reach this). Duration is an idle-state setup action; while a
+        // session runs, the live persisted anchor wins and the request is
+        // ignored (logged to Guard Hub so it stays traceable).
+        if (_isTimerRunning.value) {
+            Log.i(TAG, "setMode ignored while a session is running — the live anchor keeps the session")
+            try {
+                com.example.util.AiStudyGuardManager.logGuardSkip(
+                    getApplication(), "Focus Timer", "session-start", "setmode-ignored-running"
+                )
+            } catch (_: Exception) { }
+            return
+        }
         _currentMode.value = mode
         val seconds = durationMinutes * 60
         _targetSeconds.value = seconds
@@ -2832,18 +2864,48 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
     /**
      * UI countdown ticker. Extracted so cold-start timer restore can restart the
      * same ticking loop without re-running the whole startTimer flow.
+     *
+     * v1.1.4-item5: the displayed value is re-derived from the single
+     * persisted anchor (TimerAnchorStore) on EVERY tick — never a naive
+     * decrement counter. A Doze/screen-lock stall therefore self-corrects on
+     * the first tick after wake, exactly like the timer notification and the
+     * floating pill, so the three surfaces can never drift apart. The loop
+     * only drives cadence; the anchor owns the value.
      */
     private fun startTickJob() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
-            while (isActive && _remainingSeconds.value > 0) {
+            val app = getApplication<Application>()
+            // First frame is correct immediately — no 1s lag after start/restore.
+            _remainingSeconds.value =
+                com.example.util.TimerAnchorStore.getRemainingSeconds(app).coerceAtLeast(0)
+            while (isActive && _isTimerRunning.value) {
                 delay(1000L)
-                _remainingSeconds.value -= 1
+                if (!isActive || !_isTimerRunning.value) break
+                val anchored = com.example.util.TimerAnchorStore.getRemainingSeconds(app)
+                if (anchored <= 0) break
+                _remainingSeconds.value = anchored
             }
-            if (_remainingSeconds.value <= 0) {
+            if (isActive && _isTimerRunning.value) {
                 onTimerCompleted()
             }
         }
+    }
+
+    /**
+     * v1.1.4-item5: re-derive the displayed countdown from the single
+     * persisted anchor. Called on every app resume (mirrors the service's
+     * ACTION_USER_PRESENT unlock refresh for the notification) so the main
+     * timer screen can never show a stale counter value after a
+     * Doze/screen-lock stall. No-op when no session is running.
+     */
+    fun resyncTimerDisplayFromAnchor() {
+        try {
+            if (!_isTimerRunning.value) return
+            _remainingSeconds.value =
+                com.example.util.TimerAnchorStore.getRemainingSeconds(getApplication())
+                    .coerceAtLeast(0)
+        } catch (_: Exception) { }
     }
 
     // One-shot guard so the cold-start timer restore (called from init AND from
@@ -2915,17 +2977,37 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             return false
         }
 
-        val endTime = prefs.getLong("manual_timer_end_time_ms", 0L)
+        val endTime = com.example.util.TimerAnchorStore.getEndWallMs(app)
         val now = System.currentTimeMillis()
+        // v1.1.4-item5: remaining time comes from the single persisted anchor
+        // pair (elapsed-realtime preferred, wall-clock fallback after reboot)
+        // — the exact same source the service, notification, pill, and UI
+        // tick use. A restore continues the SAME session; it can never
+        // re-anchor at full duration.
+        val anchorRemaining = com.example.util.TimerAnchorStore.getRemainingSeconds(app)
         val storedTitle = tPrefs.getString("current_task_title", "") ?: ""
         // v1.2.1: the session target is the ORIGINAL target — reading the
         // "remaining_seconds" key here shrank every restored session toward
         // the remaining-at-kill time (root cause of 0-minute summaries).
         val originalTarget = resolveOriginalTargetSecs(prefs, tPrefs, 60)
 
-        if (endTime > now) {
+        if (anchorRemaining > 0) {
             // Timer still running: restore the running UI state.
-            val remSec = ((endTime - now) / 1000L).toInt().coerceIn(1, 4 * 3600)
+            val remSec = anchorRemaining.coerceIn(1, 4 * 3600)
+            // v1.1.4-item5: hand the service a wall end consistent with the
+            // anchor. Normally this IS the persisted wall end; after a
+            // forward wall-clock jump the persisted wall end lies in the past
+            // while the elapsed anchor is still live — re-base the wall end
+            // to now + remaining so the service re-arms and continues the
+            // SAME session instead of completing it early. Never a new
+            // full-duration anchor: the remaining time is preserved.
+            var endTimeForService = endTime
+            if (endTimeForService <= now) {
+                endTimeForService = now + anchorRemaining * 1000L
+                prefs.edit().putLong("manual_timer_end_time_ms", endTimeForService).apply()
+                Log.i(TAG, "[TimerRestore] Wall clock jumped forward; re-based wall end " +
+                        "to $endTimeForService (same elapsed session, $remSec s left)")
+            }
             _isTimerRunning.value = true
             _remainingSeconds.value = remSec
             _targetSeconds.value = originalTarget.coerceAtLeast(remSec)
@@ -2937,7 +3019,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             try {
                 val timerIntent = Intent(app, com.example.service.FocusTimerService::class.java).apply {
                     action = com.example.service.FocusTimerService.ACTION_START_TIMER
-                    putExtra(com.example.service.FocusTimerService.EXTRA_END_TIME_MS, endTime)
+                    putExtra(com.example.service.FocusTimerService.EXTRA_END_TIME_MS, endTimeForService)
                     putExtra(com.example.service.FocusTimerService.EXTRA_TARGET_SECONDS, _targetSeconds.value)
                     putExtra(com.example.service.FocusTimerService.EXTRA_TASK_TITLE, _currentTaskTitle.value)
                     putExtra(com.example.service.FocusTimerService.EXTRA_MODE, _currentMode.value)
@@ -2954,7 +3036,7 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             try {
                 com.example.util.AiStudyGuardManager.logSessionStart(
                     app, "Focus Timer", "RESTORE",
-                    "restored with $remSec s remaining; endTime=$endTime"
+                    "restored with $remSec s remaining; endTime=$endTimeForService"
                 )
             } catch (_: Exception) { }
             Log.i(TAG, "[TimerRestore] Restored running timer with $remSec s remaining")
@@ -2980,6 +3062,16 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             accumulatedSessionElapsedSecs = 0
             sessionStartTimeMs = 0L
             Log.i(TAG, "[TimerRestore] Timer expired while dead; completing missed session")
+            // v1.1.4-item5: the restore-completion path gets its own Guard
+            // Hub entry (source RESTORE) so a session recorded without the UI
+            // alive is traceable like every other start/restore path.
+            try {
+                com.example.util.AiStudyGuardManager.logGuardActivity(
+                    app, "Focus Timer", "session-complete", "RECORDED",
+                    "src=RESTORE",
+                    "expired while dead; target=${originalTarget}s endTime=$endTime"
+                )
+            } catch (_: Exception) { }
             onTimerCompleted()
         } else {
             // Flags set but no valid end time: clear the stale flags.
@@ -3201,12 +3293,23 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         // v1.1.5: claim this completion FIRST (before pauseTimer clears the flags) so
         // the FocusTimerService ticker / cold-start restore paths can never record the
         // same session a second time.
+        // v1.1.4-item5: check the claim BEFORE writing it. If the service's
+        // missed-session path already completed this exact end time, the
+        // recording/points/summary/screen below are skipped (they would be a
+        // duplicate row) — but the timer reset and the pomodoro advance still
+        // run so the UI and the cycle stay correct.
+        var alreadyRecorded = false
         try {
             val app = getApplication<Application>()
             val bootPrefs = app.getSharedPreferences("focusly_local_data", Context.MODE_PRIVATE)
             val endTimeMs = bootPrefs.getLong("manual_timer_end_time_ms", 0L)
             if (endTimeMs != 0L) {
-                bootPrefs.edit().putLong(KEY_LAST_COMPLETED_END_TIME_MS, endTimeMs).commit()
+                alreadyRecorded = bootPrefs.getLong(KEY_LAST_COMPLETED_END_TIME_MS, 0L) == endTimeMs
+                if (alreadyRecorded) {
+                    Log.i(TAG, "onTimerCompleted: endTime=$endTimeMs already recorded by the service path; skipping duplicate record")
+                } else {
+                    bootPrefs.edit().putLong(KEY_LAST_COMPLETED_END_TIME_MS, endTimeMs).commit()
+                }
             }
         } catch (_: Throwable) {}
         pauseTimer()
@@ -3257,125 +3360,133 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
             return
         }
 
-        val durationSpent = _targetSeconds.value - _remainingSeconds.value
-        val actualSeconds = when {
-            accumulatedSessionElapsedSecs > 0 -> accumulatedSessionElapsedSecs.coerceIn(1, (_targetSeconds.value * 3).coerceAtLeast(300))
-            durationSpent > 0 -> durationSpent
-            else -> _targetSeconds.value.coerceAtLeast(60)
-        }
+        // v1.1.4-item5: skip the whole recording when the service path already
+        // recorded this exact session (duplicate-row guard above).
+        // The accumulator is captured before the reset: pauseTimer() folded
+        // the final stretch into it, and the reset must run whether or not
+        // this call records.
+        val elapsedBeforeReset = accumulatedSessionElapsedSecs
         accumulatedSessionElapsedSecs = 0
         sessionStartTimeMs = 0L
+        if (!alreadyRecorded) {
+            val durationSpent = _targetSeconds.value - _remainingSeconds.value
+            val actualSeconds = when {
+                elapsedBeforeReset > 0 -> elapsedBeforeReset.coerceIn(1, (_targetSeconds.value * 3).coerceAtLeast(300))
+                durationSpent > 0 -> durationSpent
+                else -> _targetSeconds.value.coerceAtLeast(60)
+            }
 
-        val pointsEarned = maxOf(1, actualSeconds / 60)
+            val pointsEarned = maxOf(1, actualSeconds / 60)
 
-        val cal = Calendar.getInstance()
-        val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK) // 1=Sun, 2=Mon...
-        val mappedDayOfWeek = if (dayOfWeek == 1) 7 else dayOfWeek - 1 // 1=Mon, 7=Sun
-        val hourOfDay = cal.get(Calendar.HOUR_OF_DAY)
+            val cal = Calendar.getInstance()
+            val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK) // 1=Sun, 2=Mon...
+            val mappedDayOfWeek = if (dayOfWeek == 1) 7 else dayOfWeek - 1 // 1=Mon, 7=Sun
+            val hourOfDay = cal.get(Calendar.HOUR_OF_DAY)
 
-        val session = FocusSessionEntity(
-            taskTitle = _currentTaskTitle.value,
-            durationSeconds = actualSeconds,
-            targetDurationSeconds = _targetSeconds.value,
-            mode = _currentMode.value,
-            distractionsCount = _distractionsCount.value,
-            distractionTypes = _loggedDistractions.value.joinToString(", "),
-            focusPointsEarned = pointsEarned,
-            completedAt = System.currentTimeMillis(),
-            dayOfWeek = mappedDayOfWeek,
-            hourOfDay = hourOfDay,
-            notes = _sessionNotes.value
-        )
-
-        viewModelScope.launch {
-            repository.recordSession(session)
-            // Update points in preferences
-            val prefs = userPreferences.value ?: UserPreferencesEntity()
-
-            val allPast = repository.allSessions.firstOrNull() ?: emptyList()
-            val totalSessions = allPast + session
-
-            val updatedTotalFocusMinutes = totalSessions.sumOf { it.durationSeconds } / 60
-            val updatedPoints = totalSessions.sumOf { it.focusPointsEarned }
-            val newGrowthStage = when {
-                updatedTotalFocusMinutes >= 600 -> 3
-                updatedTotalFocusMinutes >= 120 -> 2
-                else -> 1
-            }.coerceAtMost(3)
-
-            val updatedLevel = newGrowthStage
-
-            val updatedPrefs = prefs.copy(
-                focusPoints = updatedPoints,
-                userLevel = updatedLevel,
-                buddyTotalFocusMinutes = updatedTotalFocusMinutes,
-                buddyGrowthStage = newGrowthStage
+            val session = FocusSessionEntity(
+                taskTitle = _currentTaskTitle.value,
+                durationSeconds = actualSeconds,
+                targetDurationSeconds = _targetSeconds.value,
+                mode = _currentMode.value,
+                distractionsCount = _distractionsCount.value,
+                distractionTypes = _loggedDistractions.value.joinToString(", "),
+                focusPointsEarned = pointsEarned,
+                completedAt = System.currentTimeMillis(),
+                dayOfWeek = mappedDayOfWeek,
+                hourOfDay = hourOfDay,
+                notes = _sessionNotes.value
             )
-            repository.savePreferences(updatedPrefs)
 
-            // Real-time Supabase sync for points and study duration
-            val uid = SupabaseService.getInstance().getCurrentUserId()
-                ?: _currentUser.value?.firebaseUid
-                ?: AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredUserId(it) }
+            viewModelScope.launch {
+                repository.recordSession(session)
+                // Update points in preferences
+                val prefs = userPreferences.value ?: UserPreferencesEntity()
 
-            if (!uid.isNullOrBlank()) {
-                val totalSeconds = totalSessions.sumOf { it.durationSeconds }
-                val avatarUrl = updatedPrefs.currentUserPhotoUrl
-                    ?: AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredAvatarUrl(it) }
+                val allPast = repository.allSessions.firstOrNull() ?: emptyList()
+                val totalSessions = allPast + session
 
-                val leaderboardDto = com.example.data.SupabaseStudyLeaderboardDto(
-                    user_id = uid,
-                    display_name = updatedPrefs.currentUserName ?: "Student",
-                    study_seconds = totalSeconds.toLong().coerceAtLeast(1L),
-                    streak = prefs.currentStreak.coerceAtLeast(1),
-                    subject_tag = _currentTaskTitle.value.ifBlank { "General Study" },
-                    avatar_url = avatarUrl
+                val updatedTotalFocusMinutes = totalSessions.sumOf { it.durationSeconds } / 60
+                val updatedPoints = totalSessions.sumOf { it.focusPointsEarned }
+                val newGrowthStage = when {
+                    updatedTotalFocusMinutes >= 600 -> 3
+                    updatedTotalFocusMinutes >= 120 -> 2
+                    else -> 1
+                }.coerceAtMost(3)
+
+                val updatedLevel = newGrowthStage
+
+                val updatedPrefs = prefs.copy(
+                    focusPoints = updatedPoints,
+                    userLevel = updatedLevel,
+                    buddyTotalFocusMinutes = updatedTotalFocusMinutes,
+                    buddyGrowthStage = newGrowthStage
                 )
+                repository.savePreferences(updatedPrefs)
 
-                Log.i("FocuslyViewModel", "[FocusPointsSync] BEFORE WRITE: Session finished! Earned $pointsEarned pts for user_id=$uid. Updating user_preferences focus_points=$updatedPoints, buddy_minutes=$updatedTotalFocusMinutes, level=$updatedLevel")
+                // Real-time Supabase sync for points and study duration
+                val uid = SupabaseService.getInstance().getCurrentUserId()
+                    ?: _currentUser.value?.firebaseUid
+                    ?: AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredUserId(it) }
 
-                val lbResult = SupabaseService.getInstance().upsertLeaderboard(leaderboardDto)
-                Log.i("FocuslyViewModel", "[FocusPointsSync] AFTER WRITE (Leaderboard): status=${lbResult.isSuccess}")
+                if (!uid.isNullOrBlank()) {
+                    val totalSeconds = totalSessions.sumOf { it.durationSeconds }
+                    val avatarUrl = updatedPrefs.currentUserPhotoUrl
+                        ?: AndroidPreferenceSessionManager.appContext?.let { AndroidPreferenceSessionManager.getStoredAvatarUrl(it) }
 
-                if (!avatarUrl.isNullOrBlank()) {
-                    SupabaseService.getInstance().updateUserAvatarUrl(uid, avatarUrl)
+                    val leaderboardDto = com.example.data.SupabaseStudyLeaderboardDto(
+                        user_id = uid,
+                        display_name = updatedPrefs.currentUserName ?: "Student",
+                        study_seconds = totalSeconds.toLong().coerceAtLeast(1L),
+                        streak = prefs.currentStreak.coerceAtLeast(1),
+                        subject_tag = _currentTaskTitle.value.ifBlank { "General Study" },
+                        avatar_url = avatarUrl
+                    )
+
+                    Log.i("FocuslyViewModel", "[FocusPointsSync] BEFORE WRITE: Session finished! Earned $pointsEarned pts for user_id=$uid. Updating user_preferences focus_points=$updatedPoints, buddy_minutes=$updatedTotalFocusMinutes, level=$updatedLevel")
+
+                    val lbResult = SupabaseService.getInstance().upsertLeaderboard(leaderboardDto)
+                    Log.i("FocuslyViewModel", "[FocusPointsSync] AFTER WRITE (Leaderboard): status=${lbResult.isSuccess}")
+
+                    if (!avatarUrl.isNullOrBlank()) {
+                        SupabaseService.getInstance().updateUserAvatarUrl(uid, avatarUrl)
+                    }
+                } else {
+                    Log.e("FocuslyViewModel", "[FocusPointsSync] ERROR: Cannot sync focus_points to Supabase — user_id is blank!")
                 }
-            } else {
-                Log.e("FocuslyViewModel", "[FocusPointsSync] ERROR: Cannot sync focus_points to Supabase — user_id is blank!")
-            }
 
-            // Real-time Firebase sync for completed study session
-            val user = _currentUser.value
-            if (user != null) {
-                firebaseSyncManager.syncSession(
-                    session = session,
-                    totalPoints = updatedPoints,
-                    streak = prefs.currentStreak
+                // Real-time Firebase sync for completed study session
+                val user = _currentUser.value
+                if (user != null) {
+                    firebaseSyncManager.syncSession(
+                        session = session,
+                        totalPoints = updatedPoints,
+                        streak = prefs.currentStreak
+                    )
+                }
+
+                // v1.4.3: post-session notifications (session complete / break over /
+                // achievements / theme unlocks / held digest). All guarded — never throws.
+                postSessionCompletionNotifications(
+                    oldPoints = prefs.focusPoints,
+                    newPoints = updatedPoints,
+                    minutes = actualSeconds / 60,
+                    pointsEarned = pointsEarned,
+                    totalSessions = totalSessions,
+                    shieldAttempts = updatedPrefs.shieldBlockedAttempts,
+                    isAppBlockerEnabled = updatedPrefs.isAppBlockerEnabled
                 )
             }
 
-            // v1.4.3: post-session notifications (session complete / break over /
-            // achievements / theme unlocks / held digest). All guarded — never throws.
-            postSessionCompletionNotifications(
-                oldPoints = prefs.focusPoints,
-                newPoints = updatedPoints,
-                minutes = actualSeconds / 60,
-                pointsEarned = pointsEarned,
-                totalSessions = totalSessions,
-                shieldAttempts = updatedPrefs.shieldBlockedAttempts,
-                isAppBlockerEnabled = updatedPrefs.isAppBlockerEnabled
-            )
-        }
-
-        _completedSessionSummary.value = session
-        // v1.1: pomodoro FOCUS phases are recorded above with real
-        // minutes+points and the Session Complete notification already fired —
-        // skip the completion screen mid-cycle and advance automatically.
-        // Classic flow: completion screen as before.
-        if (_pomodoroState.value != null) {
-            _showCompletionScreen.value = false
-        } else {
-            _showCompletionScreen.value = true
+            _completedSessionSummary.value = session
+            // v1.1: pomodoro FOCUS phases are recorded above with real
+            // minutes+points and the Session Complete notification already fired —
+            // skip the completion screen mid-cycle and advance automatically.
+            // Classic flow: completion screen as before.
+            if (_pomodoroState.value != null) {
+                _showCompletionScreen.value = false
+            } else {
+                _showCompletionScreen.value = true
+            }
         }
 
         // Reset timer

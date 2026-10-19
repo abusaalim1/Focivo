@@ -79,11 +79,18 @@ class ScheduledBlockReceiver : BroadcastReceiver() {
                     // reminder, Sunday recap, update check, comeback) —
                     // idempotent, no duplicates.
                     FocivoNotifications.scheduleAllSurvivalAlarms(context)
-                    // v1.3.1: re-arm/validate the strict-session record on
+                    // v1.1.3: re-arm/validate the strict-session record on
                     // boot — expired records are purged (never resurrect),
                     // live ones stay armed so the tamper guard cannot be
                     // dodged by rebooting mid-session.
                     com.example.util.StrictSessionStore.validateOnBoot(context)
+                    // v1.1.4-item5: report the persisted timer anchor state
+                    // to Guard Hub (live/expired/none). Never re-arms or
+                    // completes anything here — the app-open restore path
+                    // continues the same session or completes the expired
+                    // one, so a reboot can neither restart a session at full
+                    // duration nor resurrect an expired one.
+                    com.example.util.TimerAnchorStore.validateOnBoot(context)
                 } catch (e: Exception) {
                     Log.e(TAG, "[BootCompleted] Error restoring alarms/schedules on boot: ${e.message}")
                 } finally {

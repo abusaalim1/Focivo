@@ -152,14 +152,18 @@ class FocusTimerService : Service() {
         var taskTitle = intent?.getStringExtra(EXTRA_TASK_TITLE) ?: "Focus Session"
         var mode = intent?.getStringExtra(EXTRA_MODE) ?: "Deep Work"
 
-        // Process restart (intent == null): recover from persisted prefs
+        // Process restart (intent == null): recover from the single persisted
+        // anchor pair. v1.1.4-item5: the liveness decision goes through
+        // TimerAnchorStore (elapsed-realtime anchor preferred, wall-clock
+        // fallback after reboot), so a wall-clock jump can neither resurrect
+        // an expired session nor cut a live one short. The restore re-arms
+        // the SAME persisted end time — never a new full-duration anchor.
         if (intent == null || action == null) {
-            val prefs = getSharedPreferences(PREFS_LOCAL, Context.MODE_PRIVATE)
             val tPrefs = getSharedPreferences(PREFS_TIMER_STATE, Context.MODE_PRIVATE)
-            val running = prefs.getBoolean(KEY_MANUAL_RUNNING, false)
-            endTimeMs = prefs.getLong(KEY_MANUAL_END, 0L)
+            val running = TimerAnchorStore.isManualTimerRunning(this)
+            endTimeMs = TimerAnchorStore.getEndWallMs(this)
             if (!running || endTimeMs <= 0L) {
-                Log.d(TAG, "[Restart] No persisted timer found; stopping")
+                Log.d(TAG, "[Restart] No live persisted timer found; stopping")
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -170,6 +174,20 @@ class FocusTimerService : Service() {
         }
 
         if (endTimeMs <= now) {
+            // v1.1.4-item5: an explicit start command that carries no usable
+            // end time is a corrupt command, not a missed session. Recording
+            // it would invent a full-duration session with epoch timestamps
+            // (resurrection). Stop quietly and leave the claim marker alone.
+            if (intent != null && action != null && endTimeMs <= 0L) {
+                Log.w(TAG, "START command without an end time; refusing to record a phantom session")
+                try {
+                    com.example.util.AiStudyGuardManager.logGuardSkip(
+                        this, "Focus Timer", "session-start", "missing-end-time"
+                    )
+                } catch (_: Exception) { }
+                stopSelf()
+                return START_NOT_STICKY
+            }
             // End time already passed while the process was dead: complete the session properly.
             serviceScope.launch {
                 completeMissedSession(targetSeconds, taskTitle, mode, endTimeMs)
@@ -232,7 +250,11 @@ class FocusTimerService : Service() {
                     break
                 }
                 updateTimerNotification(remainingSec, taskTitle, mode)
-                persistRemaining(remainingSec)
+                // v1.1.4-item5: no per-second "remaining_seconds" write. That
+                // key was a second, constantly rewritten anchor that could
+                // disagree with the single persisted end anchor; the widget
+                // now reads TimerAnchorStore directly. The one-time write in
+                // persistTimerPrefs() stays for legacy readers.
                 delay(1000L)
             }
         }
@@ -261,6 +283,20 @@ class FocusTimerService : Service() {
             // Claim it synchronously before recording.
             claimPrefs.edit().putLong(KEY_LAST_COMPLETED_END, endTimeMs).commit()
         } catch (_: Throwable) {}
+        // v1.1.4-item5: a pomodoro break phase that expires while the UI is
+        // dead must NOT be recorded as a study session — the ViewModel's own
+        // completion path never records breaks (no points, no log). Clear the
+        // prefs, post the break-over notice, and stop quietly.
+        if (mode.contains("break", ignoreCase = true)) {
+            Log.i(TAG, "Missed break phase for endTime=$endTimeMs: not recorded (breaks earn nothing)")
+            clearTimerPrefs()
+            stopForegroundSafely()
+            try {
+                com.example.service.FocivoNotifications.postBreakOver(this)
+            } catch (_: Exception) { }
+            stopSelf()
+            return
+        }
         try {
             val cal = Calendar.getInstance()
             val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
@@ -282,6 +318,15 @@ class FocusTimerService : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "Could not record missed session: ${e.message}")
         }
+        // v1.1.4-item5: Guard Hub completion entry — a session recorded with
+        // the UI dead is traceable like every other start/restore path.
+        try {
+            com.example.util.AiStudyGuardManager.logGuardActivity(
+                this, "Focus Timer", "session-complete", "RECORDED",
+                "src=RESTORE",
+                "service missed-session path; target=${targetSeconds}s title=$taskTitle"
+            )
+        } catch (_: Exception) { }
         clearTimerPrefs()
         stopForegroundSafely()
         postCompletionNotification(taskTitle)
@@ -309,14 +354,6 @@ class FocusTimerService : Service() {
         // v1.3.1: arm the durable strict-session record at the same choke
         // point (carries expiry validation across process death/reboot).
         try { com.example.util.StrictSessionStore.arm(this, endTimeMs) } catch (_: Exception) {}
-    }
-
-    private fun persistRemaining(remainingSec: Int) {
-        try {
-            getSharedPreferences(PREFS_TIMER_STATE, Context.MODE_PRIVATE).edit()
-                .putInt(KEY_REMAINING, remainingSec)
-                .apply()
-        } catch (_: Exception) {}
     }
 
     private fun clearTimerPrefs() {

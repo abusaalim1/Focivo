@@ -113,6 +113,11 @@ class MainActivity : ComponentActivity() {
         // Restore a running timer's UI after process death (idempotent — no-op if
         // the timer is already live in this process or no timer is persisted).
         activeViewModel?.restoreTimerStateIfNeeded()
+        // v1.1.4-item5: re-derive the displayed countdown from the single
+        // persisted anchor on every resume — mirrors the service's unlock
+        // refresh for the notification, so the main screen self-corrects
+        // after any Doze/screen-lock stall instead of showing a stale value.
+        activeViewModel?.resyncTimerDisplayFromAnchor()
         com.example.service.ScheduledBlockScheduler.evaluateAndReschedule(this)
         // v1.2.2 — never let the launcher icon vanish as a side effect of a
         // blocked strict-mode uninstall (launcher-side artifact on some ROMs).

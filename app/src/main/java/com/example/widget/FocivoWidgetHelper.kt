@@ -82,8 +82,17 @@ object FocivoWidgetHelper {
         val views = RemoteViews(context.packageName, R.layout.widget_focus_timer)
 
         val timerPrefs = context.getSharedPreferences("focusly_timer_state", Context.MODE_PRIVATE)
-        val isRunning = timerPrefs.getBoolean("is_timer_running", false)
-        val remainingSecs = timerPrefs.getInt("remaining_seconds", 25 * 60)
+        // v1.1.4-item5: the widget reads the single persisted anchor — the
+        // same source as the service, pill, and UI tick — instead of the
+        // "remaining_seconds" key (which the per-second ticker no longer
+        // rewrites). Idle display keeps the last-known/default value.
+        val anchorRunning = com.example.util.TimerAnchorStore.isManualTimerRunning(context)
+        val isRunning = timerPrefs.getBoolean("is_timer_running", false) || anchorRunning
+        val remainingSecs = if (anchorRunning) {
+            com.example.util.TimerAnchorStore.getRemainingSeconds(context)
+        } else {
+            timerPrefs.getInt("remaining_seconds", 25 * 60)
+        }
         val currentTask = timerPrefs.getString("current_task_title", "Deep Work Session") ?: "Deep Work Session"
         // v1.3.2 (item 14 QA): phase-aware labels — the old build always said
         // "Focus: …" / "Focusing", even during pomodoro breaks (wrong phase
