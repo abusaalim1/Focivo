@@ -1,5 +1,6 @@
 package com.example.screenshots.v134
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,9 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,6 +26,7 @@ import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.focivoTokens
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
+import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,9 +38,13 @@ import org.robolectric.annotation.GraphicsMode
  * v1.1.4b ITEM A — full picker evidence for the true scale-to-fit thumbnails.
  *
  * Renders the REAL TimerFacePicker (the "Timer Style" row from Customize
- * Timer) and captures it at three scroll positions so ALL NINE clock styles
- * appear across the shots: start (Orbit/Flip/Liquid), mid (Editorial/Dial/
- * Horizon), end (Stack/Breathe/Bars). Dark + light at Pixel 8.
+ * Timer) and captures it at three EXACT scroll offsets so ALL NINE clock
+ * styles appear FULLY in frame across the shots:
+ *   start (464dp): Orbit / Flip / Liquid
+ *   mid   (812dp): Editorial Clock / Dial / Horizon
+ *   end   (1117dp, clamped max): Stack / Breathe / Bars
+ * (Card pitch = 104dp card + 12dp spacing = 116dp; Orbit is face index 4.)
+ * Dark + light at Pixel 8.
  *
  * Eyeball EVERY tile in EVERY PNG: the FULL clock (time + ring/cards/
  * digits) must be visible inside its tile with breathing room — no face
@@ -58,6 +62,8 @@ class V114bClockPickerGridTest {
 
     private val context: Context
         get() = ApplicationProvider.getApplicationContext()
+
+    private val scrollState = ScrollState(0)
 
     private fun content(): @Composable () -> Unit = {
         val t = focivoTokens()
@@ -86,17 +92,16 @@ class V114bClockPickerGridTest {
                     onFaceTap = { _, _ -> },
                     textPrimary = t.text,
                     cardBorder = t.line,
+                    scrollState = scrollState,
                     isAdmin = true
                 )
             }
         }
     }
 
-    private fun captureAt(label: String, name: String) {
-        composeTestRule.waitForIdle()
-        composeTestRule
-            .onNodeWithText(label, useUnmergedTree = true)
-            .performScrollTo()
+    private fun captureAt(name: String, offsetDp: Int) {
+        val px = with(composeTestRule.density) { offsetDp.dp.roundToPx() }
+        runBlocking { scrollState.scrollTo(px) }
         composeTestRule.waitForIdle()
         composeTestRule.onRoot().captureRoboImage(
             filePath = "src/test/screenshots/v134/$name.png"
@@ -104,9 +109,9 @@ class V114bClockPickerGridTest {
     }
 
     private fun runAll(prefix: String) {
-        captureAt("Orbit", "${prefix}_picker_start")
-        captureAt("Horizon", "${prefix}_picker_mid")
-        captureAt("Bars", "${prefix}_picker_end")
+        captureAt("${prefix}_picker_start", 464)
+        captureAt("${prefix}_picker_mid", 812)
+        captureAt("${prefix}_picker_end", 1160)
     }
 
     @Test
