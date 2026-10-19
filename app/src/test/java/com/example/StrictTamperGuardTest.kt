@@ -3,7 +3,9 @@ package com.example
 import com.example.util.StrictTamperGuard
 import com.example.util.StrictTamperGuard.TamperKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -166,5 +168,169 @@ class StrictTamperGuardTest {
                 appLabel = LABEL
             )
         )
+    }
+
+    // v1.3.x (item 3) — OEM coverage and fragment-hosted screens.
+
+    @Test
+    fun `samsung installer uninstall naming focivo is detected`() {
+        assertEquals(
+            TamperKind.UNINSTALL_DIALOG,
+            StrictTamperGuard.detect(
+                pkg = "com.samsung.android.packageinstaller",
+                className = "com.samsung.android.packageinstaller.UninstallActivity",
+                screenText = "do you want to uninstall focivo?",
+                ownPackage = OWN,
+                appLabel = LABEL
+            )
+        )
+    }
+
+    @Test
+    fun `miui installer uninstall naming focivo is detected`() {
+        assertEquals(
+            TamperKind.UNINSTALL_DIALOG,
+            StrictTamperGuard.detect(
+                pkg = "com.miui.packageinstaller",
+                className = "com.miui.packageinstaller.ui.UninstallActivity",
+                screenText = "uninstall com.aistudio.focusly.kqpzxr",
+                ownPackage = OWN,
+                appLabel = LABEL
+            )
+        )
+    }
+
+    @Test
+    fun `oppo installer uninstall naming focivo is detected`() {
+        assertEquals(
+            TamperKind.UNINSTALL_DIALOG,
+            StrictTamperGuard.detect(
+                pkg = "com.oppo.packageinstaller",
+                className = "com.oppo.packageinstaller.UninstallConfirm",
+                screenText = "uninstall focivo cancel ok",
+                ownPackage = OWN,
+                appLabel = LABEL
+            )
+        )
+    }
+
+    @Test
+    fun `samsung launcher long-press uninstall naming focivo is detected`() {
+        assertEquals(
+            TamperKind.UNINSTALL_DIALOG,
+            StrictTamperGuard.detect(
+                pkg = "com.sec.android.app.launcher",
+                className = "android.app.AlertDialog",
+                screenText = "uninstall focivo?",
+                ownPackage = OWN,
+                appLabel = LABEL
+            )
+        )
+    }
+
+    @Test
+    fun `xiaomi system launcher uninstall naming focivo is detected`() {
+        assertEquals(
+            TamperKind.UNINSTALL_DIALOG,
+            StrictTamperGuard.detect(
+                pkg = "com.miui.home",
+                className = "android.app.AlertDialog",
+                screenText = "uninstall focivo cancel",
+                ownPackage = OWN,
+                appLabel = LABEL
+            )
+        )
+    }
+
+    @Test
+    fun `fragment-hosted app info with uninstall button naming focivo is detected`() {
+        // Newer vivo OriginOS / Honor host app-info in a generic Settings
+        // activity — no "appinfo" in the class name — but the page still has
+        // the Uninstall button and names the app.
+        assertEquals(
+            TamperKind.APP_INFO_UNINSTALL,
+            StrictTamperGuard.detect(
+                pkg = "com.vivo.settings",
+                className = "com.vivo.settings.SubSettings",
+                screenText = "focivo com.aistudio.focusly.kqpzxr uninstall force stop clear data",
+                ownPackage = OWN,
+                appLabel = LABEL
+            )
+        )
+    }
+
+    @Test
+    fun `device admin deactivation confirm dialog naming focivo is detected`() {
+        assertEquals(
+            TamperKind.DEVICE_ADMIN_TAMPER,
+            StrictTamperGuard.detect(
+                pkg = "com.vivo.settings",
+                className = "com.vivo.settings.VivoAlertDialog",
+                screenText = "deactivate device administrator? focivo will no longer be a device administrator",
+                ownPackage = OWN,
+                appLabel = LABEL
+            )
+        )
+    }
+
+    @Test
+    fun `device admin activation screen is never caught`() {
+        // The grant flow says "Activate", never "Deactivate" — it must stay
+        // untouched so the user can always activate the admin.
+        assertNull(
+            StrictTamperGuard.detect(
+                pkg = "com.android.settings",
+                className = "com.android.settings.DeviceAdminAdd",
+                screenText = "activate device administrator? focivo",
+                ownPackage = OWN,
+                appLabel = LABEL
+            )
+        )
+    }
+
+    @Test
+    fun `galaxy store page with uninstall for focivo is detected`() {
+        assertEquals(
+            TamperKind.UNINSTALL_DIALOG,
+            StrictTamperGuard.detect(
+                pkg = "com.sec.android.app.samsungapps",
+                className = "com.sec.android.app.samsungapps.DetailActivity",
+                screenText = "focivo uninstall open",
+                ownPackage = OWN,
+                appLabel = LABEL
+            )
+        )
+    }
+
+    @Test
+    fun `unrelated launcher screen without uninstall text is ignored`() {
+        assertNull(
+            StrictTamperGuard.detect(
+                pkg = "com.bbk.launcher2",
+                className = "com.bbk.launcher2.Launcher",
+                screenText = "focivo chrome camera",
+                ownPackage = OWN,
+                appLabel = LABEL
+            )
+        )
+    }
+
+    @Test
+    fun `candidate package predicate covers oem tamper hosts`() {
+        assertTrue(StrictTamperGuard.isTamperCandidatePackage("com.samsung.android.packageinstaller"))
+        assertTrue(StrictTamperGuard.isTamperCandidatePackage("com.miui.packageinstaller"))
+        assertTrue(StrictTamperGuard.isTamperCandidatePackage("com.bbk.launcher2"))
+        assertTrue(StrictTamperGuard.isTamperCandidatePackage("com.miui.home"))
+        assertTrue(StrictTamperGuard.isTamperCandidatePackage("com.vivo.settings"))
+        assertTrue(StrictTamperGuard.isTamperCandidatePackage("com.hihonor.settings"))
+        assertTrue(StrictTamperGuard.isTamperCandidatePackage("com.vivo.imanager"))
+        assertTrue(StrictTamperGuard.isTamperCandidatePackage("com.sec.android.app.samsungapps"))
+    }
+
+    @Test
+    fun `candidate package predicate rejects ordinary apps`() {
+        assertFalse(StrictTamperGuard.isTamperCandidatePackage("com.google.android.youtube"))
+        assertFalse(StrictTamperGuard.isTamperCandidatePackage("com.whatsapp"))
+        assertFalse(StrictTamperGuard.isTamperCandidatePackage(OWN))
     }
 }

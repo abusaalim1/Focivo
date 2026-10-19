@@ -86,6 +86,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
         // uninstall / app-info / device-admin screens mid-session)
         private var lastTamperInterceptMs: Long = 0L
         private var lastTamperKey: String? = null
+        // v1.3.x (item 3): content-changed evaluation throttle per package
+        // (typeWindowContentChanged fires per keystroke/scroll).
+        private var lastTamperEvalMs: Long = 0L
+        private var lastTamperEvalKey: String? = null
+        // v1.3.x (item 3): "seen but not protected" diagnostic throttle per
+        // (reason, pkg) — the next device test shows exactly why an attempt
+        // did NOT fire, without spamming the hub.
+        private val lastTamperSkipLogMs = mutableMapOf<String, Long>()
         // v1.3.1: deep-focus home-screen block throttle
         private var lastHomeScreenInterceptMs: Long = 0L
         private var lastHomeInterceptedPkg: String? = null
@@ -1084,7 +1092,16 @@ class AiStudyAccessibilityService : AccessibilityService() {
 
     /**
      * v1.3.1 hotfix (owner order 2026-10-17, item A1) — Focivo-specific
-     * tamper guard.
+     * tamper guard. v1.3.x (item 3): evaluated BEFORE the essential-apps
+     * early return (launchers and Settings ARE the tamper screens), on
+     * window-state changes, window-set changes, and throttled content
+     * changes (some OEM uninstall dialogs never emit a window-state
+     * changes (some OEM uninstall dialogs never emit a window-state
+     * change), and no longer pre-gated on the study-period check — the
+     * four-condition gate below (identical to UninstallProtectionGate
+     * PROTECTED: strict + opted-in + live session + admin active) is the
+     * single authority, so shield-only sessions (store-armed, no study
+     * period) are covered too.
      *
      * When a protected strict session is running
      * (UninstallProtectionGate == PROTECTED), the accessibility service
@@ -1092,7 +1109,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
      * package-installer uninstall confirmation, the Settings app-info page,
      * and the device-admin deactivation screen — and:
      *   1. back-presses out of the screen (GLOBAL_ACTION_BACK),
-     *   2. re-fires on persistence (each window-state change is a new
+     *   2. re-fires on persistence (each new window event is a new
      *      detection, throttled at 1.5s so the user can never complete the
      *      flow mid-session),
      *   3. shows the premium StrictUninstallBlockedOverlay (window-safe),
@@ -1103,24 +1120,65 @@ class AiStudyAccessibilityService : AccessibilityService() {
      * Session-scoped only: outside a protected session this is a no-op and
      * uninstall/deactivation are 100% normal.
      */
-    private fun guardStrictTamperScreen(event: AccessibilityEvent, pkg: String) {
-        val gate = com.example.util.UninstallProtectionGate.decide(
-            strictEnabled = com.example.util.StrictModeManager.isStrictModeEnabled(applicationContext),
-            protectionEnabled = com.example.util.StrictModeManager.isUninstallProtectionEnabled(applicationContext),
-            sessionActive = com.example.util.AiStudyGuardManager.isStudyPeriodActive(applicationContext) ||
-                    com.example.util.StrictSessionStore.isStrictSessionActive(applicationContext),
-            adminActive = com.example.util.DeviceAdminGuard.isAdminActive(applicationContext)
-        )
-        if (gate != com.example.util.UninstallProtectionGate.State.PROTECTED) return
+    private fun guardStrictTamperScreen(
+        event: AccessibilityEvent,
+        pkg: String,
+        eventType: Int
+    ) {
+        val ctx = applicationContext
+        // Cheap pre-filter first: only tamper-capable packages are worth the
+        // gate reads below. Pure string ops — the overwhelmingly common
+        // non-candidate event costs nothing.
+        if (!com.example.util.StrictTamperGuard.isTamperCandidatePackage(pkg)) return
+
+        // TYPE_WINDOW_CONTENT_CHANGED fires per keystroke/scroll — throttle
+        // the evaluation itself so a Settings/launcher scroll storm stays
+        // cheap. Window-state/windows-changed events are always evaluated.
+        val nowTime = System.currentTimeMillis()
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            val evalKey = pkg
+            if (nowTime - lastTamperEvalMs < 800L && lastTamperEvalKey == evalKey) return
+            lastTamperEvalMs = nowTime
+            lastTamperEvalKey = evalKey
+        }
+
+        // Session-scoped gate, cheapest checks first. PROTECTED requires ALL
+        // of: Strict ON, opted in, a LIVE session (study period OR the
+        // StrictSessionStore's armed, expiry-validated record — shield-only
+        // sessions arm the store without a study period), and the device
+        // admin actually active. Outside a protected session this whole
+        // function is a no-op and uninstall/deactivation are 100% normal.
+        // The 1.1.3 session-scoping (pause/discard/completion disarm,
+        // monotonic expiry, purge on read) lives in StrictSessionStore and
+        // is untouched.
+        if (!com.example.util.StrictModeManager.isStrictModeEnabled(ctx)) {
+            // Strict off: uninstall is 100% normal. No diagnostic needed —
+            // this is the overwhelmingly common state, keep the hub quiet.
+            return
+        }
+        if (!com.example.util.StrictModeManager.isUninstallProtectionEnabled(ctx)) {
+            logTamperSkipped(pkg, "opted-out")
+            return
+        }
+        val sessionActive = com.example.util.AiStudyGuardManager.isStudyPeriodActive(ctx) ||
+                com.example.util.StrictSessionStore.isStrictSessionActive(ctx)
+        if (!sessionActive) {
+            logTamperSkipped(pkg, "no-session")
+            return
+        }
+        if (!com.example.util.DeviceAdminGuard.isAdminActive(ctx)) {
+            logTamperSkipped(pkg, "admin-inactive")
+            return
+        }
 
         val className = try { event.className?.toString() } catch (_: Exception) { null } ?: ""
         val root = try { rootInActiveWindow } catch (_: Exception) { null }
         val screenText = com.example.util.StrictTamperGuard.collectScreenText(root)
         try { root?.recycle() } catch (_: Exception) { }
-        val ownPackage = applicationContext.packageName
+        val ownPackage = ctx.packageName
         val appLabel = try {
-            val ai = applicationContext.packageManager.getApplicationInfo(ownPackage, 0)
-            applicationContext.packageManager.getApplicationLabel(ai).toString()
+            val ai = ctx.packageManager.getApplicationInfo(ownPackage, 0)
+            ctx.packageManager.getApplicationLabel(ai).toString()
         } catch (_: Exception) { "Focivo" }
 
         val tamper = com.example.util.StrictTamperGuard.detect(
@@ -1131,7 +1189,6 @@ class AiStudyAccessibilityService : AccessibilityService() {
             appLabel = appLabel
         ) ?: return
 
-        val nowTime = System.currentTimeMillis()
         val key = "${tamper.name}|$pkg"
         if (nowTime - lastTamperInterceptMs < 1500L && lastTamperKey == key) return
         lastTamperInterceptMs = nowTime
@@ -1149,7 +1206,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
         // 2. Guard Hub evidence (throttled like the intercept).
         try {
             com.example.util.AiStudyGuardManager.logGuardActivity(
-                applicationContext,
+                ctx,
                 "Focivo",
                 tamper.hubStage,
                 "BLOCKED",
@@ -1157,13 +1214,16 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 "$pkg ${className.takeLast(40)}"
             )
         } catch (_: Exception) { }
-        // 3. Premium overlay explaining why (window-safe a11y overlay path).
-        com.example.util.StrictUninstallGuard.notifyStrictUninstallBlocked(applicationContext)
+        // 3. Premium overlay explaining why (window-safe a11y overlay path —
+        // TYPE_ACCESSIBILITY_OVERLAY renders above every app window on every
+        // OEM, incl. installer dialogs; needs no overlay permission since it
+        // is added from this service).
+        com.example.util.StrictUninstallGuard.notifyStrictUninstallBlocked(ctx)
         BlockOverlayManager.intercept(
-            context = applicationContext,
+            context = ctx,
             blockedPackage = pkg,
             appName = "Focivo",
-            durationSec = FocusShieldService.getRemainingSeconds(applicationContext),
+            durationSec = FocusShieldService.getRemainingSeconds(ctx),
             reason = tamper.userReason,
             isPunishment = false
         )
@@ -1172,7 +1232,27 @@ class AiStudyAccessibilityService : AccessibilityService() {
         // above, so at most one notification fires per re-fire window; the
         // notifier re-checks the protected-session scope itself and logs
         // every post to Guard Hub.
-        com.example.util.StrictTamperAlertNotifier.notifyIntercept(applicationContext, tamper)
+        com.example.util.StrictTamperAlertNotifier.notifyIntercept(ctx, tamper)
+    }
+
+    /**
+     * v1.3.x (item 3) — throttled "seen but not protected" Guard Hub
+     * diagnostic. When a tamper-candidate package is on screen but the
+     * PROTECTED gate fails, the next device test shows exactly which
+     * condition failed instead of silent nothing. Throttled per
+     * (reason, pkg) so normal use never spams the hub.
+     */
+    private fun logTamperSkipped(pkg: String, reason: String) {
+        val key = "$reason|$pkg"
+        val now = System.currentTimeMillis()
+        if (now - (lastTamperSkipLogMs[key] ?: 0L) < 30_000L) return
+        lastTamperSkipLogMs[key] = now
+        try {
+            com.example.util.AiStudyGuardManager.logGuardActivity(
+                applicationContext, "Focivo", "tamper-guard", "skipped",
+                "candidate screen on $pkg; gate not PROTECTED ($reason)"
+            )
+        } catch (_: Exception) { }
     }
 
     private fun pauseMediaPlayback() {
@@ -1292,6 +1372,29 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 return
             }
 
+            // 1a. v1.3.x (item 3): strict-session tamper guard — evaluated
+            // BEFORE the essential-apps early return below, on window-state
+            // changes, window-set changes, and (throttled) content changes.
+            //
+            // ROOT CAUSE (owner's vivo, item 3): the guard used to run AFTER
+            // the essential-apps return and only on TYPE_WINDOW_STATE_CHANGED
+            // inside an active study period. Launchers and Settings are
+            // permanently "essential" (never blocked) — and they are exactly
+            // where the tamper screens live (launcher long-press uninstall
+            // dialogs, Settings app-info, device-admin management). Every
+            // launcher/Settings tamper screen was swallowed before the guard
+            // ever saw it, so NO notification and NO popup ever fired. It is
+            // safe to evaluate first: the guard only acts when the screen
+            // names Focivo, shows uninstall/admin text, AND the PROTECTED
+            // gate (strict + opted-in + live session + admin active) holds.
+            // Outside a protected session this is a complete no-op.
+            if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
+                eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED ||
+                eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+            ) {
+                guardStrictTamperScreen(event, pkg, eventType)
+            }
+
             // 1b. v1.3.1: Deep-focus "Block phone home screen" (Regain parity, opt-in).
             // Scoped to active deep-focus sessions only. Best-effort: the OS Home key
             // itself can't be intercepted, but landing on the launcher re-shows the
@@ -1358,20 +1461,6 @@ class AiStudyAccessibilityService : AccessibilityService() {
             val isStrictActive = StrictModeManager.shouldBlockUninstallation(applicationContext)
 
             val nowTime = System.currentTimeMillis()
-
-            // 2b. v1.3.1 hotfix (owner order 2026-10-17, item A1): Focivo-specific
-            // tamper guard for protected strict sessions. A normal device
-            // admin only forces a DEACTIVATE-FIRST step — the deactivation
-            // screen itself was unguarded (two taps defeated it). Regain-class
-            // protection watches the tamper screens and kills them the moment
-            // they name THIS app. Gated on UninstallProtectionGate == PROTECTED
-            // (strict + opted-in + genuinely running session + admin active).
-            // Only the tamper screen is touched (GLOBAL_ACTION_BACK); the
-            // premium overlay explains why. Outside a protected session this
-            // is a complete no-op.
-            if (isWindowStateChanged) {
-                guardStrictTamperScreen(event, pkg)
-            }
 
             // 3. Strict Mode: Guard uninstaller apps only during active study schedule / timer / shield.
             // v1.4.0-round2: com.android.settings is DELIBERATELY not matched here —
