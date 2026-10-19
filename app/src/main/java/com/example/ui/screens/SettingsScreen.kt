@@ -26,11 +26,9 @@ import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.RestartAlt
@@ -40,8 +38,6 @@ import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -99,28 +95,6 @@ private object SettingsT {
     val SerifItalic @Composable get() = SerifItalicFontFamily
 }
 
-/** The design's toggle: 48x28, dark track / grey thumb, lime when on. */
-@Composable
-private fun SettingsShieldToggle(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Switch(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        modifier = modifier.size(width = 48.dp, height = 28.dp),
-        colors = SwitchDefaults.colors(
-            checkedThumbColor = SettingsT.Bg,
-            checkedTrackColor = SettingsT.Lime,
-            uncheckedThumbColor = SettingsT.ThumbOff,
-            uncheckedTrackColor = SettingsT.TrackOff,
-            uncheckedBorderColor = Color.Transparent,
-            checkedBorderColor = Color.Transparent
-        )
-    )
-}
-
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -160,10 +134,15 @@ fun SettingsScreen(
     var hapticsEnabled by remember { mutableStateOf(userPreferences?.hapticsEnabled ?: true) }
     var blockStudyNotifications by remember { mutableStateOf(StudyNotificationBlockerManager.isBlockNotificationsDuringStudyEnabled(context)) }
     var hasDndPermission by remember { mutableStateOf(StudyNotificationBlockerManager.hasDndPermission(context)) }
-    var showAiGuardDisclosureDialog by remember { mutableStateOf(false) }
     var showPrivacyPolicySheet by remember { mutableStateOf(false) }
     // v1.3.3 (item 8b): global screen-time budget sheet.
     var showScreenTimeBudgetSheet by remember { mutableStateOf(false) }
+    // v1.3.4 (item 9): merged-entry sheets — one entry opens one premium
+    // sheet (the Block-sheet pattern). Every control from the old scattered
+    // cards lives inside its merged sheet; nothing was removed.
+    var showDailyTargetsSheet by remember { mutableStateOf(false) }
+    var showSessionFeedbackSheet by remember { mutableStateOf(false) }
+    var showStudyNotificationsSheet by remember { mutableStateOf(false) }
     var liveBudgetMinutes by remember(screenTimeBudgetMinutes) {
         mutableStateOf(screenTimeBudgetMinutes)
     }
@@ -196,7 +175,6 @@ fun SettingsScreen(
         else -> 0
     }
 
-    val goalOptions = listOf(120, 240, 360, 480) // 2h, 4h, 6h, 8h
 
     LazyColumn(
         modifier = modifier
@@ -292,340 +270,173 @@ fun SettingsScreen(
             }
         }
 
-        // Daily Focus Target
-        item {
-            GlassCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Schedule,
-                            contentDescription = null,
-                            tint = SettingsT.Lime,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "DAILY FOCUS TARGET",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                color = textSecondary,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.76.sp,
-                                fontSize = 11.sp
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        goalOptions.forEach { minutes ->
-                            val hrs = minutes / 60
-                            val isSelected = (userPreferences?.dailyGoalMinutes ?: 360) == minutes
-
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(
-                                        if (isSelected) SettingsT.Lime else SettingsT.Surface
-                                    )
-                                    .clickable { onUpdateDailyGoal(minutes) }
-                                    .padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "${hrs}h / day",
-                                    style = MaterialTheme.typography.labelLarge.copy(
-                                        color = if (isSelected) Color.White else textPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // v1.3.3 (item 8b): Daily Screen Time — the global budget entry.
-        // Past the budget, non-essential apps lock for a 3-hour break.
+        // v1.3.4 (item 9): MERGED entry — "Daily Targets". The old
+        // "Daily Focus Target" card (goal chips) and the old "Daily Screen
+        // Time" card (budget row) served one feature (your daily time plan);
+        // both controls live in the one premium sheet now.
         item {
             GlassCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("settings_screen_time_budget_card"),
+                    .clickable { showDailyTargetsSheet = true }
+                    .testTag("settings_daily_targets_entry"),
                 shape = RoundedCornerShape(22.dp)
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(18.dp)
+                        .padding(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.HourglassEmpty,
-                            contentDescription = null,
-                            tint = SettingsT.Lime,
-                            modifier = Modifier.size(20.dp)
+                        FeatureIcon(
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = "Daily Targets",
+                            size = 40.dp
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "DAILY SCREEN TIME",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                color = textSecondary,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.76.sp,
-                                fontSize = 11.sp
-                            )
-                        )
-                    }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.width(14.dp))
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .clickable { showScreenTimeBudgetSheet = true }
-                            .padding(vertical = 4.dp)
-                            .testTag("settings_screen_time_budget_row"),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column {
                             Text(
-                                text = "Daily screen-time limit",
+                                text = "Daily Targets",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = textPrimary,
-                                    fontFamily = PoppinsFontFamily
+                                    color = textPrimary
                                 )
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (liveBudgetMinutes > 0)
-                                    "Lock non-essentials past ${com.example.util.ScreenTimeBudgetManager.budgetLabel(liveBudgetMinutes)} / day"
-                                else "Off — set a limit to enable 3h breaks",
+                                text = "Focus goal and screen-time limit",
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    fontSize = 12.sp,
                                     color = textSecondary,
-                                    fontFamily = PoppinsFontFamily
+                                    fontSize = 12.sp
                                 )
-                            )
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (liveBudgetMinutes > 0) {
-                                Text(
-                                    text = com.example.util.ScreenTimeBudgetManager.budgetLabel(liveBudgetMinutes),
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontFamily = PoppinsFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        color = SettingsT.Lime,
-                                        fontSize = 15.sp
-                                    ),
-                                    modifier = Modifier.testTag("settings_screen_time_budget_value")
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                            }
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = textSecondary,
-                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
+
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = textSecondary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
 
-        // Feedback & Notifications
+        // v1.3.4 (item 9): MERGED entries from the old "Feedback &
+        // Notifications" card. "Haptic Feedback" + "Local Session Chimes"
+        // were two entries for one feature (session feedback) -> one entry,
+        // one sheet. "Block Notifications in Study" (+ its DND/test-silence
+        // action) is its own feature -> its own entry, one sheet.
         item {
             GlassCard(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showSessionFeedbackSheet = true }
+                    .testTag("settings_session_feedback_entry"),
                 shape = RoundedCornerShape(22.dp)
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(18.dp)
+                        .padding(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Vibration,
-                                contentDescription = null,
-                                tint = SettingsT.Lime,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FeatureIcon(
+                            imageVector = Icons.Default.Vibration,
+                            contentDescription = "Session Feedback",
+                            size = 40.dp
+                        )
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column {
                             Text(
-                                text = "Haptic Feedback",
+                                text = "Session Feedback",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = textPrimary
                                 )
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Haptics and chimes during sessions",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = textSecondary,
+                                    fontSize = 12.sp
+                                )
+                            )
                         }
-
-                        SettingsShieldToggle(
-                            checked = hapticsEnabled,
-                            onCheckedChange = { hapticsEnabled = it; onUpdateHaptics(it) }
-                        )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = textSecondary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = null,
-                                tint = SettingsT.Lime,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
+        item {
+            GlassCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showStudyNotificationsSheet = true }
+                    .testTag("settings_study_notifications_entry"),
+                shape = RoundedCornerShape(22.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FeatureIcon(
+                            imageVector = Icons.Default.NotificationsOff,
+                            contentDescription = "Study Notifications",
+                            size = 40.dp
+                        )
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column {
                             Text(
-                                text = "Local Session Chimes",
+                                text = "Study Notifications",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = textPrimary
                                 )
                             )
-                        }
-
-                        SettingsShieldToggle(
-                            checked = notificationsEnabled,
-                            onCheckedChange = { notificationsEnabled = it; onUpdateChimes(it) }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Block Notifications During Study Session
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(SettingsT.Surface)
-                            .padding(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.NotificationsOff,
-                                    contentDescription = null,
-                                    tint = SettingsT.Lime,
-                                    modifier = Modifier.size(22.dp)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (blockStudyNotifications) "Blocking on during study sessions" else "Block app alerts while you study",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = textSecondary,
+                                    fontSize = 12.sp
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Block Notifications in Study",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = textPrimary
-                                        )
-                                    )
-                                    Text(
-                                        text = "Mutes distracting app alerts & pings while timer is running",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontSize = 12.sp,
-                                            color = textSecondary
-                                        )
-                                    )
-                                }
-                            }
-
-                            SettingsShieldToggle(
-                                checked = blockStudyNotifications,
-                                onCheckedChange = { enabled ->
-                                    if (!enabled) {
-                                        blockStudyNotifications = false
-                                        StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, false)
-                                        Toast.makeText(context, "Study notification blocking disabled", Toast.LENGTH_SHORT).show()
-                                    } else if (!StudyNotificationBlockerManager.hasNotificationListenerAccess(context)) {
-                                        // v1.4.0-round2: the suppressor needs listener access to run.
-                                        StudyNotificationBlockerManager.openNotificationListenerSettings(context)
-                                        Toast.makeText(context, "Grant notification access to enable blocking", Toast.LENGTH_LONG).show()
-                                    } else if (!StudyNotificationBlockerManager.hasDndPermission(context)) {
-                                        StudyNotificationBlockerManager.openDndSettings(context)
-                                        Toast.makeText(context, "Grant Do Not Disturb access to enable blocking", Toast.LENGTH_LONG).show()
-                                    } else {
-                                        blockStudyNotifications = true
-                                        StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, true)
-                                        Toast.makeText(context, "Notifications will be blocked during study sessions", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
                             )
                         }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Action Button to Block / Manage DND access
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(42.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(SettingsT.Lime)
-                                    .clickable {
-                                        if (!hasDndPermission) {
-                                            StudyNotificationBlockerManager.openDndSettings(context)
-                                        } else {
-                                            // Toggle test instant silence
-                                            StudyNotificationBlockerManager.activateStudyNotificationBlock(context)
-                                            Toast.makeText(context, "Study Notifications Muted Now!", Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (!hasDndPermission) "Enable Do Not Disturb Access" else "Block Notifications Now",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = SettingsT.Bg
-                                    )
-                                )
-                            }
-                        }
                     }
+
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = textSecondary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
@@ -796,59 +607,10 @@ fun SettingsScreen(
             }
         }
 
-        // AI Study Guard Disclosure Link
-        item {
-            GlassCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showAiGuardDisclosureDialog = true },
-                shape = RoundedCornerShape(22.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        FeatureIcon(
-                            drawableRes = R.drawable.ic3d_book,
-                            contentDescription = "AI Study Guard Disclosure",
-                            size = 40.dp
-                        )
-
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        Column {
-                            Text(
-                                text = "AI Study Guard Disclosure",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = textPrimary
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Read plain-language privacy & permission details",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = textSecondary,
-                                    fontSize = 12.sp
-                                )
-                            )
-                        }
-                    }
-
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = textSecondary.copy(alpha = 0.5f),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
+        // v1.3.4 (item 9): the old "AI Study Guard Disclosure" entry is
+        // merged into "AI Study Guard" above — same feature, one entry. The
+        // plain-language disclosure dialog still opens from inside the AI
+        // Study Guard hub (permission rows), so nothing was removed.
 
         // Data Management & Diagnostics
         item {
@@ -1026,79 +788,63 @@ fun SettingsScreen(
                             )
                         )
                     }
-                }
-            }
-        }
 
-        // Privacy Policy Card
-        item {
-            GlassCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                onClick = { showPrivacyPolicySheet = true }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(18.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        FeatureIcon(
-                            drawableRes = R.drawable.ic3d_key,
-                            contentDescription = "Privacy Policy",
-                            size = 38.dp
-                        )
-
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        Column {
-                            Text(
-                                text = "Privacy Policy",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    color = textPrimary
-                                )
+                    // v1.3.4 (item 9): the old standalone "Privacy Policy"
+                    // entry is merged here — same feature (about this app),
+                    // one entry. The privacy sheet still opens from this row.
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { showPrivacyPolicySheet = true }
+                            .padding(horizontal = 4.dp, vertical = 10.dp)
+                            .testTag("settings_privacy_policy_row"),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            FeatureIcon(
+                                drawableRes = R.drawable.ic3d_key,
+                                contentDescription = "Privacy Policy",
+                                size = 38.dp
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Data practices, security & rights",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = textSecondary,
-                                    fontSize = 12.sp
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column {
+                                Text(
+                                    text = "Privacy Policy",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 15.sp,
+                                        color = textPrimary
+                                    )
                                 )
-                            )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Data practices, security & rights",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = textSecondary,
+                                        fontSize = 12.sp
+                                    )
+                                )
+                            }
                         }
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = textSecondary.copy(alpha = 0.5f),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
-
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = textSecondary.copy(alpha = 0.5f),
-                        modifier = Modifier.size(20.dp)
-                    )
                 }
             }
         }
+
     }
 
     if (showPrivacyPolicySheet) {
         com.example.ui.components.PrivacyPolicySheet(
             onDismiss = { showPrivacyPolicySheet = false }
-        )
-    }
-
-    if (showAiGuardDisclosureDialog) {
-        com.example.ui.components.AiStudyAccessibilityOptInDialog(
-            onConfirmOptIn = {
-                showAiGuardDisclosureDialog = false
-                com.example.util.AiStudyGuardManager.openAccessibilitySettings(context)
-            },
-            onDismiss = {
-                showAiGuardDisclosureDialog = false
-            }
         )
     }
 
@@ -1111,6 +857,63 @@ fun SettingsScreen(
                 onUpdateScreenTimeBudget(minutes)
             },
             onDismiss = { showScreenTimeBudgetSheet = false }
+        )
+    }
+
+    // v1.3.4 (item 9): merged-entry sheets. Every control from the old
+    // scattered cards is reachable inside its sheet; no capability removed.
+    if (showDailyTargetsSheet) {
+        com.example.ui.components.DailyTargetsSheet(
+            currentGoalMinutes = userPreferences?.dailyGoalMinutes ?: 360,
+            onUpdateDailyGoal = onUpdateDailyGoal,
+            budgetMinutes = liveBudgetMinutes,
+            onOpenScreenTimeBudget = { showScreenTimeBudgetSheet = true },
+            onDismiss = { showDailyTargetsSheet = false }
+        )
+    }
+
+    if (showSessionFeedbackSheet) {
+        com.example.ui.components.SessionFeedbackSheet(
+            hapticsEnabled = hapticsEnabled,
+            onUpdateHaptics = { hapticsEnabled = it; onUpdateHaptics(it) },
+            chimesEnabled = notificationsEnabled,
+            onUpdateChimes = { notificationsEnabled = it; onUpdateChimes(it) },
+            onDismiss = { showSessionFeedbackSheet = false }
+        )
+    }
+
+    if (showStudyNotificationsSheet) {
+        com.example.ui.components.StudyNotificationsSheet(
+            blockEnabled = blockStudyNotifications,
+            onBlockChange = { enabled ->
+                if (!enabled) {
+                    blockStudyNotifications = false
+                    StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, false)
+                    Toast.makeText(context, "Study notification blocking disabled", Toast.LENGTH_SHORT).show()
+                } else if (!StudyNotificationBlockerManager.hasNotificationListenerAccess(context)) {
+                    // v1.4.0-round2: the suppressor needs listener access to run.
+                    StudyNotificationBlockerManager.openNotificationListenerSettings(context)
+                    Toast.makeText(context, "Grant notification access to enable blocking", Toast.LENGTH_LONG).show()
+                } else if (!StudyNotificationBlockerManager.hasDndPermission(context)) {
+                    StudyNotificationBlockerManager.openDndSettings(context)
+                    Toast.makeText(context, "Grant Do Not Disturb access to enable blocking", Toast.LENGTH_LONG).show()
+                } else {
+                    blockStudyNotifications = true
+                    StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, true)
+                    Toast.makeText(context, "Notifications will be blocked during study sessions", Toast.LENGTH_SHORT).show()
+                }
+            },
+            hasDndPermission = hasDndPermission,
+            onDndButtonClick = {
+                if (!hasDndPermission) {
+                    StudyNotificationBlockerManager.openDndSettings(context)
+                } else {
+                    // Toggle test instant silence
+                    StudyNotificationBlockerManager.activateStudyNotificationBlock(context)
+                    Toast.makeText(context, "Study Notifications Muted Now!", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onDismiss = { showStudyNotificationsSheet = false }
         )
     }
 }

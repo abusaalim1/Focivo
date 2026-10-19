@@ -139,8 +139,12 @@ fun PresetPhotoChooserSheet(
     isAdmin: Boolean = false,
 ) {
     val tokens = focivoTokens()
+    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var selection by remember { mutableStateOf(initialSelection) }
+    // v1.3.4 (item 8): keyed on initialSelection — a late-arriving current
+    // value (e.g. prefs loading after the dialog opened) can no longer leave
+    // the sheet's selection desynced from the confirm button's enabled state.
+    var selection by remember(initialSelection) { mutableStateOf(initialSelection) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -166,6 +170,17 @@ fun PresetPhotoChooserSheet(
             onPresetConfirmed = { selection?.let(onPresetSelected) },
             focusPoints = focusPoints,
             isAdmin = isAdmin,
+            // v1.3.4 (item 8): locked tiles used to swallow taps silently —
+            // no selection formed, so the confirm button stayed disabled and
+            // it looked like no Continue/Select action existed. The tap now
+            // explains the lock instead of doing nothing.
+            onLockedTileTap = { preset ->
+                android.widget.Toast.makeText(
+                    context,
+                    "Locked \u2014 earn ${preset.unlockPoints} Focus Points to unlock this avatar.",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            },
         )
     }
 }
@@ -184,6 +199,12 @@ fun PresetChooserContent(
     modifier: Modifier = Modifier,
     focusPoints: Int = 0,
     isAdmin: Boolean = false,
+    /**
+     * v1.3.4 (item 8): fired when a LOCKED avatar tile is tapped. Locked
+     * tiles are not selectable, but the tap must never be silent — the
+     * caller explains the lock (default: no-op; the sheet shows a Toast).
+     */
+    onLockedTileTap: (AvatarPreset) -> Unit = {},
 ) {
     val tokens = focivoTokens()
     val context = LocalContext.current
@@ -294,6 +315,7 @@ fun PresetChooserContent(
                 onSelectionChange = onSelectionChange,
                 focusPoints = focusPoints,
                 isAdmin = isAdmin,
+                onLockedTileTap = onLockedTileTap,
             )
         } else if (ids.isEmpty()) {
             Text(
@@ -348,7 +370,9 @@ fun PresetChooserContent(
                 .testTag("preset_confirm_button"),
         ) {
             Text(
-                text = "Use this design",
+                // v1.3.4 (item 8): mode-aware label — the avatar flow gets a
+                // clear "Use" action ("Use This Avatar").
+                text = if (mode == PresetChooserMode.AVATAR) "Use This Avatar" else "Use this design",
                 style = TextStyle(
                     fontFamily = PoppinsFontFamily,
                     fontWeight = FontWeight.SemiBold,
@@ -362,6 +386,10 @@ fun PresetChooserContent(
 /**
  * v1.1.1: one preset tile. Shared by both chooser modes so the tile look
  * (selected lime ring, optional lock overlay) stays identical.
+ *
+ * v1.3.4 (item 8): [onDisabledClick] fires when a disabled (locked) tile is
+ * tapped — the tap is acknowledged (e.g. "locked" explainer) instead of
+ * silently swallowed.
  */
 @Composable
 private fun PresetTile(
@@ -373,8 +401,15 @@ private fun PresetTile(
     testTag: String,
     modifier: Modifier = Modifier,
     overlay: (@Composable BoxScope.() -> Unit)? = null,
+    onDisabledClick: (() -> Unit)? = null,
 ) {
     val tokens = focivoTokens()
+    val clickableModifier =
+        if (enabled || onDisabledClick != null) Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = { if (enabled) onClick() else onDisabledClick?.invoke() },
+        ) else Modifier
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
@@ -384,13 +419,7 @@ private fun PresetTile(
                 color = if (selected) RegainLimePrimary else tokens.line,
                 shape = RoundedCornerShape(20.dp),
             )
-            .then(
-                if (enabled) Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClick,
-                ) else Modifier
-            )
+            .then(clickableModifier)
             .testTag(testTag),
         contentAlignment = Alignment.Center,
     ) {
@@ -520,7 +549,8 @@ private fun PresetChooserOptionRow(
 /**
  * Avatar gallery with Boys/Girls sections. Each section shows its presets
  * in a 3-column grid; locked tiles show a lock + points price and are not
- * selectable until unlocked (or admin).
+ * selectable until unlocked (or admin). Tapping a locked tile fires
+ * [onLockedTileTap] so the tap is never silent (v1.3.4 item 8).
  */
 @Composable
 private fun AvatarSectionsGrid(
@@ -529,6 +559,7 @@ private fun AvatarSectionsGrid(
     onSelectionChange: (String?) -> Unit,
     focusPoints: Int,
     isAdmin: Boolean,
+    onLockedTileTap: (AvatarPreset) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val tokens = focivoTokens()
@@ -561,6 +592,11 @@ private fun AvatarSectionsGrid(
                         selected = preset.ref == selectedRef,
                         enabled = unlocked,
                         onClick = { onSelectionChange(preset.ref) },
+                        // v1.3.4 (item 8): a locked tile must acknowledge the
+                        // tap instead of swallowing it — otherwise no
+                        // selection forms and the confirm button never
+                        // enables, which reads as "no Continue/Select button".
+                        onDisabledClick = { onLockedTileTap(preset) },
                         testTag = "preset_tile_${preset.id}",
                         overlay = if (!unlocked) {
                             {

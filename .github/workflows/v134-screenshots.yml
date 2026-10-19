@@ -1,0 +1,98 @@
+name: v134 Item Screenshots
+
+# v1.3.4 round (items 2 + 7 + 8 + 9): runs the Robolectric/Roborazzi
+# screenshot tests for the UI batch and uploads the PNGs as an artifact for
+# owner review. Dispatch manually against the work branch:
+#   gh-api dispatch abusaalim1/Focivo v134-screenshots.yml --ref fix/v134-round
+#
+# Captures (all in record mode):
+#  - NEW com.example.screenshots.v134.* :
+#      V134ClockPickerScreenshotsTest      (item 7: picker thumbnails, 2 clock styles, dark+light)
+#      V134SettingsSheetsScreenshotsTest  (item 9: the 3 merged sheets, dark+light)
+#  - RE-RECORD (UI changed this round, old PNGs are stale):
+#      V132UiSweepScreenshotsTest: focus_idle/focus_idle_light (item 2: Block+START STUDY moved up),
+#                                  settings/settings_light (item 9: merged Settings screen)
+#      V132TimerFacesScreenshotsTest: clock_* faces (item 7: live faces now fit-scale)
+#      V132PresetPickerScreenshotsTest: avatar chooser (item 8: "Use This Avatar" label + locked-tap feedback)
+#
+# Note: this repo has no gradle wrapper committed, so we provision Gradle
+# via gradle/actions/setup-gradle like the debug build workflow does.
+
+on:
+  push:
+    branches: [fix/v134-round]
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Quarantine compile-blocking test files (other workers' WIP)
+        # The shared branch's test source set currently fails to compile
+        # because of OTHER items' test files (not items 2/7/8/9). Quarantining
+        # them ephemerally (CI workspace only — the repo is untouched) so
+        # the v134 item tests can compile and run. Owning workers must fix:
+        #  - MemberProfileStatsTest.kt: illegal characters in a test name
+        #  - TimerRemainingTimeTest.kt: unresolved setCurrentTimeMillis /
+        #    setElapsedRealtime helpers
+        #  - PermissionStatesTest.kt: unresolved strOpToOp
+        run: |
+          mkdir -p /tmp/quarantined-tests
+          for f in \
+            app/src/test/java/com/example/MemberProfileStatsTest.kt \
+            app/src/test/java/com/example/TimerRemainingTimeTest.kt \
+            app/src/test/java/com/example/util/PermissionStatesTest.kt \
+          ; do
+            if [ -f "$f" ]; then echo "quarantining $f"; mv "$f" /tmp/quarantined-tests/; fi
+          done
+
+      - name: Run v134 screenshot tests (record mode)
+        run: gradle :app:recordRoborazziDebug --tests "com.example.screenshots.v134.*" --rerun-tasks --no-configuration-cache --stacktrace
+
+      - name: Re-record affected existing screenshots (record mode)
+        run: >
+          gradle :app:recordRoborazziDebug
+          --tests "com.example.screenshots.V132UiSweepScreenshotsTest"
+          --tests "com.example.screenshots.V132TimerFacesScreenshotsTest"
+          --tests "com.example.screenshots.V132PresetPickerScreenshotsTest"
+          --rerun-tasks --no-configuration-cache --stacktrace
+
+      - name: Dump test failure stacks
+        if: always()
+        run: python3 -c "import glob,xml.etree.ElementTree as ET;[print(chr(61)*70,tc.get('classname'),'::',tc.get('name'),'MESSAGE:',(fl.get('message')or '')[:800],'STACK:',(fl.text or '')[:4000]) for f in glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml') for tc in ET.parse(f).getroot().iter('testcase') for fl in list(tc.iter('failure'))+list(tc.iter('error'))]"
+
+      - name: Locate generated PNGs
+        if: always()
+        run: |
+          echo "=== v134 screenshots ==="
+          find app/src/test/screenshots/v134 -type f 2>/dev/null | sort
+          echo "=== re-recorded (v132) screenshots ==="
+          find app/src/test/screenshots/v132_uisweep app/src/test/screenshots/v132_timerfaces -type f -newer app/build.gradle.kts 2>/dev/null | sort | head -40
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v134-screenshots
+          path: |
+            app/src/test/screenshots/v134/
+            app/src/test/screenshots/v132_uisweep/focus_idle_dark.png
+            app/src/test/screenshots/v132_uisweep/focus_idle_light.png
+            app/src/test/screenshots/v132_uisweep/settings_dark.png
+            app/src/test/screenshots/v132_uisweep/settings_light.png
+          if-no-files-found: error

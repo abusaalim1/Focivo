@@ -324,6 +324,102 @@ fun FocusScreen(
                     )
                 }
 
+                // 2. The primary action — Start / Pause. v1.3.4 (item 2): moved directly
+                // under the Study-top header. It used to sit BELOW the tall timer
+                // face, forcing a scroll to reach it; scrolling over the timer
+                // region clashed with the swipe-up-to-open-themes gesture.
+                // Same design language, same BlockHubSheet — only the position
+                // changed, so Block + START STUDY are reachable with no scroll.
+                item {
+                    var showBlockHub by remember { mutableStateOf(false) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        BlockHubEntry(
+                            // The label sits directly on the ambient
+                            // timer-theme backdrop — it must use the backdrop
+                            // content color, never the raw design token
+                            // (unreadable on dark backdrops in light app
+                            // mode, and vice versa).
+                            contentColor = selectedTheme.backdropContent(isDark),
+                            modifier = Modifier.weight(0.44f),
+                            onOpen = { showBlockHub = true }
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .weight(0.56f)
+                                .height(58.dp)
+                                .shadow(
+                                    elevation = 6.dp,
+                                    shape = CircleShape,
+                                    ambientColor = hubAccent.copy(alpha = 0.3f),
+                                    spotColor = hubAccent.copy(alpha = 0.4f)
+                                )
+                                .clip(CircleShape)
+                                .background(hubAccent)
+                                .clickable {
+                                    if (isRunning) {
+                                        onPauseTimer()
+                                    } else if (remainingSeconds < targetSeconds) {
+                                        onResumeTimer()
+                                    } else {
+                                        onStartTimer()
+                                    }
+                                }
+                                .testTag("play_pause_button"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isRunning) "Pause Study" else "Start Study",
+                                tint = NearBlack,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isRunning) "PAUSE FOCUS" else "START STUDY",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontFamily = PoppinsFontFamily,
+                                    color = NearBlack,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    letterSpacing = 1.sp
+                                )
+                            )
+                        }
+                        } // end Start/Pause pill
+                    } // end Block entry + button Row
+                    // v1.1.1: the one premium Block sheet (Strict, AI Guard,
+                    // AI YouTube Filter, Screen-time limits).
+                    if (showBlockHub) {
+                        BlockHubSheet(
+                            onOpenScreenTimeBudgets = onOpenScreenTimeBudgets,
+                            onDismiss = { showBlockHub = false }
+                        )
+                    }
+                    // Breathing room under the action; the hub hint sits quiet.
+                    if (!isRunning) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Timer, music, themes and protection live in the hub",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = PoppinsFontFamily,
+                                // v1.3.3 (item 9): captions on the backdrop use the
+                                // full-alpha caption token — the 0.55 alpha dropped
+                                // this below the 4.5:1 floor on Aurora light.
+                                color = selectedTheme.backdropCaptionContent(isDark),
+                                fontSize = 11.sp
+                            )
+                        )
+                    }
+                }
+
                 // Session Start Confirmation Banner (Only shown when not running)
                 if (!isRunning && !sessionStartConfirmation.isNullOrBlank()) {
                     item {
@@ -399,7 +495,7 @@ fun FocusScreen(
                     }
                 }
 
-                // 1. Timer presentation — the selected face renders here.
+                // 3. Timer presentation — the selected face renders here.
                 // v1.3.0: the Aurora Ring face was removed by owner order;
                 // Minimal Digits is the default face.
                 // v1.1: TimerFaceHost renders the selected timer face; the
@@ -576,104 +672,11 @@ fun FocusScreen(
                     }
                 }
 
-                // 2. Deep Focus active indicator (running only)
+                // 4. Deep Focus active indicator (running only)
                 if (isRunning && (isDeepFocusEnabled || isDeepFocusSessionActive)) {
                     item {
                         DeepFocusActiveBanner(
                             modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
-                        )
-                    }
-                }
-
-                // 3. The primary action — Start / Pause. v1.1.1: ONE compact
-                // "Block" entry sits LEFT of the button (the old four-row
-                // guard cluster was overlapped by the nav bar — gone now).
-                item {
-                    var showBlockHub by remember { mutableStateOf(false) }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        BlockHubEntry(
-                            // The label sits directly on the ambient
-                            // timer-theme backdrop — it must use the backdrop
-                            // content color, never the raw design token
-                            // (unreadable on dark backdrops in light app
-                            // mode, and vice versa).
-                            contentColor = selectedTheme.backdropContent(isDark),
-                            modifier = Modifier.weight(0.44f),
-                            onOpen = { showBlockHub = true }
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Box(
-                            modifier = Modifier
-                                .weight(0.56f)
-                                .height(58.dp)
-                                .shadow(
-                                    elevation = 6.dp,
-                                    shape = CircleShape,
-                                    ambientColor = hubAccent.copy(alpha = 0.3f),
-                                    spotColor = hubAccent.copy(alpha = 0.4f)
-                                )
-                                .clip(CircleShape)
-                                .background(hubAccent)
-                                .clickable {
-                                    if (isRunning) {
-                                        onPauseTimer()
-                                    } else if (remainingSeconds < targetSeconds) {
-                                        onResumeTimer()
-                                    } else {
-                                        onStartTimer()
-                                    }
-                                }
-                                .testTag("play_pause_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isRunning) "Pause Study" else "Start Study",
-                                tint = NearBlack,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isRunning) "PAUSE FOCUS" else "START STUDY",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    color = NearBlack,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    letterSpacing = 1.sp
-                                )
-                            )
-                        }
-                        } // end Start/Pause pill
-                    } // end Block entry + button Row
-                    // v1.1.1: the one premium Block sheet (Strict, AI Guard,
-                    // AI YouTube Filter, Screen-time limits).
-                    if (showBlockHub) {
-                        BlockHubSheet(
-                            onOpenScreenTimeBudgets = onOpenScreenTimeBudgets,
-                            onDismiss = { showBlockHub = false }
-                        )
-                    }
-                    // Breathing room under the action; the hub hint sits quiet.
-                    if (!isRunning) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Timer, music, themes and protection live in the hub",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                // v1.3.3 (item 9): captions on the backdrop use the
-                                // full-alpha caption token — the 0.55 alpha dropped
-                                // this below the 4.5:1 floor on Aurora light.
-                                color = selectedTheme.backdropCaptionContent(isDark),
-                                fontSize = 11.sp
-                            )
                         )
                     }
                 }

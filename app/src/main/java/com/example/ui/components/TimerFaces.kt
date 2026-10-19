@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -174,25 +175,41 @@ private fun ClockStyleFace(
             onTagClick = params.onTagClick
         )
         Spacer(modifier = Modifier.height(10.dp))
-        Box(
-            modifier = Modifier.then(
-                if (tappable) Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { params.onTimeClick?.invoke() } else Modifier
-            ),
+        // v1.3.4 (item 7) — FIT, never crop: the clock designs are authored
+        // at a fixed 300dp (fixed-dp digits/bars inside), but the slot can be
+        // narrower than 300dp on small phones (page padding + 24dp face
+        // padding). The old fixed size(300.dp) overflowed the slot; the clock
+        // now uniformly scales DOWN to fit when the slot is narrower, so the
+        // FULL clock is always visible. Never scales up (fit <= 1).
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (tappable) Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { params.onTimeClick?.invoke() } else Modifier
+                ),
             contentAlignment = Alignment.Center
         ) {
-            FocivoClock(
-                style = style,
-                remainingSec = params.remainingSeconds,
-                totalSec = params.totalSeconds,
-                accent = accent,
-                // v1.3.2: backdrop-appropriate ink (Aurora light canvas gets dark
-                // digits; dark backdrops keep white). Fixes invisible digits.
-                content = backdropPrimary(params.theme, isDark),
-                modifier = Modifier.size(300.dp)
-            )
+            val fit = (maxWidth / 300.dp).coerceAtMost(1f)
+            Box(
+                modifier = Modifier
+                    .size(300.dp * fit)
+                    .graphicsLayer(scaleX = fit, scaleY = fit),
+                contentAlignment = Alignment.Center
+            ) {
+                FocivoClock(
+                    style = style,
+                    remainingSec = params.remainingSeconds,
+                    totalSec = params.totalSeconds,
+                    accent = accent,
+                    // v1.3.2: backdrop-appropriate ink (Aurora light canvas gets dark
+                    // digits; dark backdrops keep white). Fixes invisible digits.
+                    content = backdropPrimary(params.theme, isDark),
+                    modifier = Modifier.size(300.dp)
+                )
+            }
         }
         if (tappable) {
             Spacer(modifier = Modifier.height(2.dp))
@@ -1096,10 +1113,19 @@ fun TimerFaceThumbnail(
  * v1.3.2 (item 13) — EXACT fit: the 300dp clock center-scales to exactly
  * 96dp and the tile is exactly 96dp, so no face clips at the card bounds.
  * The old 88dp tile cropped ~4dp per side (FLIP's wide digits far more).
+ *
+ * v1.3.4 (item 7) — BREATHING ROOM: the exact 96dp fit drew the clock
+ * edge-to-edge, so outer details (orbit tick ring, FLIP's wide digit row)
+ * kissed the tile's rounded-corner clip and read as "zoomed". The clock now
+ * renders at 88dp inside the 96dp tile (4dp margin per side) — the FULL
+ * clock is always visible with clear space around it.
  */
 @Composable
 private fun ClockStyleThumbnail(style: ClockStyle) {
     val tile = 96.dp
+    // 88/300 — the render target inside the tile; keep in sync with the
+    // graphicsLayer scale below.
+    val fit = 88f / 300f
     Box(
         modifier = Modifier
             .size(tile)
@@ -1110,7 +1136,7 @@ private fun ClockStyleThumbnail(style: ClockStyle) {
         Box(
             modifier = Modifier
                 .size(300.dp)
-                .graphicsLayer(scaleX = 0.32f, scaleY = 0.32f)
+                .graphicsLayer(scaleX = fit, scaleY = fit)
         ) {
             FocivoClock(
                 style = style,
