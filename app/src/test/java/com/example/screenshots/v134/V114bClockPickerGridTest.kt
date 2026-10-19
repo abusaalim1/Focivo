@@ -38,12 +38,11 @@ import org.robolectric.annotation.GraphicsMode
  * v1.1.4b ITEM A — full picker evidence for the true scale-to-fit thumbnails.
  *
  * Renders the REAL TimerFacePicker (the "Timer Style" row from Customize
- * Timer) and captures it at three EXACT scroll offsets so ALL NINE clock
- * styles appear FULLY in frame across the shots:
- *   start (464dp): Orbit / Flip / Liquid
- *   mid   (812dp): Editorial Clock / Dial / Horizon
- *   end   (1117dp, clamped max): Stack / Breathe / Bars
- * (Card pitch = 104dp card + 12dp spacing = 116dp; Orbit is face index 4.)
+ * Timer) and captures it with the middle card of each trio centered, so ALL
+ * NINE clock styles appear FULLY in frame across the shots:
+ *   start: Orbit / Flip / Liquid (Flip centered)
+ *   mid:   Editorial Clock / Dial / Horizon (Dial centered)
+ *   end:   Stack / Breathe / Bars (Breathe centered)
  * Dark + light at Pixel 8.
  *
  * Eyeball EVERY tile in EVERY PNG: the FULL clock (time + ring/cards/
@@ -99,9 +98,22 @@ class V114bClockPickerGridTest {
         }
     }
 
-    private fun captureAt(name: String, offsetDp: Int) {
-        val px = with(composeTestRule.density) { offsetDp.dp.roundToPx() }
-        runBlocking { scrollState.scrollTo(px) }
+    /**
+     * Scrolls so the card carrying [label] is centered in the viewport —
+     * exact regardless of per-card pitch (the tagline under each card makes
+     * every card column a different width, so fixed-dp offsets drift).
+     */
+    private fun centerCard(label: String, name: String) {
+        val root = composeTestRule.onRoot().fetchSemanticsNode()
+        val viewportCenterX = root.size.width / 2f
+        val node = composeTestRule
+            .onNodeWithText(label, useUnmergedTree = true)
+            .fetchSemanticsNode()
+        val labelCenterX = node.positionInRoot.x + node.size.width / 2f
+        val target = (scrollState.value + labelCenterX - viewportCenterX)
+            .toInt()
+            .coerceIn(0, scrollState.maxValue)
+        runBlocking { scrollState.scrollTo(target) }
         composeTestRule.waitForIdle()
         composeTestRule.onRoot().captureRoboImage(
             filePath = "src/test/screenshots/v134/$name.png"
@@ -109,9 +121,11 @@ class V114bClockPickerGridTest {
     }
 
     private fun runAll(prefix: String) {
-        captureAt("${prefix}_picker_start", 464)
-        captureAt("${prefix}_picker_mid", 812)
-        captureAt("${prefix}_picker_end", 1160)
+        // Center the middle card of each trio: its neighbours land fully
+        // in frame on both sides (~3.1 cards fit the Pixel 8 viewport).
+        centerCard("Flip", "${prefix}_picker_start") // Orbit / Flip / Liquid
+        centerCard("Dial", "${prefix}_picker_mid") // Editorial Clock / Dial / Horizon
+        centerCard("Breathe", "${prefix}_picker_end") // Stack / Breathe / Bars
     }
 
     @Test
