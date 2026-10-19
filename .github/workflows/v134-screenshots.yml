@@ -20,7 +20,7 @@ name: v134 Item Screenshots
 
 on:
   push:
-    branches: [fix/v134-round]
+    branches: [fix/v114-round]
   workflow_dispatch:
 
 jobs:
