@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -1108,24 +1109,47 @@ fun TimerFaceThumbnail(
 
 /**
  * v1.2.3 — mini render of one new clock style for the picker. The clock is
- * drawn at its natural 300dp size and scaled down to fit the card.
+ * drawn at its natural design size and scaled down to fit the card.
  *
- * v1.3.2 (item 13) — EXACT fit: the 300dp clock center-scales to exactly
- * 96dp and the tile is exactly 96dp, so no face clips at the card bounds.
- * The old 88dp tile cropped ~4dp per side (FLIP's wide digits far more).
+ * v1.1.4b (item A) — TRUE scale-to-fit. Why every earlier fit failed:
+ * `Modifier.size(300.dp)` on the inner Box does NOT lay out at 300dp —
+ * Compose clamps a required size to the parent's constraints, so the face
+ * was actually laid out at 96dp (text wrapped, rings cramped, digits cut),
+ * and the graphicsLayer then shrank that already-broken 96dp drawing.
+ * `Modifier.requiredSize` keeps the true authoring layout regardless of the
+ * parent, and the per-style uniform scale below is computed from MEASURED
+ * visible content bounds (V114bClockBoundsTest screenshots, PIL analysis),
+ * so the whole composition — text, rings, cards — shrinks proportionally
+ * and NOTHING is ever clipped by the tile.
  *
- * v1.3.4 (item 7) — BREATHING ROOM: the exact 96dp fit drew the clock
- * edge-to-edge, so outer details (orbit tick ring, FLIP's wide digit row)
- * kissed the tile's rounded-corner clip and read as "zoomed". The clock now
- * renders at 88dp inside the 96dp tile (4dp margin per side) — the FULL
- * clock is always visible with clear space around it.
+ * [clockThumbSpecs]: layout = the box size the design needs to compose as
+ * authored (EDITORIAL's 112sp numerals need 320dp to sit on one line —
+ * inside 300dp they wrap to "25:0/0"); content = the measured visible
+ * content size at that layout (+2% safety margin). BREATHE's bound is
+ * code-derived (its orb breathes; the captured frame is one phase).
  */
+private data class ClockThumbSpec(val layoutDp: Float, val contentWdp: Float, val contentHdp: Float)
+
+private val clockThumbSpecs: Map<ClockStyle, ClockThumbSpec> = mapOf(
+    ClockStyle.ORBIT to ClockThumbSpec(300f, 286.2f, 286.2f),
+    ClockStyle.FLIP to ClockThumbSpec(300f, 294.3f, 131.8f),
+    ClockStyle.LIQUID to ClockThumbSpec(300f, 241.1f, 241.1f),
+    ClockStyle.EDITORIAL to ClockThumbSpec(320f, 291.0f, 195.0f),
+    ClockStyle.DIAL to ClockThumbSpec(300f, 240.3f, 240.3f),
+    ClockStyle.HORIZON to ClockThumbSpec(300f, 296.3f, 203.4f),
+    ClockStyle.STACK to ClockThumbSpec(300f, 148.5f, 214.2f),
+    ClockStyle.BREATHE to ClockThumbSpec(300f, 290.0f, 290.0f),
+    ClockStyle.BARS to ClockThumbSpec(300f, 269.5f, 198.3f)
+)
+
 @Composable
 private fun ClockStyleThumbnail(style: ClockStyle) {
     val tile = 96.dp
-    // 88/300 — the render target inside the tile; keep in sync with the
-    // graphicsLayer scale below.
-    val fit = 88f / 300f
+    // Content target inside the tile — 6dp breathing room per side.
+    val inner = 84.dp
+    val spec = clockThumbSpecs.getValue(style)
+    // Uniform shrink-to-fit: the largest content dimension maps to [inner].
+    val fit = minOf(inner.value / spec.contentWdp, inner.value / spec.contentHdp)
     Box(
         modifier = Modifier
             .size(tile)
@@ -1135,14 +1159,15 @@ private fun ClockStyleThumbnail(style: ClockStyle) {
     ) {
         Box(
             modifier = Modifier
-                .size(300.dp)
+                .requiredSize(spec.layoutDp.dp)
                 .graphicsLayer(scaleX = fit, scaleY = fit)
         ) {
             FocivoClock(
                 style = style,
                 remainingSec = 1500,
                 totalSec = 1500,
-                accent = FaceLime
+                accent = FaceLime,
+                modifier = Modifier.requiredSize(spec.layoutDp.dp)
             )
         }
     }
