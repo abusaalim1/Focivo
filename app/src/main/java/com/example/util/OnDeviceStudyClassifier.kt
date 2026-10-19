@@ -156,6 +156,21 @@ object OnDeviceStudyClassifier {
      * Returns isCasual = true for non-study queries (games, sports, entertainment, casual chat, etc.).
      * Returns isCasual = false for academic, educational, or homework-related queries.
      */
+    // v1.3.4 (ITEM 4): precompiled word-boundary regexes. evaluateContent
+    // runs on the accessibility callback thread once per chat candidate;
+    // constructing ~200 Regex objects per candidate per scan was pure waste
+    // on a hot path. Identical matching semantics, a fraction of the cost.
+    private val ACADEMIC_PHRASES: List<String> =
+        STRONG_ACADEMIC_KEYWORDS.filter { it.contains(" ") }
+    private val ACADEMIC_WORD_RES: List<Pair<String, Regex>> =
+        STRONG_ACADEMIC_KEYWORDS.filter { !it.contains(" ") }
+            .map { kw -> kw to Regex("""\b${Regex.escape(kw)}\b""", RegexOption.IGNORE_CASE) }
+    private val CASUAL_PHRASES: List<String> =
+        CASUAL_DISTRACTION_KEYWORDS.filter { it.contains(" ") }
+    private val CASUAL_WORD_RES: List<Pair<String, Regex>> =
+        CASUAL_DISTRACTION_KEYWORDS.filter { !it.contains(" ") }
+            .map { kw -> kw to Regex("""\b${Regex.escape(kw)}\b""", RegexOption.IGNORE_CASE) }
+
     fun evaluateContent(text: String): ClassificationResult {
         val trimmed = text.trim()
         if (trimmed.isBlank()) {
@@ -187,14 +202,15 @@ object OnDeviceStudyClassifier {
         // 3. Check for strong academic keywords
         var academicScore = 0
         val matchedAcademic = mutableListOf<String>()
-        for (kw in STRONG_ACADEMIC_KEYWORDS) {
-            val matches = if (kw.contains(" ")) {
-                lower.contains(kw)
-            } else {
-                Regex("""\b${Regex.escape(kw)}\b""", RegexOption.IGNORE_CASE).containsMatchIn(lower)
+        for (kw in ACADEMIC_PHRASES) {
+            if (lower.contains(kw)) {
+                academicScore += 2
+                matchedAcademic.add(kw)
             }
-            if (matches) {
-                academicScore += if (kw.contains(" ")) 2 else 1
+        }
+        for ((kw, re) in ACADEMIC_WORD_RES) {
+            if (re.containsMatchIn(lower)) {
+                academicScore += 1
                 matchedAcademic.add(kw)
             }
         }
@@ -217,13 +233,13 @@ object OnDeviceStudyClassifier {
 
         // Check for casual distraction keywords
         val matchedCasualKeywords = mutableListOf<String>()
-        for (kw in CASUAL_DISTRACTION_KEYWORDS) {
-            val matches = if (kw.contains(" ")) {
-                lower.contains(kw)
-            } else {
-                Regex("""\b${Regex.escape(kw)}\b""", RegexOption.IGNORE_CASE).containsMatchIn(lower)
+        for (kw in CASUAL_PHRASES) {
+            if (lower.contains(kw)) {
+                matchedCasualKeywords.add(kw)
             }
-            if (matches) {
+        }
+        for ((kw, re) in CASUAL_WORD_RES) {
+            if (re.containsMatchIn(lower)) {
                 matchedCasualKeywords.add(kw)
             }
         }

@@ -91,6 +91,11 @@ object BlockOverlayManager {
     private val durationState = mutableStateOf(0)
     private val reasonState = mutableStateOf<String?>(null)
     private val punishmentState = mutableStateOf(false)
+    // v1.3.4 (ITEM 4): warning-variant as state — the refresh branch of
+    // showIfPermitted reuses the visible overlay (warn -> block upgrade);
+    // the mascot must follow the CURRENT variant, not the one captured at
+    // composition time.
+    private val warningVariantState = mutableStateOf(false)
     // v1.3.3 (item 8b): break-mode payload for the screen-time break overlay.
     private val breakInfoState =
         mutableStateOf<com.example.ui.components.BreakOverlayInfo?>(null)
@@ -132,7 +137,12 @@ object BlockOverlayManager {
         breakInfo: com.example.ui.components.BreakOverlayInfo? = null
     ): Boolean {
         val svc = AiStudyAccessibilityService.connectedInstance ?: return false
-        if (svc.isA11yBlockOverlayShowing()) return true
+        // v1.3.4 (ITEM 4): no early "already showing" return — route through
+        // the service so its reuse branch refreshes the payload
+        // (reason/punishment/warning-variant/windowed-mode). The old early
+        // return left a stage-1 WARNING overlay up (warning copy + warning
+        // mascot) after the stage-2 block had fired — the user saw "return
+        // within 3 minutes" while the app was actually 3-hour locked.
         if (Looper.myLooper() == Looper.getMainLooper()) {
             return svc.showA11yBlockOverlay(blockedPackage, appName, durationSec, reason, isPunishment, warningVariant, windowBounds, windowedMode, breakInfo)
         }
@@ -199,7 +209,11 @@ object BlockOverlayManager {
             durationState.value = durationSec
             reasonState.value = reason
             punishmentState.value = isPunishment
+            warningVariantState.value = warningVariant
             breakInfoState.value = breakInfo
+            // v1.3.4 (ITEM 4): a real block supersedes any stage-1 warning
+            // state — the overlay is no longer "the warning".
+            if (!warningVariant) warningOverlayPackage = null
             return true
         }
         if (!Settings.canDrawOverlays(context)) return false
@@ -226,6 +240,7 @@ object BlockOverlayManager {
                 durationState.value = durationSec
                 reasonState.value = reason
                 punishmentState.value = isPunishment
+                warningVariantState.value = warningVariant
                 breakInfoState.value = breakInfo
 
                 val wm = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -240,7 +255,7 @@ object BlockOverlayManager {
                                 reason = reasonState.value,
                                 isPunishment = punishmentState.value,
                                 breakInfo = breakInfoState.value,
-                                mascotRes = if (warningVariant) R.drawable.mascot_warning_transparent
+                                mascotRes = if (warningVariantState.value) R.drawable.mascot_warning_transparent
                                 else R.drawable.mascot_blocked,
                                 onExitApp = { exitToHome(appContext) },
                                 onOpenFocusly = { openFocivo(appContext) }
@@ -370,6 +385,11 @@ object BlockOverlayManager {
             OverlayPath.APP -> showIfPermitted(context, blockedPackage, appName, durationSec, reason, isPunishment, breakInfo = breakInfo)
             OverlayPath.ACTIVITY -> false
         }
+        // v1.3.4 (ITEM 4): a real block overlay supersedes any stage-1
+        // warning state — the warning is over, the block is the truth.
+        // (The showIfPermitted refresh branch already clears it for the app
+        // layer; this covers the a11y path too.)
+        if (shown) warningOverlayPackage = null
         // v1.2.3: braces — a second, guaranteed-top layer for multi-window.
         // v1.2.4: when the overlay is clipped to the offending window's
         // bounds (split/freeform), it IS the correctly-placed block — do not

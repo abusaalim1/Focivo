@@ -35,6 +35,7 @@ import com.example.util.YtGateNode
 import com.example.util.YtPlaybackSignals
 import com.example.util.YtPlayerSurface
 import com.example.util.brain.BrainBundleLoader
+import com.example.util.brain.FocivoBrainCorrections
 import com.example.util.brain.FocivoCombinedBrain
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -223,6 +224,11 @@ class AiStudyAccessibilityService : AccessibilityService() {
     private val a11yDurationSec = androidx.compose.runtime.mutableStateOf(0)
     private val a11yReason = androidx.compose.runtime.mutableStateOf<String?>(null)
     private val a11yPunishment = androidx.compose.runtime.mutableStateOf(false)
+    // v1.3.4 (ITEM 4): warning-variant as state — the reuse branch below
+    // refreshes an already-visible overlay (warn -> block upgrade); the
+    // mascot must follow the CURRENT variant, not the one captured at
+    // composition time.
+    private val a11yWarningVariant = androidx.compose.runtime.mutableStateOf(false)
     // v1.3.3 (item 8b): screen-time break variant payload.
     private val a11yBreakInfo =
         androidx.compose.runtime.mutableStateOf<com.example.ui.components.BreakOverlayInfo?>(null)
@@ -344,6 +350,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yDurationSec.value = durationSec
             a11yReason.value = reason
             a11yPunishment.value = isPunishment
+            a11yWarningVariant.value = warningVariant
             a11yWindowedMode.value = windowedMode
             a11yBreakInfo.value = breakInfo
             // Reposition to the offending window when a (different) bound
@@ -364,6 +371,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
             a11yDurationSec.value = durationSec
             a11yReason.value = reason
             a11yPunishment.value = isPunishment
+            a11yWarningVariant.value = warningVariant
             a11yWindowedMode.value = windowedMode
             a11yBreakInfo.value = breakInfo
             val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -378,7 +386,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                             reason = a11yReason.value,
                             isPunishment = a11yPunishment.value,
                             breakInfo = a11yBreakInfo.value,
-                            mascotRes = if (warningVariant) com.example.R.drawable.mascot_warning_transparent
+                            mascotRes = if (a11yWarningVariant.value) com.example.R.drawable.mascot_warning_transparent
                             else com.example.R.drawable.mascot_blocked,
                             windowedMode = a11yWindowedMode.value,
                             onExitApp = { a11yExitToHome() },
@@ -1825,37 +1833,48 @@ class AiStudyAccessibilityService : AccessibilityService() {
             // 9. AI Study Guard on AI chat apps (ChatGPT, Claude, Copilot, Perplexity, Meta AI, Grok, DeepSeek)
             // Strictly active ONLY when a study timer is running or within scheduled study hours!
             // v1.3.1: added Meta AI, Grok (X), DeepSeek — previously unmonitored by design (S3).
-            val isAiApp = pkg == "com.openai.chatgpt" ||
-                    pkg == "com.anthropic.claude" ||
-                    pkg == "com.google.android.apps.bard" ||
-                    pkg.contains("chatgpt", ignoreCase = true) ||
-                    pkg.contains("claude", ignoreCase = true) ||
-                    pkg.contains("openai", ignoreCase = true) ||
-                    pkg.contains("anthropic", ignoreCase = true) ||
-                    pkg.contains("perplexity", ignoreCase = true) ||
-                    pkg.contains("copilot", ignoreCase = true) ||
-                    pkg.contains("meta.ai", ignoreCase = true) ||
-                    pkg.contains("metaai", ignoreCase = true) ||
-                    pkg.contains("deepseek", ignoreCase = true) ||
-                    pkg == "com.x.ai" ||
-                    pkg.contains("grok", ignoreCase = true)
+            // v1.3.4 (ITEM 4): attribute by the ACTIVE WINDOW's package, not
+            // just the event's. Keystrokes arrive under the IME's package
+            // (Gboard etc.) and dialogs under the system package while the AI
+            // chat app owns the window — gating on event.packageName alone
+            // silently dropped the typed message, the single most reliable
+            // signal. The event package wins when it is itself a monitored
+            // AI app (freshest signal); otherwise the window's package is
+            // used.
+            val rootPkgForChat = try {
+                val r = rootInActiveWindow
+                try {
+                    r?.packageName?.toString()
+                } finally {
+                    try { r?.recycle() } catch (_: Exception) { }
+                }
+            } catch (_: Exception) { null }
+            val monitoredPkg: String? = when {
+                isAiChatPackage(pkg) -> pkg
+                isAiChatPackage(rootPkgForChat) -> rootPkgForChat
+                else -> null
+            }
+            val isAiApp = monitoredPkg != null
+            // The package every throttle key, hub label and discipline call
+            // in this section is attributed to.
+            val aiPkg = monitoredPkg ?: pkg
 
             // v1.1.9 diagnostic: guard master switch off (throttled).
             if (isAiApp && !AiStudyGuardManager.isAiGuardEnabled(applicationContext)) {
-                AiStudyGuardManager.logGuardSkip(applicationContext, guardMonitoredLabel(pkg) ?: pkg.take(24), "chat", "guard-disabled")
+                AiStudyGuardManager.logGuardSkip(applicationContext, guardMonitoredLabel(aiPkg) ?: aiPkg.take(24), "chat", "guard-disabled")
             }
 
             if (isAiApp && isStudyPeriod && (eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED
                         || eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
                         || isWindowStateChanged) && AiStudyGuardManager.isAiGuardEnabled(applicationContext)) {
                 // Throttle full tree-walks: at most one scan per package per 1.5s
-                val lastScan = lastAiChatScanMs[pkg] ?: 0L
+                val lastScan = lastAiChatScanMs[aiPkg] ?: 0L
                 if (nowTime - lastScan < 1500L) {
                     // v1.1.9 diagnostic (throttled)
-                    AiStudyGuardManager.logGuardSkip(applicationContext, guardMonitoredLabel(pkg) ?: pkg.take(24), "chat", "throttled")
+                    AiStudyGuardManager.logGuardSkip(applicationContext, guardMonitoredLabel(aiPkg) ?: aiPkg.take(24), "chat", "throttled")
                     return
                 }
-                lastAiChatScanMs[pkg] = nowTime
+                lastAiChatScanMs[aiPkg] = nowTime
                 if (lastAiChatScanMs.size > 40) {
                     val cutoff = nowTime - 120_000L
                     lastAiChatScanMs.entries.removeIf { it.value < cutoff }
@@ -1864,11 +1883,37 @@ class AiStudyAccessibilityService : AccessibilityService() {
                 val rootNode = rootInActiveWindow
                 if (rootNode != null) {
                     try {
-                        val candidates = extractCandidateMessages(rootNode)
+                        var candidates = extractCandidateMessages(rootNode)
+                        if (candidates.isEmpty() && eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
+                            // v1.3.4 (ITEM 4): the tree exposed nothing usable
+                            // (accessibility-dark chat view), but the event
+                            // itself carries the changed text — the user's
+                            // typed message. Harvest it directly instead of
+                            // failing open in silence.
+                            val harvested = ArrayList<String>()
+                            for (cs in event.text) {
+                                val t = cs?.toString()?.trim()
+                                if (!t.isNullOrBlank() && t.length >= 4) harvested.add(t)
+                            }
+                            if (harvested.isNotEmpty()) {
+                                Log.i(TAG, "[AI Chat Guard] Tree empty for $aiPkg; harvested ${harvested.size} text(s) from event")
+                                candidates = harvested.distinct()
+                            }
+                        }
+                        if (candidates.isEmpty()) {
+                            // v1.3.4 (ITEM 4): fail-open, but never silent —
+                            // the owner must see "scan ran, saw nothing" in
+                            // the Guard Hub instead of a blank log.
+                            AiStudyGuardManager.logGuardSkip(
+                                applicationContext,
+                                guardMonitoredLabel(aiPkg) ?: aiPkg.take(24),
+                                "chat", "chat-empty"
+                            )
+                        }
                         val now = System.currentTimeMillis()
 
                         val newCandidates = candidates.filter { msg ->
-                            val key = "$pkg:$msg"
+                            val key = "$aiPkg:$msg"
                             val lastTime = evaluatedMessages[key]
                             if (lastTime != null && (now - lastTime < 15_000L)) {
                                 false
@@ -1885,19 +1930,65 @@ class AiStudyAccessibilityService : AccessibilityService() {
 
                         if (newCandidates.isNotEmpty()) {
                             // v1.1.9 diagnostic label
-                            val chatLabel = guardMonitoredLabel(pkg) ?: pkg.take(24)
+                            val chatLabel = guardMonitoredLabel(aiPkg) ?: aiPkg.take(24)
                             for (candidate in newCandidates) {
+                                // v1.3.4 (ITEM 4): the user's own corrections
+                                // ("Was study" / "Not study" pills) and the
+                                // study-doubt gate run FIRST for chat — they
+                                // previously only ran for YouTube/browser, so
+                                // a corrected chat verdict never stuck and a
+                                // doubt could be misread. Both are fail-open:
+                                // they can only ALLOW (or honor an explicit
+                                // user override); every other case falls
+                                // through to the existing chain unchanged.
+                                val correction = runCatching {
+                                    FocivoBrainCorrections.lookup(applicationContext, candidate)
+                                }.getOrNull()
+                                if (correction != null) {
+                                    if (correction) {
+                                        Log.i(TAG, "[AI Chat Guard] Correction override (study) for $aiPkg")
+                                        AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-correction", "STUDY", "user-correction", candidate)
+                                        StudyGuardKnowledge.noteExternalChatVerdict(aiPkg, StudyGuardKnowledge.Verdict.STUDY)
+                                        AiStudyGuardManager.onStudyActivityDetected(
+                                            context = applicationContext,
+                                            packageName = aiPkg,
+                                            messageText = candidate
+                                        )
+                                    } else {
+                                        Log.w(TAG, "[AI Chat Guard] Correction override (non-study) for $aiPkg: '$candidate'")
+                                        AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-correction", "NON_STUDY", "user-correction", candidate)
+                                        StudyGuardKnowledge.noteExternalChatVerdict(aiPkg, StudyGuardKnowledge.Verdict.NON_STUDY)
+                                        AiStudyGuardManager.onNonStudyDetected(
+                                            context = applicationContext,
+                                            packageName = aiPkg,
+                                            messageText = candidate,
+                                            reason = "Marked non-study by your earlier correction"
+                                        )
+                                    }
+                                    continue
+                                }
+                                if (OnDeviceStudyClassifier.isStudyDoubt(candidate)) {
+                                    Log.i(TAG, "[AI Chat Guard] Study-doubt in $aiPkg — allowing, never a block")
+                                    AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-doubt", "STUDY", "study-doubt-allow", candidate)
+                                    StudyGuardKnowledge.noteExternalChatVerdict(aiPkg, StudyGuardKnowledge.Verdict.STUDY)
+                                    AiStudyGuardManager.onStudyActivityDetected(
+                                        context = applicationContext,
+                                        packageName = aiPkg,
+                                        messageText = candidate
+                                    )
+                                    continue
+                                }
                                 val result = OnDeviceStudyClassifier.evaluateContent(candidate)
                                 if (result.isCasual) {
-                                    Log.w(TAG, "[Non-Study Message] App: $pkg, Message: '$candidate', Reason: ${result.reason}")
+                                    Log.w(TAG, "[Non-Study Message] App: $aiPkg, Message: '$candidate', Reason: ${result.reason}")
                                     // v1.1.9 diagnostic
                                     AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-ondevice", "NON_STUDY", result.reason.take(64), candidate)
                                     // v1.1.8: feed confident verdict into the sticky cache so
                                     // low-signal follow-ups ("ok", "lol", ...) inherit it.
-                                    StudyGuardKnowledge.noteExternalChatVerdict(pkg, StudyGuardKnowledge.Verdict.NON_STUDY)
+                                    StudyGuardKnowledge.noteExternalChatVerdict(aiPkg, StudyGuardKnowledge.Verdict.NON_STUDY)
                                     AiStudyGuardManager.onNonStudyDetected(
                                         context = applicationContext,
-                                        packageName = pkg,
+                                        packageName = aiPkg,
                                         messageText = candidate,
                                         reason = result.reason
                                     )
@@ -1905,14 +1996,14 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                     // v1.1.8: curated offline knowledge BEFORE the Gemini
                                     // tie-breaker — instant, no network. Confident verdicts
                                     // act directly; UNCERTAIN keeps the existing flow.
-                                    when (StudyGuardKnowledge.scoreChatMessage(candidate, pkg)) {
+                                    when (StudyGuardKnowledge.scoreChatMessage(candidate, aiPkg)) {
                                         StudyGuardKnowledge.Verdict.NON_STUDY -> {
-                                            Log.w(TAG, "[StudyGuardKnowledge] Non-study message in $pkg: '$candidate'")
+                                            Log.w(TAG, "[StudyGuardKnowledge] Non-study message in $aiPkg: '$candidate'")
                                             // v1.1.9 diagnostic
                                             AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-knowledge", "NON_STUDY", "knowledge", candidate)
                                             AiStudyGuardManager.onNonStudyDetected(
                                                 context = applicationContext,
-                                                packageName = pkg,
+                                                packageName = aiPkg,
                                                 messageText = candidate,
                                                 reason = "Non-study content detected by Study Guard"
                                             )
@@ -1922,7 +2013,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                             AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-knowledge", "STUDY", "knowledge", candidate)
                                             AiStudyGuardManager.onStudyActivityDetected(
                                                 context = applicationContext,
-                                                packageName = pkg,
+                                                packageName = aiPkg,
                                                 messageText = candidate
                                             )
                                         }
@@ -1931,9 +2022,9 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                             // as tie-breaker so natural Hinglish/casual chat is still judged.
                                             // Throttled: at most one Gemini chat check per package per 8s.
                                             val nowGem = System.currentTimeMillis()
-                                            val lastGem = lastAiChatGeminiMs[pkg] ?: 0L
+                                            val lastGem = lastAiChatGeminiMs[aiPkg] ?: 0L
                                             if (nowGem - lastGem >= 8000L && candidate.length >= 4) {
-                                                lastAiChatGeminiMs[pkg] = nowGem
+                                                lastAiChatGeminiMs[aiPkg] = nowGem
                                                 // v1.1.9 diagnostic
                                                 AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-knowledge", "UNCERTAIN", "→gemini", candidate)
                                                 val msgCopy = candidate
@@ -1941,7 +2032,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                                     try {
                                                         val gv = GeminiContentClassifier.evaluateChatMessageWithGemini(
                                                             message = msgCopy,
-                                                            appName = pkg
+                                                            appName = aiPkg
                                                         )
                                                         // v1.2.2 (B3): AI_UNAVAILABLE = Gemini never ran.
                                                         // Fail open with an honest log entry; do NOT feed
@@ -1949,18 +2040,18 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                                         if (gv.source == GeminiContentClassifier.VerdictSource.AI_UNAVAILABLE) {
                                                             AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-gemini", "STUDY", "AI check unavailable — allowed", msgCopy)
                                                         } else if (!gv.isStudyAllowed || gv.isAdult) {
-                                                            Log.w(TAG, "[Gemini Chat Guard] Non-study message in $pkg: '$msgCopy' -> ${gv.reason}")
-                                                            StudyGuardKnowledge.noteExternalChatVerdict(pkg, StudyGuardKnowledge.Verdict.NON_STUDY)
+                                                            Log.w(TAG, "[Gemini Chat Guard] Non-study message in $aiPkg: '$msgCopy' -> ${gv.reason}")
+                                                            StudyGuardKnowledge.noteExternalChatVerdict(aiPkg, StudyGuardKnowledge.Verdict.NON_STUDY)
                                                             // v1.1.9 diagnostic
                                                             AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-gemini", "NON_STUDY", gv.reason.take(64), msgCopy)
                                                             AiStudyGuardManager.onNonStudyDetected(
                                                                 context = applicationContext,
-                                                                packageName = pkg,
+                                                                packageName = aiPkg,
                                                                 messageText = msgCopy,
                                                                 reason = gv.reason
                                                             )
                                                         } else {
-                                                            StudyGuardKnowledge.noteExternalChatVerdict(pkg, StudyGuardKnowledge.Verdict.STUDY)
+                                                            StudyGuardKnowledge.noteExternalChatVerdict(aiPkg, StudyGuardKnowledge.Verdict.STUDY)
                                                             // v1.1.9 diagnostic
                                                             AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-gemini", "STUDY", "gemini-allow", msgCopy)
                                                         }
@@ -1979,12 +2070,12 @@ class AiStudyAccessibilityService : AccessibilityService() {
                                     }
                                 } else {
                                     // v1.1.8: confident study verdict feeds the sticky cache.
-                                    StudyGuardKnowledge.noteExternalChatVerdict(pkg, StudyGuardKnowledge.Verdict.STUDY)
+                                    StudyGuardKnowledge.noteExternalChatVerdict(aiPkg, StudyGuardKnowledge.Verdict.STUDY)
                                     // v1.1.9 diagnostic
                                     AiStudyGuardManager.logGuardActivity(applicationContext, chatLabel, "chat-ondevice", "STUDY", result.reason.take(64), candidate)
                                     AiStudyGuardManager.onStudyActivityDetected(
                                         context = applicationContext,
-                                        packageName = pkg,
+                                        packageName = aiPkg,
                                         messageText = candidate
                                     )
                                 }
@@ -2215,12 +2306,27 @@ class AiStudyAccessibilityService : AccessibilityService() {
     private fun extractCandidateMessages(rootNode: AccessibilityNodeInfo): List<String> {
         val messages = mutableListOf<String>()
         collectCandidateNodes(rootNode, messages)
-        return messages
+        // v1.3.4 (ITEM 4): parent containers often repeat their children's
+        // text — dedupe so one message is classified (and hub-logged) once.
+        // Cap per-candidate length so a giant concatenated node can't blow
+        // up the regex classifiers downstream.
+        return messages.distinct().map { if (it.length > 4000) it.take(4000) else it }
     }
 
     private fun collectCandidateNodes(node: AccessibilityNodeInfo, list: MutableList<String>, depth: Int = 0) {
-        if (depth > 14) return
-        val text = node.text?.toString()?.trim()
+        // v1.3.4 (ITEM 4): 14 -> 24. Chat apps nest their message lists deep
+        // (app -> window -> composer -> list -> cell -> bubble -> text); the
+        // old cap silently pruned every real conversation node while the
+        // shallow chrome ("New chat", "Ask anything") still passed through.
+        if (depth > 24) return
+        var text = node.text?.toString()?.trim()
+        // v1.3.4 (ITEM 4): chat apps with accessibility-dark custom views
+        // (the ChatGPT app's TalkBack breakage is the documented case)
+        // expose message text only via contentDescription, or not via text
+        // at all. Read the description when text is absent.
+        if (text.isNullOrBlank()) {
+            text = node.contentDescription?.toString()?.trim()
+        }
         if (!text.isNullOrBlank() && text.length >= 4) {
             val lower = text.lowercase(Locale.ROOT)
             if (!IGNORED_UI_STRINGS.contains(lower) && !lower.startsWith("message ")) {
@@ -2322,6 +2428,33 @@ class AiStudyAccessibilityService : AccessibilityService() {
      * Used only for the activity log so the owner can see which app an entry
      * belongs to.
      */
+    /**
+     * v1.3.4 (ITEM 4): the monitored AI-chat package set, extracted so both
+     * the event package and the active-window package can be tested.
+     * Covers: ChatGPT (com.openai.chatgpt), Claude (com.anthropic.claude),
+     * Gemini (com.google.android.apps.bard), Copilot, Perplexity
+     * (ai.perplexity.app), Meta AI (com.meta.ai), Grok (ai.x.grok — matched
+     * by the "grok" contains fallback; the legacy "com.x.ai" exact check is
+     * kept harmlessly), DeepSeek (com.deepseek.chat).
+     */
+    private fun isAiChatPackage(p: String?): Boolean {
+        if (p.isNullOrBlank()) return false
+        return p == "com.openai.chatgpt" ||
+                p == "com.anthropic.claude" ||
+                p == "com.google.android.apps.bard" ||
+                p.contains("chatgpt", ignoreCase = true) ||
+                p.contains("claude", ignoreCase = true) ||
+                p.contains("openai", ignoreCase = true) ||
+                p.contains("anthropic", ignoreCase = true) ||
+                p.contains("perplexity", ignoreCase = true) ||
+                p.contains("copilot", ignoreCase = true) ||
+                p.contains("meta.ai", ignoreCase = true) ||
+                p.contains("metaai", ignoreCase = true) ||
+                p.contains("deepseek", ignoreCase = true) ||
+                p == "com.x.ai" ||
+                p.contains("grok", ignoreCase = true)
+    }
+
     private fun guardMonitoredLabel(pkg: String): String? {
         val lower = pkg.lowercase(Locale.ROOT)
         return when {

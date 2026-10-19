@@ -322,10 +322,13 @@ object AiStudyGuardManager {
 
     /**
      * Entry point for detected non-study activity in ChatGPT, Claude, or Chrome.
-     * Evaluates message-based 2-then-warn counter:
-     * - Message 1 & 2: Silently count (no visible warning)
-     * - Message 3: Fires exactly ONE warning (popup + heads-up notification)
-     * - Message 4+: Continued non-study usage after warning triggers 3-Hour BLOCK for this app only
+     * Evaluates message-based warn-then-block counter:
+     * - Message 1: fires exactly ONE Stage-1 warning (popup + heads-up
+     *   notification) and starts the 3-minute grace window
+     * - Message 2+: continued non-study usage after the warning triggers the
+     *   Stage-2 3-hour block for this app only
+     * - A study message (or the grace window elapsing quietly) resolves the
+     *   warning with no block (Stage 3)
      */
     fun onNonStudyDetected(
         context: Context,
@@ -502,6 +505,16 @@ object AiStudyGuardManager {
             graceObservationJob = null
             _activeWarning.value = null
         }
+
+        // v1.3.4 (ITEM 4): take down the stage-1 warning overlay FIRST. The
+        // shield's intercept no-ops while any block UI is showing, so leaving
+        // the warning up meant the 3-hour block never got its own overlay —
+        // the user kept seeing "return within 3 minutes" copy while the app
+        // was actually locked for 3 hours. Thread-safe (hide routes to the
+        // main thread internally).
+        try {
+            com.example.service.BlockOverlayManager.hideWarningOverlay(context, warning.packageName)
+        } catch (_: Exception) { }
 
         val lockDurationMinutes = 180
         val lockDurationSeconds = lockDurationMinutes * 60
