@@ -795,11 +795,42 @@ object SessionBlockRecorder {
     private const val CAP = 80
     private const val PRUNE_MS = 45L * 24 * 3600 * 1000
 
-    data class BlockedApp(val packageName: String, val appName: String, val ts: Long)
+    data class BlockedApp(
+        val packageName: String,
+        val appName: String,
+        val ts: Long,
+        /** v1.1.4c (C2): intercepts recorded for this package in the window. */
+        val attempts: Int = 1
+    )
+
+    /**
+     * v1.1.4c (C2) — entries that are NOT user apps and must never appear on
+     * the Shield card. The intercept choke point also fires for
+     * guard-internal screens: the deep-focus home-screen block carries the
+     * LAUNCHER package (which rendered as a generic gray HOME tile — the
+     * owner's "1 app stayed locked" screenshot) and the strict
+     * anti-uninstall block carries the package INSTALLER. Neither is an app
+     * the user tried to open. The block overlays themselves are untouched —
+     * only the share-card record is filtered, at this single choke point,
+     * so every caller (intercept + Shorts surface) inherits the rule.
+     */
+    private fun isShieldCardEntry(context: Context, packageName: String): Boolean {
+        val pkg = packageName.trim().lowercase()
+        if (pkg.isBlank()) return false
+        if (pkg == context.packageName.lowercase()) return false
+        if (pkg == "android" || pkg == "com.android.systemui") return false
+        if (pkg.contains("packageinstaller")) return false
+        return try {
+            !com.example.util.EssentialAppsGuard.isLauncherPackage(context, pkg)
+        } catch (_: Exception) {
+            true
+        }
+    }
 
     fun record(context: Context, packageName: String, appName: String) {
         try {
             if (packageName.isBlank()) return
+            if (!isShieldCardEntry(context, packageName)) return
             val prefs = context.applicationContext
                 .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val arr = org.json.JSONArray(prefs.getString(KEY, "[]") ?: "[]")
@@ -822,7 +853,11 @@ object SessionBlockRecorder {
         }
     }
 
-    /** Apps blocked within [fromMs, toMs], deduplicated by package (first hit kept). */
+    /**
+     * Apps blocked within [fromMs, toMs], deduplicated by package (first
+     * hit kept for name/ts) with the per-package intercept count aggregated
+     * into [BlockedApp.attempts] (v1.1.4c, C2).
+     */
     fun forWindow(context: Context, fromMs: Long, toMs: Long): List<BlockedApp> {
         try {
             val prefs = context.applicationContext
@@ -834,8 +869,13 @@ object SessionBlockRecorder {
                 val ts = o.optLong("ts", 0L)
                 if (ts < fromMs || ts > toMs) continue
                 val pkg = o.optString("pkg", "")
-                if (pkg.isBlank() || seen.containsKey(pkg)) continue
-                seen[pkg] = BlockedApp(pkg, o.optString("name", pkg), ts)
+                if (pkg.isBlank()) continue
+                val existing = seen[pkg]
+                seen[pkg] = if (existing == null) {
+                    BlockedApp(pkg, o.optString("name", pkg), ts, attempts = 1)
+                } else {
+                    existing.copy(attempts = existing.attempts + 1)
+                }
             }
             return seen.values.toList()
         } catch (e: Exception) {

@@ -534,9 +534,9 @@ class DailyUsagePipelineTest {
     }
 
     @Test
-    fun `reconcileUsage drops the aggregate-path bucket that starts before midnight`() {
-        // The 1.3.4-missed path: queryAndAggregateUsageStats buckets get the
-        // same boundary check as the daily path now.
+    fun `reconcileUsage drops the daily bucket that starts before midnight`() {
+        // A DAILY bucket's total spans its whole bucket, so a bucket that
+        // started before local midnight mixes yesterday in and is dropped.
         val defaultTz = TimeZone.getDefault()
         try {
             TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"))
@@ -544,9 +544,10 @@ class DailyUsagePipelineTest {
             val now = dayStart + 12 * 60 * MIN
             val result = DailyUsagePipeline.reconcileUsage(
                 paired = mapOf("com.a" to 10 * MIN),
-                buckets = listOf(
+                dailyBuckets = listOf(
                     DailyUsagePipeline.DailyBucketSample("com.a", 500 * MIN, dayStart - 1L)
                 ),
+                aggregateBuckets = emptyList(),
                 dayStartMs = dayStart,
                 nowMs = now
             )
@@ -557,14 +558,75 @@ class DailyUsagePipelineTest {
     }
 
     @Test
+    fun `reconcileUsage keeps the aggregate sample whose bucket starts before midnight`() {
+        // v1.1.4c (C4): queryAndAggregateUsageStats aggregated the exact
+        // [midnight, now] window — its firstTimeStamp describes the source
+        // bucket, not the window, so a pre-midnight stamp must NOT drop it.
+        // This was the silent vivo failure: the aggregate source (the
+        // system's own window pairing) was discarded wholesale.
+        val defaultTz = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"))
+            val dayStart = istDayStart()
+            val now = dayStart + 12 * 60 * MIN
+            val result = DailyUsagePipeline.reconcileUsage(
+                paired = mapOf("com.a" to 10 * MIN),
+                dailyBuckets = emptyList(),
+                aggregateBuckets = listOf(
+                    DailyUsagePipeline.DailyBucketSample("com.a", 95 * MIN, dayStart - 6 * 60 * MIN)
+                ),
+                dayStartMs = dayStart,
+                nowMs = now
+            )
+            assertEquals(95 * MIN, result.perAppMillis["com.a"])
+            assertEquals(1, result.discrepancies.size)
+            val d = result.discrepancies[0]
+            assertEquals(10 * MIN, d.pairedMs)
+            assertEquals(0L, d.dailyMs)
+            assertEquals(95 * MIN, d.aggregateMs)
+            assertEquals(95 * MIN, d.chosenMs)
+            assertEquals("aggregate", d.chosenSource)
+        } finally {
+            TimeZone.setDefault(defaultTz)
+        }
+    }
+
+    @Test
+    fun `reconcileUsage picks the max across events daily and aggregate`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val now = dayStart + 12 * 60 * MIN
+        val result = DailyUsagePipeline.reconcileUsage(
+            paired = mapOf("com.a" to 40 * MIN, "com.b" to 130 * MIN),
+            dailyBuckets = listOf(
+                DailyUsagePipeline.DailyBucketSample("com.a", 70 * MIN, dayStart)
+            ),
+            aggregateBuckets = listOf(
+                DailyUsagePipeline.DailyBucketSample("com.a", 55 * MIN, dayStart),
+                DailyUsagePipeline.DailyBucketSample("com.b", 100 * MIN, dayStart)
+            ),
+            dayStartMs = dayStart,
+            nowMs = now
+        )
+        // com.a: daily bucket is the largest source and wins.
+        assertEquals(70 * MIN, result.perAppMillis["com.a"])
+        // com.b: events are the largest source and win (buckets lag).
+        assertEquals(130 * MIN, result.perAppMillis["com.b"])
+        val byPkg = result.discrepancies.associateBy { it.packageName }
+        assertEquals("daily bucket", byPkg["com.a"]?.chosenSource)
+        assertEquals("events", byPkg["com.b"]?.chosenSource)
+        assertEquals(55 * MIN, byPkg["com.a"]?.aggregateMs)
+    }
+
+    @Test
     fun `reconcileUsage keeps a clean bucket as the floor for sparse event logs`() {
         val dayStart = DailyUsagePipeline.dayStartMillis()
         val now = dayStart + 6 * 60 * MIN
         val result = DailyUsagePipeline.reconcileUsage(
             paired = emptyMap(), // OEM dropped every ACTIVITY_* event
-            buckets = listOf(
+            dailyBuckets = listOf(
                 DailyUsagePipeline.DailyBucketSample("com.a", 60 * MIN, dayStart)
             ),
+            aggregateBuckets = emptyList(),
             dayStartMs = dayStart,
             nowMs = now
         )
@@ -577,7 +639,8 @@ class DailyUsagePipelineTest {
         val now = dayStart + 12 * 60 * MIN
         val result = DailyUsagePipeline.reconcileUsage(
             paired = mapOf("com.youtube" to 68 * MIN),
-            buckets = listOf(DailyUsagePipeline.DailyBucketSample("com.youtube", 240 * MIN, dayStart)),
+            dailyBuckets = listOf(DailyUsagePipeline.DailyBucketSample("com.youtube", 240 * MIN, dayStart)),
+            aggregateBuckets = emptyList(),
             dayStartMs = dayStart,
             nowMs = now
         )
@@ -587,8 +650,10 @@ class DailyUsagePipelineTest {
         val d = result.discrepancies[0]
         assertEquals("com.youtube", d.packageName)
         assertEquals(68 * MIN, d.pairedMs)
-        assertEquals(240 * MIN, d.bucketMs)
+        assertEquals(240 * MIN, d.dailyMs)
+        assertEquals(0L, d.aggregateMs)
         assertEquals(240 * MIN, d.chosenMs)
+        assertEquals("daily bucket", d.chosenSource)
         assertTrue(d.note.isNotEmpty())
     }
 
@@ -598,7 +663,8 @@ class DailyUsagePipelineTest {
         val now = dayStart + 12 * 60 * MIN
         val result = DailyUsagePipeline.reconcileUsage(
             paired = mapOf("com.a" to 120 * MIN),
-            buckets = listOf(DailyUsagePipeline.DailyBucketSample("com.a", 10 * MIN, dayStart)),
+            dailyBuckets = listOf(DailyUsagePipeline.DailyBucketSample("com.a", 10 * MIN, dayStart)),
+            aggregateBuckets = emptyList(),
             dayStartMs = dayStart,
             nowMs = now
         )
@@ -613,7 +679,8 @@ class DailyUsagePipelineTest {
         val now = dayStart + 12 * 60 * MIN
         val result = DailyUsagePipeline.reconcileUsage(
             paired = mapOf("com.a" to 60 * MIN),
-            buckets = listOf(DailyUsagePipeline.DailyBucketSample("com.a", 62 * MIN, dayStart)),
+            dailyBuckets = listOf(DailyUsagePipeline.DailyBucketSample("com.a", 62 * MIN, dayStart)),
+            aggregateBuckets = emptyList(),
             dayStartMs = dayStart,
             nowMs = now
         )
@@ -627,7 +694,8 @@ class DailyUsagePipelineTest {
         val now = dayStart + 6 * 60 * MIN // 6h day so far
         val result = DailyUsagePipeline.reconcileUsage(
             paired = mapOf("com.a" to 20 * 60 * MIN), // impossible 20h
-            buckets = emptyList(),
+            dailyBuckets = emptyList(),
+            aggregateBuckets = emptyList(),
             dayStartMs = dayStart,
             nowMs = now
         )
@@ -643,7 +711,8 @@ class DailyUsagePipelineTest {
             val now = dayStart + 12 * 60 * MIN
             val result = DailyUsagePipeline.reconcileUsage(
                 paired = mapOf("com.a" to 60 * MIN),
-                buckets = listOf(DailyUsagePipeline.DailyBucketSample("com.a", 300 * MIN, dayStart - 1L)),
+                dailyBuckets = listOf(DailyUsagePipeline.DailyBucketSample("com.a", 300 * MIN, dayStart - 1L)),
+                aggregateBuckets = emptyList(),
                 dayStartMs = dayStart,
                 nowMs = now
             )
@@ -661,13 +730,61 @@ class DailyUsagePipelineTest {
         val now = dayStart + 12 * 60 * MIN
         val result = DailyUsagePipeline.reconcileUsage(
             paired = mapOf("com.a" to 10 * MIN),
-            buckets = listOf(
+            dailyBuckets = listOf(
                 DailyUsagePipeline.DailyBucketSample("com.a", 30 * MIN, dayStart),
                 DailyUsagePipeline.DailyBucketSample("com.a", 20 * MIN, dayStart)
             ),
+            aggregateBuckets = emptyList(),
             dayStartMs = dayStart,
             nowMs = now
         )
         assertEquals(50 * MIN, result.perAppMillis["com.a"])
+    }
+
+    // ---------- v1.1.4c (C4): 48h lookback pairing + display minutes ----------
+
+    @Test
+    fun `sumForegroundTime counts a pre-midnight open closed by screen-off after midnight`() {
+        // The C4 device case, hermetic half: with the 48h lookback the
+        // stream now CONTAINS the pre-midnight RESUMED; a screen-off after
+        // midnight (Funtouch drops the PAUSED) closes it at the boundary.
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val now = dayStart + 3 * 60 * MIN
+        val totals = DailyUsagePipeline.sumForegroundTime(
+            listOf(
+                resumed("com.a", dayStart - 50 * MIN), // opened 23:10 yesterday
+                screenOff(dayStart + 25 * MIN) // screen off 00:25, no PAUSED
+            ),
+            dayStart, now
+        )
+        assertEquals(25 * MIN, totals["com.a"]) // only the post-midnight part
+    }
+
+    @Test
+    fun `sumForegroundTime banks nothing for a pair fully before midnight`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val now = dayStart + 3 * 60 * MIN
+        val totals = DailyUsagePipeline.sumForegroundTime(
+            listOf(
+                resumed("com.a", dayStart - 90 * MIN),
+                paused("com.a", dayStart - 30 * MIN)
+            ),
+            dayStart, now
+        )
+        assertTrue(totals.isEmpty())
+    }
+
+    @Test
+    fun `displayMinutes rounds to the nearest minute and never zeroes a real session`() {
+        // v1.1.4c (C1): the Session Complete display rule.
+        assertEquals(0, com.example.ui.screens.displayMinutes(0))
+        assertEquals(0, com.example.ui.screens.displayMinutes(29))
+        assertEquals(1, com.example.ui.screens.displayMinutes(30))
+        assertEquals(1, com.example.ui.screens.displayMinutes(45))
+        assertEquals(1, com.example.ui.screens.displayMinutes(59))
+        assertEquals(1, com.example.ui.screens.displayMinutes(60))
+        assertEquals(1, com.example.ui.screens.displayMinutes(89))
+        assertEquals(2, com.example.ui.screens.displayMinutes(90))
+        assertEquals(25, com.example.ui.screens.displayMinutes(1500))
     }
 }

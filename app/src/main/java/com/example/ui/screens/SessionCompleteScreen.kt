@@ -103,7 +103,9 @@ fun SessionCompleteScreen(
     /** Screenshot tests pass false for deterministic captures. */
     animateEntrance: Boolean = true
 ) {
-    val minutesSpent = session.durationSeconds / 60
+    // v1.1.4c (C1): nearest-minute display rounding (see ShareScreenData
+    // .displayMinutes) — a completed 59s/60s session shows 1m, never 0m.
+    val minutesSpent = displayMinutes(session.durationSeconds)
     val pointsEarned = session.focusPointsEarned
 
     val suppressedNotifs by SessionNotificationDigestManager.digestList.collectAsState()
@@ -149,10 +151,14 @@ fun SessionCompleteScreen(
     // real data (session minutes/distractions, name, today's totals,
     // last-7-day minutes, apps the shield blocked during THIS session).
     val shareData = remember(session) { loadShareScreenData(context, session) }
-    val shareText = if (session.distractionsCount == 0) {
+    // v1.1.4c (C2): share text + celebration stages use the ALIGNED
+    // distractions count from the share data (max of the stored counter and
+    // the shield's recorded attempts) so no surface can claim "without
+    // distractions" while the Shield card lists blocked apps.
+    val shareText = if (shareData.distractions == 0) {
         "I focused for $minutesSpent minutes without distractions with Focivo! Stay focused, stay sharp."
     } else {
-        "I focused for $minutesSpent minutes with Focivo (only ${session.distractionsCount} distractions)! Stay focused, stay sharp."
+        "I focused for $minutesSpent minutes with Focivo (only ${shareData.distractions} distractions)! Stay focused, stay sharp."
     }
 
     fun shareCard(cardIndex: Int, toWhatsApp: Boolean) {
@@ -215,10 +221,10 @@ fun SessionCompleteScreen(
             0 -> SessionFlowCelebrateStage(
                 pointsEarned = pointsEarned,
                 minutesSpent = minutesSpent,
-                distractionsCount = session.distractionsCount
+                distractionsCount = shareData.distractions
             )
             1 -> SessionFlowMessageStage(
-                distractionsCount = session.distractionsCount,
+                distractionsCount = shareData.distractions,
                 sessionId = session.id
             )
             2 -> SessionFlowFocusedStage(minutesSpent = minutesSpent)

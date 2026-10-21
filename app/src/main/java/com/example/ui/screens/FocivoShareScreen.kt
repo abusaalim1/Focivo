@@ -853,6 +853,22 @@ private fun AppGrid(apps: List<ShareBlockedApp>) {
                                 contentScale = ContentScale.Fit,
                                 colorFilter = DimGray,
                             )
+                        } else {
+                            // v1.1.4c (C2): genuinely unresolvable icon —
+                            // neutral letter tile (app initial), never a
+                            // system/launcher glyph.
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(24))
+                                    .background(Color(0xFF232A24)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    app.appName.trim().firstOrNull()?.uppercase() ?: "?",
+                                    style = ts(Outfit, 26f, FontWeight.Bold, color = Color.White.copy(alpha = .75f)),
+                                )
+                            }
                         }
                         // lock badge (.ap u)
                         Box(
@@ -881,7 +897,11 @@ private fun AppGrid(apps: List<ShareBlockedApp>) {
 /**
  * The app's REAL launcher icon via PackageManager first (owner
  * requirement); a curated official icon when that lookup fails (screenshot
- * tests), so a tile never renders blank.
+ * tests). v1.1.4c (C2): the final fallback is NO LONGER the system's
+ * generic app glyph (android.R.drawable.sym_def_app_icon — a gray
+ * system tile that reads as a "home" icon on the card). When no real icon
+ * resolves, this returns null and AppGrid renders a neutral letter tile
+ * instead — never a system glyph for a blocked-app entry.
  */
 private fun appTilePainter(context: android.content.Context, app: ShareBlockedApp): Painter? {
     return try {
@@ -891,7 +911,6 @@ private fun appTilePainter(context: android.content.Context, app: ShareBlockedAp
         } catch (_: PackageManager.NameNotFoundException) { null }
             ?: knownAppIconRes(app.packageName)?.let { ContextCompat.getDrawable(context, it) }
             ?: app.fallbackRes?.let { ContextCompat.getDrawable(context, it) }
-            ?: ContextCompat.getDrawable(context, android.R.drawable.sym_def_app_icon)
         val bmp: Bitmap? = when (drawable) {
             is BitmapDrawable -> drawable.bitmap
             null -> null

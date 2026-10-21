@@ -20,8 +20,23 @@ data class ShareBlockedApp(
     val appName: String,
     /** Optional drawable fallback for the icon (used in screenshot tests where
      * PackageManager lookups fail; in prod the real launcher icon is used). */
-    val fallbackRes: Int? = null
+    val fallbackRes: Int? = null,
+    /** v1.1.4c (C2): how many times the shield intercepted this app inside
+     * the session window — feeds the aligned distractions count. */
+    val attempts: Int = 1
 )
+
+/**
+ * v1.1.4c (C1) — the ONE display-minutes rule for the Session Complete flow.
+ *
+ * Nearest-minute rounding of a SECONDS total: (s + 30) / 60. The old floor
+ * division (s / 60) showed a genuinely completed 59-second session as "0m"
+ * on every card while the Today card (a sum of sessions) showed 1m. With
+ * nearest-minute rounding a session that ran >= ~45s never displays 0,
+ * while a genuinely tiny session (< 30s) still truthfully shows 0.
+ */
+internal fun displayMinutes(totalSeconds: Int): Int =
+    ((totalSeconds.coerceAtLeast(0) + 30) / 60)
 
 data class ShareScreenData(
     val minutes: Int,
@@ -76,8 +91,8 @@ private fun startOfDay(millis: Long): Long {
  */
 fun loadShareScreenData(context: Context, session: FocusSessionEntity): ShareScreenData {
     val prefs = context.getSharedPreferences(SHARE_PREFS, Context.MODE_PRIVATE)
-    val minutes = (session.durationSeconds / 60).coerceAtLeast(0)
-    val distractions = session.distractionsCount.coerceAtLeast(0)
+    // v1.1.4c (C1): nearest-minute display rounding — see displayMinutes.
+    val minutes = displayMinutes(session.durationSeconds)
 
     val dateLabel = try {
         SimpleDateFormat("MMM d", Locale.US).format(Date(session.completedAt))
@@ -106,7 +121,7 @@ fun loadShareScreenData(context: Context, session: FocusSessionEntity): ShareScr
     val now = System.currentTimeMillis()
     val todayStart = startOfDay(now)
     val todaySessions = sessions.filter { it.completedAt >= todayStart }
-    val todayTotalMinutes = todaySessions.sumOf { it.durationSeconds } / 60
+    val todayTotalMinutes = displayMinutes(todaySessions.sumOf { it.durationSeconds })
 
     val weekMinutes = mutableListOf<Int>()
     val weekLabels = mutableListOf<String>()
@@ -114,8 +129,10 @@ fun loadShareScreenData(context: Context, session: FocusSessionEntity): ShareScr
     for (back in 6 downTo 0) {
         val dayStart = todayStart - back * 24L * 3600 * 1000
         val dayEnd = dayStart + 24L * 3600 * 1000
-        val mins = sessions.filter { it.completedAt in dayStart until dayEnd }
-            .sumOf { it.durationSeconds } / 60
+        val mins = displayMinutes(
+            sessions.filter { it.completedAt in dayStart until dayEnd }
+                .sumOf { it.durationSeconds }
+        )
         weekMinutes.add(mins)
         val cal = Calendar.getInstance().apply { timeInMillis = dayStart }
         weekLabels.add(dayNames[cal.get(Calendar.DAY_OF_WEEK) - 1])
@@ -128,7 +145,20 @@ fun loadShareScreenData(context: Context, session: FocusSessionEntity): ShareScr
         else -> endMs - session.durationSeconds * 1000L
     }
     val blockedApps = SessionBlockRecorder.forWindow(context, startMs, endMs)
-        .map { ShareBlockedApp(it.packageName, it.appName) }
+        .map { ShareBlockedApp(it.packageName, it.appName, attempts = it.attempts) }
+
+    // v1.1.4c (C2): aligned distractions. The stored session counter only
+    // counts ViewModel-path intercepts (in-app shield overlay + manual
+    // logs); accessibility-layer blocks land in SessionBlockRecorder
+    // instead. The two sets describe the same thing — attempts that tried
+    // to pull the user away — so the cards must never claim "0
+    // distractions" while the Shield card lists blocked attempts. Take the
+    // max (the sources can overlap for one event, so never a blind sum).
+    val recordedAttempts = blockedApps.sumOf { it.attempts }
+    val distractions = maxOf(
+        session.distractionsCount.coerceAtLeast(0),
+        recordedAttempts
+    )
 
     return ShareScreenData(
         minutes = minutes,

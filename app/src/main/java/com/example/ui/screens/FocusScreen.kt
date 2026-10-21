@@ -4,7 +4,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,10 +44,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -539,10 +536,6 @@ fun FocusScreen(
                         else -> selectedTheme.mascotPose
                     }
                     val selectedFace by TimerFaceManager.selectedFace.collectAsState()
-                    val density = LocalDensity.current
-                    val swipeThresholdPx = remember(density) {
-                        with(density) { 100.dp.toPx() }
-                    }
 
                     // v1.1: pomodoro phase pill (focus / short / long break).
                     if (pomodoroState != null) {
@@ -578,32 +571,19 @@ fun FocusScreen(
                     }
 
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            // v1.1: swipe up on the timer region opens the
-                            // hub's Themes section. Tap vs drag are distinct:
-                            // detectVerticalDragGestures only fires after
-                            // touch slop, so taps (mascot, digits, buttons)
-                            // and LazyColumn scrolling are unaffected.
-                            .pointerInput(Unit) {
-                                var totalDrag = 0f
-                                detectVerticalDragGestures(
-                                    onDragStart = { totalDrag = 0f },
-                                    onVerticalDrag = { _, dragAmount ->
-                                        totalDrag += dragAmount
-                                    },
-                                    onDragEnd = {
-                                        if (totalDrag < -swipeThresholdPx) {
-                                            hubInitialSection = "themes"
-                                            showHub = true
-                                        }
-                                        totalDrag = 0f
-                                    },
-                                    onDragCancel = { totalDrag = 0f }
-                                )
-                            },
+                        modifier = Modifier.fillMaxWidth(),
                         contentAlignment = Alignment.Center
                     ) {
+                        // v1.1.4c (C3, owner order 2026-10-21): the v1.1
+                        // swipe-up-on-timer gesture (detectVerticalDragGestures
+                        // -> hub Themes) is REMOVED. On the owner's device,
+                        // ordinary up/down scrolling of the Study page that
+                        // started on the timer region kept opening Themes.
+                        // Themes now open ONLY by explicit tap: the top-bar
+                        // hub button (testTag study_hub_button) opens the
+                        // Study Hub, and its Themes row (hub_themes_row)
+                        // expands the Themes section. No drag/scroll path
+                        // opens themes anywhere on this screen.
                         val backdropRes = remember(selectedTheme.id) {
                             resolveThemeBackdropRes(context, selectedTheme)
                         }
@@ -618,7 +598,7 @@ fun FocusScreen(
                         }
                         // v1.2.3: an active pomodoro run renders the FocivoPomodoro
                         // UI, constrained to the timer slot — the surrounding
-                        // app chrome (swipe-up gesture, phase pill, controls
+                        // app chrome (phase pill, controls
                         // below) is untouched. Classic flow
                         // (pomodoroState == null) is completely unchanged.
                         val pomoStyle by PomodoroStyleManager.selectedStyle.collectAsState()
@@ -731,7 +711,9 @@ fun FocusScreen(
                     showHub = false
                     hubInitialSection = null
                 },
-                // v1.1: swipe-up on the timer opens the hub straight into Themes.
+                // v1.1.4c (C3): always null now — the swipe-up shortcut
+                // that set "themes" here was removed; the hub's Themes row
+                // is the tap-only path. Parameter kept for the sheet API.
                 initialExpandedSection = hubInitialSection,
                 isRunning = isRunning,
                 ambientSound = ambientSound,

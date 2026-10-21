@@ -3312,6 +3312,17 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         } catch (_: Throwable) {}
+        // v1.1.4c (C1): capture the persisted anchor's remaining seconds
+        // BEFORE pauseTimer() clears the running flags/anchor. At natural
+        // completion this is 0, so the recorded duration below can use the
+        // full target (target − remaining) instead of a truncated
+        // accumulator value — the old path recorded a completed 60s
+        // session as 59s and the Session Complete cards floored it to 0m.
+        val remainingAtCompletionSec = try {
+            com.example.util.TimerAnchorStore.getRemainingSeconds(getApplication<Application>())
+        } catch (_: Throwable) {
+            _remainingSeconds.value
+        }
         pauseTimer()
         if (userPreferences.value?.notificationsEnabled == true) {
             audioEngine.playCompletionChime()
@@ -3370,11 +3381,22 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         sessionStartTimeMs = 0L
         if (!alreadyRecorded) {
             val durationSpent = _targetSeconds.value - _remainingSeconds.value
-            val actualSeconds = when {
-                elapsedBeforeReset > 0 -> elapsedBeforeReset.coerceIn(1, (_targetSeconds.value * 3).coerceAtLeast(300))
-                durationSpent > 0 -> durationSpent
-                else -> _targetSeconds.value.coerceAtLeast(60)
-            }
+            // v1.1.4c (C1): anchor-derived elapsed. This path only runs when
+            // the timer reached its persisted end anchor (tick saw the
+            // anchor at 0, or the cold-start restore found it expired), so
+            // target − remainingAtCompletion is the TRUE studied time. The
+            // wall-clock accumulator and the display-derived durationSpent
+            // both truncate up to ~1s short (the tick stops the moment the
+            // whole-second remaining hits 0 and the pause fold floors the
+            // elapsed), which is how a completed 1-minute session was
+            // recorded as 59s and then floored to "0m" on the cards while
+            // the Today total (a sum) still showed 1m. Take the max of the
+            // three truthful candidates; all under-read, never over-read.
+            val anchorElapsed = (_targetSeconds.value - remainingAtCompletionSec).coerceAtLeast(0)
+            val actualSeconds = maxOf(elapsedBeforeReset, durationSpent, anchorElapsed)
+                .takeIf { it > 0 }
+                ?.coerceIn(1, (_targetSeconds.value * 3).coerceAtLeast(300))
+                ?: _targetSeconds.value.coerceAtLeast(60)
 
             val pointsEarned = maxOf(1, actualSeconds / 60)
 
@@ -3469,7 +3491,11 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 postSessionCompletionNotifications(
                     oldPoints = prefs.focusPoints,
                     newPoints = updatedPoints,
-                    minutes = actualSeconds / 60,
+                    // v1.1.4c (C1): same nearest-minute display rounding as
+                    // the Session Complete cards (ShareScreenData
+                    // .displayMinutes) — never "0 minutes" for a session
+                    // that really ran.
+                    minutes = (actualSeconds + 30) / 60,
                     pointsEarned = pointsEarned,
                     totalSessions = totalSessions,
                     shieldAttempts = updatedPrefs.shieldBlockedAttempts,

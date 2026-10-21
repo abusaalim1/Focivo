@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessibilityNew
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Layers
@@ -83,6 +84,15 @@ fun FocusShieldPermissionSheet(
     var hasBatteryExemption by remember {
         mutableStateOf(com.example.util.PermissionUtils.isBatteryOptimizationDisabled(context))
     }
+    // v1.1.4c (C5, owner order 2026-10-21): screen-time monitoring gets its
+    // OWN row in this sheet. Same underlying Usage Access grant as row 1
+    // (which is framed around app detection) — the owner asked for the
+    // screen-time purpose to be asked for explicitly here too, with live
+    // state from PermissionStates and the Grant tap going through
+    // PermissionUtils.openUsageStatsSettings.
+    var hasScreenTimeUsagePermission by remember {
+        mutableStateOf(com.example.util.PermissionStates.isUsageAccessGranted(context))
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -91,6 +101,7 @@ fun FocusShieldPermissionSheet(
                 hasOverlayPermission = FocusShieldPermissions.hasOverlayPermission(context)
                 hasAccessibilityPermission = FocusShieldPermissions.hasAccessibilityPermission(context)
                 hasBatteryExemption = com.example.util.PermissionUtils.isBatteryOptimizationDisabled(context)
+                hasScreenTimeUsagePermission = com.example.util.PermissionStates.isUsageAccessGranted(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -99,7 +110,7 @@ fun FocusShieldPermissionSheet(
         }
     }
 
-    val isAllGranted = hasUsagePermission && hasOverlayPermission && hasAccessibilityPermission && hasBatteryExemption
+    val isAllGranted = hasUsagePermission && hasOverlayPermission && hasAccessibilityPermission && hasBatteryExemption && hasScreenTimeUsagePermission
 
     // v1.2.3 design-unification — owner clean-redesign language:
     // #0A0A0B sheet, #B6F13A lime, Poppins body + Instrument Serif italic
@@ -220,6 +231,21 @@ fun FocusShieldPermissionSheet(
                 }
             )
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Permission 5: Usage Access for Screen Time monitoring (v1.1.4c, C5)
+            PermissionItemCard(
+                title = "5. Usage Access (Screen Time)",
+                description = if (hasScreenTimeUsagePermission) "Granted · Screen time monitoring active" else "Shows your real daily screen time and per-app usage on the Study screen and in Insights.",
+                isGranted = hasScreenTimeUsagePermission,
+                icon = Icons.Default.BarChart,
+                onClick = {
+                    if (!hasScreenTimeUsagePermission) {
+                        com.example.util.PermissionUtils.openUsageStatsSettings(context)
+                    }
+                }
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
 
             // Action Button
@@ -234,6 +260,8 @@ fun FocusShieldPermissionSheet(
                         FocusShieldPermissions.openOverlaySettings(context)
                     } else if (!hasBatteryExemption) {
                         com.example.util.PermissionUtils.openBatteryOptimizationSettings(context)
+                    } else if (!hasScreenTimeUsagePermission) {
+                        com.example.util.PermissionUtils.openUsageStatsSettings(context)
                     } else {
                         FocusShieldPermissions.openAccessibilitySettings(context)
                     }
