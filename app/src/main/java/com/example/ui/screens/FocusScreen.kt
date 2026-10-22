@@ -212,21 +212,39 @@ fun FocusScreen(
     // the ask is re-presented on this surface until the grant exists.
     var usageAskDismissed by remember { mutableStateOf(false) }
 
+    var lastSeenDayKey by remember {
+        mutableStateOf(com.example.util.DailyUsagePipeline.dayKeyFor())
+    }
+
     suspend fun refreshStudyHeaderUsage(force: Boolean) {
+        val dayRolledOver = com.example.util.DailyUsagePipeline.refreshIfDayChanged()
+        lastSeenDayKey = com.example.util.DailyUsagePipeline.dayKeyFor()
         val granted = withContext(Dispatchers.IO) {
             com.example.util.DailyUsagePipeline.hasUsagePermission(context)
         }
         hasUsagePermission = granted
         usageMillisToday = if (granted) {
             withContext(Dispatchers.IO) {
-                com.example.util.DailyUsagePipeline.getSnapshot(context, forceRefresh = force)?.totalMillis
+                com.example.util.DailyUsagePipeline.getSnapshot(
+                    context,
+                    forceRefresh = force || dayRolledOver
+                )?.totalMillis
             }
         } else {
             null
         }
     }
 
-    LaunchedEffect(Unit) { refreshStudyHeaderUsage(force = false) }
+    LaunchedEffect(Unit) {
+        refreshStudyHeaderUsage(force = false)
+        while (true) {
+            kotlinx.coroutines.delay(30_000L)
+            val nowKey = com.example.util.DailyUsagePipeline.dayKeyFor()
+            if (nowKey != lastSeenDayKey) {
+                refreshStudyHeaderUsage(force = true)
+            }
+        }
+    }
 
     val focusLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.DisposableEffect(focusLifecycleOwner) {
