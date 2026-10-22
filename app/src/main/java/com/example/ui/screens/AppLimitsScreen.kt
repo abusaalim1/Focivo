@@ -162,6 +162,10 @@ fun AppLimitsScreen(
     }
 
     var appUsageMap by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    // v1.1.4d (item D3): the overview total comes from the SAME pipeline
+    // snapshot as the per-app map (and as the Study header), so the number
+    // here and the number on the Study page can never disagree.
+    var snapshotTotalMillis by remember { mutableStateOf<Long?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilterTab by remember { mutableStateOf("All Apps") } // "All Apps", "With Limits", "Most Used", "Social", "Games"
 
@@ -195,6 +199,7 @@ fun AppLimitsScreen(
                     ?: emptyMap()
                 withContext(Dispatchers.Main) {
                     appUsageMap = usage
+                    snapshotTotalMillis = snapshot?.totalMillis
                 }
             }
         }
@@ -249,6 +254,18 @@ fun AppLimitsScreen(
             }
 
             matchesSearch && matchesTab
+        }
+    }
+
+    // v1.1.4d (item D3): the day's top app — the first entry of the
+    // usage-ranked list with real time on it. Highlighted only in the
+    // default view (All Apps tab, no search), where "most time today" is
+    // unambiguous; filtered/searched views don't carry the badge.
+    val topAppPackage = remember(rankedItems, hasUsagePermission, selectedFilterTab, searchQuery) {
+        if (hasUsagePermission && selectedFilterTab == "All Apps" && searchQuery.isBlank()) {
+            rankedItems.firstOrNull { it.usageMinutesToday > 0 }?.appInfo?.packageName
+        } else {
+            null
         }
     }
 
@@ -447,9 +464,19 @@ fun AppLimitsScreen(
                             )
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        val screenHrs = totalDeviceScreenTimeMins / 60
-                        val screenMins = totalDeviceScreenTimeMins % 60
-                        val formattedScreenTime = if (screenHrs > 0) "${screenHrs}h ${screenMins}m logged" else "${screenMins}m logged"
+                        // v1.1.4d (item D3): total = the pipeline snapshot's
+                        // device total (identical source to the Study
+                        // header). Without the grant: "--", never a
+                        // dressed-up "0m logged" (Round B honesty rule).
+                        val overviewMins = snapshotTotalMillis?.let { (it / 60_000L).toInt() }
+                            ?: totalDeviceScreenTimeMins
+                        val screenHrs = overviewMins / 60
+                        val screenMins = overviewMins % 60
+                        val formattedScreenTime = when {
+                            !hasUsagePermission -> "--"
+                            screenHrs > 0 -> "${screenHrs}h ${screenMins}m logged"
+                            else -> "${screenMins}m logged"
+                        }
                         Text(
                             text = formattedScreenTime,
                             style = MaterialTheme.typography.titleLarge.copy(
@@ -591,6 +618,7 @@ fun AppLimitsScreen(
                         AppRankAndLimitCard(
                             item = item,
                             hasUsagePermission = hasUsagePermission,
+                            isTopApp = item.appInfo.packageName == topAppPackage,
                             onSetLimit = {
                                 selectedLimitForEdit = null
                                 preselectedAppForAdd = item.appInfo
@@ -646,6 +674,10 @@ fun AppRankAndLimitCard(
     // v1.1.4b (item B, clause 10): the no-grant state renders "--" for the
     // spent time instead of "0m" dressed as data.
     hasUsagePermission: Boolean = true,
+    // v1.1.4d (item D3): the day's most-used app carries a lime
+    // "MOST TIME TODAY" chip so the answer to "kis app me jyada time
+    // gaya" is readable at a glance.
+    isTopApp: Boolean = false,
     onSetLimit: () -> Unit,
     onEditLimit: (AppDailyLimitEntity) -> Unit,
     onDeleteLimit: (String) -> Unit,
@@ -738,6 +770,25 @@ fun AppRankAndLimitCard(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
+                            if (isTopApp) {
+                                Surface(
+                                    color = Limits.Lime.copy(alpha = 0.18f),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.testTag("top_app_badge")
+                                ) {
+                                    Text(
+                                        text = "MOST TIME TODAY",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = PoppinsFontFamily,
+                                            color = Limits.Lime,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 9.sp,
+                                            letterSpacing = 0.8.sp
+                                        ),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
                             Surface(
                                 color = Limits.Line,
                                 shape = RoundedCornerShape(6.dp)
@@ -759,7 +810,10 @@ fun AppRankAndLimitCard(
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(
-                                    text = if (usedMins > 0) "$formattedSpentToday today" else "0m today",
+                                    // v1.1.4d: no grant -> "--" here too; the
+                                    // old else-branch printed "0m today" even
+                                    // without the grant (a dressed-up zero).
+                                    text = if (!hasUsagePermission) "--" else if (usedMins > 0) "$formattedSpentToday today" else "0m today",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         color = if (usedMins > 0) Limits.Lime else Limits.Muted,

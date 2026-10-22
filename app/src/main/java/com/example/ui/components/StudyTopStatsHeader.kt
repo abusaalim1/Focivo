@@ -34,7 +34,9 @@ import com.example.ui.theme.focivoTokens
  * - "Usage Time": today's total device screen time from [com.example.util.DailyUsagePipeline].
  *   When usage permission is missing the value reads "--" with the sub-label
  *   "Usage access needed" (honest grant state, never a fabricated number);
- *   tapping the card opens the premium usage-permission sheet (caller-owned).
+ *   tapping then opens the premium usage-permission sheet. WITH the grant,
+ *   tapping opens the per-app usage view instead (v1.1.4d, item D3 —
+ *   caller-owned routing).
  * - "Focus Time": today's completed focus minutes from the session log.
  *
  * Design system: cream/dark token surfaces, lime accent, Poppins labels +
