@@ -738,6 +738,32 @@ fun AppRankAndLimitCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
+            // v1.1.4d (item D3): the top-app strip gets its OWN full-width
+            // row above the app row. (First version put the chip inside
+            // the meta row; at phone widths that squeezed the duration
+            // badge to a sliver — caught in the Roborazzi capture.)
+            if (isTopApp) {
+                Surface(
+                    color = Limits.Lime.copy(alpha = 0.18f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("top_app_badge")
+                ) {
+                    Text(
+                        text = "MOST TIME TODAY · $formattedSpentToday",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = PoppinsFontFamily,
+                            color = Limits.Lime,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            letterSpacing = 0.8.sp
+                        ),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+            }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -770,25 +796,6 @@ fun AppRankAndLimitCard(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            if (isTopApp) {
-                                Surface(
-                                    color = Limits.Lime.copy(alpha = 0.18f),
-                                    shape = RoundedCornerShape(6.dp),
-                                    modifier = Modifier.testTag("top_app_badge")
-                                ) {
-                                    Text(
-                                        text = "MOST TIME TODAY",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontFamily = PoppinsFontFamily,
-                                            color = Limits.Lime,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 9.sp,
-                                            letterSpacing = 0.8.sp
-                                        ),
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
                             Surface(
                                 color = Limits.Line,
                                 shape = RoundedCornerShape(6.dp)
