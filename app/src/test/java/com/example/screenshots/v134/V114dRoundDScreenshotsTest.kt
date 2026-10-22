@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
@@ -263,7 +264,10 @@ class V114dRoundDScreenshotsTest {
         )
         composeTestRule.setContent {
             FocuslyTheme(darkTheme = true) {
-                Box(Modifier.background(Color(0xFF0A0C0B))) {
+                // Fixed phone-like width: unconstrained, the card's
+                // fillMaxWidth collapses and the capture lies about the
+                // real layout (in the app it gets the list's full width).
+                Box(Modifier.width(400.dp).background(Color(0xFF0A0C0B))) {
                     AppRankAndLimitCard(
                         item = item,
                         hasUsagePermission = true,
