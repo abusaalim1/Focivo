@@ -58,16 +58,17 @@ fun StudyTopStatsHeader(
     ) {
         StatCard(
             label = "Usage Time",
-            displayValue = if (!hasUsagePermission) {
+            displayValue = if (!hasUsagePermission || usageMillis == null) {
                 "--"
             } else {
-                formatStatDuration(usageMillis ?: 0L)
+                formatStatDuration(usageMillis)
             },
             // v1.1.3 (FIX 2) HONESTY rule: when PACKAGE_USAGE_STATS is missing
             // the card names the missing grant ("Usage access needed") instead
-            // of implying a number or a stale value. Tapping routes to the
-            // premium grant sheet (caller-owned).
-            subLabel = if (!hasUsagePermission) "Usage access needed" else "screen time today",
+            // of implying a number or a stale value. Tap routing is
+            // caller-owned: without the grant it opens the premium
+            // permission sheet; with it, the per-app usage view.
+            subLabel = if (!hasUsagePermission || usageMillis == null) "Usage access needed" else "screen time today",
             icon = Icons.Default.Timer,
             onClick = onUsageCardClick,
             clickable = true,
