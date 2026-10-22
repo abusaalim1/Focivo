@@ -219,7 +219,7 @@ class V114dRoundDScreenshotsTest {
         composeTestRule.waitForIdle()
         // Never a number without the grant. (unmerged: the value Text
         // lives inside the card's merged clickable subtree)
-        composeTestRule.onNodeWithTag("study_usage_time_value", useUnmergedNode = true)
+        composeTestRule.onNodeWithTag("study_usage_time_value", useUnmergedTree = true)
             .assertTextEquals("--")
         // Tap -> the permission ask (premium sheet), not a usage view.
         composeTestRule.onNodeWithTag("study_usage_time_card").performClick()
@@ -276,7 +276,7 @@ class V114dRoundDScreenshotsTest {
                 }
             }
         }
-        composeTestRule.onNodeWithTag("top_app_badge", useUnmergedNode = true).assertExists()
+        composeTestRule.onNodeWithTag("top_app_badge", useUnmergedTree = true).assertExists()
         capture("v114d_top_app_card_dark")
     }
 }
