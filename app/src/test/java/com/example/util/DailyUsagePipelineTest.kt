@@ -356,6 +356,15 @@ class DailyUsagePipelineTest {
     private fun shutdown(t: Long) =
         DailyUsagePipeline.AppUsageEvent("", DailyUsagePipeline.AppEventType.SHUTDOWN, t)
 
+    private fun screenOff(t: Long) =
+        DailyUsagePipeline.AppUsageEvent("", DailyUsagePipeline.AppEventType.SCREEN_OFF, t)
+
+    private fun screenOn(t: Long) =
+        DailyUsagePipeline.AppUsageEvent("", DailyUsagePipeline.AppEventType.SCREEN_ON, t)
+
+    private fun startup(t: Long) =
+        DailyUsagePipeline.AppUsageEvent("", DailyUsagePipeline.AppEventType.STARTUP, t)
+
     @Test
     fun `sumForegroundTime pairs resumed and paused per app`() {
         val defaultTz = TimeZone.getDefault()
@@ -471,16 +480,79 @@ class DailyUsagePipelineTest {
         assertEquals(120_000L, DailyUsagePipeline.deviceTotalMillis(context))
     }
 
-    // ---------- v1.1.4: screen-off splits, crash gaps, cross-validation ----------
+    @Test
+    fun `sumForegroundTime pairs ACTIVITY_STOPPED and coalesces overlapping multi-activity intervals`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val now = dayStart + 3 * 60 * MIN
+        val totals = DailyUsagePipeline.sumForegroundTime(
+            listOf(
+                DailyUsagePipeline.AppUsageEvent("com.a", DailyUsagePipeline.AppEventType.RESUMED, dayStart + 10 * MIN, "ActivityA"),
+                DailyUsagePipeline.AppUsageEvent("com.a", DailyUsagePipeline.AppEventType.RESUMED, dayStart + 20 * MIN, "ActivityB"),
+                DailyUsagePipeline.AppUsageEvent("com.a", DailyUsagePipeline.AppEventType.STOPPED, dayStart + 25 * MIN, "ActivityA"),
+                DailyUsagePipeline.AppUsageEvent("com.a", DailyUsagePipeline.AppEventType.STOPPED, dayStart + 70 * MIN, "ActivityB")
+            ),
+            dayStart,
+            now
+        )
+        // [10m, 25m] and [20m, 70m] coalesce into [10m, 70m] = 60m (never double-counted, never cut short at 25m)
+        assertEquals(60 * MIN, totals["com.a"])
+    }
 
-    private fun screenOff(t: Long) =
-        DailyUsagePipeline.AppUsageEvent("", DailyUsagePipeline.AppEventType.SCREEN_OFF, t)
+    @Test
+    fun `reconcilePerAppUsage chooses max of events daily and aggregate clamped to day length`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val now = dayStart + 120 * MIN // 2 hours into the day
+        val reconciled = DailyUsagePipeline.reconcilePerAppUsage(
+            eventsMap = mapOf("com.a" to 45 * MIN, "com.b" to 90 * MIN),
+            dailyMap = mapOf("com.a" to 60 * MIN, "com.b" to 30 * MIN),
+            aggregateMap = mapOf("com.a" to 50 * MIN, "com.c" to 200 * MIN), // 200m exceeds 120m elapsed day
+            dayStartMs = dayStart,
+            nowMs = now
+        )
+        val byPkg = reconciled.associateBy { it.packageName }
+        assertEquals(60 * MIN, byPkg["com.a"]?.chosenMs)
+        assertEquals(90 * MIN, byPkg["com.b"]?.chosenMs)
+        assertEquals(120 * MIN, byPkg["com.c"]?.chosenMs) // clamped to 120m elapsed day length
+    }
 
-    private fun screenOn(t: Long) =
-        DailyUsagePipeline.AppUsageEvent("", DailyUsagePipeline.AppEventType.SCREEN_ON, t)
+    @Test
+    fun `recordReconcileDiagnostics writes USAGE_RECONCILE entries to Guard Hub log`() {
+        AiStudyGuardManager.clearGuardActivity(context)
+        val entries = listOf(
+            DailyUsagePipeline.ReconcileEntry(
+                packageName = "com.youtube",
+                eventsMs = 68 * MIN,
+                dailyMs = 65 * MIN,
+                aggregateMs = 68 * MIN,
+                chosenMs = 68 * MIN
+            )
+        )
+        DailyUsagePipeline.recordReconcileDiagnostics(context, entries)
+        val logged = AiStudyGuardManager.guardActivity.value
+        assertTrue(logged.any {
+            it.stage == DailyUsagePipeline.STAGE_USAGE_RECONCILE &&
+                it.app == "com.youtube" &&
+                it.reason.contains("ev=${68 * MIN}ms") &&
+                it.reason.contains("daily=${65 * MIN}ms") &&
+                it.reason.contains("agg=${68 * MIN}ms") &&
+                it.snippet.contains("chosen=${68 * MIN}ms")
+        })
+    }
 
-    private fun startup(t: Long) =
-        DailyUsagePipeline.AppUsageEvent("", DailyUsagePipeline.AppEventType.STARTUP, t)
+    @Test
+    fun `revoking permission clears cached snapshot and returns null`() {
+        fakeSamples = listOf(DailyUsagePipeline.UsageSample("com.a", 60_000L))
+        assertNotNull(DailyUsagePipeline.getSnapshot(context))
+        assertNotNull(DailyUsagePipeline.lastQueriedAtMs())
+
+        DailyUsagePipeline.testPermissionOverride = false
+        assertNull(DailyUsagePipeline.getSnapshot(context))
+        assertNull(DailyUsagePipeline.lastQueriedAtMs())
+        assertEquals(0L, DailyUsagePipeline.deviceTotalMillis(context))
+        assertEquals(0L, DailyUsagePipeline.usageMillisForPackage(context, "com.a"))
+    }
+
+    // ---------- v1.1.4 merge: Round C hermetic behaviours on the merged pipeline ----------
 
     @Test
     fun `sumForegroundTime closes open intervals when the screen turns off`() {
@@ -513,7 +585,7 @@ class DailyUsagePipelineTest {
             ),
             dayStart, now
         )
-        // 60m (up to the crash) + 20m — NOT 140m + 20m leaked to nowMs
+        // 60m (up to the crash) + 20m — NOT leaked to nowMs
         assertEquals(80 * MIN, totals["com.a"])
     }
 
@@ -534,218 +606,8 @@ class DailyUsagePipelineTest {
     }
 
     @Test
-    fun `reconcileUsage drops the daily bucket that starts before midnight`() {
-        // A DAILY bucket's total spans its whole bucket, so a bucket that
-        // started before local midnight mixes yesterday in and is dropped.
-        val defaultTz = TimeZone.getDefault()
-        try {
-            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"))
-            val dayStart = istDayStart()
-            val now = dayStart + 12 * 60 * MIN
-            val result = DailyUsagePipeline.reconcileUsage(
-                paired = mapOf("com.a" to 10 * MIN),
-                dailyBuckets = listOf(
-                    DailyUsagePipeline.DailyBucketSample("com.a", 500 * MIN, dayStart - 1L)
-                ),
-                aggregateBuckets = emptyList(),
-                dayStartMs = dayStart,
-                nowMs = now
-            )
-            assertEquals(10 * MIN, result.perAppMillis["com.a"])
-        } finally {
-            TimeZone.setDefault(defaultTz)
-        }
-    }
-
-    @Test
-    fun `reconcileUsage keeps the aggregate sample whose bucket starts before midnight`() {
-        // v1.1.4c (C4): queryAndAggregateUsageStats aggregated the exact
-        // [midnight, now] window — its firstTimeStamp describes the source
-        // bucket, not the window, so a pre-midnight stamp must NOT drop it.
-        // This was the silent vivo failure: the aggregate source (the
-        // system's own window pairing) was discarded wholesale.
-        val defaultTz = TimeZone.getDefault()
-        try {
-            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"))
-            val dayStart = istDayStart()
-            val now = dayStart + 12 * 60 * MIN
-            val result = DailyUsagePipeline.reconcileUsage(
-                paired = mapOf("com.a" to 10 * MIN),
-                dailyBuckets = emptyList(),
-                aggregateBuckets = listOf(
-                    DailyUsagePipeline.DailyBucketSample("com.a", 95 * MIN, dayStart - 6 * 60 * MIN)
-                ),
-                dayStartMs = dayStart,
-                nowMs = now
-            )
-            assertEquals(95 * MIN, result.perAppMillis["com.a"])
-            assertEquals(1, result.discrepancies.size)
-            val d = result.discrepancies[0]
-            assertEquals(10 * MIN, d.pairedMs)
-            assertEquals(0L, d.dailyMs)
-            assertEquals(95 * MIN, d.aggregateMs)
-            assertEquals(95 * MIN, d.chosenMs)
-            assertEquals("aggregate", d.chosenSource)
-        } finally {
-            TimeZone.setDefault(defaultTz)
-        }
-    }
-
-    @Test
-    fun `reconcileUsage picks the max across events daily and aggregate`() {
-        val dayStart = DailyUsagePipeline.dayStartMillis()
-        val now = dayStart + 12 * 60 * MIN
-        val result = DailyUsagePipeline.reconcileUsage(
-            paired = mapOf("com.a" to 40 * MIN, "com.b" to 130 * MIN),
-            dailyBuckets = listOf(
-                DailyUsagePipeline.DailyBucketSample("com.a", 70 * MIN, dayStart)
-            ),
-            aggregateBuckets = listOf(
-                DailyUsagePipeline.DailyBucketSample("com.a", 55 * MIN, dayStart),
-                DailyUsagePipeline.DailyBucketSample("com.b", 100 * MIN, dayStart)
-            ),
-            dayStartMs = dayStart,
-            nowMs = now
-        )
-        // com.a: daily bucket is the largest source and wins.
-        assertEquals(70 * MIN, result.perAppMillis["com.a"])
-        // com.b: events are the largest source and win (buckets lag).
-        assertEquals(130 * MIN, result.perAppMillis["com.b"])
-        val byPkg = result.discrepancies.associateBy { it.packageName }
-        assertEquals("daily bucket", byPkg["com.a"]?.chosenSource)
-        assertEquals("events", byPkg["com.b"]?.chosenSource)
-        assertEquals(55 * MIN, byPkg["com.a"]?.aggregateMs)
-    }
-
-    @Test
-    fun `reconcileUsage keeps a clean bucket as the floor for sparse event logs`() {
-        val dayStart = DailyUsagePipeline.dayStartMillis()
-        val now = dayStart + 6 * 60 * MIN
-        val result = DailyUsagePipeline.reconcileUsage(
-            paired = emptyMap(), // OEM dropped every ACTIVITY_* event
-            dailyBuckets = listOf(
-                DailyUsagePipeline.DailyBucketSample("com.a", 60 * MIN, dayStart)
-            ),
-            aggregateBuckets = emptyList(),
-            dayStartMs = dayStart,
-            nowMs = now
-        )
-        assertEquals(60 * MIN, result.perAppMillis["com.a"])
-    }
-
-    @Test
-    fun `reconcileUsage flags a material bucket-above-events disagreement`() {
-        val dayStart = DailyUsagePipeline.dayStartMillis()
-        val now = dayStart + 12 * 60 * MIN
-        val result = DailyUsagePipeline.reconcileUsage(
-            paired = mapOf("com.youtube" to 68 * MIN),
-            dailyBuckets = listOf(DailyUsagePipeline.DailyBucketSample("com.youtube", 240 * MIN, dayStart)),
-            aggregateBuckets = emptyList(),
-            dayStartMs = dayStart,
-            nowMs = now
-        )
-        // Sane value: the larger clean source wins (bucket floor).
-        assertEquals(240 * MIN, result.perAppMillis["com.youtube"])
-        assertEquals(1, result.discrepancies.size)
-        val d = result.discrepancies[0]
-        assertEquals("com.youtube", d.packageName)
-        assertEquals(68 * MIN, d.pairedMs)
-        assertEquals(240 * MIN, d.dailyMs)
-        assertEquals(0L, d.aggregateMs)
-        assertEquals(240 * MIN, d.chosenMs)
-        assertEquals("daily bucket", d.chosenSource)
-        assertTrue(d.note.isNotEmpty())
-    }
-
-    @Test
-    fun `reconcileUsage flags material events-above-bucket and keeps events`() {
-        val dayStart = DailyUsagePipeline.dayStartMillis()
-        val now = dayStart + 12 * 60 * MIN
-        val result = DailyUsagePipeline.reconcileUsage(
-            paired = mapOf("com.a" to 120 * MIN),
-            dailyBuckets = listOf(DailyUsagePipeline.DailyBucketSample("com.a", 10 * MIN, dayStart)),
-            aggregateBuckets = emptyList(),
-            dayStartMs = dayStart,
-            nowMs = now
-        )
-        assertEquals(120 * MIN, result.perAppMillis["com.a"]) // bucket lags; events win
-        assertEquals(1, result.discrepancies.size)
-        assertTrue(result.discrepancies[0].note.contains("events"))
-    }
-
-    @Test
-    fun `reconcileUsage does not flag immaterial gaps`() {
-        val dayStart = DailyUsagePipeline.dayStartMillis()
-        val now = dayStart + 12 * 60 * MIN
-        val result = DailyUsagePipeline.reconcileUsage(
-            paired = mapOf("com.a" to 60 * MIN),
-            dailyBuckets = listOf(DailyUsagePipeline.DailyBucketSample("com.a", 62 * MIN, dayStart)),
-            aggregateBuckets = emptyList(),
-            dayStartMs = dayStart,
-            nowMs = now
-        )
-        assertEquals(62 * MIN, result.perAppMillis["com.a"])
-        assertTrue(result.discrepancies.isEmpty())
-    }
-
-    @Test
-    fun `reconcileUsage clamps a per-app total to the length of the day`() {
-        val dayStart = DailyUsagePipeline.dayStartMillis()
-        val now = dayStart + 6 * 60 * MIN // 6h day so far
-        val result = DailyUsagePipeline.reconcileUsage(
-            paired = mapOf("com.a" to 20 * 60 * MIN), // impossible 20h
-            dailyBuckets = emptyList(),
-            aggregateBuckets = emptyList(),
-            dayStartMs = dayStart,
-            nowMs = now
-        )
-        assertEquals(6 * 60 * MIN, result.perAppMillis["com.a"])
-    }
-
-    @Test
-    fun `reconcileUsage notes a dropped boundary bucket as the disagreement cause`() {
-        val defaultTz = TimeZone.getDefault()
-        try {
-            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"))
-            val dayStart = istDayStart()
-            val now = dayStart + 12 * 60 * MIN
-            val result = DailyUsagePipeline.reconcileUsage(
-                paired = mapOf("com.a" to 60 * MIN),
-                dailyBuckets = listOf(DailyUsagePipeline.DailyBucketSample("com.a", 300 * MIN, dayStart - 1L)),
-                aggregateBuckets = emptyList(),
-                dayStartMs = dayStart,
-                nowMs = now
-            )
-            assertEquals(60 * MIN, result.perAppMillis["com.a"]) // kept events
-            assertEquals(1, result.discrepancies.size)
-            assertTrue(result.discrepancies[0].note.contains("boundary"))
-        } finally {
-            TimeZone.setDefault(defaultTz)
-        }
-    }
-
-    @Test
-    fun `reconcileUsage sums multiple clean buckets for one package`() {
-        val dayStart = DailyUsagePipeline.dayStartMillis()
-        val now = dayStart + 12 * 60 * MIN
-        val result = DailyUsagePipeline.reconcileUsage(
-            paired = mapOf("com.a" to 10 * MIN),
-            dailyBuckets = listOf(
-                DailyUsagePipeline.DailyBucketSample("com.a", 30 * MIN, dayStart),
-                DailyUsagePipeline.DailyBucketSample("com.a", 20 * MIN, dayStart)
-            ),
-            aggregateBuckets = emptyList(),
-            dayStartMs = dayStart,
-            nowMs = now
-        )
-        assertEquals(50 * MIN, result.perAppMillis["com.a"])
-    }
-
-    // ---------- v1.1.4c (C4): 48h lookback pairing + display minutes ----------
-
-    @Test
     fun `sumForegroundTime counts a pre-midnight open closed by screen-off after midnight`() {
-        // The C4 device case, hermetic half: with the 48h lookback the
+        // The Round C device case, hermetic half: with the 48h lookback the
         // stream now CONTAINS the pre-midnight RESUMED; a screen-off after
         // midnight (Funtouch drops the PAUSED) closes it at the boundary.
         val dayStart = DailyUsagePipeline.dayStartMillis()
@@ -772,6 +634,42 @@ class DailyUsagePipelineTest {
             dayStart, now
         )
         assertTrue(totals.isEmpty())
+    }
+
+    @Test
+    fun `sumDailyBuckets drops the bucket that starts before midnight and sums clean buckets`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val summed = DailyUsagePipeline.sumDailyBuckets(
+            listOf(
+                DailyUsagePipeline.DailyBucketSample("com.a", 300 * MIN, dayStart - 1L),
+                DailyUsagePipeline.DailyBucketSample("com.a", 30 * MIN, dayStart),
+                DailyUsagePipeline.DailyBucketSample("com.a", 20 * MIN, dayStart),
+                DailyUsagePipeline.DailyBucketSample("com.b", 45 * MIN, dayStart)
+            ),
+            dayStart
+        )
+        // yesterday's 300m bucket dropped; today's two clean buckets sum
+        assertEquals(50 * MIN, summed["com.a"])
+        assertEquals(45 * MIN, summed["com.b"])
+    }
+
+    @Test
+    fun `reconcilePerAppUsage keeps the aggregate value and the clean bucket floor`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val now = dayStart + 12 * 60 * MIN
+        val entries = DailyUsagePipeline.reconcilePerAppUsage(
+            eventsMap = mapOf("com.a" to 10 * MIN, "com.b" to 10 * MIN),
+            dailyMap = mapOf("com.b" to 45 * MIN),
+            aggregateMap = mapOf("com.a" to 95 * MIN),
+            dayStartMs = dayStart,
+            nowMs = now
+        )
+        val byPkg = entries.associateBy { it.packageName }
+        // aggregate is window-scoped by construction: never boundary-dropped
+        assertEquals(95 * MIN, byPkg["com.a"]?.chosenMs)
+        assertEquals(95 * MIN, byPkg["com.a"]?.aggregateMs)
+        // clean bucket is the floor for sparse event logs
+        assertEquals(45 * MIN, byPkg["com.b"]?.chosenMs)
     }
 
     @Test

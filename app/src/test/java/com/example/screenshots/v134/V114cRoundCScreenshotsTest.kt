@@ -54,7 +54,7 @@ import org.robolectric.annotation.GraphicsMode
  *      distractions on the cards align with recorded attempts.
  *  C3: scrolling the Study page must NOT open themes; the hub opens by TAP
  *      (gear button) and the Themes row expands by TAP.
- *  C4: reconcileUsage three-source pick rule (aggregate is window-scoped
+ *  C4: three-source pick rule (sumDailyBuckets + reconcilePerAppUsage) (aggregate is window-scoped
  *      and never boundary-dropped; daily buckets still are).
  *  C5: the permission sheet carries a 5th row — Usage Access (Screen Time).
  */
@@ -334,6 +334,9 @@ class V114cRoundCScreenshotsTest {
     }
 
     // ---------------- C4: pick rule (executes in CI) ----------------
+    // v1.1.4 merge: re-pointed at the merged pipeline API — the daily
+    // boundary-drop + bucket summing lives in sumDailyBuckets, the
+    // three-source pick in reconcilePerAppUsage.
 
     @Test
     fun reconcile_pick_rule_three_sources() {
@@ -341,36 +344,41 @@ class V114cRoundCScreenshotsTest {
         val dayStart = DailyUsagePipeline.dayStartMillis()
         val now = dayStart + 12 * 60 * min
 
-        // Aggregate is window-scoped: a pre-midnight bucket stamp must NOT
-        // drop it (the silent vivo failure), and it wins when it is the
-        // largest source; the discrepancy carries all three raw values.
-        val agg = DailyUsagePipeline.reconcileUsage(
-            paired = mapOf("com.a" to 10 * min),
-            dailyBuckets = emptyList(),
-            aggregateBuckets = listOf(
-                DailyUsagePipeline.DailyBucketSample("com.a", 95 * min, dayStart - 6 * 60 * min)
+        // Daily source: a bucket starting before local midnight is dropped
+        // (it would leak yesterday into today); clean buckets sum.
+        val daily = DailyUsagePipeline.sumDailyBuckets(
+            listOf(
+                DailyUsagePipeline.DailyBucketSample("com.a", 500 * min, dayStart - 1L),
+                DailyUsagePipeline.DailyBucketSample("com.a", 30 * min, dayStart),
+                DailyUsagePipeline.DailyBucketSample("com.a", 20 * min, dayStart)
             ),
-            dayStartMs = dayStart,
-            nowMs = now
+            dayStart
         )
-        assertEquals(95 * min, agg.perAppMillis["com.a"])
-        assertEquals(1, agg.discrepancies.size)
-        assertEquals("aggregate", agg.discrepancies[0].chosenSource)
-        assertEquals(95 * min, agg.discrepancies[0].aggregateMs)
+        assertEquals(50 * min, daily["com.a"])
 
-        // Daily buckets still get the boundary drop; events win over a
-        // lagging aggregate.
-        val mixed = DailyUsagePipeline.reconcileUsage(
-            paired = mapOf("com.a" to 130 * min),
-            dailyBuckets = listOf(
-                DailyUsagePipeline.DailyBucketSample("com.a", 500 * min, dayStart - 1L)
-            ),
-            aggregateBuckets = listOf(
-                DailyUsagePipeline.DailyBucketSample("com.a", 100 * min, dayStart)
-            ),
+        // Aggregate is window-scoped: never boundary-dropped, and it wins
+        // when it is the largest source; the entry carries all three raw
+        // values for the Guard Hub USAGE_RECONCILE log.
+        val agg = DailyUsagePipeline.reconcilePerAppUsage(
+            eventsMap = mapOf("com.a" to 10 * min),
+            dailyMap = daily,
+            aggregateMap = mapOf("com.a" to 95 * min),
             dayStartMs = dayStart,
             nowMs = now
         )
-        assertEquals(130 * min, mixed.perAppMillis["com.a"])
+        val aggA = agg.first { it.packageName == "com.a" }
+        assertEquals(95 * min, aggA.chosenMs)
+        assertEquals(95 * min, aggA.aggregateMs)
+        assertEquals(50 * min, aggA.dailyMs)
+
+        // Events win over a lagging aggregate.
+        val mixed = DailyUsagePipeline.reconcilePerAppUsage(
+            eventsMap = mapOf("com.a" to 130 * min),
+            dailyMap = emptyMap(),
+            aggregateMap = mapOf("com.a" to 100 * min),
+            dayStartMs = dayStart,
+            nowMs = now
+        )
+        assertEquals(130 * min, mixed.first { it.packageName == "com.a" }.chosenMs)
     }
 }
