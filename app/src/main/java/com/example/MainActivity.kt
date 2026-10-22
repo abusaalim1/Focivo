@@ -833,6 +833,17 @@ fun FocuslyApp(viewModel: FocuslyViewModel) {
                                             }
                                         },
                                         onResumeTimer = { viewModel.resumeTimer() },
+                                        // v1.1.4d (ROUND D, item D2): Reset in the
+                                        // running row. Strict Mode forbids
+                                        // Restart exactly like Stop (owner rule),
+                                        // so the same StrictLockDialog gates it.
+                                        onRestartSession = {
+                                            if (com.example.util.StrictModeManager.isStrictModeEnabled(context)) {
+                                                showStrictEndConfirmDialog = true
+                                            } else {
+                                                viewModel.restartCurrentSession()
+                                            }
+                                        },
                                         onFinishEarly = {
                                             // v1.2.3 (Task 10): strict mode FULL lock-in —
                                             // the session cannot be stopped or restarted

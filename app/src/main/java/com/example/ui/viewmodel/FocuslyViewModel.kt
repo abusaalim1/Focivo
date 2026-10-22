@@ -3205,6 +3205,26 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
         startTimerInternal(source = "RESUME_TAP")
     }
 
+    /**
+     * v1.1.4d (ROUND D, item D2) — the running session's Reset action:
+     * discard the current attempt (exactly like finishing early — nothing
+     * is recorded) and immediately restart the SAME mode/target from full.
+     * Strict Mode forbids Restart exactly like Stop (owner rule, see
+     * StrictPauseGate) — the UI gate in MainActivity shows the strict
+     * lock dialog instead of calling this, mirroring onFinishEarly.
+     * Pomodoro runs keep their own in-component controls; if this is ever
+     * called during one, it degrades to the run's existing reset
+     * (stopPomodoro clears the run).
+     */
+    fun restartCurrentSession() {
+        if (_pomodoroState.value != null) {
+            stopPomodoro()
+            return
+        }
+        discardActiveSession()
+        startTimerInternal(source = "RESET")
+    }
+
     fun addFiveMinutes() {
         _remainingSeconds.value += 300
         _targetSeconds.value += 300

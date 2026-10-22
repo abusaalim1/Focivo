@@ -240,12 +240,11 @@ private fun ClockStyleFace(
             }
             Spacer(modifier = Modifier.height(12.dp))
         }
-        FaceControlRow(
-            isRunning = params.isRunning,
-            isBreak = params.isBreak,
-            onTogglePlay = params.onTogglePlay,
-            onReset = params.onReset
-        )
+        // v1.1.4d (ROUND D, item D2): NO control row inside the faces any
+        // more. Start/Pause/Reset/Stop exist exactly ONCE on the Study
+        // page — in the page-level action cluster below the timer (owner:
+        // the face buttons duplicated the page's Start pill). Faces are
+        // presentation + tap-to-edit only.
     }
 }
 
@@ -472,34 +471,13 @@ fun FaceResetButton(
 }
 
 /**
- * Shared control row for the non-clock faces — consistent placement:
- * primary play/pause pill + quiet reset circle, centered below the visual.
+ * v1.1.4d (D2): the shared in-face control row was REMOVED — every face
+ * rendered its own play/pause + reset buttons, duplicating the Study
+ * page's action cluster (the owner's "do option" complaint). The buttons
+ * themselves ([FacePlayPauseButton] / [FaceResetButton]) remain as
+ * design-system components (still covered by V132TimerButtons shots);
+ * faces no longer render them.
  */
-@Composable
-private fun FaceControlRow(
-    isRunning: Boolean,
-    isBreak: Boolean,
-    onTogglePlay: () -> Unit,
-    onReset: () -> Unit
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        FacePlayPauseButton(
-            isRunning = isRunning,
-            isBreak = isBreak,
-            onClick = onTogglePlay,
-            buttonSize = 72.dp
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        FaceResetButton(
-            onClick = onReset,
-            buttonSize = 48.dp
-        )
-    }
-}
 
 private fun faceTextPrimary(isDark: Boolean): Color =
     if (isDark) Color(0xFFF2F5EE) else NearBlack
@@ -595,13 +573,8 @@ private fun MinimalDigitsFace(
             pose = params.mascotPose,
             animate = params.isRunning
         )
-        Spacer(modifier = Modifier.height(22.dp))
-        FaceControlRow(
-            isRunning = params.isRunning,
-            isBreak = params.isBreak,
-            onTogglePlay = params.onTogglePlay,
-            onReset = params.onReset
-        )
+        // v1.1.4d (D2): face control row removed — page cluster owns the
+        // session actions (see ClockStyleFace note).
     }
 }
 
@@ -704,21 +677,9 @@ private fun GlassCardFace(
                         pose = params.mascotPose,
                         animate = params.isRunning
                     )
-                    Spacer(modifier = Modifier.width(18.dp))
-                    // Compact controls inside the card — v1.3.2 (item 12):
-                    // the shared buttons (same glass/lime styling + press
-                    // states as every other face; sizes unchanged).
-                    FacePlayPauseButton(
-                        isRunning = params.isRunning,
-                        isBreak = params.isBreak,
-                        onClick = params.onTogglePlay,
-                        buttonSize = 60.dp
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    FaceResetButton(
-                        onClick = params.onReset,
-                        buttonSize = 44.dp
-                    )
+                    // v1.1.4d (D2): the in-card play/reset buttons are
+                    // removed — the page cluster below the timer is the
+                    // single session-action surface.
                 }
             }
         }
@@ -808,13 +769,8 @@ private fun HalfArcFace(
             pose = params.mascotPose,
             animate = params.isRunning
         )
-        Spacer(modifier = Modifier.height(14.dp))
-        FaceControlRow(
-            isRunning = params.isRunning,
-            isBreak = params.isBreak,
-            onTogglePlay = params.onTogglePlay,
-            onReset = params.onReset
-        )
+        // v1.1.4d (D2): face control row removed — page cluster owns the
+        // session actions (see ClockStyleFace note).
     }
 }
 
@@ -918,20 +874,9 @@ private fun EditorialFace(
                 pose = params.mascotPose,
                 animate = params.isRunning
             )
-            Spacer(modifier = Modifier.weight(1f))
-            // Left-aligned controls — v1.3.2 (item 12): the shared buttons
-            // (same glass/lime styling + press states; sizes unchanged).
-            FacePlayPauseButton(
-                isRunning = params.isRunning,
-                isBreak = params.isBreak,
-                onClick = params.onTogglePlay,
-                buttonSize = 64.dp
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            FaceResetButton(
-                onClick = params.onReset,
-                buttonSize = 46.dp
-            )
+            // v1.1.4d (D2): the left-aligned play/reset buttons are
+            // removed — the page cluster below the timer is the single
+            // session-action surface.
         }
     }
 }

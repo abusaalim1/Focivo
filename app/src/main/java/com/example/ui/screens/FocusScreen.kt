@@ -24,8 +24,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -136,6 +137,10 @@ fun FocusScreen(
     onStartTimer: () -> Unit,
     onPauseTimer: () -> Unit,
     onResumeTimer: () -> Unit,
+    // v1.1.4d (ROUND D, item D2): the running row's Reset — discard this
+    // attempt and restart the same timer from full (strict-gated by the
+    // caller, exactly like Stop).
+    onRestartSession: () -> Unit = {},
     onFinishEarly: () -> Unit,
     onAddFiveMinutes: () -> Unit,
     onSkipBreak: () -> Unit,
@@ -306,7 +311,8 @@ fun FocusScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .weight(1f)
+                    .testTag("study_scroll_column"),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = BottomNavClearance),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(22.dp)
@@ -339,10 +345,16 @@ fun FocusScreen(
                         hasUsagePermission = hasUsagePermission,
                         focusMinutesToday = todayFocusMinutes,
                         onUsageCardClick = {
+                            // v1.1.4d (ROUND D, item D3): the Usage Time
+                            // box is a real door now. WITHOUT the grant it
+                            // only ever opens the permission ask (the card
+                            // itself shows "--", never a number). WITH the
+                            // grant it opens the per-app usage view (the
+                            // App Limits screen: every app sorted by time
+                            // spent, top app highlighted) — same
+                            // DailyUsagePipeline snapshot as this header.
                             if (hasUsagePermission) {
-                                kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
-                                    refreshStudyHeaderUsage(force = true)
-                                }
+                                onOpenScreenTimeBudgets()
                             } else {
                                 showUsagePermissionSheet = true
                             }
@@ -350,101 +362,14 @@ fun FocusScreen(
                     )
                 }
 
-                // 2. The primary action — Start / Pause. v1.3.4 (item 2): moved directly
-                // under the Study-top header. It used to sit BELOW the tall timer
-                // face, forcing a scroll to reach it; scrolling over the timer
-                // region clashed with the swipe-up-to-open-themes gesture.
-                // Same design language, same BlockHubSheet — only the position
-                // changed, so Block + START STUDY are reachable with no scroll.
-                item {
-                    var showBlockHub by remember { mutableStateOf(false) }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        BlockHubEntry(
-                            // The label sits directly on the ambient
-                            // timer-theme backdrop — it must use the backdrop
-                            // content color, never the raw design token
-                            // (unreadable on dark backdrops in light app
-                            // mode, and vice versa).
-                            contentColor = selectedTheme.backdropContent(isDark),
-                            modifier = Modifier.weight(0.44f),
-                            onOpen = { showBlockHub = true }
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Box(
-                            modifier = Modifier
-                                .weight(0.56f)
-                                .height(58.dp)
-                                .shadow(
-                                    elevation = 6.dp,
-                                    shape = CircleShape,
-                                    ambientColor = hubAccent.copy(alpha = 0.3f),
-                                    spotColor = hubAccent.copy(alpha = 0.4f)
-                                )
-                                .clip(CircleShape)
-                                .background(hubAccent)
-                                .clickable {
-                                    if (isRunning) {
-                                        onPauseTimer()
-                                    } else if (remainingSeconds < targetSeconds) {
-                                        onResumeTimer()
-                                    } else {
-                                        onStartTimer()
-                                    }
-                                }
-                                .testTag("play_pause_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isRunning) "Pause Study" else "Start Study",
-                                tint = NearBlack,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isRunning) "PAUSE FOCUS" else "START STUDY",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontFamily = PoppinsFontFamily,
-                                    color = NearBlack,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    letterSpacing = 1.sp
-                                )
-                            )
-                        }
-                        } // end Start/Pause pill
-                    } // end Block entry + button Row
-                    // v1.1.1: the one premium Block sheet (Strict, AI Guard,
-                    // AI YouTube Filter, Screen-time limits).
-                    if (showBlockHub) {
-                        BlockHubSheet(
-                            onOpenScreenTimeBudgets = onOpenScreenTimeBudgets,
-                            onDismiss = { showBlockHub = false }
-                        )
-                    }
-                    // Breathing room under the action; the hub hint sits quiet.
-                    if (!isRunning) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Timer, music, themes and protection live in the hub",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = PoppinsFontFamily,
-                                // v1.3.3 (item 9): captions on the backdrop use the
-                                // full-alpha caption token — the 0.55 alpha dropped
-                                // this below the 4.5:1 floor on Aurora light.
-                                color = selectedTheme.backdropCaptionContent(isDark),
-                                fontSize = 11.sp
-                            )
-                        )
-                    }
-                }
+                // v1.1.4d (ROUND D, item D2): the Block + START STUDY
+                // cluster no longer sits here. Round A had moved it up
+                // under this header; the owner ordered it back DOWN below
+                // the timer ("uper wala niche lake de de") — it now
+                // renders as the LAST LazyColumn item, state-aware:
+                // idle -> Block + START STUDY, running -> Reset + Stop
+                // only, paused -> Resume + Stop. The timer faces' own
+                // play/reset buttons (the duplication) are gone too.
 
                 // Session Start Confirmation Banner (Only shown when not running)
                 if (!isRunning && !sessionStartConfirmation.isNullOrBlank()) {
@@ -687,6 +612,251 @@ fun FocusScreen(
                         DeepFocusActiveBanner(
                             modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
                         )
+                    }
+                }
+
+                // 5. v1.1.4d (ROUND D, item D2) — THE action cluster, back
+                // BELOW the timer (owner order: "uper study guard and
+                // start rakha hai use niche lake de de"). One cluster, one
+                // home for every session action — the timer faces no
+                // longer carry their own play/reset buttons, so nothing
+                // is duplicated:
+                //   idle    -> Block entry + START STUDY (as before)
+                //   running -> Reset + Stop, ONLY ("bas 2 option")
+                //   paused  -> Resume + Stop (a paused session must stay
+                //              resumable; Stop still discards it)
+                // During a pomodoro run the cluster hides entirely —
+                // FocivoPomodoro carries its own in-component controls.
+                if (pomodoroState == null) {
+                    item {
+                        var showBlockHub by remember { mutableStateOf(false) }
+                        val inSession = isRunning || remainingSeconds < targetSeconds
+                        val backdropInk = selectedTheme.backdropContent(isDark)
+                        when {
+                            isRunning -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(56.dp)
+                                            .clip(CircleShape)
+                                            .background(cardBg)
+                                            .border(1.dp, cardBorder, CircleShape)
+                                            .clickable { onRestartSession() }
+                                            .testTag("session_reset_button"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Refresh,
+                                                contentDescription = "Reset session",
+                                                tint = backdropInk,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "RESET",
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontFamily = PoppinsFontFamily,
+                                                    color = backdropInk,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp,
+                                                    letterSpacing = 1.sp
+                                                )
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(56.dp)
+                                            .shadow(
+                                                elevation = 6.dp,
+                                                shape = CircleShape,
+                                                ambientColor = hubAccent.copy(alpha = 0.3f),
+                                                spotColor = hubAccent.copy(alpha = 0.4f)
+                                            )
+                                            .clip(CircleShape)
+                                            .background(hubAccent)
+                                            .clickable { onFinishEarly() }
+                                            .testTag("session_stop_button"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Stop,
+                                                contentDescription = "Stop session",
+                                                tint = NearBlack,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "STOP",
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontFamily = PoppinsFontFamily,
+                                                    color = NearBlack,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp,
+                                                    letterSpacing = 1.sp
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            inSession -> {
+                                // Paused mid-session: Resume (primary) + Stop.
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(56.dp)
+                                            .shadow(
+                                                elevation = 6.dp,
+                                                shape = CircleShape,
+                                                ambientColor = hubAccent.copy(alpha = 0.3f),
+                                                spotColor = hubAccent.copy(alpha = 0.4f)
+                                            )
+                                            .clip(CircleShape)
+                                            .background(hubAccent)
+                                            .clickable { onResumeTimer() }
+                                            .testTag("play_pause_button"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.PlayArrow,
+                                                contentDescription = "Resume Study",
+                                                tint = NearBlack,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "RESUME",
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontFamily = PoppinsFontFamily,
+                                                    color = NearBlack,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp,
+                                                    letterSpacing = 1.sp
+                                                )
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .height(56.dp)
+                                            .clip(CircleShape)
+                                            .background(cardBg)
+                                            .border(1.dp, cardBorder, CircleShape)
+                                            .clickable { onFinishEarly() }
+                                            .padding(horizontal = 22.dp)
+                                            .testTag("session_stop_button"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Stop,
+                                                contentDescription = "Stop session",
+                                                tint = backdropInk,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "STOP",
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontFamily = PoppinsFontFamily,
+                                                    color = backdropInk,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp,
+                                                    letterSpacing = 1.sp
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            else -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    BlockHubEntry(
+                                        // The label sits on the ambient
+                                        // timer-theme backdrop — backdrop
+                                        // content color, never the raw token.
+                                        contentColor = backdropInk,
+                                        modifier = Modifier.weight(0.44f),
+                                        onOpen = { showBlockHub = true }
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(0.56f)
+                                            .height(58.dp)
+                                            .shadow(
+                                                elevation = 6.dp,
+                                                shape = CircleShape,
+                                                ambientColor = hubAccent.copy(alpha = 0.3f),
+                                                spotColor = hubAccent.copy(alpha = 0.4f)
+                                            )
+                                            .clip(CircleShape)
+                                            .background(hubAccent)
+                                            .clickable { onStartTimer() }
+                                            .testTag("play_pause_button"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.PlayArrow,
+                                                contentDescription = "Start Study",
+                                                tint = NearBlack,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "START STUDY",
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontFamily = PoppinsFontFamily,
+                                                    color = NearBlack,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp,
+                                                    letterSpacing = 1.sp
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Timer, music, themes and protection live in the hub",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = PoppinsFontFamily,
+                                        color = selectedTheme.backdropCaptionContent(isDark),
+                                        fontSize = 11.sp
+                                    )
+                                )
+                            }
+                        }
+                        // v1.1.1: the one premium Block sheet (Strict, AI
+                        // Guard, AI YouTube Filter, Screen-time limits).
+                        if (showBlockHub) {
+                            BlockHubSheet(
+                                onOpenScreenTimeBudgets = onOpenScreenTimeBudgets,
+                                onDismiss = { showBlockHub = false }
+                            )
+                        }
                     }
                 }
             }
