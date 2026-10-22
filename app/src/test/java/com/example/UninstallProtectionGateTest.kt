@@ -134,4 +134,55 @@ class UninstallProtectionGateTest {
             )
         )
     }
+
+    // v1.1.4d (ROUND D, item D1) — the owner's "biggest bug" acceptance
+    // matrix, exercised end-to-end through the gate:
+    //   Strict OFF                       -> normal uninstall
+    //   Strict ON, no session            -> normal uninstall incl. the
+    //                                       admin deactivate step
+    //   Strict ON, session running      -> PROTECTED (popup + block)
+    //   session paused/discarded/done    -> protection disarms at once
+    // The D1 fix adds the in-app release (DeviceAdminGuard.canReleaseAdmin):
+    // release is allowed in EVERY state except PROTECTED, so the state
+    // that used to strand the owner (NO_SESSION with the admin still
+    // active) now has a guaranteed one-tap exit inside the app.
+    @Test
+    fun `round D acceptance - strict on no session releases admin in app`() {
+        val state = UninstallProtectionGate.decide(
+            strictEnabled = true,
+            protectionEnabled = true,
+            sessionActive = false,
+            adminActive = true
+        )
+        assertEquals(NO_SESSION, state)
+        org.junit.Assert.assertTrue(
+            "no-session state must allow the in-app admin release",
+            com.example.util.DeviceAdminGuard.canReleaseAdmin(state)
+        )
+    }
+
+    @Test
+    fun `round D acceptance - live strict session refuses admin release`() {
+        val state = UninstallProtectionGate.decide(
+            strictEnabled = true,
+            protectionEnabled = true,
+            sessionActive = true,
+            adminActive = true
+        )
+        assertEquals(PROTECTED, state)
+        org.junit.Assert.assertFalse(
+            "a live strict session must refuse the in-app admin release",
+            com.example.util.DeviceAdminGuard.canReleaseAdmin(state)
+        )
+    }
+
+    @Test
+    fun `round D acceptance - release allowed in every non protected state`() {
+        listOf(STRICT_OFF, OPTED_OUT, NO_SESSION, ADMIN_INACTIVE).forEach { state ->
+            org.junit.Assert.assertTrue(
+                "release must be allowed in $state",
+                com.example.util.DeviceAdminGuard.canReleaseAdmin(state)
+            )
+        }
+    }
 }
