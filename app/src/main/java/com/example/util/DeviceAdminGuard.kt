@@ -21,10 +21,20 @@ import com.example.service.FocivoDeviceAdminReceiver
  *  - On deactivation Android shows the system warning dialog containing
  *    whatever [FocivoDeviceAdminReceiver.onDisableRequested] returns — the
  *    user reads our strict explanation there and can back out.
- *  - This helper only READS admin state and LAUNCHES the system screens.
- *    Focivo can never deactivate itself: [android.app.admin.DevicePolicyManager]
- *    exposes no self-deactivate API — that absence is deliberate, and it is
- *    the user's guarantee that the app cannot secretly drop its own shield.
+ *
+ * v1.1.4d (ROUND D, item D1) — CORRECTION of a long-standing false claim
+ * in this file: DevicePolicyManager DOES expose a self-deactivate API.
+ * [DevicePolicyManager.removeActiveAdmin] "can only be called by the
+ * application that owns the administration component" (Android
+ * Developers reference) — Focivo can release its OWN admin, and only its
+ * own. The persistent admin was the actual mechanism behind the owner's
+ * "biggest bug": with Strict ON and NO session running, uninstall still
+ * silently failed on every path (no Focivo popup — the OS refusal is
+ * invisible), because the admin stays active 24/7 once granted. Regain-
+ * class apps protect only during the session; outside it, deactivation
+ * must proceed normally. [deactivateOwnAdmin] is that normal path,
+ * in-app: it refuses ONLY while the gate is PROTECTED (a live strict
+ * session) and releases immediately otherwise.
  *
  * POLICY MINIMALITY (read the XML, not just this comment):
  *  res/xml/device_admin_policies.xml declares an EMPTY <uses-policies/>.
@@ -71,10 +81,75 @@ object DeviceAdminGuard {
     }
 
     /**
-     * Opens the system's device-admin list so the user can deactivate Focivo
-     * themselves. Android gives apps NO API to deactivate their own admin —
-     * so the disable path is always the system Settings screen, never an
-     * in-app switch. Honest and trap-free by construction.
+     * Pure release rule (unit-tested): the in-app admin release is allowed
+     * in every gate state EXCEPT [UninstallProtectionGate.State.PROTECTED]
+     * — a live strict session. In every other state (strict off, opted
+     * out, no session, admin somehow inactive) nothing may hold the admin
+     * hostage.
+     */
+    fun canReleaseAdmin(state: UninstallProtectionGate.State): Boolean =
+        state != UninstallProtectionGate.State.PROTECTED
+
+    /**
+     * v1.1.4d (item D1) — in-app one-tap release of Focivo's OWN device
+     * admin via [DevicePolicyManager.removeActiveAdmin]. This is the fix
+     * for "Strict ON + no session → uninstall silently impossible": the
+     * user no longer has to dig through OEM Settings (on vivo the
+     * hardcoded AOSP DeviceAdminSettings component does not resolve to
+     * the device-admin list at all, which stranded the owner).
+     *
+     * Defence in depth: the gate is re-decided HERE with live inputs —
+     * even if a caller mis-wires its button, a PROTECTED (live strict
+     * session) state refuses the release and logs the refusal to Guard
+     * Hub. The operation is asynchronous at the OS level; callers should
+     * re-read [isAdminActive] on resume. Returns true when the release
+     * was requested (or there was nothing to release is NOT success —
+     * false means: not active, refused, or failed, all logged).
+     */
+    fun deactivateOwnAdmin(context: Context): Boolean {
+        if (!isAdminActive(context)) {
+            Log.i(TAG, "deactivateOwnAdmin: admin not active — nothing to release.")
+            return false
+        }
+        val state = UninstallProtectionGate.decide(
+            strictEnabled = StrictModeManager.isStrictModeEnabled(context),
+            protectionEnabled = StrictModeManager.isUninstallProtectionEnabled(context),
+            sessionActive = AiStudyGuardManager.isStudyPeriodActive(context) ||
+                StrictSessionStore.isStrictSessionActive(context),
+            adminActive = true
+        )
+        if (!canReleaseAdmin(state)) {
+            Log.w(TAG, "deactivateOwnAdmin REFUSED: gate is PROTECTED (live strict session).")
+            try {
+                AiStudyGuardManager.logGuardActivity(
+                    context, "Device Admin", "admin-release", "REFUSED_PROTECTED",
+                    "In-app admin release refused — a strict session is live."
+                )
+            } catch (_: Exception) { }
+            return false
+        }
+        return try {
+            val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE)
+                as? DevicePolicyManager ?: return false
+            dpm.removeActiveAdmin(componentName(context))
+            Log.i(TAG, "deactivateOwnAdmin: removeActiveAdmin requested (gate=$state).")
+            try {
+                AiStudyGuardManager.logGuardActivity(
+                    context, "Device Admin", "admin-release", "RELEASED",
+                    "Device admin released in-app outside a protected session (gate=$state); uninstall is fully normal."
+                )
+            } catch (_: Exception) { }
+            true
+        } catch (t: Throwable) {
+            Log.e(TAG, "deactivateOwnAdmin failed: ${t.message}")
+            false
+        }
+    }
+
+    /**
+     * Opens the system's device-admin list so the user can deactivate
+     * Focivo themselves — kept as the fallback route next to the in-app
+     * one-tap release ([deactivateOwnAdmin]).
      *
      * Returns true when a settings screen was launched. OEMs rename this
      * screen (vivo: Security → More security settings → Device admin apps),

@@ -208,13 +208,21 @@ fun StrictAdminExplainerSheet(
 
 /**
  * Shown from the "Uninstall protection" row whenever the device admin is
- * present. The disable path is the SYSTEM settings screen — Android gives
- * apps no API to deactivate their own admin, and we say so plainly. That is
- * the user's guarantee against trapping.
+ * present.
  *
  * v1.1.3 FIX 1: [isCurrentlyBlocking] keeps the copy honest — the sheet is
  * now also reachable when the admin is on but no strict session is running,
  * in which case uninstall is already one standard step away.
+ *
+ * v1.1.4d (ROUND D, item D1): the old copy claimed "Android gives apps no
+ * API to deactivate their own admin" — that was WRONG (removeActiveAdmin
+ * exists for an app's OWN admin component) and it mattered: the settings
+ * route hardcodes an AOSP component that does not resolve to vivo's
+ * device-admin list, so outside a session the owner was stranded with an
+ * uninstall that silently failed. Now, when NOT blocking, the primary
+ * action is a true in-app one-tap release ([onDeactivateInApp]); the
+ * system Settings route stays as a secondary fallback. While a session
+ * IS blocking, no release is offered here at all — protection holds.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -222,7 +230,8 @@ fun StrictAdminDisableSheet(
     isCurrentlyBlocking: Boolean,
     onOpenSettings: () -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDeactivateInApp: (() -> Unit)? = null
 ) {
     val T = focivoTokens()
     ModalBottomSheet(
@@ -265,16 +274,15 @@ fun StrictAdminDisableSheet(
             Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = if (isCurrentlyBlocking) {
-                    "Android is blocking Focivo's uninstall right now. " +
-                        "To remove this, deactivate Focivo in your phone's " +
-                        "device-admin list — Focivo can't do it itself, and " +
-                        "that's your guarantee we can never trap you."
+                    "Android is blocking Focivo's uninstall right now, " +
+                        "while your strict session runs. The protection " +
+                        "lifts on its own the moment the session ends — " +
+                        "that's the promise you set for yourself."
                 } else {
-                    "No strict session is running, so uninstall is already " +
-                        "one standard step away. To make it fully normal, " +
-                        "deactivate Focivo in your phone's device-admin " +
-                        "list — Focivo can't do it itself, and that's your " +
-                        "guarantee we can never trap you."
+                    "No strict session is running, so nothing is being " +
+                        "protected right now. Turn the device admin off " +
+                        "right here and uninstall works completely " +
+                        "normally — no digging through phone settings."
                 },
                 fontFamily = PoppinsFontFamily,
                 fontWeight = FontWeight.Normal,
@@ -284,24 +292,62 @@ fun StrictAdminDisableSheet(
                 color = T.muted
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onOpenSettings,
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = RegainLimePrimary,
-                    contentColor = RegainLimeDeepText
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp)
-                    .testTag("strict_admin_open_settings_cta")
-            ) {
-                Text(
-                    text = "Open device admin settings",
-                    fontFamily = PoppinsFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
-                )
+            if (!isCurrentlyBlocking && onDeactivateInApp != null) {
+                // v1.1.4d (D1): one-tap in-app release — the primary exit
+                // outside a protected session. The gate is re-checked
+                // inside deactivateOwnAdmin, so this button can never
+                // release the admin mid-session even if mis-wired.
+                Button(
+                    onClick = onDeactivateInApp,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RegainLimePrimary,
+                        contentColor = RegainLimeDeepText
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .testTag("strict_admin_deactivate_cta")
+                ) {
+                    Text(
+                        text = "Turn off uninstall protection",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
+                TextButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.testTag("strict_admin_open_settings_cta")
+                ) {
+                    Text(
+                        text = "Open device admin settings instead",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 13.sp,
+                        color = T.muted
+                    )
+                }
+            } else {
+                Button(
+                    onClick = onOpenSettings,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RegainLimePrimary,
+                        contentColor = RegainLimeDeepText
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .testTag("strict_admin_open_settings_cta")
+                ) {
+                    Text(
+                        text = "Open device admin settings",
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
             }
             TextButton(onClick = onDismiss) {
                 Text(

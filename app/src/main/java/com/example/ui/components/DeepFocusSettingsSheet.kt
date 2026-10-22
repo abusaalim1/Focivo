@@ -195,6 +195,15 @@ fun DeepFocusSettingsSheet(
                 DeviceAdminGuard.openDeactivateScreen(context)
                 adminRefreshTick += 1
             },
+            // v1.1.4d (item D1): one-tap in-app admin release outside a
+            // protected session. deactivateOwnAdmin re-decides the gate
+            // with live inputs and refuses while PROTECTED, so this can
+            // never drop the shield mid-session.
+            onDeactivateInApp = {
+                val released = DeviceAdminGuard.deactivateOwnAdmin(context)
+                if (released) showAdminDisableSheet = false
+                adminRefreshTick += 1
+            },
             onDismiss = { showAdminDisableSheet = false }
         )
     }

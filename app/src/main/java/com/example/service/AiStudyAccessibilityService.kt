@@ -1164,18 +1164,32 @@ class AiStudyAccessibilityService : AccessibilityService() {
             // this is the overwhelmingly common state, keep the hub quiet.
             return
         }
+        // v1.1.4d (item D1): every gate decision is logged WITH the full
+        // session state (which source claims a session, admin on/off), so
+        // any residual silent block is diagnosable from Guard Hub on the
+        // device instead of guesswork. The two session sources are read
+        // separately precisely so the log can name the live one.
+        val studyPeriodActive = com.example.util.AiStudyGuardManager.isStudyPeriodActive(ctx)
+        val storeSessionActive = com.example.util.StrictSessionStore.isStrictSessionActive(ctx)
+        val adminActiveNow = com.example.util.DeviceAdminGuard.isAdminActive(ctx)
+        val sessionSource = when {
+            studyPeriodActive && storeSessionActive -> "study-period+strict-store"
+            studyPeriodActive -> "study-period"
+            storeSessionActive -> "strict-store"
+            else -> "none"
+        }
+        val gateSummary = "strict=on session=$sessionSource admin=${if (adminActiveNow) "on" else "off"}"
         if (!com.example.util.StrictModeManager.isUninstallProtectionEnabled(ctx)) {
-            logTamperSkipped(pkg, "opted-out")
+            logTamperSkipped(pkg, "opted-out", gateSummary)
             return
         }
-        val sessionActive = com.example.util.AiStudyGuardManager.isStudyPeriodActive(ctx) ||
-                com.example.util.StrictSessionStore.isStrictSessionActive(ctx)
+        val sessionActive = studyPeriodActive || storeSessionActive
         if (!sessionActive) {
-            logTamperSkipped(pkg, "no-session")
+            logTamperSkipped(pkg, "no-session", gateSummary)
             return
         }
-        if (!com.example.util.DeviceAdminGuard.isAdminActive(ctx)) {
-            logTamperSkipped(pkg, "admin-inactive")
+        if (!adminActiveNow) {
+            logTamperSkipped(pkg, "admin-inactive", gateSummary)
             return
         }
 
@@ -1202,7 +1216,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
         lastTamperInterceptMs = nowTime
         lastTamperKey = key
 
-        Log.w(TAG, "[StrictTamperGuard] ${tamper.name} naming $ownPackage on $pkg ($className) — back-pressing out.")
+        Log.w(TAG, "[StrictTamperGuard] ${tamper.name} naming $ownPackage on $pkg ($className) — back-pressing out. Gate: $gateSummary")
         // 1. Kill the tamper screen. Back first (safer than HOME — never
         // collapses the user's other windows); the re-fire throttle keeps it
         // dead while the user keeps trying mid-session.
@@ -1211,14 +1225,16 @@ class AiStudyAccessibilityService : AccessibilityService() {
         } catch (t: Throwable) {
             Log.e(TAG, "[StrictTamperGuard] BACK failed: ${t.message}")
         }
-        // 2. Guard Hub evidence (throttled like the intercept).
+        // 2. Guard Hub evidence (throttled like the intercept). v1.1.4d:
+        // the gate snapshot rides along so the intercept's session source
+        // is on record next to the skip entries.
         try {
             com.example.util.AiStudyGuardManager.logGuardActivity(
                 ctx,
                 "Focivo",
                 tamper.hubStage,
                 "BLOCKED",
-                "tamper-screen mid-session; back-press + overlay",
+                "tamper-screen mid-session; back-press + overlay [$gateSummary]",
                 "$pkg ${className.takeLast(40)}"
             )
         } catch (_: Exception) { }
@@ -1250,7 +1266,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
      * condition failed instead of silent nothing. Throttled per
      * (reason, pkg) so normal use never spams the hub.
      */
-    private fun logTamperSkipped(pkg: String, reason: String) {
+    private fun logTamperSkipped(pkg: String, reason: String, gateSummary: String = "") {
         val key = "$reason|$pkg"
         val now = System.currentTimeMillis()
         if (now - (lastTamperSkipLogMs[key] ?: 0L) < 30_000L) return
@@ -1258,7 +1274,7 @@ class AiStudyAccessibilityService : AccessibilityService() {
         try {
             com.example.util.AiStudyGuardManager.logGuardActivity(
                 applicationContext, "Focivo", "tamper-guard", "skipped",
-                "candidate screen on $pkg; gate not PROTECTED ($reason)"
+                "candidate screen on $pkg; gate not PROTECTED ($reason) [$gateSummary]"
             )
         } catch (_: Exception) { }
     }
