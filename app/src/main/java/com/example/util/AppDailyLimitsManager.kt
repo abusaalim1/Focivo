@@ -48,7 +48,7 @@ object AppDailyLimitsManager {
                 "App Daily Time Limits",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Real-time warnings and enforcement for per-app daily time budgets"
+                description = "Warnings and enforcement for per-app daily time budgets"
             }
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             manager?.createNotificationChannel(channel)
@@ -83,6 +83,8 @@ object AppDailyLimitsManager {
      * using live UsageStatsManager data.
      */
     private suspend fun updateAllLimitsUsage(context: Context) {
+        DailyUsagePipeline.refreshIfDayChanged()
+        if (!DailyUsagePipeline.hasUsagePermission(context)) return
         val repo = FocuslyRepository.getInstance(context)
         val limits = repo.loadAppDailyLimitsFromLocal()
         if (limits.isEmpty()) return
@@ -124,14 +126,15 @@ object AppDailyLimitsManager {
      */
     fun isDailyLimitExceeded(context: Context, packageName: String): Boolean {
         if (EssentialAppsGuard.isEssentialApp(context, packageName)) return false
+        DailyUsagePipeline.refreshIfDayChanged()
+        if (!DailyUsagePipeline.hasUsagePermission(context)) return false
         val repo = FocuslyRepository.getInstance(context)
         val limits = repo.loadAppDailyLimitsFromLocal()
         val limit = limits.find { it.appPackage.equals(packageName, ignoreCase = true) && it.isEnabled } ?: return false
         val checked = limit.checkAndResetDailyUsage()
         val realMinutes = queryRealAppUsageMinutesToday(context, packageName)
-        val effectiveMins = if (realMinutes > 0) realMinutes else checked.minutesUsedToday
         return PerAppBudgetEvaluator.isExceeded(
-            usageMinutesToday = effectiveMins,
+            usageMinutesToday = realMinutes,
             dailyLimitMinutes = checked.dailyLimitMinutes,
             emergencyBypassUntilMs = checked.emergencyBypassUntilMs
         )
@@ -142,6 +145,7 @@ object AppDailyLimitsManager {
      */
     fun onForegroundAppPolled(context: Context, foregroundPackage: String) {
         if (EssentialAppsGuard.isEssentialApp(context, foregroundPackage)) return
+        if (!DailyUsagePipeline.hasUsagePermission(context)) return
 
         val repo = FocuslyRepository.getInstance(context)
         val limits = repo.loadAppDailyLimitsFromLocal()
@@ -155,12 +159,13 @@ object AppDailyLimitsManager {
 
     fun checkAndEnforceLimit(context: Context, limit: AppDailyLimitEntity): Boolean {
         if (!limit.isEnabled || EssentialAppsGuard.isEssentialApp(context, limit.appPackage)) return false
+        DailyUsagePipeline.refreshIfDayChanged()
+        if (!DailyUsagePipeline.hasUsagePermission(context)) return false
 
         val checkedLimit = limit.checkAndResetDailyUsage()
 
-        // Query REAL screen time from UsageStatsManager
-        val realMinutes = queryRealAppUsageMinutesToday(context, checkedLimit.appPackage)
-        val effectiveMinutes = if (realMinutes > 0) realMinutes else checkedLimit.minutesUsedToday
+        // Query screen time from DailyUsagePipeline snapshot
+        val effectiveMinutes = queryRealAppUsageMinutesToday(context, checkedLimit.appPackage)
 
         var updatedLimit = checkedLimit.copy(minutesUsedToday = effectiveMinutes)
 

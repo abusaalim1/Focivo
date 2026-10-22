@@ -158,10 +158,13 @@ fun AppLimitsScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var hasUsagePermission by remember {
-        mutableStateOf(FocusShieldPermissions.hasUsageStatsPermission(context))
+        mutableStateOf(DailyUsagePipeline.hasUsagePermission(context))
     }
 
     var appUsageMap by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    var snapshotTotalMillis by remember { mutableStateOf<Long?>(null) }
+    var resumeRefreshCounter by remember { mutableStateOf(0) }
+    var lastSeenDayKey by remember { mutableStateOf(DailyUsagePipeline.dayKeyFor()) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilterTab by remember { mutableStateOf("All Apps") } // "All Apps", "With Limits", "Most Used", "Social", "Games"
 
@@ -169,12 +172,19 @@ fun AppLimitsScreen(
     var preselectedAppForAdd by remember { mutableStateOf<DeviceAppInfo?>(null) }
     var showAddSheet by remember { mutableStateOf(false) }
 
-    // Live permission monitoring on resume
+    // Permission monitoring and snapshot refresh on resume
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                val granted = FocusShieldPermissions.hasUsageStatsPermission(context)
+                DailyUsagePipeline.refreshIfDayChanged()
+                lastSeenDayKey = DailyUsagePipeline.dayKeyFor()
+                val granted = DailyUsagePipeline.hasUsagePermission(context)
                 hasUsagePermission = granted
+                if (!granted) {
+                    appUsageMap = emptyMap()
+                    snapshotTotalMillis = null
+                }
+                resumeRefreshCounter++
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -183,19 +193,35 @@ fun AppLimitsScreen(
         }
     }
 
-    // Refresh usage statistics whenever permission is available or resumed.
-    // v1.3.3: reads from DailyUsagePipeline — the same source as the
-    // Study-top header and the global budget.
-    LaunchedEffect(hasUsagePermission) {
+    // Refresh usage statistics whenever permission changes, screen resumes, or day rolls over.
+    LaunchedEffect(hasUsagePermission, resumeRefreshCounter) {
         if (hasUsagePermission) {
             withContext(Dispatchers.IO) {
                 val snapshot = DailyUsagePipeline.getSnapshot(context, forceRefresh = true)
                 val usage = snapshot?.perAppMillis
                     ?.mapValues { (_, ms) -> (ms / (1000 * 60)).toInt() }
                     ?: emptyMap()
+                val totalMs = snapshot?.totalMillis
                 withContext(Dispatchers.Main) {
                     appUsageMap = usage
+                    snapshotTotalMillis = totalMs
                 }
+            }
+        } else {
+            appUsageMap = emptyMap()
+            snapshotTotalMillis = null
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000L)
+            val nowKey = DailyUsagePipeline.dayKeyFor()
+            if (nowKey != lastSeenDayKey) {
+                DailyUsagePipeline.refreshIfDayChanged()
+                lastSeenDayKey = nowKey
+                hasUsagePermission = DailyUsagePipeline.hasUsagePermission(context)
+                resumeRefreshCounter++
             }
         }
     }
@@ -205,13 +231,16 @@ fun AppLimitsScreen(
         installedApps.filterNot { EssentialAppsGuard.isEssentialApp(context, it.packageName) }
     }
 
-    // Build unified ranked list
-    val rankedItems = remember(nonEssentialApps, limits, appUsageMap) {
+    // Build unified ranked list exclusively from DailyUsagePipeline snapshot when granted
+    val rankedItems = remember(nonEssentialApps, limits, appUsageMap, hasUsagePermission) {
         val limitMap = limits.associateBy { it.appPackage.lowercase() }
         val itemsList = nonEssentialApps.map { app ->
             val limit = limitMap[app.packageName.lowercase()]
-            val realUsage = appUsageMap[app.packageName] ?: 0
-            val effectiveUsage = maxOf(limit?.minutesUsedToday ?: 0, realUsage)
+            val effectiveUsage = if (hasUsagePermission) {
+                appUsageMap[app.packageName] ?: 0
+            } else {
+                0
+            }
             AppUsageRankItem(
                 appInfo = app,
                 usageMinutesToday = effectiveUsage,
@@ -255,8 +284,10 @@ fun AppLimitsScreen(
         limits.count { it.isEnabled }
     }
 
-    val totalDeviceScreenTimeMins = remember(rankedItems) {
-        rankedItems.sumOf { it.usageMinutesToday }
+    val totalDeviceScreenTimeMins = remember(snapshotTotalMillis, rankedItems, hasUsagePermission) {
+        if (!hasUsagePermission) 0
+        else ((snapshotTotalMillis ?: 0L) / 60_000L).toInt().takeIf { snapshotTotalMillis != null }
+            ?: rankedItems.sumOf { it.usageMinutesToday }
     }
 
     Scaffold(
@@ -368,7 +399,7 @@ fun AppLimitsScreen(
                                     )
                                 )
                                 Text(
-                                    text = "Required to see live screen time spent on each app & enforce limits",
+                                    text = "Required to see screen time spent on each app and enforce limits",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontFamily = PoppinsFontFamily,
                                         color = Limits.Muted,
@@ -421,7 +452,10 @@ fun AppLimitsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 6.dp),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(20.dp),
+                onClick = if (!hasUsagePermission) {
+                    { FocusShieldPermissions.openUsageAccessSettings(context) }
+                } else null
             ) {
                 Row(
                     modifier = Modifier
@@ -442,9 +476,13 @@ fun AppLimitsScreen(
                             )
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        val screenHrs = totalDeviceScreenTimeMins / 60
-                        val screenMins = totalDeviceScreenTimeMins % 60
-                        val formattedScreenTime = if (screenHrs > 0) "${screenHrs}h ${screenMins}m logged" else "${screenMins}m logged"
+                        val formattedScreenTime = if (!hasUsagePermission || snapshotTotalMillis == null) {
+                            "--"
+                        } else {
+                            val screenHrs = totalDeviceScreenTimeMins / 60
+                            val screenMins = totalDeviceScreenTimeMins % 60
+                            if (screenHrs > 0) "${screenHrs}h ${screenMins}m logged" else "${screenMins}m logged"
+                        }
                         Text(
                             text = formattedScreenTime,
                             style = MaterialTheme.typography.titleLarge.copy(
@@ -585,6 +623,7 @@ fun AppLimitsScreen(
                     items(filteredItems, key = { it.appInfo.packageName }) { item ->
                         AppRankAndLimitCard(
                             item = item,
+                            hasUsagePermission = hasUsagePermission,
                             onSetLimit = {
                                 selectedLimitForEdit = null
                                 preselectedAppForAdd = item.appInfo
@@ -641,15 +680,17 @@ fun AppRankAndLimitCard(
     onEditLimit: (AppDailyLimitEntity) -> Unit,
     onDeleteLimit: (String) -> Unit,
     onToggleEnabled: (String, Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hasUsagePermission: Boolean = true
 ) {
     val limit = item.limit
     val appInfo = item.appInfo
-    val usedMins = item.usageMinutesToday
+    val usedMins = if (hasUsagePermission) item.usageMinutesToday else 0
 
     val hrs = usedMins / 60
     val mins = usedMins % 60
     val formattedSpentToday = when {
+        !hasUsagePermission -> "--"
         hrs > 0 && mins > 0 -> "${hrs}h ${mins}m"
         hrs > 0 -> "${hrs}h"
         mins > 0 -> "${mins}m"
@@ -663,12 +704,12 @@ fun AppRankAndLimitCard(
     val limitMins = (limit?.dailyLimitMinutes ?: 0) % 60
     val limitText = if (limitHrs > 0) "${limitHrs}h ${limitMins}m" else "${limitMins}m"
 
-    val progressFraction = if (hasLimit && limit!!.dailyLimitMinutes > 0) {
+    val progressFraction = if (hasUsagePermission && hasLimit && limit!!.dailyLimitMinutes > 0) {
         (usedMins.toFloat() / limit.dailyLimitMinutes.toFloat()).coerceIn(0f, 1f)
     } else 0f
 
     val progressColor = when {
-        !hasLimit || !isLimitEnabled -> Color.Gray
+        !hasUsagePermission || !hasLimit || !isLimitEnabled -> Color.Gray
         progressFraction >= 1.0f -> Color(0xFFEF4444)
         progressFraction >= 0.8f -> Color(0xFFF59E0B)
         else -> Limits.Lime
@@ -741,15 +782,19 @@ fun AppRankAndLimitCard(
 
                             // Time spent today badge
                             Surface(
-                                color = if (usedMins > 0) Limits.Lime.copy(alpha = 0.15f) else Color(0x15FFFFFF),
+                                color = if (hasUsagePermission && usedMins > 0) Limits.Lime.copy(alpha = 0.15f) else Color(0x15FFFFFF),
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Text(
-                                    text = if (usedMins > 0) "$formattedSpentToday today" else "0m today",
+                                    text = when {
+                                        !hasUsagePermission -> "--"
+                                        usedMins > 0 -> "$formattedSpentToday today"
+                                        else -> "0m today"
+                                    },
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontFamily = PoppinsFontFamily,
-                                        color = if (usedMins > 0) Limits.Lime else Limits.Muted,
-                                        fontWeight = if (usedMins > 0) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (hasUsagePermission && usedMins > 0) Limits.Lime else Limits.Muted,
+                                        fontWeight = if (hasUsagePermission && usedMins > 0) FontWeight.Bold else FontWeight.Normal,
                                         fontSize = 10.sp
                                     ),
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -817,7 +862,7 @@ fun AppRankAndLimitCard(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Used today: ${usedMins}m / ${limitText}",
+                            text = if (hasUsagePermission) "Used today: ${usedMins}m / ${limitText}" else "Used today: -- / ${limitText}",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
                                 color = progressColor,
@@ -826,7 +871,7 @@ fun AppRankAndLimitCard(
                             )
                         )
                         Text(
-                            text = "${(progressFraction * 100).toInt()}%",
+                            text = if (hasUsagePermission) "${(progressFraction * 100).toInt()}%" else "--",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = PoppinsFontFamily,
                                 color = progressColor,

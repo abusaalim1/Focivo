@@ -1,9 +1,11 @@
 package com.example.util
 
+import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageEventsQuery
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.os.Process
 import android.util.Log
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -11,32 +13,28 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * v1.1.1 — the ONE source of truth for device usage stats.
+ * Single source of truth for device screen-time detection.
  *
- * Every surface that needs screen-time data (Study-top header, per-app
- * budgets, the global screen-time budget, the existing per-app daily-limit
- * enforcement) reads from here, so the numbers are identical everywhere.
+ * Every surface that needs screen-time data (Study-top header, Insights,
+ * per-app list, and budgets) reads from [getSnapshot], keeping numbers
+ * identical everywhere.
  *
- * - [getSnapshot] returns today's per-app foreground millis + the device
- *   total (sum of all apps). UsageStatsManager queries are expensive, so the
- *   snapshot is cached in-memory per app-open with a short TTL and only
- *   re-queried on demand ([invalidate] / forceRefresh) or when the day rolls
- *   over.
- * - [hasUsagePermission] exposes the PACKAGE_USAGE_STATS grant check; when
- *   it is false every read returns null/0 and callers must show the
- *   permission-gated UX instead of numbers.
- *
- * Today's per-app numbers come from EVENT PAIRING ([sumForegroundTime]):
- * ACTIVITY_RESUMED/ACTIVITY_PAUSED pairs clipped to [local midnight, now] —
- * the same method Digital Wellbeing-style dashboards use, so the Study header
- * tracks the system per-app minutes (YouTube, Muse, ...) and the summed
- * total. The aggregate query survives only as a per-package FLOOR: on OEMs
- * with sparse event logs it fills under-counted packages — never the reverse.
- *
- * Pure, hermetic helpers ([sumForegroundTime], [aggregate], [dayKeyFor],
- * [shouldRefresh]) are unit-tested; the Android query path is injected via
- * [UsageSampleProvider] so tests can substitute a fake provider without a
- * UsageStatsManager.
+ * 1. Permission: always checks PACKAGE_USAGE_STATS via AppOpsManager
+ *    (OPSTR_GET_USAGE_STATS). When not granted, clears any cached snapshot
+ *    and returns null so callers display "--" (never 0 or stale values).
+ * 2. Data: queries UsageEvents from (local midnight - 48 hours) to now,
+ *    pairs ACTIVITY_RESUMED / MOVE_TO_FOREGROUND with ACTIVITY_PAUSED /
+ *    MOVE_TO_BACKGROUND and ACTIVITY_STOPPED (plus DEVICE_SHUTDOWN /
+ *    DEVICE_STARTUP) into foreground intervals per package, clips intervals
+ *    to [today 00:00, now], and coalesces overlapping intervals per package
+ *    so overlapping intervals are never double-counted.
+ * 3. Cross-check: reconciles per app against queryUsageStats(INTERVAL_DAILY)
+ *    for today and queryAndAggregateUsageStats(midnight, now), choosing the
+ *    largest of the three values per app (clamped to the elapsed day length).
+ *    The header total is strictly the sum of the per-app values from this
+ *    single snapshot.
+ * 4. Diagnostics: records a Guard Hub diagnostic log entry (USAGE_RECONCILE)
+ *    listing, per app, the three raw values plus the chosen one.
  */
 object DailyUsagePipeline {
 
@@ -44,6 +42,15 @@ object DailyUsagePipeline {
 
     /** In-memory cache TTL — UsageStatsManager queries are expensive. */
     const val CACHE_TTL_MS = 60_000L
+
+    /** 48-hour lookback window before local midnight for UsageEvents queries. */
+    const val LOOKBACK_BEFORE_MIDNIGHT_MS = 48L * 60L * 60L * 1000L
+
+    /** Upper bound on a calendar day's length in milliseconds (24 hours). */
+    const val MAX_DAY_LENGTH_MS = 24L * 60L * 60L * 1000L
+
+    /** Guard Hub stage tag for screen-time reconciliation diagnostics. */
+    const val STAGE_USAGE_RECONCILE = "USAGE_RECONCILE"
 
     /** One app's foreground time for today. */
     data class UsageSample(
@@ -68,31 +75,46 @@ object DailyUsagePipeline {
         val queriedAtMs: Long
     )
 
-    /** Production provider: event-paired per-package foreground time. */
+    /** Per-package three-way reconciliation record for USAGE_RECONCILE logs. */
+    internal data class ReconcileEntry(
+        val packageName: String,
+        val eventsMs: Long,
+        val dailyMs: Long,
+        val aggregateMs: Long,
+        val chosenMs: Long
+    )
+
+    /** Production provider: 48h event-paired intervals + 3-way reconciliation. */
     private val systemProvider = object : UsageSampleProvider {
         override fun queryTodaySamples(
             context: Context,
             dayStartMs: Long,
             nowMs: Long
         ): List<UsageSample> {
+            if (!checkAppOpsUsageStats(context)) return emptyList()
+
             val usageStatsManager =
                 context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
                     ?: return emptyList()
-            val merged = mutableMapOf<String, Long>()
 
-            // PRIMARY (v1.1.1): pair ACTIVITY_RESUMED/ACTIVITY_PAUSED events
-            // clipped to [dayStartMs, nowMs] — Digital Wellbeing fidelity.
+            val queryStartMs = (dayStartMs - LOOKBACK_BEFORE_MIDNIGHT_MS).coerceAtLeast(0L)
+            var eventsMap: Map<String, Long> = emptyMap()
+            val dailyMap = mutableMapOf<String, Long>()
+            val aggregateMap = mutableMapOf<String, Long>()
+
+            // 1. Query UsageEvents from (local midnight - 48h) to now.
+            // Note: MOVE_TO_FOREGROUND == ACTIVITY_RESUMED (1) and
+            // MOVE_TO_BACKGROUND == ACTIVITY_PAUSED (2) in UsageEvents.Event.
             var eventCount = 0
             try {
-                // UsageEventsQuery.Builder is API 34+; the deprecated
-                // queryEvents(begin, end) covers API 21-33 (minSdk is 24).
                 val usageEvents = if (android.os.Build.VERSION.SDK_INT >=
                     android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE
                 ) {
-                    val query = UsageEventsQuery.Builder(dayStartMs, nowMs)
+                    val query = UsageEventsQuery.Builder(queryStartMs, nowMs)
                         .setEventTypes(
                             UsageEvents.Event.ACTIVITY_RESUMED,
                             UsageEvents.Event.ACTIVITY_PAUSED,
+                            UsageEvents.Event.ACTIVITY_STOPPED,
                             UsageEvents.Event.DEVICE_SHUTDOWN,
                             UsageEvents.Event.DEVICE_STARTUP
                         )
@@ -100,57 +122,51 @@ object DailyUsagePipeline {
                     usageStatsManager.queryEvents(query)
                 } else {
                     @Suppress("DEPRECATION")
-                    usageStatsManager.queryEvents(dayStartMs, nowMs)
+                    usageStatsManager.queryEvents(queryStartMs, nowMs)
                 }
                 val events = mutableListOf<AppUsageEvent>()
                 if (usageEvents != null) {
                     val ev = UsageEvents.Event()
                     while (usageEvents.hasNextEvent()) {
                         usageEvents.getNextEvent(ev)
+                        val pkg = ev.packageName
+                        val mappedType = when (ev.eventType) {
+                            UsageEvents.Event.ACTIVITY_RESUMED,
+                            UsageEvents.Event.MOVE_TO_FOREGROUND -> AppEventType.RESUMED
+                            UsageEvents.Event.ACTIVITY_PAUSED,
+                            UsageEvents.Event.MOVE_TO_BACKGROUND -> AppEventType.PAUSED
+                            UsageEvents.Event.ACTIVITY_STOPPED -> AppEventType.STOPPED
+                            UsageEvents.Event.DEVICE_SHUTDOWN -> AppEventType.SHUTDOWN
+                            UsageEvents.Event.DEVICE_STARTUP -> AppEventType.STARTUP
+                            else -> null
+                        } ?: continue
+
+                        if (mappedType != AppEventType.SHUTDOWN &&
+                            mappedType != AppEventType.STARTUP &&
+                            pkg.isNullOrBlank()
+                        ) {
+                            continue
+                        }
+
                         events.add(
                             AppUsageEvent(
-                                ev.packageName ?: continue,
-                                when (ev.eventType) {
-                                    UsageEvents.Event.ACTIVITY_RESUMED -> AppEventType.RESUMED
-                                    UsageEvents.Event.ACTIVITY_PAUSED -> AppEventType.PAUSED
-                                    UsageEvents.Event.DEVICE_SHUTDOWN -> AppEventType.SHUTDOWN
-                                    UsageEvents.Event.DEVICE_STARTUP -> AppEventType.STARTUP
-                                    else -> continue
-                                },
-                                ev.timeStamp
+                                packageName = pkg ?: "",
+                                type = mappedType,
+                                timeMs = ev.timeStamp,
+                                className = ev.className
                             )
                         )
                         eventCount++
                     }
                 }
                 if (events.isNotEmpty()) {
-                    merged.putAll(sumForegroundTime(events, dayStartMs, nowMs))
+                    eventsMap = sumForegroundTime(events, dayStartMs, nowMs)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "queryEvents pairing failed", e)
             }
 
-            // FALLBACK/FLOOR: per-package aggregate — only RAISES a package's
-            // number, never lowers it (OEMs with sparse event logs can
-            // under-count the pairing). When the event list was empty this is
-            // the whole answer.
-            try {
-                val aggregated = usageStatsManager.queryAndAggregateUsageStats(dayStartMs, nowMs)
-                if (!aggregated.isNullOrEmpty()) {
-                    for ((pkg, stats) in aggregated) {
-                        val fg = stats.totalTimeInForeground
-                        if (fg > 0L) {
-                            merged[pkg] = maxOf(merged[pkg] ?: 0L, fg)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "queryAndAggregateUsageStats failed", e)
-            }
-
-            // Second fallback: daily-interval stats, anchored to today by
-            // mergeDailyIntervalStats (v1.3.4 fix — never merges buckets that
-            // started before local midnight).
+            // 2. Cross-check source A: queryUsageStats(INTERVAL_DAILY) for today.
             try {
                 val statsList = usageStatsManager.queryUsageStats(
                     UsageStatsManager.INTERVAL_DAILY,
@@ -158,21 +174,54 @@ object DailyUsagePipeline {
                     nowMs
                 )
                 if (!statsList.isNullOrEmpty()) {
-                    val samples = statsList.map { stats ->
+                    val samples = statsList.mapNotNull { stats ->
+                        val pkg = stats.packageName ?: return@mapNotNull null
                         DailyBucketSample(
-                            stats.packageName,
-                            stats.totalTimeInForeground,
-                            stats.firstTimeStamp
+                            packageName = pkg,
+                            totalTimeInForegroundMs = stats.totalTimeInForeground,
+                            bucketStartMs = stats.firstTimeStamp
                         )
                     }
-                    mergeDailyIntervalStats(merged, samples, dayStartMs)
+                    mergeDailyIntervalStats(dailyMap, samples, dayStartMs)
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "queryUsageStats fallback failed", e)
+                Log.w(TAG, "queryUsageStats(INTERVAL_DAILY) failed", e)
             }
 
-            Log.d(TAG, "queryTodaySamples: $eventCount events -> ${merged.size} pkgs, total=${merged.values.sum()}")
-            return merged.map { (pkg, ms) -> UsageSample(pkg, ms) }
+            // 3. Cross-check source B: queryAndAggregateUsageStats(midnight, now).
+            try {
+                val aggregated = usageStatsManager.queryAndAggregateUsageStats(dayStartMs, nowMs)
+                if (!aggregated.isNullOrEmpty()) {
+                    for ((pkg, stats) in aggregated) {
+                        if (pkg.isBlank()) continue
+                        val fg = stats.totalTimeInForeground
+                        if (fg > 0L) {
+                            aggregateMap[pkg] = maxOf(aggregateMap[pkg] ?: 0L, fg)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "queryAndAggregateUsageStats failed", e)
+            }
+
+            // 4. Reconcile per app: largest of the three values, clamped to day length.
+            val reconciled = reconcilePerAppUsage(
+                eventsMap = eventsMap,
+                dailyMap = dailyMap,
+                aggregateMap = aggregateMap,
+                dayStartMs = dayStartMs,
+                nowMs = nowMs
+            )
+
+            // 5. Emit Guard Hub diagnostic log entry (USAGE_RECONCILE) per app.
+            recordReconcileDiagnostics(context, reconciled)
+
+            Log.d(
+                TAG,
+                "queryTodaySamples: $eventCount events -> ${reconciled.size} pkgs, " +
+                    "total=${reconciled.sumOf { it.chosenMs }}"
+            )
+            return reconciled.map { UsageSample(it.packageName, it.chosenMs) }
         }
     }
 
@@ -188,9 +237,32 @@ object DailyUsagePipeline {
     @Volatile
     private var cached: DeviceUsageSnapshot? = null
 
-    /** True when PACKAGE_USAGE_STATS is granted to Focivo. */
-    fun hasUsagePermission(context: Context): Boolean =
-        testPermissionOverride ?: PermissionUtils.hasUsageStatsPermission(context)
+    /**
+     * Direct AppOpsManager check for OPSTR_GET_USAGE_STATS.
+     */
+    internal fun checkAppOpsUsageStats(context: Context): Boolean {
+        return try {
+            val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager
+                ?: return false
+            val mode = appOps.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                context.packageName
+            )
+            mode == AppOpsManager.MODE_ALLOWED
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** True when PACKAGE_USAGE_STATS is granted via AppOpsManager. */
+    fun hasUsagePermission(context: Context): Boolean {
+        val granted = testPermissionOverride ?: checkAppOpsUsageStats(context)
+        if (!granted) {
+            synchronized(cacheLock) { cached = null }
+        }
+        return granted
+    }
 
     /** "yyyy-MM-dd" in the device timezone — the day bucket key. */
     fun dayKeyFor(timeMs: Long = System.currentTimeMillis()): String {
@@ -220,75 +292,163 @@ object DailyUsagePipeline {
     )
 
     /** Kinds of usage events the pairing cares about (hermetic). */
-    internal enum class AppEventType { RESUMED, PAUSED, SHUTDOWN, STARTUP }
+    internal enum class AppEventType { RESUMED, PAUSED, STOPPED, SHUTDOWN, STARTUP }
 
-    /** One hermetic usage event: package + kind + wall-clock time. */
+    /** One hermetic usage event: package + kind + wall-clock time + optional activity class. */
     internal data class AppUsageEvent(
         val packageName: String,
         val type: AppEventType,
-        val timeMs: Long
+        val timeMs: Long,
+        val className: String? = null
     )
 
     /**
-     * v1.1.1 — pure event pairing: foreground millis per package.
+     * Coalesces a list of [startMs, endMs] intervals so overlapping or adjacent
+     * intervals are merged and never double-counted.
+     */
+    internal fun mergeIntervals(intervals: List<Pair<Long, Long>>): List<Pair<Long, Long>> {
+        val valid = intervals.filter { (s, e) -> e > s }.sortedWith(
+            compareBy<Pair<Long, Long>> { it.first }.thenBy { it.second }
+        )
+        if (valid.isEmpty()) return emptyList()
+
+        val merged = mutableListOf<Pair<Long, Long>>()
+        var curStart = valid[0].first
+        var curEnd = valid[0].second
+
+        for (i in 1 until valid.size) {
+            val (nextStart, nextEnd) = valid[i]
+            if (nextStart <= curEnd) {
+                if (nextEnd > curEnd) curEnd = nextEnd
+            } else {
+                merged.add(curStart to curEnd)
+                curStart = nextStart
+                curEnd = nextEnd
+            }
+        }
+        merged.add(curStart to curEnd)
+        return merged
+    }
+
+    /**
+     * Pure event pairing: foreground millis per package.
      *
-     * Pairs ACTIVITY_RESUMED/ACTIVITY_PAUSED per package, clipping every
-     * interval to [dayStartMs, nowMs]. Rules:
-     * - RESUMED opens an interval (re-open is ignored while already open).
-     * - PAUSED closes it and banks the clipped duration.
-     * - DEVICE_SHUTDOWN closes ALL open intervals at the shutdown time (the
-     *   platform generates no matching PAUSED after a shutdown; events between
-     *   SHUTDOWN and STARTUP are ignored per the UsageEvents docs).
-     * - At the end of the stream, still-open intervals close at nowMs (the app
-     *   is still on screen).
-     * - Split-screen/PiP: two apps can be open at once; each banks its own
-     *   foreground time — the total is the sum of per-app minutes, exactly
-     *   like the system "Today" total.
-     * Unit-tested (split-screen overlap, midnight-spanning sessions,
-     * resume-without-pause, shutdown, per-app-sum-equals-total).
+     * Pairs ACTIVITY_RESUMED / MOVE_TO_FOREGROUND with ACTIVITY_PAUSED /
+     * MOVE_TO_BACKGROUND and ACTIVITY_STOPPED (plus DEVICE_SHUTDOWN /
+     * DEVICE_STARTUP) into foreground intervals per package, clips every
+     * interval to [dayStartMs, nowMs], and merges overlapping intervals per
+     * package so overlapping transitions are never double-counted and sessions
+     * starting before midnight contribute their after-midnight portion.
      */
     internal fun sumForegroundTime(
         events: List<AppUsageEvent>,
         dayStartMs: Long,
         nowMs: Long
     ): Map<String, Long> {
-        val totals = mutableMapOf<String, Long>()
-        val openStart = mutableMapOf<String, Long>()
+        if (nowMs <= dayStartMs || events.isEmpty()) return emptyMap()
 
-        fun close(pkg: String, endMs: Long) {
-            val start = openStart.remove(pkg) ?: return
-            val s = maxOf(start, dayStartMs)
-            val e = minOf(endMs, nowMs)
-            if (e > s) totals[pkg] = (totals[pkg] ?: 0L) + (e - s)
-        }
+        // Track open intervals per (packageName, activityKey) so an intra-app
+        // ActivityA -> ActivityB handoff where ActivityA emits STOPPED shortly
+        // after ActivityB emits RESUMED closes only ActivityA and never drops
+        // ActivityB, while merging intervals per package prevents any overlap
+        // from being double-counted.
+        val openStartByComponent = mutableMapOf<Pair<String, String>, Long>()
+        val rawIntervalsByPkg = mutableMapOf<String, MutableList<Pair<Long, Long>>>()
 
-        for (ev in events.sortedBy { it.timeMs }) {
-            val t = ev.timeMs.coerceIn(dayStartMs, nowMs)
-            when (ev.type) {
-                AppEventType.RESUMED ->
-                    if (!openStart.containsKey(ev.packageName)) openStart[ev.packageName] = t
-                AppEventType.PAUSED -> close(ev.packageName, t)
-                AppEventType.SHUTDOWN -> {
-                    val pkgs = openStart.keys.toList()
-                    for (pkg in pkgs) close(pkg, t)
-                }
-                AppEventType.STARTUP -> { /* already closed at SHUTDOWN; nothing to do */ }
+        fun recordInterval(pkg: String, startMs: Long, endMs: Long) {
+            if (pkg.isBlank()) return
+            val clippedStart = maxOf(startMs, dayStartMs)
+            val clippedEnd = minOf(endMs, nowMs)
+            if (clippedEnd > clippedStart) {
+                rawIntervalsByPkg.getOrPut(pkg) { mutableListOf() }
+                    .add(clippedStart to clippedEnd)
             }
         }
-        // Still on screen at query time.
-        for (pkg in openStart.keys.toList()) close(pkg, nowMs)
+
+        fun closeComponent(pkg: String, clsKey: String, endMs: Long) {
+            val exactKey = pkg to clsKey
+            val start = openStartByComponent.remove(exactKey)
+            if (start != null) {
+                recordInterval(pkg, start, endMs)
+                return
+            }
+            // If the closing event has no className (or only a package-level
+            // open entry exists), close matching open entries for this package.
+            if (clsKey.isEmpty()) {
+                val matchingKeys = openStartByComponent.keys.filter { it.first == pkg }
+                for (k in matchingKeys) {
+                    val s = openStartByComponent.remove(k) ?: continue
+                    recordInterval(pkg, s, endMs)
+                }
+            } else {
+                val fallbackKey = pkg to ""
+                val fallbackStart = openStartByComponent.remove(fallbackKey)
+                if (fallbackStart != null) {
+                    recordInterval(pkg, fallbackStart, endMs)
+                }
+            }
+        }
+
+        val sortedEvents = events.sortedBy { it.timeMs }
+        for (ev in sortedEvents) {
+            val t = ev.timeMs
+            if (t > nowMs) continue
+            val pkg = ev.packageName
+            val clsKey = ev.className?.trim().orEmpty()
+
+            when (ev.type) {
+                AppEventType.RESUMED -> {
+                    if (pkg.isNotBlank()) {
+                        val compKey = pkg to clsKey
+                        if (!openStartByComponent.containsKey(compKey)) {
+                            openStartByComponent[compKey] = t
+                        }
+                    }
+                }
+                AppEventType.PAUSED,
+                AppEventType.STOPPED -> {
+                    if (pkg.isNotBlank()) {
+                        closeComponent(pkg, clsKey, t)
+                    }
+                }
+                AppEventType.SHUTDOWN -> {
+                    val allOpenKeys = openStartByComponent.keys.toList()
+                    for (k in allOpenKeys) {
+                        val s = openStartByComponent.remove(k) ?: continue
+                        recordInterval(k.first, s, t)
+                    }
+                }
+                AppEventType.STARTUP -> {
+                    // Already closed at SHUTDOWN.
+                }
+            }
+        }
+
+        // Still on screen at query time: close at nowMs.
+        val remainingKeys = openStartByComponent.keys.toList()
+        for (k in remainingKeys) {
+            val s = openStartByComponent.remove(k) ?: continue
+            recordInterval(k.first, s, nowMs)
+        }
+
+        val totals = mutableMapOf<String, Long>()
+        for ((pkg, intervals) in rawIntervalsByPkg) {
+            val coalesced = mergeIntervals(intervals)
+            val totalMs = coalesced.sumOf { (s, e) -> e - s }
+            if (totalMs > 0L) {
+                totals[pkg] = totalMs
+            }
+        }
         return totals
     }
 
     /**
-     * v1.3.4 — pure merge of the daily-interval fallback stats.
+     * Pure merge of the daily-interval stats.
      *
-     * Keeps the max per package (some OEMs under-report one of the two
-     * UsageStats APIs), but SKIPS buckets whose interval started before
+     * Keeps the max per package, skipping buckets whose interval started before
      * [dayStartMs]: queryUsageStats(INTERVAL_DAILY) returns every bucket
      * intersecting the query range, including the previous day's bucket,
      * which otherwise leaks yesterday's minutes into today's totals.
-     * Unit-tested (incl. an Asia/Kolkata midnight-boundary case).
      */
     internal fun mergeDailyIntervalStats(
         merged: MutableMap<String, Long>,
@@ -302,6 +462,76 @@ object DailyUsagePipeline {
             merged[s.packageName] = maxOf(current, s.totalTimeInForegroundMs)
         }
         return merged
+    }
+
+    /**
+     * Cross-checks per-app foreground time across the three UsageStatsManager
+     * sources (48h-clipped UsageEvents intervals, today's INTERVAL_DAILY stats,
+     * and queryAndAggregateUsageStats(midnight, now)) and chooses the largest
+     * of the three values per app, clamped to the elapsed day length.
+     */
+    internal fun reconcilePerAppUsage(
+        eventsMap: Map<String, Long>,
+        dailyMap: Map<String, Long>,
+        aggregateMap: Map<String, Long>,
+        dayStartMs: Long,
+        nowMs: Long
+    ): List<ReconcileEntry> {
+        val dayElapsedCapMs = (nowMs - dayStartMs).coerceIn(0L, MAX_DAY_LENGTH_MS)
+        val allPackages = LinkedHashSet<String>().apply {
+            addAll(eventsMap.keys)
+            addAll(dailyMap.keys)
+            addAll(aggregateMap.keys)
+        }
+        val results = mutableListOf<ReconcileEntry>()
+        for (pkg in allPackages) {
+            if (pkg.isBlank()) continue
+            val evMs = (eventsMap[pkg] ?: 0L).coerceAtLeast(0L)
+            val dailyMs = (dailyMap[pkg] ?: 0L).coerceAtLeast(0L)
+            val aggMs = (aggregateMap[pkg] ?: 0L).coerceAtLeast(0L)
+            val rawMax = maxOf(evMs, dailyMs, aggMs)
+            val chosenMs = if (dayElapsedCapMs > 0L) {
+                rawMax.coerceAtMost(dayElapsedCapMs)
+            } else {
+                0L
+            }
+            if (chosenMs > 0L) {
+                results.add(
+                    ReconcileEntry(
+                        packageName = pkg,
+                        eventsMs = evMs,
+                        dailyMs = dailyMs,
+                        aggregateMs = aggMs,
+                        chosenMs = chosenMs
+                    )
+                )
+            }
+        }
+        return results.sortedByDescending { it.chosenMs }
+    }
+
+    /**
+     * Records per-app USAGE_RECONCILE diagnostic entries in the Guard Hub log
+     * with the three raw values plus the chosen one.
+     */
+    internal fun recordReconcileDiagnostics(
+        context: Context,
+        entries: List<ReconcileEntry>
+    ) {
+        for (entry in entries) {
+            if (entry.chosenMs <= 0L) continue
+            try {
+                AiStudyGuardManager.logGuardActivity(
+                    context = context,
+                    app = entry.packageName,
+                    stage = STAGE_USAGE_RECONCILE,
+                    verdict = "RECONCILED",
+                    reason = "ev=${entry.eventsMs}ms daily=${entry.dailyMs}ms agg=${entry.aggregateMs}ms",
+                    snippet = "chosen=${entry.chosenMs}ms"
+                )
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     /**
@@ -330,14 +560,34 @@ object DailyUsagePipeline {
     }
 
     /**
+     * Invalidates the cached snapshot if the local calendar day has rolled over.
+     * Returns true when a rollover was detected and cache was cleared.
+     */
+    fun refreshIfDayChanged(nowMs: Long = System.currentTimeMillis()): Boolean {
+        val todayKey = dayKeyFor(nowMs)
+        synchronized(cacheLock) {
+            val existing = cached ?: return false
+            if (existing.dayKey != todayKey) {
+                cached = null
+                return true
+            }
+            return false
+        }
+    }
+
+    /**
      * Returns today's snapshot, or null when usage permission is missing.
      * Cached per app-open (TTL [CACHE_TTL_MS]); pass [forceRefresh] to bypass
-     * the cache (e.g. when the user returns from system settings).
+     * the cache (e.g. when the user returns from system settings or on resume).
      */
     fun getSnapshot(context: Context, forceRefresh: Boolean = false): DeviceUsageSnapshot? {
-        if (!hasUsagePermission(context)) return null
+        if (!hasUsagePermission(context)) {
+            synchronized(cacheLock) { cached = null }
+            return null
+        }
         val now = System.currentTimeMillis()
         val todayKey = dayKeyFor(now)
+        val dayStart = dayStartMillis(now)
 
         synchronized(cacheLock) {
             val existing = cached
@@ -345,15 +595,21 @@ object DailyUsagePipeline {
                 return existing
             }
 
-            val dayStart = dayStartMillis(now)
             val provider = testProvider ?: systemProvider
-            val samples = try {
+            val rawSamples = try {
                 provider.queryTodaySamples(context, dayStart, now)
             } catch (e: Exception) {
                 Log.w(TAG, "provider query failed", e)
                 emptyList()
             }
-            val (perApp, total) = aggregate(samples)
+            val clampedSamples = rawSamples.map { s ->
+                if (s.totalTimeInForegroundMs > MAX_DAY_LENGTH_MS) {
+                    s.copy(totalTimeInForegroundMs = MAX_DAY_LENGTH_MS)
+                } else {
+                    s
+                }
+            }
+            val (perApp, total) = aggregate(clampedSamples)
             val snapshot = DeviceUsageSnapshot(
                 dayKey = todayKey,
                 perAppMillis = perApp,
@@ -365,7 +621,7 @@ object DailyUsagePipeline {
         }
     }
 
-    /** Today's foreground millis for one package (0 when unknown). */
+    /** Today's foreground millis for one package (0 when unknown or ungranted). */
     fun usageMillisForPackage(context: Context, packageName: String): Long {
         val snapshot = getSnapshot(context) ?: return 0L
         return snapshot.perAppMillis[packageName] ?: 0L
@@ -382,11 +638,9 @@ object DailyUsagePipeline {
     }
 
     /**
-     * v1.1.3 (FIX 2) — read-only freshness accessor for the Block hub's
-     * "Screen time" readiness card: when the usage numbers were last computed
-     * (null when no snapshot has been computed this app-open). Never triggers
-     * a query and never requires the permission — callers combine it with
-     * [hasUsagePermission] to decide what to show.
+     * Read-only freshness accessor for the Block hub's "Screen time" readiness
+     * card: when the usage numbers were last computed (null when no snapshot
+     * has been computed this app-open or permission is revoked).
      */
     fun lastQueriedAtMs(): Long? {
         synchronized(cacheLock) { return cached?.queriedAtMs }

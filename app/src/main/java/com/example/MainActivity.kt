@@ -109,6 +109,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        com.example.util.DailyUsagePipeline.refreshIfDayChanged()
+        com.example.util.DailyUsagePipeline.invalidate()
         activeViewModel?.syncShieldStateWithService()
         // Restore a running timer's UI after process death (idempotent — no-op if
         // the timer is already live in this process or no timer is persisted).

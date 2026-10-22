@@ -470,4 +470,77 @@ class DailyUsagePipelineTest {
         assertEquals(0L, DailyUsagePipeline.usageMillisForPackage(context, "com.unknown"))
         assertEquals(120_000L, DailyUsagePipeline.deviceTotalMillis(context))
     }
+
+    @Test
+    fun `sumForegroundTime pairs ACTIVITY_STOPPED and coalesces overlapping multi-activity intervals`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val now = dayStart + 3 * 60 * MIN
+        val totals = DailyUsagePipeline.sumForegroundTime(
+            listOf(
+                DailyUsagePipeline.AppUsageEvent("com.a", DailyUsagePipeline.AppEventType.RESUMED, dayStart + 10 * MIN, "ActivityA"),
+                DailyUsagePipeline.AppUsageEvent("com.a", DailyUsagePipeline.AppEventType.RESUMED, dayStart + 20 * MIN, "ActivityB"),
+                DailyUsagePipeline.AppUsageEvent("com.a", DailyUsagePipeline.AppEventType.STOPPED, dayStart + 25 * MIN, "ActivityA"),
+                DailyUsagePipeline.AppUsageEvent("com.a", DailyUsagePipeline.AppEventType.STOPPED, dayStart + 70 * MIN, "ActivityB")
+            ),
+            dayStart,
+            now
+        )
+        // [10m, 25m] and [20m, 70m] coalesce into [10m, 70m] = 60m (never double-counted, never cut short at 25m)
+        assertEquals(60 * MIN, totals["com.a"])
+    }
+
+    @Test
+    fun `reconcilePerAppUsage chooses max of events daily and aggregate clamped to day length`() {
+        val dayStart = DailyUsagePipeline.dayStartMillis()
+        val now = dayStart + 120 * MIN // 2 hours into the day
+        val reconciled = DailyUsagePipeline.reconcilePerAppUsage(
+            eventsMap = mapOf("com.a" to 45 * MIN, "com.b" to 90 * MIN),
+            dailyMap = mapOf("com.a" to 60 * MIN, "com.b" to 30 * MIN),
+            aggregateMap = mapOf("com.a" to 50 * MIN, "com.c" to 200 * MIN), // 200m exceeds 120m elapsed day
+            dayStartMs = dayStart,
+            nowMs = now
+        )
+        val byPkg = reconciled.associateBy { it.packageName }
+        assertEquals(60 * MIN, byPkg["com.a"]?.chosenMs)
+        assertEquals(90 * MIN, byPkg["com.b"]?.chosenMs)
+        assertEquals(120 * MIN, byPkg["com.c"]?.chosenMs) // clamped to 120m elapsed day length
+    }
+
+    @Test
+    fun `recordReconcileDiagnostics writes USAGE_RECONCILE entries to Guard Hub log`() {
+        AiStudyGuardManager.clearGuardActivity(context)
+        val entries = listOf(
+            DailyUsagePipeline.ReconcileEntry(
+                packageName = "com.youtube",
+                eventsMs = 68 * MIN,
+                dailyMs = 65 * MIN,
+                aggregateMs = 68 * MIN,
+                chosenMs = 68 * MIN
+            )
+        )
+        DailyUsagePipeline.recordReconcileDiagnostics(context, entries)
+        val logged = AiStudyGuardManager.guardActivity.value
+        assertTrue(logged.any {
+            it.stage == DailyUsagePipeline.STAGE_USAGE_RECONCILE &&
+                it.app == "com.youtube" &&
+                it.reason.contains("ev=${68 * MIN}ms") &&
+                it.reason.contains("daily=${65 * MIN}ms") &&
+                it.reason.contains("agg=${68 * MIN}ms") &&
+                it.snippet.contains("chosen=${68 * MIN}ms")
+        })
+    }
+
+    @Test
+    fun `revoking permission clears cached snapshot and returns null`() {
+        fakeSamples = listOf(DailyUsagePipeline.UsageSample("com.a", 60_000L))
+        assertNotNull(DailyUsagePipeline.getSnapshot(context))
+        assertNotNull(DailyUsagePipeline.lastQueriedAtMs())
+
+        DailyUsagePipeline.testPermissionOverride = false
+        assertNull(DailyUsagePipeline.getSnapshot(context))
+        assertNull(DailyUsagePipeline.lastQueriedAtMs())
+        assertEquals(0L, DailyUsagePipeline.deviceTotalMillis(context))
+        assertEquals(0L, DailyUsagePipeline.usageMillisForPackage(context, "com.a"))
+    }
 }
+
