@@ -49,11 +49,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import com.example.ui.components.RollingNumber
 import com.example.ui.components.RollingText
-import com.example.ui.components.SessionNotificationDigestSheet
 import com.example.ui.theme.PoppinsFontFamily
 import com.example.ui.theme.SerifItalicFontFamily
 import com.example.ui.theme.FocivoDarkTokens
-import com.example.util.SessionNotificationDigestManager
 import com.example.util.captureComposedBitmapGuarded
 import com.example.util.saveBitmapToGallery
 import com.example.util.shareCardViaSystemSheet
@@ -108,8 +106,6 @@ fun SessionCompleteScreen(
     val minutesSpent = displayMinutes(session.durationSeconds)
     val pointsEarned = session.focusPointsEarned
 
-    val suppressedNotifs by SessionNotificationDigestManager.digestList.collectAsState()
-    var showDigestSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -141,10 +137,6 @@ fun SessionCompleteScreen(
             1 -> { delay(2400); flowStage = 2 }
             2 -> { delay(2400); flowStage = 3 }
         }
-    }
-
-    if (showDigestSheet) {
-        SessionNotificationDigestSheet(onDismiss = { showDigestSheet = false })
     }
 
     // v1.2.2 — the owner's own share-screen design: every value is the user's
@@ -229,8 +221,6 @@ fun SessionCompleteScreen(
             )
             2 -> SessionFlowFocusedStage(minutesSpent = minutesSpent)
             else -> SessionFlowShareStage(
-                suppressedNotifs = suppressedNotifs,
-                onOpenDigest = { showDigestSheet = true },
                 shareContent = {
                     FocivoShareEntry(
                         data = shareData,
@@ -498,40 +488,9 @@ private fun SessionFlowFocusedStage(minutesSpent: Int) {
 /** Stage 3 — the share cards + share sheet (existing plumbing). */
 @Composable
 private fun SessionFlowShareStage(
-    suppressedNotifs: List<*>,
-    onOpenDigest: () -> Unit,
     shareContent: @Composable () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        if (suppressedNotifs.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(top = 12.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFF1D221C))
-                    .border(1.dp, Color(0x358CE000), RoundedCornerShape(20.dp))
-                    .clickable { onOpenDigest() }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.NotificationsOff,
-                    contentDescription = null,
-                    tint = Color(0xFFB6F13A),
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "${suppressedNotifs.size} ${if (suppressedNotifs.size == 1) "notification" else "notifications"} held during session (tap to view)",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFB6F13A),
-                        fontSize = 12.sp
-                    )
-                )
-            }
-        }
         Box(modifier = Modifier.weight(1f)) {
             shareContent()
         }

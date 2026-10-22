@@ -63,7 +63,6 @@ import com.example.util.UninstallProtectionGate
 import com.example.data.FocuslyRepository
 import com.example.util.TimerTheme
 import com.example.util.TimerThemeManager
-import com.example.util.SessionNotificationDigestManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -152,12 +151,6 @@ fun DeepFocusSettingsSheet(
     LaunchedEffect(focusPoints, selectedTheme.id) {
         TimerThemeManager.validateSelection(context, focusPoints)
     }
-
-    var showDigestSheet by remember { mutableStateOf(false) }
-    if (showDigestSheet) {
-        SessionNotificationDigestSheet(onDismiss = { showDigestSheet = false })
-    }
-    val digestList by SessionNotificationDigestManager.digestList.collectAsState()
 
     // Round-4: locked-theme explainer dialog (shared with the study hub).
     lockedDialogTheme?.let { lockedTheme ->
@@ -320,37 +313,20 @@ fun DeepFocusSettingsSheet(
                     }
                 }
                 item {
-                    SettingsActionRow(
-                        icon = Icons.Default.NotificationsOff,
-                        icon3dRes = com.example.R.drawable.ic3d_bell,
-                        title = "Suppressed notifications digest",
-                        subtitle = if (digestList.isEmpty()) "No notifications held yet in this session" else "${digestList.size} notifications held during focus sessions",
-                        onClick = { showDigestSheet = true },
-                        textPrimary = textPrimary,
-                        textSecondary = textSecondary,
-                        rowBg = rowBg,
-                        rowBorder = rowBorder,
-                        badgeCount = digestList.size,
-                        testTag = "deep_focus_digest_row"
-                    )
-                }
-                item {
                     SettingsToggleRow(
                         icon = Icons.Default.NotificationsOff,
                         icon3dRes = com.example.R.drawable.ic3d_bell,
                         title = "Block notifications",
-                        subtitle = "Silence notifications during focus sessions so pings don't pull you out. Needs notification access + Do Not Disturb.",
+                        subtitle = "Silence notifications during focus sessions so pings don't pull you out. Needs Do Not Disturb access.",
                         checked = blockNotifications,
                         onCheckedChange = { enabled ->
                             if (!enabled) {
                                 StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, false)
                                 blockNotifications = false
-                            } else if (!StudyNotificationBlockerManager.hasNotificationListenerAccess(context)) {
-                                // v1.4.0-round2: without listener access the suppressor
-                                // never runs — send the user to grant it first.
-                                StudyNotificationBlockerManager.openNotificationListenerSettings(context)
                             } else if (!StudyNotificationBlockerManager.hasDndPermission(context)) {
-                                // Ask for Do Not Disturb access next; keep the toggle off until granted.
+                                // v1.1.4e: blocking is DND-only (the notification
+                                // listener was removed) — ask for Do Not Disturb
+                                // access; keep the toggle off until granted.
                                 StudyNotificationBlockerManager.openDndSettings(context)
                             } else {
                                 StudyNotificationBlockerManager.setBlockNotificationsDuringStudyEnabled(context, true)

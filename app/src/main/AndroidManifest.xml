@@ -285,16 +285,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Notification Listener Service for suppressing blocked app notifications (Feature 6) -->
-        <service
-            android:name=".service.FocivoNotificationListenerService"
-            android:label="Focivo Notification Shield"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
     </application>
 
 </manifest>

@@ -3638,15 +3638,6 @@ class FocuslyViewModel(application: Application) : AndroidViewModel(application)
                 } catch (_: Exception) { }
             }
 
-            // Held-notifications digest: only when the guard actually held some.
-            try {
-                val held = com.example.util.SessionNotificationDigestManager.getDigestCount()
-                if (held > 0) {
-                    com.example.service.FocivoNotifications.postHeldDigest(app, held)
-                    com.example.util.SessionNotificationDigestManager.clearDigest(app)
-                }
-            } catch (_: Exception) { }
-
         } catch (_: Exception) { }
     }
 

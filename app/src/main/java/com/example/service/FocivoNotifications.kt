@@ -46,7 +46,6 @@ object FocivoNotifications {
     private const val CHANNEL_THEMES = "focivo_themes_channel"
     private const val CHANNEL_UPDATES = "focivo_updates_channel"
     private const val CHANNEL_SCHEDULE = "focivo_schedule_channel"
-    private const val CHANNEL_DIGEST = "focivo_digest_channel"
     private const val CHANNEL_RECAP = "focivo_recap_channel"
     private const val CHANNEL_STRICT_GUARD = "focivo_strict_guard_channel"
 
@@ -55,7 +54,6 @@ object FocivoNotifications {
     private const val ID_ACHIEVEMENT_BASE = 9110
     private const val ID_THEME_BASE = 9130
     private const val ID_UPDATE_AVAILABLE = 9150
-    private const val ID_HELD_DIGEST = 9151
     private const val ID_SCHEDULE_REMINDER = 9152
     private const val ID_COMEBACK = 9153
     private const val ID_SUNDAY_RECAP = 9154
@@ -213,18 +211,6 @@ object FocivoNotifications {
             ID_BREAK_OVER,
             "Break's over",
             "Ready for the next round?"
-        )
-    }
-
-    /** 9. Guard-held notifications digest — only called when held >= 1. */
-    fun postHeldDigest(context: Context, heldCount: Int) {
-        post(
-            context,
-            CHANNEL_DIGEST, "Focus Digest", "Notifications held back while you focused",
-            NotificationManager.IMPORTANCE_DEFAULT,
-            ID_HELD_DIGEST,
-            "While you focused",
-            "$heldCount notification${if (heldCount == 1) " was" else "s were"} held back during your session."
         )
     }
 
