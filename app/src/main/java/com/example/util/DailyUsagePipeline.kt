@@ -28,9 +28,18 @@ import java.util.Locale
  *    DEVICE_STARTUP) into foreground intervals per package, clips intervals
  *    to [today 00:00, now], and coalesces overlapping intervals per package
  *    so overlapping intervals are never double-counted.
- * 3. Cross-check: reconciles per app against queryUsageStats(INTERVAL_DAILY)
- *    for today and queryAndAggregateUsageStats(midnight, now), choosing the
- *    largest of the three values per app (clamped to the elapsed day length).
+ * 3. Valuation (v1.1.4f): the event stream is the ONLY primary source,
+ *    resolved as a UNION TIMELINE — every instant of [today 00:00, now] is
+ *    attributed to at most one app (the most recently resumed one), exactly
+ *    like Digital Wellbeing's wall-clock totals, so the device total can
+ *    never exceed the elapsed day. The INTERVAL_DAILY buckets and the
+ *    queryAndAggregateUsageStats totals are FALLBACK-ONLY (an app with zero
+ *    attributed event time may receive a bucket value capped by the day's
+ *    remaining headroom) and SANITY-CAPPED: any raw bucket/aggregate value
+ *    larger than the elapsed day is distrusted outright and logged as
+ *    DISTRUSTED (some OEM builds report multi-day or since-boot totals
+ *    there — taking the max across sources imported that inflation
+ *    wholesale: 19h shown for ~7h of real use on the owner's vivo).
  *    The header total is strictly the sum of the per-app values from this
  *    single snapshot.
  * 4. Diagnostics: records Guard Hub diagnostic log entries (USAGE_RECONCILE)
@@ -86,7 +95,16 @@ object DailyUsagePipeline {
         val eventsMs: Long,
         val dailyMs: Long,
         val aggregateMs: Long,
-        val chosenMs: Long
+        val chosenMs: Long,
+        /** v1.1.4f: union-timeline attributed millis (the primary value). */
+        val attributedMs: Long = 0L,
+        /** v1.1.4f: how [chosenMs] was decided — "EVENTS" or "FALLBACK". */
+        val path: String = "EVENTS",
+        /**
+         * v1.1.4f: raw sources rejected for this app because they claimed
+         * more than the elapsed day ("daily", "agg", or "daily,agg").
+         */
+        val distrusted: String = ""
     )
 
     /** Production provider: 48h event-paired intervals + 3-way reconciliation. */
@@ -104,6 +122,7 @@ object DailyUsagePipeline {
 
             val queryStartMs = (dayStartMs - LOOKBACK_BEFORE_MIDNIGHT_MS).coerceAtLeast(0L)
             var eventsMap: Map<String, Long> = emptyMap()
+            var attributedMap: Map<String, Long> = emptyMap()
             val dailyMap = mutableMapOf<String, Long>()
             val aggregateMap = mutableMapOf<String, Long>()
 
@@ -179,6 +198,9 @@ object DailyUsagePipeline {
                 }
                 if (events.isNotEmpty()) {
                     eventsMap = sumForegroundTime(events, dayStartMs, nowMs)
+                    // v1.1.4f: the SAME stream, resolved as a union timeline
+                    // (one owner per instant) — the primary value source.
+                    attributedMap = attributeForegroundTime(events, dayStartMs, nowMs)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "queryEvents pairing failed", e)
@@ -222,8 +244,13 @@ object DailyUsagePipeline {
                 Log.w(TAG, "queryAndAggregateUsageStats failed", e)
             }
 
-            // 4. Reconcile per app: largest of the three values, clamped to day length.
-            val reconciled = reconcilePerAppUsage(
+            // 4. Value selection (v1.1.4f): union-timeline attribution is
+            // primary; buckets/aggregate are fallback-only under a distrust
+            // clamp (a raw value above the elapsed day is invalid) and a
+            // shared headroom cap. The old MAX-of-three rule is retired —
+            // it imported non-window-scoped OEM bucket totals wholesale.
+            val reconciled = reconcileAttributedUsage(
+                attributedMap = attributedMap,
                 eventsMap = eventsMap,
                 dailyMap = dailyMap,
                 aggregateMap = aggregateMap,
@@ -474,6 +501,239 @@ object DailyUsagePipeline {
     }
 
     /**
+     * Union-timeline attribution (v1.1.4f, pure): foreground millis per
+     * package where every instant of [dayStartMs, nowMs] is owned by AT
+     * MOST ONE app — the app with the latest RESUMED whose components are
+     * still open. This mirrors how Digital Wellbeing builds its wall-clock
+     * totals: split-screen partners and overlapping RESUMED-without-PAUSE
+     * pairs can no longer each bank the full span, so the summed total is
+     * at most the elapsed day BY CONSTRUCTION.
+     *
+     * Ownership rules (same event-hardening as [sumForegroundTime]):
+     *  - RESUMED opens a (package, activity) component and takes ownership
+     *    (most recent interaction wins), even over a still-open other app.
+     *  - PAUSED / STOPPED closes its matching component(s); when the owner
+     *    app has no component left, ownership falls back to the still-open
+     *    component with the latest start, else the timeline goes idle.
+     *  - DEVICE_SHUTDOWN / DEVICE_STARTUP / screen-off / keyguard-shown
+     *    close everything (screen-off splits match DW's screen-on
+     *    accounting on OEMs that emit no PAUSED at screen-off).
+     *  - Segments are clipped to [dayStartMs, nowMs] as they are credited:
+     *    a session opened yesterday contributes only its post-midnight
+     *    attributed part.
+     */
+    internal fun attributeForegroundTime(
+        events: List<AppUsageEvent>,
+        dayStartMs: Long,
+        nowMs: Long
+    ): Map<String, Long> {
+        if (nowMs <= dayStartMs || events.isEmpty()) return emptyMap()
+
+        val openStartByComponent = mutableMapOf<Pair<String, String>, Long>()
+        val totals = mutableMapOf<String, Long>()
+        var ownerPkg: String? = null
+        var ownerSinceMs = 0L
+
+        fun credit(pkg: String, fromMs: Long, toMs: Long) {
+            val s = maxOf(fromMs, dayStartMs)
+            val e = minOf(toMs, nowMs)
+            if (e > s) totals[pkg] = (totals[pkg] ?: 0L) + (e - s)
+        }
+
+        fun closeOwnerSegment(atMs: Long) {
+            val owner = ownerPkg ?: return
+            credit(owner, ownerSinceMs, atMs)
+            ownerPkg = null
+        }
+
+        fun adoptLatestOpenComponent(atMs: Long) {
+            val latest = openStartByComponent.entries.maxByOrNull { it.value } ?: return
+            ownerPkg = latest.key.first
+            ownerSinceMs = atMs
+        }
+
+        // Mirrors sumForegroundTime's component matching (exact class, else
+        // package-wide for classless closers, else the blank-class entry);
+        // returns the component keys that were actually closed.
+        fun closeComponents(pkg: String, clsKey: String): Set<Pair<String, String>> {
+            val closed = mutableSetOf<Pair<String, String>>()
+            val exactKey = pkg to clsKey
+            if (openStartByComponent.remove(exactKey) != null) {
+                closed.add(exactKey)
+                return closed
+            }
+            if (clsKey.isEmpty()) {
+                val matchingKeys = openStartByComponent.keys.filter { it.first == pkg }
+                for (k in matchingKeys) {
+                    if (openStartByComponent.remove(k) != null) closed.add(k)
+                }
+            } else {
+                val fallbackKey = pkg to ""
+                if (openStartByComponent.remove(fallbackKey) != null) closed.add(fallbackKey)
+            }
+            return closed
+        }
+
+        for (ev in events.sortedBy { it.timeMs }) {
+            val t = ev.timeMs
+            if (t > nowMs) continue
+            val pkg = ev.packageName
+            val clsKey = ev.className?.trim().orEmpty()
+            when (ev.type) {
+                AppEventType.RESUMED -> {
+                    if (pkg.isBlank()) continue
+                    val compKey = pkg to clsKey
+                    if (!openStartByComponent.containsKey(compKey)) {
+                        openStartByComponent[compKey] = t
+                    }
+                    if (ownerPkg != pkg) {
+                        closeOwnerSegment(t)
+                        ownerPkg = pkg
+                        ownerSinceMs = t
+                    }
+                }
+                AppEventType.PAUSED,
+                AppEventType.STOPPED -> {
+                    if (pkg.isBlank()) continue
+                    closeComponents(pkg, clsKey)
+                    if (ownerPkg == pkg &&
+                        openStartByComponent.keys.none { it.first == pkg }
+                    ) {
+                        closeOwnerSegment(t)
+                        adoptLatestOpenComponent(t)
+                    }
+                }
+                AppEventType.SHUTDOWN,
+                AppEventType.STARTUP,
+                AppEventType.SCREEN_OFF -> {
+                    closeOwnerSegment(t)
+                    openStartByComponent.clear()
+                }
+                AppEventType.SCREEN_ON -> {
+                    // Segments already closed at the off boundary; the next
+                    // RESUMED re-opens ownership.
+                }
+            }
+        }
+        // Still on screen at query time: the owner banks up to nowMs.
+        closeOwnerSegment(nowMs)
+        return totals.filterValues { it > 0L }
+    }
+
+    /** [reconcileAttributedUsage] path tag: value came from the event timeline. */
+    internal const val PATH_EVENTS = "EVENTS"
+
+    /** [reconcileAttributedUsage] path tag: bucket fallback for an event-less app. */
+    internal const val PATH_FALLBACK = "FALLBACK"
+
+    /**
+     * Value selection (v1.1.4f, pure): union-timeline attribution
+     * ([attributeForegroundTime]) is the primary and effectively only value
+     * source. The daily-bucket and aggregate sources may ONLY fill an app
+     * that has zero attributed event time (OEMs that drop events), and only
+     * up to the day's remaining headroom (elapsed minus the union total,
+     * largest candidates first), so the device total still can never exceed
+     * the elapsed day. A raw bucket/aggregate value above the elapsed day
+     * is DISTRUSTED — invalid on its face (some OEM builds report multi-day
+     * or since-boot totals there) — logged via [ReconcileEntry.distrusted]
+     * and excluded for that app.
+     */
+    internal fun reconcileAttributedUsage(
+        attributedMap: Map<String, Long>,
+        eventsMap: Map<String, Long>,
+        dailyMap: Map<String, Long>,
+        aggregateMap: Map<String, Long>,
+        dayStartMs: Long,
+        nowMs: Long
+    ): List<ReconcileEntry> {
+        val elapsedMs = (nowMs - dayStartMs).coerceIn(0L, MAX_DAY_LENGTH_MS)
+        var headroomMs = (elapsedMs - attributedMap.values.sum()).coerceAtLeast(0L)
+
+        val allPackages = LinkedHashSet<String>().apply {
+            addAll(attributedMap.keys)
+            addAll(eventsMap.keys)
+            addAll(dailyMap.keys)
+            addAll(aggregateMap.keys)
+        }
+
+        val entries = mutableListOf<ReconcileEntry>()
+        val fallbacks = mutableListOf<ReconcileEntry>()
+        for (pkg in allPackages) {
+            if (pkg.isBlank()) continue
+            val attrMs = (attributedMap[pkg] ?: 0L).coerceAtLeast(0L)
+            val evMs = (eventsMap[pkg] ?: 0L).coerceAtLeast(0L)
+            val dailyRaw = (dailyMap[pkg] ?: 0L).coerceAtLeast(0L)
+            val aggRaw = (aggregateMap[pkg] ?: 0L).coerceAtLeast(0L)
+            val distrusted = mutableListOf<String>()
+            val dailyTrusted = if (dailyRaw > elapsedMs) {
+                distrusted.add("daily"); 0L
+            } else {
+                dailyRaw
+            }
+            val aggTrusted = if (aggRaw > elapsedMs) {
+                distrusted.add("agg"); 0L
+            } else {
+                aggRaw
+            }
+            val distrustedText = distrusted.joinToString(",")
+            when {
+                attrMs > 0L -> entries.add(
+                    ReconcileEntry(
+                        packageName = pkg,
+                        eventsMs = evMs,
+                        dailyMs = dailyRaw,
+                        aggregateMs = aggRaw,
+                        chosenMs = attrMs,
+                        attributedMs = attrMs,
+                        path = PATH_EVENTS,
+                        distrusted = distrustedText
+                    )
+                )
+                else -> {
+                    val candidate = maxOf(dailyTrusted, aggTrusted)
+                    if (candidate > 0L) {
+                        fallbacks.add(
+                            ReconcileEntry(
+                                packageName = pkg,
+                                eventsMs = evMs,
+                                dailyMs = dailyRaw,
+                                aggregateMs = aggRaw,
+                                chosenMs = candidate,
+                                attributedMs = 0L,
+                                path = PATH_FALLBACK,
+                                distrusted = distrustedText
+                            )
+                        )
+                    } else if (distrusted.isNotEmpty()) {
+                        // Nothing trustworthy to show for this app, but the
+                        // rejected claim itself is diagnostic gold — keep the
+                        // entry so USAGE_RECONCILE logs it as DISTRUSTED.
+                        entries.add(
+                            ReconcileEntry(
+                                packageName = pkg,
+                                eventsMs = evMs,
+                                dailyMs = dailyRaw,
+                                aggregateMs = aggRaw,
+                                chosenMs = 0L,
+                                attributedMs = 0L,
+                                path = PATH_EVENTS,
+                                distrusted = distrustedText
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        // Scarce headroom goes to the largest fallback candidates first.
+        for (fb in fallbacks.sortedByDescending { it.chosenMs }) {
+            val grant = minOf(fb.chosenMs, headroomMs)
+            headroomMs -= grant
+            entries.add(fb.copy(chosenMs = grant))
+        }
+        return entries.sortedByDescending { it.chosenMs }
+    }
+
+    /**
      * Round C daily-source rule (pure): buckets starting before local
      * midnight are dropped (yesterday never leaks into today); multiple
      * clean buckets for one package SUM (some OEMs split a day into
@@ -515,10 +775,12 @@ object DailyUsagePipeline {
     }
 
     /**
-     * Cross-checks per-app foreground time across the three UsageStatsManager
-     * sources (48h-clipped UsageEvents intervals, today's INTERVAL_DAILY stats,
-     * and queryAndAggregateUsageStats(midnight, now)) and chooses the largest
-     * of the three values per app, clamped to the elapsed day length.
+     * LEGACY (pre-v1.1.4f) cross-check: chose the largest of the three
+     * UsageStatsManager sources per app. Retired from the production path —
+     * on OEM builds whose bucket/aggregate totals are not window-scoped the
+     * max imported their inflation wholesale (19h shown for ~7h real).
+     * Superseded by [reconcileAttributedUsage]; retained with its pinned
+     * unit tests as the record of the old rule.
      */
     internal fun reconcilePerAppUsage(
         eventsMap: Map<String, Long>,
@@ -588,6 +850,13 @@ object DailyUsagePipeline {
     ) {
         val material = entries
             .filter { e ->
+                // v1.1.4f: a rejected (DISTRUSTED) source or a bucket
+                // FALLBACK is always material — those are exactly the rows
+                // that explain why the shown number differs from a raw
+                // source, and the owner's vivo case (30h bucket claims).
+                if (e.distrusted.isNotEmpty() || e.path == PATH_FALLBACK) {
+                    return@filter true
+                }
                 val hi = maxOf(e.eventsMs, e.dailyMs, e.aggregateMs)
                 val lo = minOf(e.eventsMs, e.dailyMs, e.aggregateMs)
                 hi > 0L && (hi - lo) > maxOf(
@@ -627,22 +896,30 @@ object DailyUsagePipeline {
 
     /**
      * Records per-app USAGE_RECONCILE diagnostic entries in the Guard Hub log
-     * with the three raw values plus the chosen one.
+     * with the three raw values, the attributed value, the chosen one, and
+     * the path that chose it. Entries carrying a DISTRUSTED source are
+     * logged even when nothing was chosen for the app — the rejected claim
+     * is the evidence.
      */
     internal fun recordReconcileDiagnostics(
         context: Context,
         entries: List<ReconcileEntry>
     ) {
         for (entry in entries) {
-            if (entry.chosenMs <= 0L) continue
+            if (entry.chosenMs <= 0L && entry.distrusted.isEmpty()) continue
             try {
                 AiStudyGuardManager.logGuardActivity(
                     context = context,
                     app = entry.packageName,
                     stage = STAGE_USAGE_RECONCILE,
-                    verdict = "RECONCILED",
-                    reason = "ev=${entry.eventsMs}ms daily=${entry.dailyMs}ms agg=${entry.aggregateMs}ms",
-                    snippet = "chosen=${entry.chosenMs}ms"
+                    verdict = if (entry.distrusted.isNotEmpty()) "DISTRUSTED" else "RECONCILED",
+                    reason = "ev=${entry.eventsMs}ms daily=${entry.dailyMs}ms agg=${entry.aggregateMs}ms attr=${entry.attributedMs}ms",
+                    snippet = "chosen=${entry.chosenMs}ms path=${entry.path}" +
+                        if (entry.distrusted.isNotEmpty()) {
+                            " distrusted=${entry.distrusted}"
+                        } else {
+                            ""
+                        }
                 )
             } catch (_: Throwable) {
             }
